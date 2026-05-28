@@ -1,0 +1,35 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd admin-ui && npm ci
+          cd ../public-web && npm ci
+
+      - name: Audit moderate severity dependencies
+        run: npm audit --audit-level=moderate || true
+
+      - name: Check outdated packages
+        run: npm outdated || true

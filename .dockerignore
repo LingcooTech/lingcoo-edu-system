@@ -1,0 +1,12 @@
+node_modules
+admin-ui/node_modules
+public-web/node_modules
+dist
+admin-ui/dist
+public-web/dist
+.git
+.env
+.DS_Store
+coverage
+*.log
+

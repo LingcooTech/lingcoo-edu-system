@@ -1,0 +1,61 @@
+{
+  "name": "fd-edu-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted education operations platform for community classrooms and training centers.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:api": "npm run dev",
+    "dev:worker": "tsx watch src/worker.ts",
+    "dev:admin": "cd admin-ui && npm run dev",
+    "dev:public": "cd public-web && npm run dev",
+    "build": "tsc -p tsconfig.json",
+    "build:admin": "cd admin-ui && npm install && npm run build",
+    "build:public": "cd public-web && npm install && npm run build",
+    "build:all": "npm run build:admin && npm run build:public && npm run build",
+    "start": "node dist/server.js",
+    "start:worker": "node dist/worker.js",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc --noEmit && cd admin-ui && npm run typecheck && cd ../public-web && npm run typecheck",
+    "lint": "eslint . && cd admin-ui && npm run lint && cd ../public-web && npm run lint",
+    "lint:fix": "eslint . --fix && cd admin-ui && npm run lint -- --fix && cd ../public-web && npm run lint -- --fix",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/run-migrations.mjs",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@fastify/cookie": "^10.0.1",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/helmet": "^13.0.1",
+    "@fastify/jwt": "^9.1.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/sensible": "6.0.4",
+    "@fastify/static": "^9.0.0",
+    "@fastify/swagger": "^9.5.1",
+    "@fastify/swagger-ui": "^5.2.3",
+    "drizzle-orm": "^0.44.5",
+    "fastify": "^5.6.1",
+    "pg": "^8.16.3",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.5.2",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.5",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.59.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
