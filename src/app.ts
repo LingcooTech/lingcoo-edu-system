@@ -72,6 +72,23 @@ export async function buildApp(env: AppEnv) {
     routePrefix: '/api-docs',
   });
 
+  // Payment provider callbacks arrive as XML (WeChat) or form-urlencoded
+  // (Alipay); deliver them as raw strings so the adapters can verify the
+  // original signed payload byte-for-byte.
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_request, payload, done) => {
+      done(null, payload);
+    },
+  );
+  app.addContentTypeParser('text/xml', { parseAs: 'string' }, (_request, payload, done) => {
+    done(null, payload);
+  });
+  app.addContentTypeParser('application/xml', { parseAs: 'string' }, (_request, payload, done) => {
+    done(null, payload);
+  });
+
   app.decorate('authenticate', async (request, reply) => {
     try {
       await request.jwtVerify();
