@@ -503,16 +503,17 @@ export const orders = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => students.id, { onDelete: 'restrict' }),
-    courseId: uuid('course_id')
-      .notNull()
-      .references(() => courses.id, { onDelete: 'restrict' }),
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'restrict' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'restrict' }),
+    parentId: uuid('parent_id').references(() => parents.id, { onDelete: 'set null' }),
+    packageId: uuid('package_id').references(() => coursePackages.id, { onDelete: 'set null' }),
     orderNo: varchar('order_no', { length: 64 }).notNull().unique(),
     amount: integer('amount').notNull(),
     paidAmount: integer('paid_amount').notNull().default(0),
     lessonCount: integer('lesson_count').notNull().default(0),
+    currency: varchar('currency', { length: 8 }).notNull().default('CNY'),
+    paymentProvider: varchar('payment_provider', { length: 40 }),
+    providerOrderId: varchar('provider_order_id', { length: 120 }),
     status: orderStatusEnum('status').notNull().default('pending'),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -520,6 +521,7 @@ export const orders = pgTable(
   },
   (table) => ({
     tenantStatusIdx: index('orders_tenant_status_idx').on(table.tenantId, table.status),
+    parentIdx: index('orders_parent_idx').on(table.parentId),
   }),
 );
 
@@ -609,5 +611,102 @@ export const notifications = pgTable(
       table.recipientId,
       table.status,
     ),
+  }),
+);
+
+// --- Parent (家长) accounts ---
+
+export const parentStatusEnum = pgEnum('parent_status', ['active', 'suspended']);
+export const parentSecurityPurposeEnum = pgEnum('parent_security_purpose', [
+  'email_verify',
+  'password_reset',
+]);
+
+export const parents = pgTable(
+  'parents',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    email: varchar('email', { length: 255 }).notNull(),
+    phone: varchar('phone', { length: 40 }),
+    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    displayName: varchar('display_name', { length: 120 }).notNull(),
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
+    status: parentStatusEnum('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantEmailUnique: uniqueIndex('parents_tenant_email_idx').on(table.tenantId, table.email),
+  }),
+);
+
+export const parentSecurityCodes = pgTable(
+  'parent_security_codes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    parentId: uuid('parent_id')
+      .notNull()
+      .references(() => parents.id, { onDelete: 'cascade' }),
+    purpose: parentSecurityPurposeEnum('purpose').notNull(),
+    codeHash: varchar('code_hash', { length: 255 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    parentPurposeIdx: index('parent_security_codes_parent_purpose_idx').on(
+      table.parentId,
+      table.purpose,
+      table.createdAt,
+    ),
+  }),
+);
+
+// --- Course packages (课时包) + payments ---
+
+export const coursePackageStatusEnum = pgEnum('course_package_status', ['active', 'archived']);
+
+export const coursePackages = pgTable(
+  'course_packages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description').notNull().default(''),
+    lessonCount: integer('lesson_count').notNull(),
+    priceAmount: integer('price_amount').notNull(),
+    status: coursePackageStatusEnum('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantStatusIdx: index('course_packages_tenant_status_idx').on(table.tenantId, table.status),
+  }),
+);
+
+export const payments = pgTable(
+  'payments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderNo: varchar('order_no', { length: 64 }).notNull(),
+    provider: varchar('provider', { length: 40 }).notNull(),
+    providerOrderId: varchar('provider_order_id', { length: 120 }),
+    providerEventId: varchar('provider_event_id', { length: 160 }).notNull().unique(),
+    amount: integer('amount').notNull(),
+    status: varchar('status', { length: 40 }).notNull(),
+    raw: jsonb('raw')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orderNoIdx: index('payments_order_no_idx').on(table.orderNo),
   }),
 );

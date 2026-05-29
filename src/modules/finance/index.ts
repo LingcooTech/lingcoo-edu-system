@@ -33,8 +33,8 @@ export const financeModule: AppModule = {
       return {
         orders: orders.map((order) => ({
           ...order,
-          student: studentById.get(order.studentId),
-          course: courseById.get(order.courseId),
+          student: order.studentId ? studentById.get(order.studentId) : undefined,
+          course: order.courseId ? courseById.get(order.courseId) : undefined,
         })),
       };
     });

@@ -15,6 +15,13 @@
       "when": 1780038897609,
       "tag": "0001_pretty_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780041608067,
+      "tag": "0002_high_king_bedlam",
+      "breakpoints": true
     }
   ]
 }
