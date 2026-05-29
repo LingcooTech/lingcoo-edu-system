@@ -119,7 +119,6 @@ export async function buildApp(env: AppEnv) {
     await app.register(fastifyStatic, {
       root: publicDist,
       prefix: '/',
-      decorateReply: false,
     });
   }
 
