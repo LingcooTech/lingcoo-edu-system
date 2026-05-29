@@ -15,6 +15,7 @@ import { ZodError } from 'zod';
 
 import { appModules } from './modules/index.js';
 import { parseCorsOrigin } from './lib/http.js';
+import { createDb } from './db/client.js';
 import type { AppEnv } from './lib/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +31,13 @@ export async function buildApp(env: AppEnv) {
       level: env.LOG_LEVEL,
     },
     trustProxy: true,
+  });
+
+  const { db, pool } = createDb(env.DATABASE_URL);
+  app.decorate('db', db);
+  app.decorate('appEnv', env);
+  app.addHook('onClose', async () => {
+    await pool.end();
   });
 
   await app.register(sensible);

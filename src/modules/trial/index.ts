@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { createId, requireCourse, requireTenant, store } from '../../lib/store.js';
+import * as trialRepo from '../../db/repositories/trial.js';
+import * as catalogRepo from '../../db/repositories/catalog.js';
+import { findTenantBySlug, requireTenant } from '../../db/repositories/tenant.js';
+import * as crmRepo from '../../db/repositories/crm.js';
 import type { AppModule } from '../types.js';
 
 const trialSessionSchema = z.object({
@@ -23,60 +26,48 @@ const registrationSchema = z.object({
   source: z.string().default('unknown'),
 });
 
+function notFound(message: string): Error {
+  return Object.assign(new Error(message), { statusCode: 404 });
+}
+
 export const trialModule: AppModule = {
   name: 'trial',
   async register(app) {
     app.get('/public/:tenantSlug/home', async (request) => {
       const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = store.tenants.find((item) => item.slug === tenantSlug);
-      if (!tenant) throw Object.assign(new Error('Tenant not found'), { statusCode: 404 });
+      const tenant = await findTenantBySlug(app.db, tenantSlug);
+      if (!tenant) throw notFound('Tenant not found');
 
-      return {
-        tenant,
-        featuredCourses: store.courses.filter(
-          (course) => course.tenantId === tenant.id && course.status === 'published',
-        ),
-        trialSessions: store.trialSessions.filter(
-          (session) => session.tenantId === tenant.id && session.status === 'open',
-        ),
-      };
+      const [featuredCourses, trialSessions] = await Promise.all([
+        catalogRepo.listPublishedCourses(app.db, tenant.id),
+        trialRepo.listOpenTrialSessions(app.db, tenant.id),
+      ]);
+      return { tenant, featuredCourses, trialSessions };
     });
 
     app.get('/public/:tenantSlug/courses', async (request) => {
       const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = store.tenants.find((item) => item.slug === tenantSlug);
-      if (!tenant) throw Object.assign(new Error('Tenant not found'), { statusCode: 404 });
-
-      return {
-        courses: store.courses.filter(
-          (course) => course.tenantId === tenant.id && course.status === 'published',
-        ),
-      };
+      const tenant = await findTenantBySlug(app.db, tenantSlug);
+      if (!tenant) throw notFound('Tenant not found');
+      return { courses: await catalogRepo.listPublishedCourses(app.db, tenant.id) };
     });
 
     app.get('/public/:tenantSlug/trial-sessions', async (request) => {
       const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = store.tenants.find((item) => item.slug === tenantSlug);
-      if (!tenant) throw Object.assign(new Error('Tenant not found'), { statusCode: 404 });
-
-      return {
-        trialSessions: store.trialSessions.filter(
-          (session) => session.tenantId === tenant.id && session.status === 'open',
-        ),
-      };
+      const tenant = await findTenantBySlug(app.db, tenantSlug);
+      if (!tenant) throw notFound('Tenant not found');
+      return { trialSessions: await trialRepo.listOpenTrialSessions(app.db, tenant.id) };
     });
 
     app.post('/public/:tenantSlug/trial-registrations', async (request) => {
       const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = store.tenants.find((item) => item.slug === tenantSlug);
-      if (!tenant) throw Object.assign(new Error('Tenant not found'), { statusCode: 404 });
+      const tenant = await findTenantBySlug(app.db, tenantSlug);
+      if (!tenant) throw notFound('Tenant not found');
 
       const body = registrationSchema.parse(request.body);
-      const campusId = store.campuses.find((campus) => campus.tenantId === tenant.id)?.id;
-      if (!campusId) throw Object.assign(new Error('Campus not found'), { statusCode: 404 });
+      const campusId = await trialRepo.firstCampusId(app.db, tenant.id);
 
-      const lead = {
-        id: createId('lead'),
+      const lead = await crmRepo.createLead(app.db, {
         tenantId: tenant.id,
         campusId,
         courseId: body.courseId,
@@ -86,15 +77,11 @@ export const trialModule: AppModule = {
         studentName: body.studentName,
         grade: body.grade,
         source: body.source,
-        status: 'new' as const,
-        createdAt: new Date().toISOString(),
-      };
-
-      store.leads.unshift(lead);
+        status: 'new',
+      });
 
       if (body.trialSessionId) {
-        const session = store.trialSessions.find((item) => item.id === body.trialSessionId);
-        if (session) session.bookedCount += 1;
+        await trialRepo.incrementBookedCount(app.db, body.trialSessionId);
       }
 
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
@@ -105,10 +92,8 @@ export const trialModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
-        return {
-          trialSessions: store.trialSessions.filter((session) => session.tenantId === tenantId),
-        };
+        await requireTenant(app.db, tenantId);
+        return { trialSessions: await trialRepo.listTrialSessions(app.db, tenantId) };
       },
     );
 
@@ -117,17 +102,21 @@ export const trialModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
+        await requireTenant(app.db, tenantId);
         const body = trialSessionSchema.parse(request.body);
-        requireCourse(tenantId, body.courseId);
+        await catalogRepo.requireCourse(app.db, tenantId, body.courseId);
 
-        const trialSession = {
-          id: createId('trial'),
+        const trialSession = await trialRepo.createTrialSession(app.db, {
           tenantId,
+          campusId: body.campusId,
+          courseId: body.courseId,
+          title: body.title,
+          startsAt: new Date(body.startsAt),
+          endsAt: new Date(body.endsAt),
+          capacity: body.capacity,
+          status: body.status,
           bookedCount: 0,
-          ...body,
-        };
-        store.trialSessions.unshift(trialSession);
+        });
         return { trialSession };
       },
     );

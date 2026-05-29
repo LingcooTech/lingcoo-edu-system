@@ -1,4 +1,6 @@
-import { requireTenant, store } from '../../lib/store.js';
+import * as crmRepo from '../../db/repositories/crm.js';
+import * as tenantRepo from '../../db/repositories/tenant.js';
+import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 export const reportModule: AppModule = {
@@ -9,8 +11,12 @@ export const reportModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
-        const leads = store.leads.filter((lead) => lead.tenantId === tenantId);
+        await requireTenant(app.db, tenantId);
+
+        const [leads, channels] = await Promise.all([
+          crmRepo.listLeads(app.db, tenantId),
+          tenantRepo.listChannels(app.db, tenantId),
+        ]);
 
         return {
           funnel: {
@@ -20,7 +26,7 @@ export const reportModule: AppModule = {
             trialAttended: leads.filter((lead) => lead.status === 'trial_attended').length,
             paid: leads.filter((lead) => lead.status === 'paid').length,
           },
-          bySource: store.channels.map((channel) => {
+          bySource: channels.map((channel) => {
             const sourceLeads = leads.filter((lead) => lead.source === channel.code);
             return {
               source: channel.code,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { createId, requireTenant, store } from '../../lib/store.js';
+import * as catalogRepo from '../../db/repositories/catalog.js';
+import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const courseSchema = z.object({
@@ -21,20 +22,15 @@ export const catalogModule: AppModule = {
   async register(app) {
     app.get('/v1/tenants/:tenantId/courses', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
-      return { courses: store.courses.filter((course) => course.tenantId === tenantId) };
+      await requireTenant(app.db, tenantId);
+      return { courses: await catalogRepo.listCourses(app.db, tenantId) };
     });
 
     app.post('/v1/tenants/:tenantId/courses', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
+      await requireTenant(app.db, tenantId);
       const body = courseSchema.parse(request.body);
-      const course = {
-        id: createId('course'),
-        tenantId,
-        ...body,
-      };
-      store.courses.unshift(course);
+      const course = await catalogRepo.createCourse(app.db, { tenantId, ...body });
       return { course };
     });
   },

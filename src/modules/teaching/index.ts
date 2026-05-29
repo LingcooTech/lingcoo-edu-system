@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { createId, requireTenant, store } from '../../lib/store.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
+import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const teacherSchema = z.object({
@@ -20,8 +21,8 @@ export const teachingModule: AppModule = {
   async register(app) {
     app.get('/v1/tenants/:tenantId/teachers', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
-      return { teachers: store.teachers.filter((teacher) => teacher.tenantId === tenantId) };
+      await requireTenant(app.db, tenantId);
+      return { teachers: await teachingRepo.listTeachers(app.db, tenantId) };
     });
 
     app.post(
@@ -29,10 +30,9 @@ export const teachingModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
+        await requireTenant(app.db, tenantId);
         const body = teacherSchema.parse(request.body);
-        const teacher = { id: createId('teacher'), tenantId, ...body };
-        store.teachers.unshift(teacher);
+        const teacher = await teachingRepo.createTeacher(app.db, { tenantId, ...body });
         return { teacher };
       },
     );
@@ -42,10 +42,8 @@ export const teachingModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
-        return {
-          classrooms: store.classrooms.filter((classroom) => classroom.tenantId === tenantId),
-        };
+        await requireTenant(app.db, tenantId);
+        return { classrooms: await teachingRepo.listClassrooms(app.db, tenantId) };
       },
     );
 
@@ -54,10 +52,9 @@ export const teachingModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
+        await requireTenant(app.db, tenantId);
         const body = classroomSchema.parse(request.body);
-        const classroom = { id: createId('classroom'), tenantId, ...body };
-        store.classrooms.unshift(classroom);
+        const classroom = await teachingRepo.createClassroom(app.db, { tenantId, ...body });
         return { classroom };
       },
     );

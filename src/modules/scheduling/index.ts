@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { createId, requireTenant, store } from '../../lib/store.js';
+import * as schedulingRepo from '../../db/repositories/scheduling.js';
+import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
+import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const classSchema = z.object({
@@ -22,37 +25,41 @@ const sessionSchema = z.object({
   topic: z.string().min(1),
 });
 
-function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
-  return new Date(aStart) < new Date(bEnd) && new Date(bStart) < new Date(aEnd);
-}
-
 export const schedulingModule: AppModule = {
   name: 'scheduling',
   async register(app) {
     app.get('/v1/tenants/:tenantId/classes', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
-      return {
-        classes: store.classes
-          .filter((item) => item.tenantId === tenantId)
-          .map((item) => ({
-            ...item,
-            course: store.courses.find((course) => course.id === item.courseId),
-            teacher: store.teachers.find((teacher) => teacher.id === item.teacherId),
-            classroom: store.classrooms.find((classroom) => classroom.id === item.classroomId),
-            enrolledCount: store.enrollments.filter(
-              (enrollment) => enrollment.classId === item.id && enrollment.status === 'active',
-            ).length,
-          })),
-      };
+      await requireTenant(app.db, tenantId);
+
+      const [classes, courses, teachers, classrooms] = await Promise.all([
+        schedulingRepo.listClasses(app.db, tenantId),
+        catalogRepo.listCourses(app.db, tenantId),
+        teachingRepo.listTeachers(app.db, tenantId),
+        teachingRepo.listClassrooms(app.db, tenantId),
+      ]);
+      const courseById = new Map(courses.map((item) => [item.id, item]));
+      const teacherById = new Map(teachers.map((item) => [item.id, item]));
+      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+
+      const enriched = await Promise.all(
+        classes.map(async (item) => ({
+          ...item,
+          course: courseById.get(item.courseId),
+          teacher: teacherById.get(item.teacherId),
+          classroom: classroomById.get(item.classroomId),
+          enrolledCount: await schedulingRepo.countActiveEnrollments(app.db, item.id),
+        })),
+      );
+
+      return { classes: enriched };
     });
 
     app.post('/v1/tenants/:tenantId/classes', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
+      await requireTenant(app.db, tenantId);
       const body = classSchema.parse(request.body);
-      const classGroup = { id: createId('class'), tenantId, ...body };
-      store.classes.unshift(classGroup);
+      const classGroup = await schedulingRepo.createClass(app.db, { tenantId, ...body });
       return { class: classGroup };
     });
 
@@ -61,16 +68,25 @@ export const schedulingModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
+        await requireTenant(app.db, tenantId);
+
+        const [sessions, classes, teachers, classrooms] = await Promise.all([
+          schedulingRepo.listClassSessions(app.db, tenantId),
+          schedulingRepo.listClasses(app.db, tenantId),
+          teachingRepo.listTeachers(app.db, tenantId),
+          teachingRepo.listClassrooms(app.db, tenantId),
+        ]);
+        const classById = new Map(classes.map((item) => [item.id, item]));
+        const teacherById = new Map(teachers.map((item) => [item.id, item]));
+        const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+
         return {
-          classSessions: store.classSessions
-            .filter((session) => session.tenantId === tenantId)
-            .map((session) => ({
-              ...session,
-              class: store.classes.find((item) => item.id === session.classId),
-              teacher: store.teachers.find((item) => item.id === session.teacherId),
-              classroom: store.classrooms.find((item) => item.id === session.classroomId),
-            })),
+          classSessions: sessions.map((session) => ({
+            ...session,
+            class: classById.get(session.classId),
+            teacher: teacherById.get(session.teacherId),
+            classroom: classroomById.get(session.classroomId),
+          })),
         };
       },
     );
@@ -80,28 +96,33 @@ export const schedulingModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
+        await requireTenant(app.db, tenantId);
         const body = sessionSchema.parse(request.body);
 
-        const conflict = store.classSessions.find(
-          (session) =>
-            session.tenantId === tenantId &&
-            session.status !== 'cancelled' &&
-            overlaps(body.startsAt, body.endsAt, session.startsAt, session.endsAt) &&
-            (session.classroomId === body.classroomId || session.teacherId === body.teacherId),
-        );
+        const startsAt = new Date(body.startsAt);
+        const endsAt = new Date(body.endsAt);
 
+        const conflict = await schedulingRepo.findScheduleConflict(app.db, {
+          tenantId,
+          startsAt,
+          endsAt,
+          classroomId: body.classroomId,
+          teacherId: body.teacherId,
+        });
         if (conflict) {
           throw Object.assign(new Error('Classroom or teacher time conflict'), { statusCode: 409 });
         }
 
-        const classSession = {
-          id: createId('session'),
+        const classSession = await schedulingRepo.createClassSession(app.db, {
           tenantId,
-          status: 'scheduled' as const,
-          ...body,
-        };
-        store.classSessions.unshift(classSession);
+          classId: body.classId,
+          teacherId: body.teacherId,
+          classroomId: body.classroomId,
+          topic: body.topic,
+          startsAt,
+          endsAt,
+          status: 'scheduled',
+        });
         return { classSession };
       },
     );

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { createId, requireTenant, store } from '../../lib/store.js';
-import type { LeadStatus } from '../../lib/domain.js';
+import * as crmRepo from '../../db/repositories/crm.js';
+import * as peopleRepo from '../../db/repositories/people.js';
 import type { AppModule } from '../types.js';
 
 const statusSchema = z.object({
@@ -30,8 +30,7 @@ export const crmModule: AppModule = {
   async register(app) {
     app.get('/v1/tenants/:tenantId/leads', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
-      return { leads: store.leads.filter((lead) => lead.tenantId === tenantId) };
+      return { leads: await crmRepo.listLeads(app.db, tenantId) };
     });
 
     app.patch(
@@ -40,9 +39,8 @@ export const crmModule: AppModule = {
       async (request) => {
         const { tenantId, leadId } = request.params as { tenantId: string; leadId: string };
         const body = statusSchema.parse(request.body);
-        const lead = store.leads.find((item) => item.tenantId === tenantId && item.id === leadId);
-        if (!lead) throw Object.assign(new Error('Lead not found'), { statusCode: 404 });
-        lead.status = body.status as LeadStatus;
+        await crmRepo.requireLead(app.db, tenantId, leadId);
+        const lead = await crmRepo.updateLead(app.db, leadId, { status: body.status });
         return { lead };
       },
     );
@@ -52,22 +50,20 @@ export const crmModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId, leadId } = request.params as { tenantId: string; leadId: string };
-        const lead = store.leads.find((item) => item.tenantId === tenantId && item.id === leadId);
-        if (!lead) throw Object.assign(new Error('Lead not found'), { statusCode: 404 });
-
+        await crmRepo.requireLead(app.db, tenantId, leadId);
         const body = followUpSchema.parse(request.body);
-        const followUp = {
-          id: createId('follow_up'),
+
+        const nextFollowUpAt = body.nextFollowUpAt ? new Date(body.nextFollowUpAt) : null;
+        const followUp = await crmRepo.addFollowUp(app.db, {
           tenantId,
           leadId,
           content: body.content,
-          nextFollowUpAt: body.nextFollowUpAt,
-          createdAt: new Date().toISOString(),
-        };
-
-        lead.nextFollowUpAt = body.nextFollowUpAt;
-        lead.status = 'follow_up';
-        store.followUps.unshift(followUp);
+          nextFollowUpAt,
+        });
+        const lead = await crmRepo.updateLead(app.db, leadId, {
+          nextFollowUpAt,
+          status: 'follow_up',
+        });
 
         return { followUp, lead };
       },
@@ -79,37 +75,32 @@ export const crmModule: AppModule = {
       async (request) => {
         const { tenantId, leadId } = request.params as { tenantId: string; leadId: string };
         const body = convertSchema.parse(request.body);
-        const lead = store.leads.find((item) => item.tenantId === tenantId && item.id === leadId);
-        if (!lead) throw Object.assign(new Error('Lead not found'), { statusCode: 404 });
+        const lead = await crmRepo.requireLead(app.db, tenantId, leadId);
 
-        let guardian = store.guardians.find(
-          (item) => item.tenantId === tenantId && item.phone === lead.phone,
-        );
+        let guardian = await peopleRepo.findGuardianByPhone(app.db, tenantId, lead.phone);
         if (!guardian) {
-          guardian = {
-            id: createId('guardian'),
+          guardian = await peopleRepo.createGuardian(app.db, {
             tenantId,
             name: lead.guardianName,
             phone: lead.phone,
-          };
-          store.guardians.unshift(guardian);
+          });
         }
 
-        const student = {
-          id: createId('student'),
+        const student = await peopleRepo.createStudent(app.db, {
           tenantId,
           guardianId: guardian.id,
           name: lead.studentName,
           grade: lead.grade,
           school: body.school,
-          status: 'active' as const,
-        };
+          status: 'active',
+        });
 
-        store.students.unshift(student);
-        lead.convertedStudentId = student.id;
-        lead.status = 'paid';
+        const updatedLead = await crmRepo.updateLead(app.db, leadId, {
+          convertedStudentId: student.id,
+          status: 'paid',
+        });
 
-        return { guardian, student, lead };
+        return { guardian, student, lead: updatedLead };
       },
     );
   },
