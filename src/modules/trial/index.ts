@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
-import { findTenantBySlug, requireTenant } from '../../db/repositories/tenant.js';
+import { findTenantBySlug, listCampuses, requireTenant } from '../../db/repositories/tenant.js';
 import * as crmRepo from '../../db/repositories/crm.js';
+import { readTenantPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
 const trialSessionSchema = z.object({
@@ -38,11 +39,25 @@ export const trialModule: AppModule = {
       const tenant = await findTenantBySlug(app.db, tenantSlug);
       if (!tenant) throw notFound('Tenant not found');
 
-      const [featuredCourses, trialSessions] = await Promise.all([
+      const [featuredCourses, trialSessions, campuses] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db, tenant.id),
         trialRepo.listOpenTrialSessions(app.db, tenant.id),
+        listCampuses(app.db, tenant.id),
       ]);
-      return { tenant, featuredCourses, trialSessions };
+      return {
+        tenant: {
+          id: tenant.id,
+          slug: tenant.slug,
+          name: tenant.name,
+          brandName: tenant.brandName,
+          phone: tenant.phone,
+          address: tenant.address,
+          publicProfile: readTenantPublicProfile(tenant.settings),
+        },
+        featuredCourses,
+        trialSessions,
+        campuses,
+      };
     });
 
     app.get('/public/:tenantSlug/courses', async (request) => {

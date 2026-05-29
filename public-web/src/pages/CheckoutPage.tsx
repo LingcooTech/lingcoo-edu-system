@@ -7,6 +7,7 @@ import {
   createPaymentIntent,
   fetchChildren,
   fetchCoursePackages,
+  fetchPaymentProviders,
   getParentToken,
   mockPayOrder,
   syncPayment,
@@ -14,6 +15,7 @@ import {
   type CoursePackage,
   type PaymentIntent,
   type PaymentProvider,
+  type PaymentProviderStatus,
 } from '@/api/client';
 import { money } from '@/lib/utils';
 
@@ -25,6 +27,20 @@ const PROVIDER_LABEL: Record<PaymentProvider, string> = {
   mock: '模拟支付（开发）',
 };
 
+const DEFAULT_PROVIDERS: PaymentProviderStatus[] = [
+  { code: 'wechat_pay', label: '微信支付', configured: false, supportedModes: ['native_qr'] },
+  { code: 'alipay', label: '支付宝', configured: false, supportedModes: ['page_redirect'] },
+];
+
+if (import.meta.env.DEV) {
+  DEFAULT_PROVIDERS.push({
+    code: 'mock',
+    label: '模拟支付（开发）',
+    configured: true,
+    supportedModes: ['mock_mini_program'],
+  });
+}
+
 export function CheckoutPage() {
   const navigate = useNavigate();
   const { packageId = '' } = useParams();
@@ -33,6 +49,7 @@ export function CheckoutPage() {
   const [studentId, setStudentId] = useState('');
   const [step, setStep] = useState<Step>('select');
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
+  const [providers, setProviders] = useState<PaymentProviderStatus[]>(DEFAULT_PROVIDERS);
   const [orderNo, setOrderNo] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -44,10 +61,15 @@ export function CheckoutPage() {
       navigate(`/login?redirect=/checkout/${packageId}`);
       return;
     }
-    Promise.all([fetchCoursePackages(), fetchChildren().catch(() => [])])
-      .then(([packages, kids]) => {
+    Promise.all([
+      fetchCoursePackages(),
+      fetchChildren().catch(() => []),
+      fetchPaymentProviders().catch(() => DEFAULT_PROVIDERS),
+    ])
+      .then(([packages, kids, paymentProviders]) => {
         setPkg(packages.find((p) => p.id === packageId) ?? null);
         setChildren(kids);
+        setProviders(paymentProviders);
         setStudentId(kids[0]?.id ?? '');
       })
       .finally(() => setLoading(false));
@@ -126,6 +148,10 @@ export function CheckoutPage() {
     }
   }
 
+  const providerByCode = new Map(providers.map((provider) => [provider.code, provider]));
+  const liveProviders = providers.filter((provider) => provider.code !== 'mock');
+  const mockProvider = providerByCode.get('mock');
+
   if (loading) {
     return <main className="px-5 py-10 text-center text-sm text-slate-500">加载中...</main>;
   }
@@ -149,10 +175,12 @@ export function CheckoutPage() {
       </Link>
 
       <div className="mt-4 rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">Checkout</div>
+        <div className="text-xs font-semibold tracking-wide text-blue-600 uppercase">Checkout</div>
         <h1 className="mt-1 text-xl font-bold">{pkg.name}</h1>
         <div className="mt-1 text-sm text-slate-500">{pkg.lessonCount} 课时</div>
-        {pkg.description && <p className="mt-2 text-sm leading-6 text-slate-600">{pkg.description}</p>}
+        {pkg.description && (
+          <p className="mt-2 text-sm leading-6 text-slate-600">{pkg.description}</p>
+        )}
         <div className="mt-3 text-2xl font-bold text-blue-700">{money(pkg.priceAmount)}</div>
       </div>
 
@@ -227,24 +255,23 @@ export function CheckoutPage() {
           <section className="mt-6">
             <div className="mb-2 text-sm font-semibold text-slate-700">选择支付方式</div>
             <div className="grid gap-2">
-              <button
-                onClick={() => pay('wechat_pay')}
-                disabled={busy}
-                className="rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                微信支付
-              </button>
-              <button
-                onClick={() => pay('alipay')}
-                disabled={busy}
-                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                支付宝
-              </button>
-              {import.meta.env.DEV && (
+              {liveProviders.map((provider) => (
+                <button
+                  key={provider.code}
+                  onClick={() => pay(provider.code)}
+                  disabled={busy || !provider.configured}
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
+                    provider.code === 'wechat_pay' ? 'bg-green-600' : 'bg-blue-600'
+                  }`}
+                >
+                  {provider.label}
+                  {!provider.configured ? '（未开通）' : ''}
+                </button>
+              ))}
+              {mockProvider && (
                 <button
                   onClick={() => (orderNo ? payMock() : pay('mock'))}
-                  disabled={busy}
+                  disabled={busy || !mockProvider.configured}
                   className="rounded-xl border border-dashed border-slate-400 px-4 py-3 text-sm font-semibold text-slate-600 disabled:opacity-60"
                 >
                   {orderNo && intent?.provider === 'mock' ? '确认模拟支付' : '模拟支付（开发）'}
@@ -253,7 +280,9 @@ export function CheckoutPage() {
             </div>
           </section>
 
-          {error && <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          {error && (
+            <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
         </>
       )}
     </main>

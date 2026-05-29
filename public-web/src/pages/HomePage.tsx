@@ -101,12 +101,27 @@ export function HomePage() {
               家长中心
             </Link>
           </div>
-          <h1 className="mt-5 text-3xl font-bold leading-tight">
+          <h1 className="mt-5 text-3xl leading-tight font-bold">
             {home?.tenant.brandName ?? '美智优品儿童成长教室'}
           </h1>
           <p className="mt-3 text-sm leading-6 text-blue-50">
-            书法、美术、手工、阅读表达、幼小衔接等社区小班课程。扫码预约试听，老师会尽快联系确认时间。
+            {home?.tenant.publicProfile.introduction ??
+              '书法、美术、手工、阅读表达、幼小衔接等社区小班课程。扫码预约试听，老师会尽快联系确认时间。'}
           </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              to="/about"
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-blue-700"
+            >
+              了解机构
+            </Link>
+            <a
+              href="#booking"
+              className="rounded-full border border-white/40 px-4 py-2 text-sm font-semibold text-white"
+            >
+              预约试听
+            </a>
+          </div>
           <div className="mt-5 space-y-2 text-sm text-blue-50">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -123,7 +138,7 @@ export function HomePage() {
       <section className="mx-auto max-w-3xl px-5 py-6">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+            <div className="text-xs font-semibold tracking-wide text-blue-600 uppercase">
               Courses
             </div>
             <h2 className="mt-1 text-xl font-bold">推荐课程</h2>
@@ -158,7 +173,7 @@ export function HomePage() {
       {packages.length > 0 && (
         <section className="mx-auto max-w-3xl px-5 pb-6">
           <div className="mb-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+            <div className="text-xs font-semibold tracking-wide text-blue-600 uppercase">
               Packages
             </div>
             <h2 className="mt-1 text-xl font-bold">课时包</h2>
@@ -192,7 +207,7 @@ export function HomePage() {
 
       <section className="mx-auto max-w-3xl px-5 pb-6">
         <div className="mb-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">Trial</div>
+          <div className="text-xs font-semibold tracking-wide text-blue-600 uppercase">Trial</div>
           <h2 className="mt-1 text-xl font-bold">本周公开课</h2>
         </div>
         <div className="grid gap-3">
@@ -210,7 +225,7 @@ export function HomePage() {
 
       <section id="booking" className="mx-auto max-w-3xl px-5 pb-10">
         <form className="rounded-2xl border bg-white p-5 shadow-sm" onSubmit={submit}>
-          <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">Booking</div>
+          <div className="text-xs font-semibold tracking-wide text-blue-600 uppercase">Booking</div>
           <h2 className="mt-1 text-xl font-bold">预约试听 / 公开课</h2>
           <div className="mt-4 grid gap-3">
             <input

@@ -1,3 +1,11 @@
+import type {
+  AlipayPaymentSettingsInput,
+  PaymentProviderOverview,
+  Tenant,
+  TenantPublicProfile,
+  WechatPaymentSettingsInput,
+} from './types';
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8090');
 
@@ -40,4 +48,40 @@ export async function login(email: string, password: string) {
   });
   setToken(payload.token);
   return payload;
+}
+
+export async function fetchTenants() {
+  return (await api<{ tenants: Tenant[] }>('/v1/tenants')).tenants;
+}
+
+export async function fetchPaymentSettings(tid: string) {
+  return api<PaymentProviderOverview>(`/v1/tenants/${tid}/payment-settings`);
+}
+
+export async function fetchTenantPublicProfile(tid: string) {
+  return (await api<{ publicProfile: TenantPublicProfile }>(`/v1/tenants/${tid}/public-profile`))
+    .publicProfile;
+}
+
+export async function saveTenantPublicProfile(tid: string, input: TenantPublicProfile) {
+  return (
+    await api<{ publicProfile: TenantPublicProfile }>(`/v1/tenants/${tid}/public-profile`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    })
+  ).publicProfile;
+}
+
+export async function saveWechatSettings(tid: string, input: WechatPaymentSettingsInput) {
+  return api<unknown>(`/v1/tenants/${tid}/payment-settings/wechat`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveAlipaySettings(tid: string, input: AlipayPaymentSettingsInput) {
+  return api<unknown>(`/v1/tenants/${tid}/payment-settings/alipay`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
 }

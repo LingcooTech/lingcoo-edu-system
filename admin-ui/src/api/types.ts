@@ -99,3 +99,55 @@ export interface Order {
   student?: { name: string };
   course?: { name: string };
 }
+
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  brandName: string;
+  phone: string;
+  address: string;
+  status: string;
+}
+
+export interface PaymentProviderItem {
+  code: 'wechat_pay' | 'alipay' | 'mock';
+  label: string;
+  source: 'database' | 'env' | 'none';
+  configured: boolean;
+  supportedModes: string[];
+  notifyUrl?: string;
+  values: Record<string, string | boolean>;
+  secrets: Record<string, { configured: boolean }>;
+}
+
+export interface PaymentProviderOverview {
+  items: PaymentProviderItem[];
+}
+
+export interface TenantPublicProfile {
+  headline: string;
+  introduction: string;
+  highlights: string[];
+  promises: string[];
+}
+
+export interface WechatPaymentSettingsInput {
+  appId?: string;
+  appSecret?: string;
+  mchId?: string;
+  apiKey?: string;
+  disableH5?: boolean;
+  notifyUrl?: string;
+}
+
+export interface AlipayPaymentSettingsInput {
+  appId?: string;
+  gateway?: string;
+  notifyUrl?: string;
+  returnUrl?: string;
+  keyType?: 'PKCS1' | 'PKCS8';
+  f2fPay?: boolean;
+  privateKeyPem?: string;
+  publicKeyPem?: string;
+}

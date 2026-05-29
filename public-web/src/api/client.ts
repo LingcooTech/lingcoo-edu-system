@@ -26,10 +26,23 @@ export interface TrialSession {
 
 export interface HomePayload {
   tenant: {
+    slug: string;
+    name: string;
     brandName: string;
-    phone: string;
-    address: string;
+    phone: string | null;
+    address: string | null;
+    publicProfile: {
+      headline: string;
+      introduction: string;
+      highlights: string[];
+      promises: string[];
+    };
   };
+  campuses: Array<{
+    id: string;
+    name: string;
+    address: string | null;
+  }>;
   featuredCourses: Course[];
   trialSessions: TrialSession[];
 }
@@ -103,9 +116,7 @@ export async function parentLogin(email: string, password: string) {
 }
 
 export async function parentLogout() {
-  await publicApi(`/public/${TENANT_SLUG}/auth/logout`, { method: 'POST' }).catch(
-    () => undefined,
-  );
+  await publicApi(`/public/${TENANT_SLUG}/auth/logout`, { method: 'POST' }).catch(() => undefined);
   clearParentToken();
 }
 
@@ -173,15 +184,20 @@ export interface CoursePackage {
 
 export async function fetchCoursePackages() {
   return (
-    await publicApi<{ coursePackages: CoursePackage[] }>(
-      `/public/${TENANT_SLUG}/course-packages`,
-    )
+    await publicApi<{ coursePackages: CoursePackage[] }>(`/public/${TENANT_SLUG}/course-packages`)
   ).coursePackages;
 }
 
 // --- Checkout / payment ---
 
 export type PaymentProvider = 'wechat_pay' | 'alipay' | 'mock';
+
+export interface PaymentProviderStatus {
+  code: PaymentProvider;
+  label: string;
+  configured: boolean;
+  supportedModes: string[];
+}
 
 export interface PaymentIntent {
   orderNo: string;
@@ -209,6 +225,14 @@ export async function createOrder(packageId: string, studentId: string) {
       body: JSON.stringify({ packageId, studentId }),
     })
   ).order;
+}
+
+export async function fetchPaymentProviders() {
+  return (
+    await publicApi<{ providers: PaymentProviderStatus[] }>(
+      `/public/${TENANT_SLUG}/payment-providers`,
+    )
+  ).providers;
 }
 
 export async function createPaymentIntent(orderNo: string, provider: PaymentProvider) {

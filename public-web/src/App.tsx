@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { AccountPage } from '@/pages/AccountPage';
+import { AboutPage } from '@/pages/AboutPage';
 import { AuthPage } from '@/pages/AuthPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
@@ -11,6 +12,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/account" element={<AccountPage />} />
