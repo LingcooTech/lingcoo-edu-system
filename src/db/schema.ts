@@ -559,3 +559,55 @@ export const studentGuardians = pgTable(
     pk: primaryKey({ columns: [table.studentId, table.guardianId] }),
   }),
 );
+
+// --- Infrastructure tables (settings, notifications) ---
+
+export const notificationRecipientEnum = pgEnum('notification_recipient', ['staff', 'parent']);
+export const notificationStatusEnum = pgEnum('notification_status', ['unread', 'read', 'archived']);
+export const notificationLevelEnum = pgEnum('notification_level', [
+  'info',
+  'success',
+  'warning',
+  'error',
+]);
+
+export const settings = pgTable('settings', {
+  key: varchar('key', { length: 120 }).primaryKey(),
+  value: jsonb('value')
+    .notNull()
+    .default(sql`'{}'::jsonb`),
+  isEncrypted: boolean('is_encrypted').notNull().default(false),
+  updatedBy: varchar('updated_by', { length: 120 }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    recipientType: notificationRecipientEnum('recipient_type').notNull(),
+    recipientId: uuid('recipient_id').notNull(),
+    category: varchar('category', { length: 80 }).notNull(),
+    level: notificationLevelEnum('level').notNull().default('info'),
+    title: varchar('title', { length: 200 }).notNull(),
+    body: text('body').notNull().default(''),
+    ctaLabel: varchar('cta_label', { length: 120 }),
+    ctaUrl: varchar('cta_url', { length: 255 }),
+    sourceEventName: varchar('source_event_name', { length: 120 }),
+    dedupeKey: varchar('dedupe_key', { length: 200 }).notNull().unique(),
+    status: notificationStatusEnum('status').notNull().default('unread'),
+    meta: jsonb('meta')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    recipientIdx: index('notifications_recipient_idx').on(
+      table.recipientType,
+      table.recipientId,
+      table.status,
+    ),
+  }),
+);

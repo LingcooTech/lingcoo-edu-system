@@ -5,6 +5,7 @@ import { crmModule } from './crm/index.js';
 import { financeModule } from './finance/index.js';
 import { lessonModule } from './lesson/index.js';
 import { marketingModule } from './marketing/index.js';
+import { notificationsModule } from './notifications/index.js';
 import { peopleModule } from './people/index.js';
 import { reportModule } from './report/index.js';
 import { schedulingModule } from './scheduling/index.js';
@@ -29,6 +30,7 @@ export const appModules: AppModule[] = [
   financeModule,
   marketingModule,
   reportModule,
+  notificationsModule,
 ];
 
 export function getModuleNames(): string[] {
