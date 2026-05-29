@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { createId, requireCourse, requireStudent, requireTenant, store } from '../../lib/store.js';
+import * as financeRepo from '../../db/repositories/finance.js';
+import * as peopleRepo from '../../db/repositories/people.js';
+import * as catalogRepo from '../../db/repositories/catalog.js';
+import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const orderSchema = z.object({
@@ -17,63 +20,41 @@ export const financeModule: AppModule = {
   async register(app) {
     app.get('/v1/tenants/:tenantId/orders', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
+      await requireTenant(app.db, tenantId);
+
+      const [orders, students, courses] = await Promise.all([
+        financeRepo.listOrders(app.db, tenantId),
+        peopleRepo.listStudents(app.db, tenantId),
+        catalogRepo.listCourses(app.db, tenantId),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+
       return {
-        orders: store.orders
-          .filter((order) => order.tenantId === tenantId)
-          .map((order) => ({
-            ...order,
-            student: store.students.find((student) => student.id === order.studentId),
-            course: store.courses.find((course) => course.id === order.courseId),
-          })),
+        orders: orders.map((order) => ({
+          ...order,
+          student: order.studentId ? studentById.get(order.studentId) : undefined,
+          course: order.courseId ? courseById.get(order.courseId) : undefined,
+        })),
       };
     });
 
     app.post('/v1/tenants/:tenantId/orders', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
+      await requireTenant(app.db, tenantId);
       const body = orderSchema.parse(request.body);
-      requireStudent(tenantId, body.studentId);
-      requireCourse(tenantId, body.courseId);
+      await peopleRepo.requireStudent(app.db, tenantId, body.studentId);
+      await catalogRepo.requireCourse(app.db, tenantId, body.courseId);
 
-      const order = {
-        id: createId('order'),
+      const order = await financeRepo.createOrder(app.db, {
         tenantId,
-        orderNo: `EDU${Date.now()}`,
-        paidAt: body.status === 'paid' ? new Date().toISOString() : undefined,
-        createdAt: new Date().toISOString(),
-        ...body,
-      };
-      store.orders.unshift(order);
-
-      if (order.status === 'paid') {
-        let account = store.lessonAccounts.find(
-          (item) => item.studentId === order.studentId && item.courseId === order.courseId,
-        );
-        if (!account) {
-          account = {
-            id: createId('lesson_account'),
-            tenantId,
-            studentId: order.studentId,
-            courseId: order.courseId,
-            balance: 0,
-          };
-          store.lessonAccounts.unshift(account);
-        }
-        account.balance += order.lessonCount;
-        store.lessonTransactions.unshift({
-          id: createId('lesson_tx'),
-          tenantId,
-          lessonAccountId: account.id,
-          studentId: order.studentId,
-          type: 'purchase',
-          amount: order.lessonCount,
-          balanceAfter: account.balance,
-          relatedEntityType: 'order',
-          relatedEntityId: order.id,
-          createdAt: new Date().toISOString(),
-        });
-      }
+        studentId: body.studentId,
+        courseId: body.courseId,
+        amount: body.amount,
+        paidAmount: body.paidAmount,
+        lessonCount: body.lessonCount,
+        status: body.status,
+      });
 
       return { order };
     });

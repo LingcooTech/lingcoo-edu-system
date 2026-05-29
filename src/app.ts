@@ -15,6 +15,9 @@ import { ZodError } from 'zod';
 
 import { appModules } from './modules/index.js';
 import { parseCorsOrigin } from './lib/http.js';
+import { createDb } from './db/client.js';
+import { findParentById } from './db/repositories/parents.js';
+import { verifyParentToken } from './lib/parent-token.js';
 import type { AppEnv } from './lib/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +33,13 @@ export async function buildApp(env: AppEnv) {
       level: env.LOG_LEVEL,
     },
     trustProxy: true,
+  });
+
+  const { db, pool } = createDb(env.DATABASE_URL);
+  app.decorate('db', db);
+  app.decorate('appEnv', env);
+  app.addHook('onClose', async () => {
+    await pool.end();
   });
 
   await app.register(sensible);
@@ -62,12 +72,50 @@ export async function buildApp(env: AppEnv) {
     routePrefix: '/api-docs',
   });
 
+  // Payment provider callbacks arrive as XML (WeChat) or form-urlencoded
+  // (Alipay); deliver them as raw strings so the adapters can verify the
+  // original signed payload byte-for-byte.
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_request, payload, done) => {
+      done(null, payload);
+    },
+  );
+  app.addContentTypeParser('text/xml', { parseAs: 'string' }, (_request, payload, done) => {
+    done(null, payload);
+  });
+  app.addContentTypeParser('application/xml', { parseAs: 'string' }, (_request, payload, done) => {
+    done(null, payload);
+  });
+
   app.decorate('authenticate', async (request, reply) => {
     try {
       await request.jwtVerify();
     } catch {
       return reply.unauthorized('Invalid or expired access token');
     }
+  });
+
+  const parentTokenSecret = env.PARENT_TOKEN_SECRET?.trim() || env.JWT_SECRET;
+  app.decorateRequest('parent');
+  app.decorate('authenticateParent', async (request, reply) => {
+    const header = request.headers.authorization;
+    const bearer = header?.startsWith('Bearer ') ? header.slice(7) : null;
+    const cookieToken = request.cookies?.fd_edu_parent_token ?? null;
+    const token = bearer ?? cookieToken;
+    if (!token) {
+      return reply.unauthorized('Parent authentication required');
+    }
+    const parentId = verifyParentToken(token, parentTokenSecret);
+    if (!parentId) {
+      return reply.unauthorized('Invalid or expired parent token');
+    }
+    const parent = await findParentById(db, parentId);
+    if (!parent || parent.status !== 'active') {
+      return reply.unauthorized('Parent account is not available');
+    }
+    request.parent = { id: parent.id, tenantId: parent.tenantId };
   });
 
   for (const module of appModules) {
@@ -88,7 +136,6 @@ export async function buildApp(env: AppEnv) {
     await app.register(fastifyStatic, {
       root: publicDist,
       prefix: '/',
-      decorateReply: false,
     });
   }
 

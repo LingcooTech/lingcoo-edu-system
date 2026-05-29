@@ -1,4 +1,6 @@
-import { requireTenant, store } from '../../lib/store.js';
+import * as peopleRepo from '../../db/repositories/people.js';
+import * as lessonRepo from '../../db/repositories/lesson.js';
+import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 export const peopleModule: AppModule = {
@@ -9,24 +11,28 @@ export const peopleModule: AppModule = {
       { preHandler: app.authenticate },
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
-        requireTenant(tenantId);
-        return { guardians: store.guardians.filter((guardian) => guardian.tenantId === tenantId) };
+        await requireTenant(app.db, tenantId);
+        return { guardians: await peopleRepo.listGuardians(app.db, tenantId) };
       },
     );
 
     app.get('/v1/tenants/:tenantId/students', { preHandler: app.authenticate }, async (request) => {
       const { tenantId } = request.params as { tenantId: string };
-      requireTenant(tenantId);
+      await requireTenant(app.db, tenantId);
+
+      const [students, guardians, accounts] = await Promise.all([
+        peopleRepo.listStudents(app.db, tenantId),
+        peopleRepo.listGuardians(app.db, tenantId),
+        lessonRepo.listLessonAccounts(app.db, tenantId),
+      ]);
+      const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
+
       return {
-        students: store.students
-          .filter((student) => student.tenantId === tenantId)
-          .map((student) => ({
-            ...student,
-            guardian: store.guardians.find((guardian) => guardian.id === student.guardianId),
-            lessonAccounts: store.lessonAccounts.filter(
-              (account) => account.studentId === student.id,
-            ),
-          })),
+        students: students.map((student) => ({
+          ...student,
+          guardian: student.guardianId ? guardianById.get(student.guardianId) : undefined,
+          lessonAccounts: accounts.filter((account) => account.studentId === student.id),
+        })),
       };
     });
   },

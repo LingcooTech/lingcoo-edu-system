@@ -5,6 +5,10 @@ import { crmModule } from './crm/index.js';
 import { financeModule } from './finance/index.js';
 import { lessonModule } from './lesson/index.js';
 import { marketingModule } from './marketing/index.js';
+import { notificationsModule } from './notifications/index.js';
+import { parentAuthModule } from './parent-auth/index.js';
+import { parentCenterModule } from './parent-center/index.js';
+import { paymentModule } from './payment/index.js';
 import { peopleModule } from './people/index.js';
 import { reportModule } from './report/index.js';
 import { schedulingModule } from './scheduling/index.js';
@@ -29,6 +33,10 @@ export const appModules: AppModule[] = [
   financeModule,
   marketingModule,
   reportModule,
+  notificationsModule,
+  parentAuthModule,
+  parentCenterModule,
+  paymentModule,
 ];
 
 export function getModuleNames(): string[] {

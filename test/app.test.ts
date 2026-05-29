@@ -40,7 +40,9 @@ test('exposes the public tenant home payload', async () => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().tenant.slug, 'meizhi');
+    assert.equal(typeof response.json().tenant.publicProfile.headline, 'string');
     assert.ok(Array.isArray(response.json().featuredCourses));
+    assert.ok(Array.isArray(response.json().campuses));
   } finally {
     await app.close();
   }

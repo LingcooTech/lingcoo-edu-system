@@ -17,6 +17,24 @@ jobs:
   validate:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fd_edu
+          POSTGRES_USER: fd_edu
+          POSTGRES_PASSWORD: fd_edu
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U fd_edu -d fd_edu"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://fd_edu:fd_edu@localhost:5434/fd_edu
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +50,11 @@ jobs:
           npm ci
           cd admin-ui && npm ci
           cd ../public-web && npm ci
+
+      - name: Run migrations and seed
+        run: |
+          npm run db:migrate
+          npm run db:seed
 
       - name: Typecheck
         run: npm run typecheck
