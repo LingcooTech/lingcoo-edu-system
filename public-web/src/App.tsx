@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { AccountPage } from '@/pages/AccountPage';
 import { AuthPage } from '@/pages/AuthPage';
+import { CheckoutPage } from '@/pages/CheckoutPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { HomePage } from '@/pages/HomePage';
 
@@ -13,6 +14,7 @@ export function App() {
         <Route path="/login" element={<AuthPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/checkout/:packageId" element={<CheckoutPage />} />
       </Routes>
     </BrowserRouter>
   );

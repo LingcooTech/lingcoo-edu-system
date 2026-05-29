@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 
 import { parentLogin, parentRegister } from '@/api/client';
 
 export function AuthPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') ?? '/account';
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +26,7 @@ export function AuthPage() {
       } else {
         await parentRegister({ email: email.trim(), password, displayName: displayName.trim(), phone: phone.trim() || undefined });
       }
-      navigate('/account');
+      navigate(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败，请稍后再试');
     } finally {

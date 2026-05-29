@@ -178,3 +178,64 @@ export async function fetchCoursePackages() {
     )
   ).coursePackages;
 }
+
+// --- Checkout / payment ---
+
+export type PaymentProvider = 'wechat_pay' | 'alipay' | 'mock';
+
+export interface PaymentIntent {
+  orderNo: string;
+  provider: PaymentProvider;
+  amount: number;
+  currency: string;
+  mode: 'native_qr' | 'page_redirect' | 'mock_mini_program';
+  status: 'pending_payment' | 'paid';
+  configured: boolean;
+  integrationStatus: 'live' | 'mock' | 'not_configured';
+  nextAction: 'render_qr' | 'redirect' | 'mock_pay' | 'none';
+  nextStep: string;
+  payload: {
+    qrCodeDataUrl?: string;
+    qrCodeText?: string;
+    checkoutUrl?: string;
+    [key: string]: unknown;
+  };
+}
+
+export async function createOrder(packageId: string, studentId: string) {
+  return (
+    await publicApi<{ order: ParentOrder }>(`/public/${TENANT_SLUG}/orders`, {
+      method: 'POST',
+      body: JSON.stringify({ packageId, studentId }),
+    })
+  ).order;
+}
+
+export async function createPaymentIntent(orderNo: string, provider: PaymentProvider) {
+  return (
+    await publicApi<{ item: PaymentIntent }>(
+      `/public/${TENANT_SLUG}/orders/${orderNo}/payment-intent`,
+      { method: 'POST', body: JSON.stringify({ provider }) },
+    )
+  ).item;
+}
+
+export async function mockPayOrder(orderNo: string) {
+  return (
+    await publicApi<{ item: ParentOrder }>(`/public/${TENANT_SLUG}/orders/${orderNo}/mock-pay`, {
+      method: 'POST',
+    })
+  ).item;
+}
+
+export interface PaymentSyncResult {
+  changed: boolean;
+  item: ParentOrder;
+  reconciliation: { status: string; source: string; reason: string };
+}
+
+export async function syncPayment(orderNo: string) {
+  return publicApi<PaymentSyncResult>(`/public/${TENANT_SLUG}/orders/${orderNo}/payment-sync`, {
+    method: 'POST',
+  });
+}

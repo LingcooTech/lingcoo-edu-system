@@ -178,6 +178,12 @@ export function HomePage() {
                 {pkg.description && (
                   <p className="mt-3 text-sm leading-6 text-slate-600">{pkg.description}</p>
                 )}
+                <Link
+                  to={`/checkout/${pkg.id}`}
+                  className="mt-3 block rounded-xl bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
+                >
+                  购买课时包
+                </Link>
               </article>
             ))}
           </div>
