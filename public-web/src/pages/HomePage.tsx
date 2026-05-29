@@ -4,9 +4,11 @@ import { Link } from 'react-router-dom';
 import { MapPin, Phone, Sparkles, UserRound } from 'lucide-react';
 
 import {
+  fetchCoursePackages,
   getTenantSlug,
   publicApi,
   type Course,
+  type CoursePackage,
   type HomePayload,
   type TrialSession,
 } from '@/api/client';
@@ -32,6 +34,7 @@ const initialForm: FormState = {
 
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
+  const [packages, setPackages] = useState<CoursePackage[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -51,6 +54,9 @@ export function HomePage() {
         trialSessionId: payload.trialSessions[0]?.id ?? '',
       }));
     });
+    fetchCoursePackages()
+      .then(setPackages)
+      .catch(() => setPackages([]));
   }, [tenantSlug]);
 
   async function submit(event: FormEvent) {
@@ -148,6 +154,35 @@ export function HomePage() {
           ))}
         </div>
       </section>
+
+      {packages.length > 0 && (
+        <section className="mx-auto max-w-3xl px-5 pb-6">
+          <div className="mb-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+              Packages
+            </div>
+            <h2 className="mt-1 text-xl font-bold">课时包</h2>
+          </div>
+          <div className="grid gap-3">
+            {packages.map((pkg: CoursePackage) => (
+              <article key={pkg.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">{pkg.name}</div>
+                    <div className="mt-1 text-xs text-slate-500">{pkg.lessonCount} 课时</div>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 px-2 py-1 text-sm font-semibold text-blue-700">
+                    {money(pkg.priceAmount)}
+                  </div>
+                </div>
+                {pkg.description && (
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{pkg.description}</p>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-3xl px-5 pb-6">
         <div className="mb-4">

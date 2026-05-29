@@ -19,6 +19,15 @@ export interface Course {
   summary: string;
 }
 
+export interface CoursePackage {
+  id: string;
+  name: string;
+  description: string;
+  lessonCount: number;
+  priceAmount: number;
+  status: string;
+}
+
 export interface Lead {
   id: string;
   guardianName: string;

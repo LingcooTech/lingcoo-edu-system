@@ -162,3 +162,19 @@ export async function fetchParentLessonAccounts() {
 export async function fetchParentOrders() {
   return (await publicApi<{ orders: ParentOrder[] }>(`/public/${TENANT_SLUG}/me/orders`)).orders;
 }
+
+export interface CoursePackage {
+  id: string;
+  name: string;
+  description: string;
+  lessonCount: number;
+  priceAmount: number;
+}
+
+export async function fetchCoursePackages() {
+  return (
+    await publicApi<{ coursePackages: CoursePackage[] }>(
+      `/public/${TENANT_SLUG}/course-packages`,
+    )
+  ).coursePackages;
+}
