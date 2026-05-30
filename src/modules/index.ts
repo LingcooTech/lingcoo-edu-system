@@ -14,14 +14,14 @@ import { reportModule } from './report/index.js';
 import { schedulingModule } from './scheduling/index.js';
 import { systemModule } from './system/index.js';
 import { teachingModule } from './teaching/index.js';
-import { tenantModule } from './tenant/index.js';
+import { organizationModule } from './organization/index.js';
 import { trialModule } from './trial/index.js';
 import type { AppModule } from './types.js';
 
 export const appModules: AppModule[] = [
   systemModule,
   authModule,
-  tenantModule,
+  organizationModule,
   catalogModule,
   trialModule,
   crmModule,

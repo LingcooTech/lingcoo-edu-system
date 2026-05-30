@@ -9,6 +9,6 @@ declare module 'fastify' {
   }
 
   interface FastifyRequest {
-    parent?: { id: string; tenantId: string };
+    parent?: { id: string };
   }
 }

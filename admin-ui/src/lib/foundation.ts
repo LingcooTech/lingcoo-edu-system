@@ -10,19 +10,6 @@ import {
   Users,
 } from 'lucide-react';
 
-// Active tenant, resolved at runtime from GET /v1/tenants after login (see the
-// TenantGate in App.tsx). These are mutable module bindings: pages import
-// `tenantId` and read it at render time, and ES module live bindings mean they
-// observe the resolved value once the gate has set it — so no per-page wiring
-// is needed. Empty until the gate runs; the gate blocks rendering until then.
-export let tenantId = '';
-export let tenantName = '';
-
-export function setActiveTenant(id: string, name = '') {
-  tenantId = id;
-  tenantName = name;
-}
-
 export const adminSections = [
   {
     group: '经营',

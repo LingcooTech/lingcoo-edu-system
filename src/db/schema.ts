@@ -15,15 +15,6 @@ import {
 } from 'drizzle-orm/pg-core';
 
 export const userStatusEnum = pgEnum('user_status', ['active', 'suspended']);
-export const tenantStatusEnum = pgEnum('tenant_status', ['active', 'suspended', 'trialing']);
-export const memberRoleEnum = pgEnum('member_role', [
-  'owner',
-  'admin',
-  'advisor',
-  'academic',
-  'teacher',
-  'finance',
-]);
 export const courseStatusEnum = pgEnum('course_status', ['draft', 'published', 'archived']);
 export const leadStatusEnum = pgEnum('lead_status', [
   'new',
@@ -82,14 +73,16 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const tenants = pgTable('tenants', {
+// Single-institution deployment: this table holds exactly one row describing the
+// organization that owns the deployment (its identity + brand/profile settings).
+// There is no multi-tenancy — read it with LIMIT 1.
+export const organization = pgTable('organization', {
   id: uuid('id').defaultRandom().primaryKey(),
-  slug: varchar('slug', { length: 80 }).notNull().unique(),
   name: varchar('name', { length: 160 }).notNull(),
   brandName: varchar('brand_name', { length: 160 }).notNull(),
   phone: varchar('phone', { length: 40 }),
   address: varchar('address', { length: 255 }),
-  status: tenantStatusEnum('status').notNull().default('trialing'),
+  // publicProfile + branding (VI theme) live here as JSON.
   settings: jsonb('settings')
     .notNull()
     .default(sql`'{}'::jsonb`),
@@ -97,57 +90,24 @@ export const tenants = pgTable('tenants', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const campuses = pgTable(
-  'campuses',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    name: varchar('name', { length: 120 }).notNull(),
-    address: varchar('address', { length: 255 }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    tenantIdx: index('campuses_tenant_idx').on(table.tenantId),
-  }),
-);
-
-export const tenantMemberships = pgTable(
-  'tenant_memberships',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    role: memberRoleEnum('role').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    tenantUserUnique: uniqueIndex('tenant_memberships_tenant_user_idx').on(
-      table.tenantId,
-      table.userId,
-    ),
-  }),
-);
+export const campuses = pgTable('campuses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 120 }).notNull(),
+  address: varchar('address', { length: 255 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const channels = pgTable(
   'channels',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     code: varchar('code', { length: 80 }).notNull(),
     name: varchar('name', { length: 120 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantCodeUnique: uniqueIndex('channels_tenant_code_idx').on(table.tenantId, table.code),
+    codeUnique: uniqueIndex('channels_code_idx').on(table.code),
   }),
 );
 
@@ -160,9 +120,6 @@ export const campaigns = pgTable(
   'campaigns',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     channelId: uuid('channel_id')
       .notNull()
       .references(() => channels.id, { onDelete: 'cascade' }),
@@ -175,8 +132,8 @@ export const campaigns = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantCodeUnique: uniqueIndex('campaigns_tenant_code_idx').on(table.tenantId, table.code),
-    tenantChannelIdx: index('campaigns_tenant_channel_idx').on(table.tenantId, table.channelId),
+    codeUnique: uniqueIndex('campaigns_code_idx').on(table.code),
+    channelIdx: index('campaigns_channel_idx').on(table.channelId),
   }),
 );
 
@@ -184,9 +141,6 @@ export const courses = pgTable(
   'courses',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     campusId: uuid('campus_id').references(() => campuses.id, { onDelete: 'set null' }),
     slug: varchar('slug', { length: 120 }).notNull(),
     name: varchar('name', { length: 160 }).notNull(),
@@ -202,8 +156,8 @@ export const courses = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantSlugUnique: uniqueIndex('courses_tenant_slug_idx').on(table.tenantId, table.slug),
-    statusIdx: index('courses_tenant_status_idx').on(table.tenantId, table.status),
+    slugUnique: uniqueIndex('courses_slug_idx').on(table.slug),
+    statusIdx: index('courses_status_idx').on(table.status),
   }),
 );
 
@@ -211,9 +165,6 @@ export const trialSessions = pgTable(
   'trial_sessions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     campusId: uuid('campus_id')
       .notNull()
       .references(() => campuses.id, { onDelete: 'cascade' }),
@@ -230,7 +181,7 @@ export const trialSessions = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantStartsIdx: index('trial_sessions_tenant_starts_idx').on(table.tenantId, table.startsAt),
+    startsIdx: index('trial_sessions_starts_idx').on(table.startsAt),
   }),
 );
 
@@ -238,16 +189,13 @@ export const guardians = pgTable(
   'guardians',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 120 }).notNull(),
     phone: varchar('phone', { length: 40 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantPhoneIdx: index('guardians_tenant_phone_idx').on(table.tenantId, table.phone),
+    phoneIdx: index('guardians_phone_idx').on(table.phone),
   }),
 );
 
@@ -255,9 +203,6 @@ export const students = pgTable(
   'students',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
     name: varchar('name', { length: 120 }).notNull(),
     grade: varchar('grade', { length: 80 }).notNull(),
@@ -267,7 +212,7 @@ export const students = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantStatusIdx: index('students_tenant_status_idx').on(table.tenantId, table.status),
+    statusIdx: index('students_status_idx').on(table.status),
   }),
 );
 
@@ -275,9 +220,6 @@ export const leads = pgTable(
   'leads',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     campusId: uuid('campus_id').references(() => campuses.id, { onDelete: 'set null' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
     trialSessionId: uuid('trial_session_id').references(() => trialSessions.id, {
@@ -300,9 +242,9 @@ export const leads = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantStatusIdx: index('leads_tenant_status_idx').on(table.tenantId, table.status),
-    tenantSourceIdx: index('leads_tenant_source_idx').on(table.tenantId, table.source),
-    tenantChannelIdx: index('leads_tenant_channel_idx').on(table.tenantId, table.channelId),
+    statusIdx: index('leads_status_idx').on(table.status),
+    sourceIdx: index('leads_source_idx').on(table.source),
+    channelIdx: index('leads_channel_idx').on(table.channelId),
   }),
 );
 
@@ -310,9 +252,6 @@ export const followUpRecords = pgTable(
   'follow_up_records',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     leadId: uuid('lead_id')
       .notNull()
       .references(() => leads.id, { onDelete: 'cascade' }),
@@ -329,9 +268,6 @@ export const teachers = pgTable(
   'teachers',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 120 }).notNull(),
     phone: varchar('phone', { length: 40 }),
     specialties: jsonb('specialties')
@@ -342,8 +278,7 @@ export const teachers = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantIdx: index('teachers_tenant_idx').on(table.tenantId),
-    tenantStatusIdx: index('teachers_tenant_status_idx').on(table.tenantId, table.status),
+    statusIdx: index('teachers_status_idx').on(table.status),
   }),
 );
 
@@ -351,9 +286,6 @@ export const classrooms = pgTable(
   'classrooms',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     campusId: uuid('campus_id')
       .notNull()
       .references(() => campuses.id, { onDelete: 'cascade' }),
@@ -364,8 +296,8 @@ export const classrooms = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantCampusIdx: index('classrooms_tenant_campus_idx').on(table.tenantId, table.campusId),
-    tenantStatusIdx: index('classrooms_tenant_status_idx').on(table.tenantId, table.status),
+    campusIdx: index('classrooms_campus_idx').on(table.campusId),
+    statusIdx: index('classrooms_status_idx').on(table.status),
   }),
 );
 
@@ -373,9 +305,6 @@ export const classes = pgTable(
   'classes',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     campusId: uuid('campus_id')
       .notNull()
       .references(() => campuses.id, { onDelete: 'cascade' }),
@@ -395,7 +324,7 @@ export const classes = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantStatusIdx: index('classes_tenant_status_idx').on(table.tenantId, table.status),
+    statusIdx: index('classes_status_idx').on(table.status),
   }),
 );
 
@@ -403,9 +332,6 @@ export const classEnrollments = pgTable(
   'class_enrollments',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     classId: uuid('class_id')
       .notNull()
       .references(() => classes.id, { onDelete: 'cascade' }),
@@ -427,9 +353,6 @@ export const classSessions = pgTable(
   'class_sessions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     classId: uuid('class_id')
       .notNull()
       .references(() => classes.id, { onDelete: 'cascade' }),
@@ -448,15 +371,10 @@ export const classSessions = pgTable(
   },
   (table) => ({
     classroomTimeIdx: index('class_sessions_classroom_time_idx').on(
-      table.tenantId,
       table.classroomId,
       table.startsAt,
     ),
-    teacherTimeIdx: index('class_sessions_teacher_time_idx').on(
-      table.tenantId,
-      table.teacherId,
-      table.startsAt,
-    ),
+    teacherTimeIdx: index('class_sessions_teacher_time_idx').on(table.teacherId, table.startsAt),
   }),
 );
 
@@ -464,9 +382,6 @@ export const attendanceRecords = pgTable(
   'attendance_records',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     classSessionId: uuid('class_session_id')
       .notNull()
       .references(() => classSessions.id, { onDelete: 'cascade' }),
@@ -490,9 +405,6 @@ export const lessonAccounts = pgTable(
   'lesson_accounts',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'cascade' }),
@@ -514,9 +426,6 @@ export const lessonTransactions = pgTable(
   'lesson_transactions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     lessonAccountId: uuid('lesson_account_id')
       .notNull()
       .references(() => lessonAccounts.id, { onDelete: 'cascade' }),
@@ -542,9 +451,6 @@ export const orders = pgTable(
   'orders',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     studentId: uuid('student_id').references(() => students.id, { onDelete: 'restrict' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'restrict' }),
     parentId: uuid('parent_id').references(() => parents.id, { onDelete: 'set null' }),
@@ -562,7 +468,7 @@ export const orders = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantStatusIdx: index('orders_tenant_status_idx').on(table.tenantId, table.status),
+    statusIdx: index('orders_status_idx').on(table.status),
     parentIdx: index('orders_parent_idx').on(table.parentId),
   }),
 );
@@ -571,7 +477,6 @@ export const auditLogs = pgTable(
   'audit_logs',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
     actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
     action: varchar('action', { length: 160 }).notNull(),
     resourceType: varchar('resource_type', { length: 80 }).notNull(),
@@ -584,7 +489,7 @@ export const auditLogs = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantActionIdx: index('audit_logs_tenant_action_idx').on(table.tenantId, table.action),
+    actionIdx: index('audit_logs_action_idx').on(table.action),
   }),
 );
 
@@ -629,7 +534,6 @@ export const notifications = pgTable(
   'notifications',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
     recipientType: notificationRecipientEnum('recipient_type').notNull(),
     recipientId: uuid('recipient_id').notNull(),
     category: varchar('category', { length: 80 }).notNull(),
@@ -668,9 +572,6 @@ export const parents = pgTable(
   'parents',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     email: varchar('email', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 40 }),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
@@ -682,7 +583,7 @@ export const parents = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantEmailUnique: uniqueIndex('parents_tenant_email_idx').on(table.tenantId, table.email),
+    emailUnique: uniqueIndex('parents_email_idx').on(table.email),
   }),
 );
 
@@ -716,9 +617,6 @@ export const coursePackages = pgTable(
   'course_packages',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
     name: varchar('name', { length: 160 }).notNull(),
     description: text('description').notNull().default(''),
@@ -729,7 +627,7 @@ export const coursePackages = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    tenantStatusIdx: index('course_packages_tenant_status_idx').on(table.tenantId, table.status),
+    statusIdx: index('course_packages_status_idx').on(table.status),
   }),
 );
 

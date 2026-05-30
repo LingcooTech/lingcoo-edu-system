@@ -32,15 +32,15 @@ test('serves health and readiness probes', async () => {
   }
 });
 
-test('exposes the public tenant home payload', async () => {
+test('exposes the public organization home payload', async () => {
   const app = await buildApp(testEnv);
 
   try {
-    const response = await app.inject({ method: 'GET', url: '/public/meizhi/home' });
+    const response = await app.inject({ method: 'GET', url: '/public/home' });
 
     assert.equal(response.statusCode, 200);
-    assert.equal(response.json().tenant.slug, 'meizhi');
-    assert.equal(typeof response.json().tenant.publicProfile.headline, 'string');
+    assert.equal(typeof response.json().organization.name, 'string');
+    assert.equal(typeof response.json().organization.publicProfile.headline, 'string');
     assert.ok(Array.isArray(response.json().featuredCourses));
     assert.ok(Array.isArray(response.json().campuses));
   } finally {

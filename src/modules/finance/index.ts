@@ -3,7 +3,6 @@ import { z } from 'zod';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
-import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const orderSchema = z.object({
@@ -18,14 +17,11 @@ const orderSchema = z.object({
 export const financeModule: AppModule = {
   name: 'finance',
   async register(app) {
-    app.get('/v1/tenants/:tenantId/orders', { preHandler: app.authenticate }, async (request) => {
-      const { tenantId } = request.params as { tenantId: string };
-      await requireTenant(app.db, tenantId);
-
+    app.get('/v1/orders', { preHandler: app.authenticate }, async () => {
       const [orders, students, courses] = await Promise.all([
-        financeRepo.listOrders(app.db, tenantId),
-        peopleRepo.listStudents(app.db, tenantId),
-        catalogRepo.listCourses(app.db, tenantId),
+        financeRepo.listOrders(app.db),
+        peopleRepo.listStudents(app.db),
+        catalogRepo.listCourses(app.db),
       ]);
       const studentById = new Map(students.map((student) => [student.id, student]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
@@ -39,15 +35,12 @@ export const financeModule: AppModule = {
       };
     });
 
-    app.post('/v1/tenants/:tenantId/orders', { preHandler: app.authenticate }, async (request) => {
-      const { tenantId } = request.params as { tenantId: string };
-      await requireTenant(app.db, tenantId);
+    app.post('/v1/orders', { preHandler: app.authenticate }, async (request) => {
       const body = orderSchema.parse(request.body);
-      await peopleRepo.requireStudent(app.db, tenantId, body.studentId);
-      await catalogRepo.requireCourse(app.db, tenantId, body.courseId);
+      await peopleRepo.requireStudent(app.db, body.studentId);
+      await catalogRepo.requireCourse(app.db, body.courseId);
 
       const order = await financeRepo.createOrder(app.db, {
-        tenantId,
         studentId: body.studentId,
         courseId: body.courseId,
         amount: body.amount,

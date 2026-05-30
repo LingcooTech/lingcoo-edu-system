@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as lessonRepo from '../../db/repositories/lesson.js';
-import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const studentSchema = z.object({
@@ -26,24 +25,15 @@ function notFound(message: string): Error {
 export const peopleModule: AppModule = {
   name: 'people',
   async register(app) {
-    app.get(
-      '/v1/tenants/:tenantId/guardians',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-        return { guardians: await peopleRepo.listGuardians(app.db, tenantId) };
-      },
-    );
+    app.get('/v1/guardians', { preHandler: app.authenticate }, async () => {
+      return { guardians: await peopleRepo.listGuardians(app.db) };
+    });
 
-    app.get('/v1/tenants/:tenantId/students', { preHandler: app.authenticate }, async (request) => {
-      const { tenantId } = request.params as { tenantId: string };
-      await requireTenant(app.db, tenantId);
-
+    app.get('/v1/students', { preHandler: app.authenticate }, async () => {
       const [students, guardians, accounts] = await Promise.all([
-        peopleRepo.listStudents(app.db, tenantId),
-        peopleRepo.listGuardians(app.db, tenantId),
-        lessonRepo.listLessonAccounts(app.db, tenantId),
+        peopleRepo.listStudents(app.db),
+        peopleRepo.listGuardians(app.db),
+        lessonRepo.listLessonAccounts(app.db),
       ]);
       const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
 
@@ -56,53 +46,37 @@ export const peopleModule: AppModule = {
       };
     });
 
-    app.post(
-      '/v1/tenants/:tenantId/students',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-        const body = studentSchema.parse(request.body);
+    app.post('/v1/students', { preHandler: app.authenticate }, async (request) => {
+      const body = studentSchema.parse(request.body);
 
-        let guardianId = body.guardianId ?? null;
-        if (!guardianId && body.guardianPhone && body.guardianName) {
-          const existing = await peopleRepo.findGuardianByPhone(app.db, tenantId, body.guardianPhone);
-          const guardian =
-            existing ??
-            (await peopleRepo.createGuardian(app.db, {
-              tenantId,
-              name: body.guardianName,
-              phone: body.guardianPhone,
-            }));
-          guardianId = guardian.id;
-        }
+      let guardianId = body.guardianId ?? null;
+      if (!guardianId && body.guardianPhone && body.guardianName) {
+        const existing = await peopleRepo.findGuardianByPhone(app.db, body.guardianPhone);
+        const guardian =
+          existing ??
+          (await peopleRepo.createGuardian(app.db, {
+            name: body.guardianName,
+            phone: body.guardianPhone,
+          }));
+        guardianId = guardian.id;
+      }
 
-        const student = await peopleRepo.createStudent(app.db, {
-          tenantId,
-          guardianId,
-          name: body.name,
-          grade: body.grade,
-          school: body.school,
-          status: body.status,
-        });
-        return { student };
-      },
-    );
+      const student = await peopleRepo.createStudent(app.db, {
+        guardianId,
+        name: body.name,
+        grade: body.grade,
+        school: body.school,
+        status: body.status,
+      });
+      return { student };
+    });
 
-    app.patch(
-      '/v1/tenants/:tenantId/students/:studentId',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId, studentId } = request.params as {
-          tenantId: string;
-          studentId: string;
-        };
-        await requireTenant(app.db, tenantId);
-        const body = studentUpdateSchema.parse(request.body);
-        const student = await peopleRepo.updateStudent(app.db, tenantId, studentId, body);
-        if (!student) throw notFound('Student not found');
-        return { student };
-      },
-    );
+    app.patch('/v1/students/:studentId', { preHandler: app.authenticate }, async (request) => {
+      const { studentId } = request.params as { studentId: string };
+      const body = studentUpdateSchema.parse(request.body);
+      const student = await peopleRepo.updateStudent(app.db, studentId, body);
+      if (!student) throw notFound('Student not found');
+      return { student };
+    });
   },
 };

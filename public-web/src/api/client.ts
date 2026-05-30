@@ -1,6 +1,5 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8090');
-const TENANT_SLUG = import.meta.env.VITE_TENANT_SLUG ?? 'meizhi';
 
 export interface Course {
   id: string;
@@ -26,8 +25,7 @@ export interface TrialSession {
 }
 
 export interface HomePayload {
-  tenant: {
-    slug: string;
+  organization: {
     name: string;
     brandName: string;
     phone: string | null;
@@ -46,10 +44,6 @@ export interface HomePayload {
   }>;
   featuredCourses: Course[];
   trialSessions: TrialSession[];
-}
-
-export function getTenantSlug(): string {
-  return TENANT_SLUG;
 }
 
 const PARENT_TOKEN_KEY = 'fd_edu_parent_token';
@@ -100,7 +94,7 @@ export async function parentRegister(input: {
   phone?: string;
 }) {
   const payload = await publicApi<{ token: string; parent: ParentProfile }>(
-    `/public/${TENANT_SLUG}/auth/register`,
+    '/public/auth/register',
     { method: 'POST', body: JSON.stringify(input) },
   );
   setParentToken(payload.token);
@@ -109,7 +103,7 @@ export async function parentRegister(input: {
 
 export async function parentLogin(email: string, password: string) {
   const payload = await publicApi<{ token: string; parent: ParentProfile }>(
-    `/public/${TENANT_SLUG}/auth/login`,
+    '/public/auth/login',
     { method: 'POST', body: JSON.stringify({ email, password }) },
   );
   setParentToken(payload.token);
@@ -117,7 +111,7 @@ export async function parentLogin(email: string, password: string) {
 }
 
 export async function parentLogout() {
-  await publicApi(`/public/${TENANT_SLUG}/auth/logout`, { method: 'POST' }).catch(() => undefined);
+  await publicApi('/public/auth/logout', { method: 'POST' }).catch(() => undefined);
   clearParentToken();
 }
 
@@ -126,9 +120,7 @@ export async function fetchParentProfile(): Promise<ParentProfile | null> {
     return null;
   }
   try {
-    const payload = await publicApi<{ parent: ParentProfile | null }>(
-      `/public/${TENANT_SLUG}/auth/me`,
-    );
+    const payload = await publicApi<{ parent: ParentProfile | null }>('/public/auth/me');
     return payload.parent;
   } catch {
     clearParentToken();
@@ -159,20 +151,19 @@ export interface ParentOrder {
 }
 
 export async function fetchChildren() {
-  return (await publicApi<{ children: ChildStudent[] }>(`/public/${TENANT_SLUG}/me/children`))
-    .children;
+  return (await publicApi<{ children: ChildStudent[] }>('/public/me/children')).children;
 }
 
 export async function fetchParentLessonAccounts() {
   return (
     await publicApi<{ lessonAccounts: ParentLessonAccount[] }>(
-      `/public/${TENANT_SLUG}/me/lesson-accounts`,
+      '/public/me/lesson-accounts',
     )
   ).lessonAccounts;
 }
 
 export async function fetchParentOrders() {
-  return (await publicApi<{ orders: ParentOrder[] }>(`/public/${TENANT_SLUG}/me/orders`)).orders;
+  return (await publicApi<{ orders: ParentOrder[] }>('/public/me/orders')).orders;
 }
 
 export interface CoursePackage {
@@ -185,7 +176,7 @@ export interface CoursePackage {
 
 export async function fetchCoursePackages() {
   return (
-    await publicApi<{ coursePackages: CoursePackage[] }>(`/public/${TENANT_SLUG}/course-packages`)
+    await publicApi<{ coursePackages: CoursePackage[] }>('/public/course-packages')
   ).coursePackages;
 }
 
@@ -197,13 +188,13 @@ let homeCache: Promise<HomePayload> | null = null;
 
 export function loadHome(): Promise<HomePayload> {
   if (!homeCache) {
-    homeCache = publicApi<HomePayload>(`/public/${TENANT_SLUG}/home`);
+    homeCache = publicApi<HomePayload>('/public/home');
   }
   return homeCache;
 }
 
 export async function fetchCourses() {
-  return (await publicApi<{ courses: Course[] }>(`/public/${TENANT_SLUG}/courses`)).courses;
+  return (await publicApi<{ courses: Course[] }>('/public/courses')).courses;
 }
 
 export interface CourseDetail {
@@ -212,12 +203,12 @@ export interface CourseDetail {
 }
 
 export async function fetchCourse(slug: string) {
-  return publicApi<CourseDetail>(`/public/${TENANT_SLUG}/courses/${slug}`);
+  return publicApi<CourseDetail>(`/public/courses/${slug}`);
 }
 
 export async function fetchTrialSessions() {
   return (
-    await publicApi<{ trialSessions: TrialSession[] }>(`/public/${TENANT_SLUG}/trial-sessions`)
+    await publicApi<{ trialSessions: TrialSession[] }>('/public/trial-sessions')
   ).trialSessions;
 }
 
@@ -236,7 +227,7 @@ export interface TrialRegistrationInput {
 }
 
 export async function submitTrialRegistration(input: TrialRegistrationInput) {
-  return publicApi<{ message: string }>(`/public/${TENANT_SLUG}/trial-registrations`, {
+  return publicApi<{ message: string }>('/public/trial-registrations', {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -274,7 +265,7 @@ export interface PaymentIntent {
 
 export async function createOrder(packageId: string, studentId: string) {
   return (
-    await publicApi<{ order: ParentOrder }>(`/public/${TENANT_SLUG}/orders`, {
+    await publicApi<{ order: ParentOrder }>('/public/orders', {
       method: 'POST',
       body: JSON.stringify({ packageId, studentId }),
     })
@@ -283,16 +274,14 @@ export async function createOrder(packageId: string, studentId: string) {
 
 export async function fetchPaymentProviders() {
   return (
-    await publicApi<{ providers: PaymentProviderStatus[] }>(
-      `/public/${TENANT_SLUG}/payment-providers`,
-    )
+    await publicApi<{ providers: PaymentProviderStatus[] }>('/public/payment-providers')
   ).providers;
 }
 
 export async function createPaymentIntent(orderNo: string, provider: PaymentProvider) {
   return (
     await publicApi<{ item: PaymentIntent }>(
-      `/public/${TENANT_SLUG}/orders/${orderNo}/payment-intent`,
+      `/public/orders/${orderNo}/payment-intent`,
       { method: 'POST', body: JSON.stringify({ provider }) },
     )
   ).item;
@@ -300,7 +289,7 @@ export async function createPaymentIntent(orderNo: string, provider: PaymentProv
 
 export async function mockPayOrder(orderNo: string) {
   return (
-    await publicApi<{ item: ParentOrder }>(`/public/${TENANT_SLUG}/orders/${orderNo}/mock-pay`, {
+    await publicApi<{ item: ParentOrder }>(`/public/orders/${orderNo}/mock-pay`, {
       method: 'POST',
     })
   ).item;
@@ -313,7 +302,7 @@ export interface PaymentSyncResult {
 }
 
 export async function syncPayment(orderNo: string) {
-  return publicApi<PaymentSyncResult>(`/public/${TENANT_SLUG}/orders/${orderNo}/payment-sync`, {
+  return publicApi<PaymentSyncResult>(`/public/orders/${orderNo}/payment-sync`, {
     method: 'POST',
   });
 }

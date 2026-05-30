@@ -9,10 +9,9 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 
-const STUDENTS = () => `/v1/tenants/${tenantId}/students`;
+const STUDENTS = () => '/v1/students';
 
 interface StudentForm {
   name: string;

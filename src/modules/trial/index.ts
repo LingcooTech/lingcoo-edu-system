@@ -3,9 +3,9 @@ import { z } from 'zod';
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as marketingRepo from '../../db/repositories/marketing.js';
-import { findTenantBySlug, listCampuses, requireTenant } from '../../db/repositories/tenant.js';
+import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
-import { readTenantPublicProfile } from '../../lib/public-profile.js';
+import { readPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
 const trialSessionSchema = z.object({
@@ -49,25 +49,22 @@ function normalizeTrialSessionPatch(body: z.infer<typeof trialSessionUpdateSchem
 export const trialModule: AppModule = {
   name: 'trial',
   async register(app) {
-    app.get('/public/:tenantSlug/home', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await findTenantBySlug(app.db, tenantSlug);
-      if (!tenant) throw notFound('Tenant not found');
+    app.get('/public/home', async () => {
+      const organization = await organizationRepo.requireOrganization(app.db);
 
       const [featuredCourses, trialSessions, campuses] = await Promise.all([
-        catalogRepo.listPublishedCourses(app.db, tenant.id),
-        trialRepo.listOpenTrialSessions(app.db, tenant.id),
-        listCampuses(app.db, tenant.id),
+        catalogRepo.listPublishedCourses(app.db),
+        trialRepo.listOpenTrialSessions(app.db),
+        organizationRepo.listCampuses(app.db),
       ]);
       return {
-        tenant: {
-          id: tenant.id,
-          slug: tenant.slug,
-          name: tenant.name,
-          brandName: tenant.brandName,
-          phone: tenant.phone,
-          address: tenant.address,
-          publicProfile: readTenantPublicProfile(tenant.settings),
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          brandName: organization.brandName,
+          phone: organization.phone,
+          address: organization.address,
+          publicProfile: readPublicProfile(organization.settings),
         },
         featuredCourses,
         trialSessions,
@@ -75,43 +72,32 @@ export const trialModule: AppModule = {
       };
     });
 
-    app.get('/public/:tenantSlug/courses', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await findTenantBySlug(app.db, tenantSlug);
-      if (!tenant) throw notFound('Tenant not found');
-      return { courses: await catalogRepo.listPublishedCourses(app.db, tenant.id) };
+    app.get('/public/courses', async () => {
+      return { courses: await catalogRepo.listPublishedCourses(app.db) };
     });
 
-    app.get('/public/:tenantSlug/trial-sessions', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await findTenantBySlug(app.db, tenantSlug);
-      if (!tenant) throw notFound('Tenant not found');
-      return { trialSessions: await trialRepo.listOpenTrialSessions(app.db, tenant.id) };
+    app.get('/public/trial-sessions', async () => {
+      return { trialSessions: await trialRepo.listOpenTrialSessions(app.db) };
     });
 
-    app.post('/public/:tenantSlug/trial-registrations', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await findTenantBySlug(app.db, tenantSlug);
-      if (!tenant) throw notFound('Tenant not found');
-
+    app.post('/public/trial-registrations', async (request) => {
       const body = registrationSchema.parse(request.body);
-      const campusId = await trialRepo.firstCampusId(app.db, tenant.id);
+      const campusId = await trialRepo.firstCampusId(app.db);
 
       // Prefer the explicit form selection; fall back to the course slug carried
       // in the QR attribution when the form had no course picker.
       let courseId = body.courseId ?? null;
       if (!courseId && body.course) {
-        const course = await catalogRepo.findPublishedCourseBySlug(app.db, tenant.id, body.course);
+        const course = await catalogRepo.findPublishedCourseBySlug(app.db, body.course);
         courseId = course?.id ?? null;
       }
 
-      const { channelId, campaignId } = await marketingRepo.resolveAttribution(app.db, tenant.id, {
+      const { channelId, campaignId } = await marketingRepo.resolveAttribution(app.db, {
         source: body.source,
         campaignCode: body.campaign,
       });
 
       const lead = await crmRepo.createLead(app.db, {
-        tenantId: tenant.id,
         campusId,
         courseId: courseId ?? undefined,
         trialSessionId: body.trialSessionId,
@@ -134,26 +120,21 @@ export const trialModule: AppModule = {
     });
 
     app.get(
-      '/v1/tenants/:tenantId/trial-sessions',
+      '/v1/trial-sessions',
       { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-        return { trialSessions: await trialRepo.listTrialSessions(app.db, tenantId) };
+      async () => {
+        return { trialSessions: await trialRepo.listTrialSessions(app.db) };
       },
     );
 
     app.post(
-      '/v1/tenants/:tenantId/trial-sessions',
+      '/v1/trial-sessions',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
         const body = trialSessionSchema.parse(request.body);
-        await catalogRepo.requireCourse(app.db, tenantId, body.courseId);
+        await catalogRepo.requireCourse(app.db, body.courseId);
 
         const trialSession = await trialRepo.createTrialSession(app.db, {
-          tenantId,
           campusId: body.campusId,
           courseId: body.courseId,
           title: body.title,
@@ -168,21 +149,18 @@ export const trialModule: AppModule = {
     );
 
     app.patch(
-      '/v1/tenants/:tenantId/trial-sessions/:trialSessionId',
+      '/v1/trial-sessions/:trialSessionId',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId, trialSessionId } = request.params as {
-          tenantId: string;
+        const { trialSessionId } = request.params as {
           trialSessionId: string;
         };
-        await requireTenant(app.db, tenantId);
         const body = trialSessionUpdateSchema.parse(request.body);
         if (body.courseId) {
-          await catalogRepo.requireCourse(app.db, tenantId, body.courseId);
+          await catalogRepo.requireCourse(app.db, body.courseId);
         }
         const trialSession = await trialRepo.updateTrialSession(
           app.db,
-          tenantId,
           trialSessionId,
           normalizeTrialSessionPatch(body),
         );
@@ -192,15 +170,13 @@ export const trialModule: AppModule = {
     );
 
     app.delete(
-      '/v1/tenants/:tenantId/trial-sessions/:trialSessionId',
+      '/v1/trial-sessions/:trialSessionId',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId, trialSessionId } = request.params as {
-          tenantId: string;
+        const { trialSessionId } = request.params as {
           trialSessionId: string;
         };
-        await requireTenant(app.db, tenantId);
-        const trialSession = await trialRepo.cancelTrialSession(app.db, tenantId, trialSessionId);
+        const trialSession = await trialRepo.cancelTrialSession(app.db, trialSessionId);
         if (!trialSession) throw notFound('Trial session not found');
         return { trialSession };
       },

@@ -28,7 +28,6 @@ function conflict(message: string): Error {
 export async function recordAttendance(
   db: Database,
   input: {
-    tenantId: string;
     sessionId: string;
     courseId: string;
     records: Array<{ studentId: string; status: AttendanceStatus; note?: string }>;
@@ -56,7 +55,6 @@ export async function recordAttendance(
       const [attendanceRecord] = await tx
         .insert(schema.attendanceRecords)
         .values({
-          tenantId: input.tenantId,
           classSessionId: input.sessionId,
           studentId: record.studentId,
           status: record.status,
@@ -68,7 +66,6 @@ export async function recordAttendance(
 
       if (lessonDelta !== 0) {
         await applyLessonDelta(tx, {
-          tenantId: input.tenantId,
           studentId: record.studentId,
           courseId: input.courseId,
           type: 'consume',

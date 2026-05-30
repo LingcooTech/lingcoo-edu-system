@@ -6,7 +6,6 @@ type RecipientType = (typeof schema.notificationRecipientEnum.enumValues)[number
 type Level = (typeof schema.notificationLevelEnum.enumValues)[number];
 
 export interface CreateNotificationInput {
-  tenantId?: string;
   recipientType: RecipientType;
   recipientId: string;
   category: string;
@@ -34,7 +33,6 @@ export class NotificationsService {
       return existing;
     }
     return notificationsRepo.createNotification(this.db, {
-      tenantId: input.tenantId ?? null,
       recipientType: input.recipientType,
       recipientId: input.recipientId,
       category: input.category,

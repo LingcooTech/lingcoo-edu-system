@@ -9,12 +9,8 @@ import { applyLessonDelta } from './lesson.js';
 
 export type Order = typeof schema.orders.$inferSelect;
 
-export async function listOrders(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.orders)
-    .where(eq(schema.orders.tenantId, tenantId))
-    .orderBy(desc(schema.orders.createdAt));
+export async function listOrders(db: Database) {
+  return db.select().from(schema.orders).orderBy(desc(schema.orders.createdAt));
 }
 
 export async function findOrderByOrderNo(db: Database, orderNo: string): Promise<Order | null> {
@@ -38,11 +34,10 @@ export async function markPaymentPrepared(db: Database, orderNo: string, provide
     .where(eq(schema.orders.orderNo, orderNo));
 }
 
-export async function sumPaidRevenue(db: Database, tenantId: string) {
+export async function sumPaidRevenue(db: Database) {
   const rows = await db
     .select({ paidAmount: schema.orders.paidAmount, status: schema.orders.status })
-    .from(schema.orders)
-    .where(eq(schema.orders.tenantId, tenantId));
+    .from(schema.orders);
   return rows
     .filter((row) => row.status === 'paid')
     .reduce((sum, row) => sum + row.paidAmount, 0);
@@ -56,7 +51,6 @@ export async function sumPaidRevenue(db: Database, tenantId: string) {
 export async function createOrder(
   db: Database,
   input: {
-    tenantId: string;
     studentId: string;
     courseId: string;
     amount: number;
@@ -70,7 +64,6 @@ export async function createOrder(
     const [order] = await tx
       .insert(schema.orders)
       .values({
-        tenantId: input.tenantId,
         studentId: input.studentId,
         courseId: input.courseId,
         orderNo,
@@ -84,7 +77,6 @@ export async function createOrder(
 
     if (order.status === 'paid' && order.lessonCount > 0) {
       await applyLessonDelta(tx, {
-        tenantId: input.tenantId,
         studentId: input.studentId,
         courseId: input.courseId,
         type: 'purchase',
@@ -106,7 +98,6 @@ export async function createOrder(
 export async function createPackageOrder(
   db: Database,
   input: {
-    tenantId: string;
     parentId: string;
     packageId: string;
     studentId: string;
@@ -120,7 +111,6 @@ export async function createPackageOrder(
   const [order] = await db
     .insert(schema.orders)
     .values({
-      tenantId: input.tenantId,
       parentId: input.parentId,
       packageId: input.packageId,
       studentId: input.studentId,
@@ -205,7 +195,6 @@ export async function markOrderPaidAndCredit(
 
     if (order.studentId && order.courseId && order.lessonCount > 0) {
       await applyLessonDelta(tx, {
-        tenantId: order.tenantId,
         studentId: order.studentId,
         courseId: order.courseId,
         type: 'purchase',

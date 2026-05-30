@@ -33,33 +33,24 @@ function check(label: string, ok: boolean, detail = '') {
 const appStub = { db, appEnv: env } as unknown as ConstructorParameters<typeof PaymentService>[0];
 
 async function main() {
-  const [tenant] = await db
-    .select()
-    .from(schema.tenants)
-    .where(eq(schema.tenants.slug, 'meizhi'))
-    .limit(1);
-  if (!tenant) throw new Error('seed tenant meizhi missing — run npm run db:seed');
-
   const [student] = await db
     .select()
     .from(schema.students)
-    .where(and(eq(schema.students.tenantId, tenant.id), eq(schema.students.name, '小宇')))
+    .where(eq(schema.students.name, '小宇'))
     .limit(1);
   if (!student?.guardianId) throw new Error('seed student 小宇 (with guardian) missing');
 
   const [course] = await db
     .select()
     .from(schema.courses)
-    .where(eq(schema.courses.tenantId, tenant.id))
     .limit(1);
   if (!course) throw new Error('seed course missing');
 
   // find-or-create an active 10-lesson package
-  const existingPackages = await packagesRepo.listActivePackages(db, tenant.id);
+  const existingPackages = await packagesRepo.listActivePackages(db);
   const pkg =
     existingPackages.find((p) => p.name === '智慧成长 10 课时包') ??
     (await packagesRepo.createPackage(db, {
-      tenantId: tenant.id,
       courseId: course.id,
       name: '智慧成长 10 课时包',
       description: '体验套餐',
@@ -72,13 +63,12 @@ async function main() {
   let [parent] = await db
     .select()
     .from(schema.parents)
-    .where(and(eq(schema.parents.tenantId, tenant.id), eq(schema.parents.email, 'smoke-parent@fd-edu.local')))
+    .where(eq(schema.parents.email, 'smoke-parent@fd-edu.local'))
     .limit(1);
   if (!parent) {
     [parent] = await db
       .insert(schema.parents)
       .values({
-        tenantId: tenant.id,
         email: 'smoke-parent@fd-edu.local',
         passwordHash: await hashPassword('smoke123456'),
         displayName: '冒烟测试家长',
@@ -104,7 +94,6 @@ async function main() {
 
   console.log('\n[1] create pending package order');
   const order = await financeRepo.createPackageOrder(db, {
-    tenantId: tenant.id,
     parentId: parent.id,
     packageId: pkg.id,
     studentId: student.id,

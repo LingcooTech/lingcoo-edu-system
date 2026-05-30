@@ -15,10 +15,10 @@ export function HomePage() {
       .catch(() => undefined);
   }, []);
 
-  const tenant = home?.tenant;
+  const organization = home?.organization;
   const courses = home?.featuredCourses ?? [];
   const sessions = home?.trialSessions ?? [];
-  const highlights = tenant?.publicProfile.highlights ?? [];
+  const highlights = organization?.publicProfile.highlights ?? [];
 
   return (
     <Layout>
@@ -27,10 +27,12 @@ export function HomePage() {
         <div className="container-narrow py-10">
           <div className="eyebrow">社区小班成长教室</div>
           <h1 className="text-ink mt-3 text-3xl leading-tight font-bold">
-            {tenant?.publicProfile.headline ?? tenant?.brandName ?? '美智优品儿童成长教室'}
+            {organization?.publicProfile.headline ??
+              organization?.brandName ??
+              '美智优品儿童成长教室'}
           </h1>
           <p className="text-ink-soft mt-3 text-sm leading-7">
-            {tenant?.publicProfile.introduction ??
+            {organization?.publicProfile.introduction ??
               '书法、美术、手工、阅读表达、幼小衔接等社区小班课程。扫码预约试听，老师会尽快联系确认时间。'}
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
@@ -51,16 +53,16 @@ export function HomePage() {
             </div>
           )}
           <div className="text-ink-soft mt-6 space-y-2 text-sm">
-            {tenant?.address && (
+            {organization?.address && (
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
-                {tenant.address}
+                {organization.address}
               </div>
             )}
-            {tenant?.phone && (
+            {organization?.phone && (
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                {tenant.phone}
+                {organization.phone}
               </div>
             )}
           </div>

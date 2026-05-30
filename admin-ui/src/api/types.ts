@@ -197,16 +197,6 @@ export interface Order {
   course?: { name: string };
 }
 
-export interface Tenant {
-  id: string;
-  slug: string;
-  name: string;
-  brandName: string;
-  phone: string;
-  address: string;
-  status: string;
-}
-
 export interface PaymentProviderItem {
   code: 'wechat_pay' | 'alipay' | 'mock';
   label: string;
@@ -222,11 +212,42 @@ export interface PaymentProviderOverview {
   items: PaymentProviderItem[];
 }
 
-export interface TenantPublicProfile {
+export interface PublicProfile {
   headline: string;
   introduction: string;
   highlights: string[];
   promises: string[];
+}
+
+export interface OrganizationBranding {
+  logoUrl?: string;
+  darkLogoUrl?: string;
+  faviconUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  backgroundColor?: string;
+  cardColor?: string;
+  textColor?: string;
+  headingFont?: string;
+  bodyFont?: string;
+  radius?: string;
+}
+
+export interface OrganizationSettings {
+  id: string;
+  name: string;
+  brandName: string;
+  phone: string | null;
+  address: string | null;
+  publicProfile: PublicProfile;
+  branding: OrganizationBranding;
+}
+
+export interface SystemSettingOverview {
+  configured: boolean;
+  source: 'database' | 'env' | 'none';
+  values: Record<string, string | number | boolean>;
+  secrets: Record<string, { configured: boolean }>;
 }
 
 export interface WechatPaymentSettingsInput {
@@ -247,4 +268,22 @@ export interface AlipayPaymentSettingsInput {
   f2fPay?: boolean;
   privateKeyPem?: string;
   publicKeyPem?: string;
+}
+
+export interface SmtpSettingsInput {
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  password?: string;
+  from?: string;
+}
+
+export interface QiniuSettingsInput {
+  accessKey?: string;
+  secretKey?: string;
+  bucketName?: string;
+  publicBaseUrl?: string;
+  uploadHost?: string;
+  defaultPrefix?: string;
 }

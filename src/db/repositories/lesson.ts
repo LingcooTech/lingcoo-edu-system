@@ -6,25 +6,18 @@ import * as schema from '../schema.js';
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type DbOrTx = Database | Tx;
 
-export async function listLessonAccounts(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.lessonAccounts)
-    .where(eq(schema.lessonAccounts.tenantId, tenantId));
+export async function listLessonAccounts(db: Database) {
+  return db.select().from(schema.lessonAccounts);
 }
 
-export async function listLessonTransactions(db: Database, tenantId: string) {
+export async function listLessonTransactions(db: Database) {
   return db
     .select()
     .from(schema.lessonTransactions)
-    .where(eq(schema.lessonTransactions.tenantId, tenantId))
     .orderBy(desc(schema.lessonTransactions.createdAt));
 }
 
-async function findOrCreateAccount(
-  tx: DbOrTx,
-  input: { tenantId: string; studentId: string; courseId: string },
-) {
+async function findOrCreateAccount(tx: DbOrTx, input: { studentId: string; courseId: string }) {
   const [existing] = await tx
     .select()
     .from(schema.lessonAccounts)
@@ -41,7 +34,6 @@ async function findOrCreateAccount(
   const [created] = await tx
     .insert(schema.lessonAccounts)
     .values({
-      tenantId: input.tenantId,
       studentId: input.studentId,
       courseId: input.courseId,
       balance: 0,
@@ -59,7 +51,6 @@ async function findOrCreateAccount(
 export async function applyLessonDelta(
   tx: DbOrTx,
   input: {
-    tenantId: string;
     studentId: string;
     courseId: string;
     type: (typeof schema.lessonTransactionTypeEnum.enumValues)[number];
@@ -69,7 +60,6 @@ export async function applyLessonDelta(
   },
 ) {
   const account = await findOrCreateAccount(tx, {
-    tenantId: input.tenantId,
     studentId: input.studentId,
     courseId: input.courseId,
   });
@@ -84,7 +74,6 @@ export async function applyLessonDelta(
   const [transaction] = await tx
     .insert(schema.lessonTransactions)
     .values({
-      tenantId: input.tenantId,
       lessonAccountId: account.id,
       studentId: input.studentId,
       type: input.type,

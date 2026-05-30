@@ -2,21 +2,42 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import {
+  clearQiniuSettings,
+  clearSmtpSettings,
+  fetchOrganization,
   fetchPaymentSettings,
-  fetchTenantPublicProfile,
-  saveTenantPublicProfile,
+  fetchQiniuSettings,
+  fetchSmtpSettings,
   saveAlipaySettings,
+  saveOrganization,
+  saveQiniuSettings,
+  saveSmtpSettings,
   saveWechatSettings,
+  testQiniuSettings,
+  testSmtpSettings,
 } from '@/api/client';
-import type { PaymentProviderItem } from '@/api/types';
+import type { PaymentProviderItem, SystemSettingOverview } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
-import { tenantId } from '@/lib/foundation';
 
 const SOURCE_LABEL: Record<string, string> = {
   database: '后台配置',
   env: '环境变量',
   none: '未配置',
 };
+
+const tabs = [
+  { key: 'brand', label: '品牌 VI' },
+  { key: 'payment', label: '支付' },
+  { key: 'smtp', label: 'SMTP' },
+  { key: 'qiniu', label: '七牛云' },
+] as const;
+
+type TabKey = (typeof tabs)[number]['key'];
+
+const inputClass = 'mt-1 w-full rounded-lg border px-3 py-2 text-sm';
+const buttonClass =
+  'bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60';
+const outlineButtonClass = 'rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-60';
 
 function StatusBadge({ configured }: { configured: boolean }) {
   return (
@@ -30,7 +51,13 @@ function StatusBadge({ configured }: { configured: boolean }) {
   );
 }
 
-const inputClass = 'mt-1 w-full rounded-lg border px-3 py-2 text-sm';
+function SourceLabel({ source }: { source?: string }) {
+  return (
+    <span className="text-muted-foreground text-xs">
+      来源：{SOURCE_LABEL[source ?? 'none'] ?? source}
+    </span>
+  );
+}
 
 function linesToList(value: string) {
   return value
@@ -39,15 +66,49 @@ function linesToList(value: string) {
     .filter(Boolean);
 }
 
+function stringValue(overview: SystemSettingOverview | null, key: string) {
+  const value = overview?.values[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function boolValue(overview: SystemSettingOverview | null, key: string, fallback = false) {
+  const value = overview?.values[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function numberValue(overview: SystemSettingOverview | null, key: string, fallback = 0) {
+  const value = overview?.values[key];
+  return typeof value === 'number' ? String(value) : String(fallback);
+}
+
 export function SettingsPage() {
-  const [items, setItems] = useState<PaymentProviderItem[]>([]);
+  const [activeTab, setActiveTab] = useState<TabKey>('brand');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [profile, setProfile] = useState({
+  const [paymentItems, setPaymentItems] = useState<PaymentProviderItem[]>([]);
+  const [smtpOverview, setSmtpOverview] = useState<SystemSettingOverview | null>(null);
+  const [qiniuOverview, setQiniuOverview] = useState<SystemSettingOverview | null>(null);
+
+  const [org, setOrg] = useState({
+    name: '',
+    brandName: '',
+    phone: '',
+    address: '',
     headline: '',
     introduction: '',
     highlightsText: '',
     promisesText: '',
+    logoUrl: '',
+    darkLogoUrl: '',
+    faviconUrl: '',
+    primaryColor: '',
+    secondaryColor: '',
+    backgroundColor: '',
+    cardColor: '',
+    textColor: '',
+    headingFont: '',
+    bodyFont: '',
+    radius: '',
   });
   const [wechat, setWechat] = useState({
     appId: '',
@@ -66,89 +127,173 @@ export function SettingsPage() {
     keyType: 'PKCS1' as 'PKCS1' | 'PKCS8',
     f2fPay: false,
   });
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingWechat, setSavingWechat] = useState(false);
-  const [savingAlipay, setSavingAlipay] = useState(false);
+  const [smtp, setSmtp] = useState({
+    host: '',
+    port: '465',
+    secure: true,
+    user: '',
+    password: '',
+    from: '',
+    testTo: '',
+  });
+  const [qiniu, setQiniu] = useState({
+    accessKey: '',
+    secretKey: '',
+    bucketName: '',
+    publicBaseUrl: '',
+    uploadHost: '',
+    defaultPrefix: '',
+  });
+  const [saving, setSaving] = useState<string | null>(null);
 
-  const wechatItem = items.find((item) => item.code === 'wechat_pay');
-  const alipayItem = items.find((item) => item.code === 'alipay');
+  const wechatItem = paymentItems.find((item) => item.code === 'wechat_pay');
+  const alipayItem = paymentItems.find((item) => item.code === 'alipay');
 
-  function loadPaymentSettings() {
-    return fetchPaymentSettings(tenantId).then((data) => {
-      setItems(data.items);
-      const w = data.items.find((i) => i.code === 'wechat_pay');
-      const a = data.items.find((i) => i.code === 'alipay');
-      if (w) {
-        setWechat((prev) => ({
-          ...prev,
-          appId: String(w.values.appId ?? ''),
-          mchId: String(w.values.mchId ?? ''),
-          notifyUrl: String(w.values.notifyUrl ?? ''),
-        }));
-      }
-      if (a) {
-        setAlipay((prev) => ({
-          ...prev,
-          appId: String(a.values.appId ?? ''),
-          gateway: String(a.values.gateway ?? ''),
-          notifyUrl: String(a.values.notifyUrl ?? ''),
-          returnUrl: String(a.values.returnUrl ?? ''),
-          keyType: (a.values.keyType as 'PKCS1' | 'PKCS8') ?? 'PKCS1',
-          f2fPay: Boolean(a.values.f2fPay),
-        }));
-      }
-    });
+  function hydratePayment(items: PaymentProviderItem[]) {
+    setPaymentItems(items);
+    const w = items.find((i) => i.code === 'wechat_pay');
+    const a = items.find((i) => i.code === 'alipay');
+    if (w) {
+      setWechat((prev) => ({
+        ...prev,
+        appId: String(w.values.appId ?? ''),
+        mchId: String(w.values.mchId ?? ''),
+        notifyUrl: String(w.values.notifyUrl ?? ''),
+      }));
+    }
+    if (a) {
+      setAlipay((prev) => ({
+        ...prev,
+        appId: String(a.values.appId ?? ''),
+        gateway: String(a.values.gateway ?? ''),
+        notifyUrl: String(a.values.notifyUrl ?? ''),
+        returnUrl: String(a.values.returnUrl ?? ''),
+        keyType: (a.values.keyType as 'PKCS1' | 'PKCS8') ?? 'PKCS1',
+        f2fPay: Boolean(a.values.f2fPay),
+      }));
+    }
   }
 
-  function loadPublicProfile() {
-    return fetchTenantPublicProfile(tenantId).then((data) => {
-      setProfile({
-        headline: data.headline,
-        introduction: data.introduction,
-        highlightsText: data.highlights.join('\n'),
-        promisesText: data.promises.join('\n'),
-      });
-    });
+  function hydrateSmtp(overview: SystemSettingOverview) {
+    setSmtpOverview(overview);
+    setSmtp((prev) => ({
+      ...prev,
+      host: stringValue(overview, 'host'),
+      port: numberValue(overview, 'port', 465),
+      secure: boolValue(overview, 'secure', true),
+      user: stringValue(overview, 'user'),
+      from: stringValue(overview, 'from'),
+    }));
+  }
+
+  function hydrateQiniu(overview: SystemSettingOverview) {
+    setQiniuOverview(overview);
+    setQiniu((prev) => ({
+      ...prev,
+      accessKey: stringValue(overview, 'accessKey'),
+      bucketName: stringValue(overview, 'bucketName'),
+      publicBaseUrl: stringValue(overview, 'publicBaseUrl'),
+      uploadHost: stringValue(overview, 'uploadHost'),
+      defaultPrefix: stringValue(overview, 'defaultPrefix'),
+    }));
+  }
+
+  async function reloadPayment() {
+    const data = await fetchPaymentSettings();
+    hydratePayment(data.items);
+  }
+
+  async function reloadSmtp() {
+    hydrateSmtp(await fetchSmtpSettings());
+  }
+
+  async function reloadQiniu() {
+    hydrateQiniu(await fetchQiniuSettings());
   }
 
   useEffect(() => {
-    Promise.all([loadPaymentSettings(), loadPublicProfile()])
+    Promise.all([fetchOrganization(), fetchPaymentSettings(), fetchSmtpSettings(), fetchQiniuSettings()])
+      .then(([organization, payment, smtpData, qiniuData]) => {
+        setOrg({
+          name: organization.name,
+          brandName: organization.brandName,
+          phone: organization.phone ?? '',
+          address: organization.address ?? '',
+          headline: organization.publicProfile.headline,
+          introduction: organization.publicProfile.introduction,
+          highlightsText: organization.publicProfile.highlights.join('\n'),
+          promisesText: organization.publicProfile.promises.join('\n'),
+          logoUrl: organization.branding.logoUrl ?? '',
+          darkLogoUrl: organization.branding.darkLogoUrl ?? '',
+          faviconUrl: organization.branding.faviconUrl ?? '',
+          primaryColor: organization.branding.primaryColor ?? '',
+          secondaryColor: organization.branding.secondaryColor ?? '',
+          backgroundColor: organization.branding.backgroundColor ?? '',
+          cardColor: organization.branding.cardColor ?? '',
+          textColor: organization.branding.textColor ?? '',
+          headingFont: organization.branding.headingFont ?? '',
+          bodyFont: organization.branding.bodyFont ?? '',
+          radius: organization.branding.radius ?? '',
+        });
+        hydratePayment(payment.items);
+        hydrateSmtp(smtpData);
+        hydrateQiniu(qiniuData);
+      })
       .catch((err: Error) => setMessage(err.message))
       .finally(() => setLoading(false));
   }, []);
 
-  async function submitProfile(event: FormEvent) {
+  async function submitBrand(event: FormEvent) {
     event.preventDefault();
-    setSavingProfile(true);
+    setSaving('brand');
     setMessage('');
     try {
-      const updated = await saveTenantPublicProfile(tenantId, {
-        headline: profile.headline,
-        introduction: profile.introduction,
-        highlights: linesToList(profile.highlightsText),
-        promises: linesToList(profile.promisesText),
+      const updated = await saveOrganization({
+        name: org.name,
+        brandName: org.brandName,
+        phone: org.phone,
+        address: org.address,
+        publicProfile: {
+          headline: org.headline,
+          introduction: org.introduction,
+          highlights: linesToList(org.highlightsText),
+          promises: linesToList(org.promisesText),
+        },
+        branding: {
+          logoUrl: org.logoUrl,
+          darkLogoUrl: org.darkLogoUrl,
+          faviconUrl: org.faviconUrl,
+          primaryColor: org.primaryColor,
+          secondaryColor: org.secondaryColor,
+          backgroundColor: org.backgroundColor,
+          cardColor: org.cardColor,
+          textColor: org.textColor,
+          headingFont: org.headingFont,
+          bodyFont: org.bodyFont,
+          radius: org.radius,
+        },
       });
-      setProfile({
-        headline: updated.headline,
-        introduction: updated.introduction,
-        highlightsText: updated.highlights.join('\n'),
-        promisesText: updated.promises.join('\n'),
-      });
-      setMessage('机构介绍已保存');
+      setOrg((prev) => ({
+        ...prev,
+        headline: updated.publicProfile.headline,
+        introduction: updated.publicProfile.introduction,
+        highlightsText: updated.publicProfile.highlights.join('\n'),
+        promisesText: updated.publicProfile.promises.join('\n'),
+      }));
+      setMessage('品牌 VI 已保存');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '保存失败');
     } finally {
-      setSavingProfile(false);
+      setSaving(null);
     }
   }
 
   async function submitWechat(event: FormEvent) {
     event.preventDefault();
-    setSavingWechat(true);
+    setSaving('wechat');
     setMessage('');
     try {
-      // Secrets are write-only: only send them when the admin typed a new value.
-      await saveWechatSettings(tenantId, {
+      await saveWechatSettings({
         appId: wechat.appId,
         mchId: wechat.mchId,
         notifyUrl: wechat.notifyUrl,
@@ -156,21 +301,21 @@ export function SettingsPage() {
         ...(wechat.apiKey ? { apiKey: wechat.apiKey } : {}),
       });
       setWechat((prev) => ({ ...prev, appSecret: '', apiKey: '' }));
-      await loadPaymentSettings();
+      await reloadPayment();
       setMessage('微信支付配置已保存');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '保存失败');
     } finally {
-      setSavingWechat(false);
+      setSaving(null);
     }
   }
 
   async function submitAlipay(event: FormEvent) {
     event.preventDefault();
-    setSavingAlipay(true);
+    setSaving('alipay');
     setMessage('');
     try {
-      await saveAlipaySettings(tenantId, {
+      await saveAlipaySettings({
         appId: alipay.appId,
         gateway: alipay.gateway,
         notifyUrl: alipay.notifyUrl,
@@ -181,74 +326,146 @@ export function SettingsPage() {
         ...(alipay.publicKeyPem ? { publicKeyPem: alipay.publicKeyPem } : {}),
       });
       setAlipay((prev) => ({ ...prev, privateKeyPem: '', publicKeyPem: '' }));
-      await loadPaymentSettings();
+      await reloadPayment();
       setMessage('支付宝配置已保存');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '保存失败');
     } finally {
-      setSavingAlipay(false);
+      setSaving(null);
+    }
+  }
+
+  function smtpPayload() {
+    return {
+      host: smtp.host,
+      port: Number(smtp.port) || 465,
+      secure: smtp.secure,
+      user: smtp.user,
+      from: smtp.from,
+      ...(smtp.password ? { password: smtp.password } : {}),
+    };
+  }
+
+  async function submitSmtp(event: FormEvent) {
+    event.preventDefault();
+    setSaving('smtp');
+    setMessage('');
+    try {
+      await saveSmtpSettings(smtpPayload());
+      setSmtp((prev) => ({ ...prev, password: '' }));
+      await reloadSmtp();
+      setMessage('SMTP 配置已保存');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function testSmtp() {
+    setSaving('smtp-test');
+    setMessage('');
+    try {
+      await testSmtpSettings({ ...smtpPayload(), testTo: smtp.testTo });
+      setMessage('SMTP 测试邮件已发送');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '测试失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearSmtp() {
+    setSaving('smtp-clear');
+    setMessage('');
+    try {
+      await clearSmtpSettings();
+      await reloadSmtp();
+      setSmtp((prev) => ({ ...prev, password: '' }));
+      setMessage('SMTP 配置已清除');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '清除失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  function qiniuPayload() {
+    return {
+      accessKey: qiniu.accessKey,
+      bucketName: qiniu.bucketName,
+      publicBaseUrl: qiniu.publicBaseUrl,
+      uploadHost: qiniu.uploadHost,
+      defaultPrefix: qiniu.defaultPrefix,
+      ...(qiniu.secretKey ? { secretKey: qiniu.secretKey } : {}),
+    };
+  }
+
+  async function submitQiniu(event: FormEvent) {
+    event.preventDefault();
+    setSaving('qiniu');
+    setMessage('');
+    try {
+      await saveQiniuSettings(qiniuPayload());
+      setQiniu((prev) => ({ ...prev, secretKey: '' }));
+      await reloadQiniu();
+      setMessage('七牛云配置已保存');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function testQiniu() {
+    setSaving('qiniu-test');
+    setMessage('');
+    try {
+      await testQiniuSettings(qiniuPayload());
+      setMessage('七牛云连接测试通过');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '测试失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearQiniu() {
+    setSaving('qiniu-clear');
+    setMessage('');
+    try {
+      await clearQiniuSettings();
+      await reloadQiniu();
+      setQiniu((prev) => ({ ...prev, secretKey: '' }));
+      setMessage('七牛云配置已清除');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '清除失败');
+    } finally {
+      setSaving(null);
     }
   }
 
   return (
     <PageFrame section="settings">
       <div className="resource-card p-5">
-        <div className="text-sm font-semibold">机构介绍</div>
+        <div className="text-sm font-semibold">系统设置</div>
         <p className="text-muted-foreground mt-1 text-sm">
-          维护家长端“机构介绍”页面的核心文案。每行亮点会展示为一个独立条目。
+          统一维护机构品牌、支付渠道、SMTP 邮件和七牛云存储。密钥字段留空表示保持原值。
         </p>
-      </div>
-
-      <form className="resource-card mt-4 p-5" onSubmit={submitProfile}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block sm:col-span-2">
-            <span className="text-sm font-medium">页面主标题</span>
-            <input
-              className={inputClass}
-              value={profile.headline}
-              onChange={(e) => setProfile({ ...profile, headline: e.target.value })}
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="text-sm font-medium">机构简介</span>
-            <textarea
-              className={`${inputClass} h-24`}
-              value={profile.introduction}
-              onChange={(e) => setProfile({ ...profile, introduction: e.target.value })}
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">教学亮点（每行一条）</span>
-            <textarea
-              className={`${inputClass} h-28`}
-              value={profile.highlightsText}
-              onChange={(e) => setProfile({ ...profile, highlightsText: e.target.value })}
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">服务承诺（每行一条）</span>
-            <textarea
-              className={`${inputClass} h-28`}
-              value={profile.promisesText}
-              onChange={(e) => setProfile({ ...profile, promisesText: e.target.value })}
-            />
-          </label>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`rounded-full px-4 py-2 text-sm font-medium ${
+                activeTab === tab.key ? 'bg-primary text-primary-foreground' : 'bg-muted'
+              }`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        <button
-          className="bg-primary text-primary-foreground mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
-          disabled={savingProfile || loading}
-        >
-          {savingProfile ? '保存中...' : '保存机构介绍'}
-        </button>
-      </form>
-
-      <div className="resource-card mt-4 p-5">
-        <div className="text-sm font-semibold">支付渠道</div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          配置家长端在线购买课时包的收款渠道。密钥经 AES-256-GCM
-          加密存库，保存后不回显，仅显示是否已配置。 回调地址需公网可达（已部署在
-          edu.futuredecade.com）。
-        </p>
       </div>
 
       {message && (
@@ -258,181 +475,182 @@ export function SettingsPage() {
       {loading ? (
         <div className="text-muted-foreground mt-4 text-sm">加载中...</div>
       ) : (
-        <div className="mt-4 grid gap-4">
-          {/* WeChat Pay */}
-          <form className="resource-card p-5" onSubmit={submitWechat}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">微信支付</span>
-                <StatusBadge configured={Boolean(wechatItem?.configured)} />
+        <>
+          {activeTab === 'brand' && (
+            <form className="resource-card mt-4 p-5" onSubmit={submitBrand}>
+              <div className="text-sm font-semibold">品牌 VI / 机构介绍</div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-medium">机构名称</span>
+                  <input className={inputClass} value={org.name} onChange={(e) => setOrg({ ...org, name: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">品牌名</span>
+                  <input className={inputClass} value={org.brandName} onChange={(e) => setOrg({ ...org, brandName: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">电话</span>
+                  <input className={inputClass} value={org.phone} onChange={(e) => setOrg({ ...org, phone: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">地址</span>
+                  <input className={inputClass} value={org.address} onChange={(e) => setOrg({ ...org, address: e.target.value })} />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-sm font-medium">页面主标题</span>
+                  <input className={inputClass} value={org.headline} onChange={(e) => setOrg({ ...org, headline: e.target.value })} />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-sm font-medium">机构简介</span>
+                  <textarea className={`${inputClass} h-24`} value={org.introduction} onChange={(e) => setOrg({ ...org, introduction: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">教学亮点（每行一条）</span>
+                  <textarea className={`${inputClass} h-28`} value={org.highlightsText} onChange={(e) => setOrg({ ...org, highlightsText: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">服务承诺（每行一条）</span>
+                  <textarea className={`${inputClass} h-28`} value={org.promisesText} onChange={(e) => setOrg({ ...org, promisesText: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Logo URL</span>
+                  <input className={inputClass} value={org.logoUrl} onChange={(e) => setOrg({ ...org, logoUrl: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">暗色 Logo URL</span>
+                  <input className={inputClass} value={org.darkLogoUrl} onChange={(e) => setOrg({ ...org, darkLogoUrl: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Favicon URL</span>
+                  <input className={inputClass} value={org.faviconUrl} onChange={(e) => setOrg({ ...org, faviconUrl: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">主色</span>
+                  <input className={inputClass} placeholder="#1f6f5b" value={org.primaryColor} onChange={(e) => setOrg({ ...org, primaryColor: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">辅助色</span>
+                  <input className={inputClass} placeholder="#f2a65a" value={org.secondaryColor} onChange={(e) => setOrg({ ...org, secondaryColor: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">背景色</span>
+                  <input className={inputClass} value={org.backgroundColor} onChange={(e) => setOrg({ ...org, backgroundColor: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">卡片色</span>
+                  <input className={inputClass} value={org.cardColor} onChange={(e) => setOrg({ ...org, cardColor: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">文字色</span>
+                  <input className={inputClass} value={org.textColor} onChange={(e) => setOrg({ ...org, textColor: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">标题字体</span>
+                  <input className={inputClass} value={org.headingFont} onChange={(e) => setOrg({ ...org, headingFont: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">正文字体</span>
+                  <input className={inputClass} value={org.bodyFont} onChange={(e) => setOrg({ ...org, bodyFont: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">圆角</span>
+                  <input className={inputClass} placeholder="18px" value={org.radius} onChange={(e) => setOrg({ ...org, radius: e.target.value })} />
+                </label>
               </div>
-              <span className="text-muted-foreground text-xs">
-                来源：{SOURCE_LABEL[wechatItem?.source ?? 'none']}
-              </span>
-            </div>
-            {wechatItem?.notifyUrl && (
-              <div className="text-muted-foreground mt-2 text-xs">
-                回调地址：<code>{wechatItem.notifyUrl}</code>
-              </div>
-            )}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-sm font-medium">App ID</span>
-                <input
-                  className={inputClass}
-                  value={wechat.appId}
-                  onChange={(e) => setWechat({ ...wechat, appId: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">商户号 (mchId)</span>
-                <input
-                  className={inputClass}
-                  value={wechat.mchId}
-                  onChange={(e) => setWechat({ ...wechat, mchId: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">App Secret</span>
-                <input
-                  className={inputClass}
-                  type="password"
-                  placeholder={
-                    wechatItem?.secrets.appSecret?.configured ? '已配置（留空不变）' : ''
-                  }
-                  value={wechat.appSecret}
-                  onChange={(e) => setWechat({ ...wechat, appSecret: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">API Key</span>
-                <input
-                  className={inputClass}
-                  type="password"
-                  placeholder={wechatItem?.secrets.apiKey?.configured ? '已配置（留空不变）' : ''}
-                  value={wechat.apiKey}
-                  onChange={(e) => setWechat({ ...wechat, apiKey: e.target.value })}
-                />
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="text-sm font-medium">回调地址（可选，默认按域名推导）</span>
-                <input
-                  className={inputClass}
-                  value={wechat.notifyUrl}
-                  onChange={(e) => setWechat({ ...wechat, notifyUrl: e.target.value })}
-                />
-              </label>
-            </div>
-            <button
-              className="bg-primary text-primary-foreground mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
-              disabled={savingWechat}
-            >
-              {savingWechat ? '保存中...' : '保存微信支付'}
-            </button>
-          </form>
+              <button className={`${buttonClass} mt-4`} disabled={saving === 'brand'}>
+                {saving === 'brand' ? '保存中...' : '保存品牌 VI'}
+              </button>
+            </form>
+          )}
 
-          {/* Alipay */}
-          <form className="resource-card p-5" onSubmit={submitAlipay}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">支付宝</span>
-                <StatusBadge configured={Boolean(alipayItem?.configured)} />
-              </div>
-              <span className="text-muted-foreground text-xs">
-                来源：{SOURCE_LABEL[alipayItem?.source ?? 'none']}
-              </span>
+          {activeTab === 'payment' && (
+            <div className="mt-4 grid gap-4">
+              <form className="resource-card p-5" onSubmit={submitWechat}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">微信支付</span>
+                    <StatusBadge configured={Boolean(wechatItem?.configured)} />
+                  </div>
+                  <SourceLabel source={wechatItem?.source} />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="block"><span className="text-sm font-medium">App ID</span><input className={inputClass} value={wechat.appId} onChange={(e) => setWechat({ ...wechat, appId: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">商户号</span><input className={inputClass} value={wechat.mchId} onChange={(e) => setWechat({ ...wechat, mchId: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">App Secret</span><input className={inputClass} type="password" placeholder={wechatItem?.secrets.appSecret?.configured ? '已配置（留空不变）' : ''} value={wechat.appSecret} onChange={(e) => setWechat({ ...wechat, appSecret: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">API Key</span><input className={inputClass} type="password" placeholder={wechatItem?.secrets.apiKey?.configured ? '已配置（留空不变）' : ''} value={wechat.apiKey} onChange={(e) => setWechat({ ...wechat, apiKey: e.target.value })} /></label>
+                  <label className="block sm:col-span-2"><span className="text-sm font-medium">回调地址</span><input className={inputClass} value={wechat.notifyUrl} onChange={(e) => setWechat({ ...wechat, notifyUrl: e.target.value })} /></label>
+                </div>
+                <button className={`${buttonClass} mt-4`} disabled={saving === 'wechat'}>{saving === 'wechat' ? '保存中...' : '保存微信支付'}</button>
+              </form>
+
+              <form className="resource-card p-5" onSubmit={submitAlipay}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">支付宝</span>
+                    <StatusBadge configured={Boolean(alipayItem?.configured)} />
+                  </div>
+                  <SourceLabel source={alipayItem?.source} />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="block"><span className="text-sm font-medium">App ID</span><input className={inputClass} value={alipay.appId} onChange={(e) => setAlipay({ ...alipay, appId: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">网关地址</span><input className={inputClass} value={alipay.gateway} onChange={(e) => setAlipay({ ...alipay, gateway: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">密钥类型</span><select className={inputClass} value={alipay.keyType} onChange={(e) => setAlipay({ ...alipay, keyType: e.target.value as 'PKCS1' | 'PKCS8' })}><option value="PKCS1">PKCS1</option><option value="PKCS8">PKCS8</option></select></label>
+                  <label className="flex items-center gap-2 pt-6"><input type="checkbox" checked={alipay.f2fPay} onChange={(e) => setAlipay({ ...alipay, f2fPay: e.target.checked })} /><span className="text-sm font-medium">当面付（扫码）</span></label>
+                  <label className="block sm:col-span-2"><span className="text-sm font-medium">应用私钥 PEM {alipayItem?.secrets.privateKeyPem?.configured ? '（已配置，留空不变）' : ''}</span><textarea className={`${inputClass} h-24 font-mono text-xs`} value={alipay.privateKeyPem} onChange={(e) => setAlipay({ ...alipay, privateKeyPem: e.target.value })} /></label>
+                  <label className="block sm:col-span-2"><span className="text-sm font-medium">支付宝公钥 PEM {alipayItem?.secrets.publicKeyPem?.configured ? '（已配置，留空不变）' : ''}</span><textarea className={`${inputClass} h-24 font-mono text-xs`} value={alipay.publicKeyPem} onChange={(e) => setAlipay({ ...alipay, publicKeyPem: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">异步回调地址</span><input className={inputClass} value={alipay.notifyUrl} onChange={(e) => setAlipay({ ...alipay, notifyUrl: e.target.value })} /></label>
+                  <label className="block"><span className="text-sm font-medium">同步返回地址</span><input className={inputClass} value={alipay.returnUrl} onChange={(e) => setAlipay({ ...alipay, returnUrl: e.target.value })} /></label>
+                </div>
+                <button className={`${buttonClass} mt-4`} disabled={saving === 'alipay'}>{saving === 'alipay' ? '保存中...' : '保存支付宝'}</button>
+              </form>
             </div>
-            {alipayItem?.notifyUrl && (
-              <div className="text-muted-foreground mt-2 text-xs">
-                回调地址：<code>{alipayItem.notifyUrl}</code>
+          )}
+
+          {activeTab === 'smtp' && (
+            <form className="resource-card mt-4 p-5" onSubmit={submitSmtp}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2"><span className="text-sm font-semibold">SMTP 邮件</span><StatusBadge configured={Boolean(smtpOverview?.configured)} /></div>
+                <SourceLabel source={smtpOverview?.source} />
               </div>
-            )}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-sm font-medium">App ID</span>
-                <input
-                  className={inputClass}
-                  value={alipay.appId}
-                  onChange={(e) => setAlipay({ ...alipay, appId: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">网关地址</span>
-                <input
-                  className={inputClass}
-                  placeholder="https://openapi.alipay.com/gateway.do"
-                  value={alipay.gateway}
-                  onChange={(e) => setAlipay({ ...alipay, gateway: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">密钥类型</span>
-                <select
-                  className={inputClass}
-                  value={alipay.keyType}
-                  onChange={(e) =>
-                    setAlipay({ ...alipay, keyType: e.target.value as 'PKCS1' | 'PKCS8' })
-                  }
-                >
-                  <option value="PKCS1">PKCS1</option>
-                  <option value="PKCS8">PKCS8</option>
-                </select>
-              </label>
-              <label className="flex items-center gap-2 pt-6">
-                <input
-                  type="checkbox"
-                  checked={alipay.f2fPay}
-                  onChange={(e) => setAlipay({ ...alipay, f2fPay: e.target.checked })}
-                />
-                <span className="text-sm font-medium">当面付（扫码）</span>
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="text-sm font-medium">
-                  应用私钥 PEM
-                  {alipayItem?.secrets.privateKeyPem?.configured ? '（已配置，留空不变）' : ''}
-                </span>
-                <textarea
-                  className={`${inputClass} h-24 font-mono text-xs`}
-                  value={alipay.privateKeyPem}
-                  onChange={(e) => setAlipay({ ...alipay, privateKeyPem: e.target.value })}
-                />
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="text-sm font-medium">
-                  支付宝公钥 PEM
-                  {alipayItem?.secrets.publicKeyPem?.configured ? '（已配置，留空不变）' : ''}
-                </span>
-                <textarea
-                  className={`${inputClass} h-24 font-mono text-xs`}
-                  value={alipay.publicKeyPem}
-                  onChange={(e) => setAlipay({ ...alipay, publicKeyPem: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">异步回调地址（可选）</span>
-                <input
-                  className={inputClass}
-                  value={alipay.notifyUrl}
-                  onChange={(e) => setAlipay({ ...alipay, notifyUrl: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">同步返回地址（可选）</span>
-                <input
-                  className={inputClass}
-                  value={alipay.returnUrl}
-                  onChange={(e) => setAlipay({ ...alipay, returnUrl: e.target.value })}
-                />
-              </label>
-            </div>
-            <button
-              className="bg-primary text-primary-foreground mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
-              disabled={savingAlipay}
-            >
-              {savingAlipay ? '保存中...' : '保存支付宝'}
-            </button>
-          </form>
-        </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block"><span className="text-sm font-medium">Host</span><input className={inputClass} value={smtp.host} onChange={(e) => setSmtp({ ...smtp, host: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">Port</span><input className={inputClass} value={smtp.port} onChange={(e) => setSmtp({ ...smtp, port: e.target.value })} /></label>
+                <label className="flex items-center gap-2 pt-6"><input type="checkbox" checked={smtp.secure} onChange={(e) => setSmtp({ ...smtp, secure: e.target.checked })} /><span className="text-sm font-medium">SSL/TLS secure</span></label>
+                <label className="block"><span className="text-sm font-medium">User</span><input className={inputClass} value={smtp.user} onChange={(e) => setSmtp({ ...smtp, user: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">Password</span><input className={inputClass} type="password" placeholder={smtpOverview?.secrets.password?.configured ? '已配置（留空不变）' : ''} value={smtp.password} onChange={(e) => setSmtp({ ...smtp, password: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">From</span><input className={inputClass} value={smtp.from} onChange={(e) => setSmtp({ ...smtp, from: e.target.value })} /></label>
+                <label className="block sm:col-span-2"><span className="text-sm font-medium">测试收件人</span><input className={inputClass} value={smtp.testTo} onChange={(e) => setSmtp({ ...smtp, testTo: e.target.value })} /></label>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button className={buttonClass} disabled={saving === 'smtp'}>{saving === 'smtp' ? '保存中...' : '保存 SMTP'}</button>
+                <button type="button" className={outlineButtonClass} disabled={saving === 'smtp-test'} onClick={testSmtp}>发送测试邮件</button>
+                <button type="button" className={outlineButtonClass} disabled={saving === 'smtp-clear'} onClick={clearSmtp}>清除配置</button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === 'qiniu' && (
+            <form className="resource-card mt-4 p-5" onSubmit={submitQiniu}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2"><span className="text-sm font-semibold">七牛云存储</span><StatusBadge configured={Boolean(qiniuOverview?.configured)} /></div>
+                <SourceLabel source={qiniuOverview?.source} />
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block"><span className="text-sm font-medium">Access Key</span><input className={inputClass} value={qiniu.accessKey} onChange={(e) => setQiniu({ ...qiniu, accessKey: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">Secret Key</span><input className={inputClass} type="password" placeholder={qiniuOverview?.secrets.secretKey?.configured ? '已配置（留空不变）' : ''} value={qiniu.secretKey} onChange={(e) => setQiniu({ ...qiniu, secretKey: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">Bucket</span><input className={inputClass} value={qiniu.bucketName} onChange={(e) => setQiniu({ ...qiniu, bucketName: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">默认目录</span><input className={inputClass} value={qiniu.defaultPrefix} onChange={(e) => setQiniu({ ...qiniu, defaultPrefix: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">公共域名</span><input className={inputClass} placeholder="https://cdn.example.com" value={qiniu.publicBaseUrl} onChange={(e) => setQiniu({ ...qiniu, publicBaseUrl: e.target.value })} /></label>
+                <label className="block"><span className="text-sm font-medium">上传 Host</span><input className={inputClass} placeholder="https://upload.qiniup.com" value={qiniu.uploadHost} onChange={(e) => setQiniu({ ...qiniu, uploadHost: e.target.value })} /></label>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button className={buttonClass} disabled={saving === 'qiniu'}>{saving === 'qiniu' ? '保存中...' : '保存七牛云'}</button>
+                <button type="button" className={outlineButtonClass} disabled={saving === 'qiniu-test'} onClick={testQiniu}>测试连接</button>
+                <button type="button" className={outlineButtonClass} disabled={saving === 'qiniu-clear'} onClick={clearQiniu}>清除配置</button>
+              </div>
+            </form>
+          )}
+        </>
       )}
     </PageFrame>
   );

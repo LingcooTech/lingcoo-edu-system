@@ -22,17 +22,12 @@ export const parentCenterModule: AppModule = {
       const students = await app.db
         .select()
         .from(schema.students)
-        .where(
-          and(
-            eq(schema.students.tenantId, parent.tenantId),
-            eq(schema.students.guardianId, parent.guardianId),
-          ),
-        );
+        .where(eq(schema.students.guardianId, parent.guardianId));
       return { parent, students };
     }
 
     app.get(
-      '/public/:tenantSlug/me/children',
+      '/public/me/children',
       { preHandler: app.authenticateParent },
       async (request) => {
         const { students } = await resolveChildren(request.parent!.id);
@@ -41,7 +36,7 @@ export const parentCenterModule: AppModule = {
     );
 
     app.get(
-      '/public/:tenantSlug/me/lesson-accounts',
+      '/public/me/lesson-accounts',
       { preHandler: app.authenticateParent },
       async (request) => {
         const { students } = await resolveChildren(request.parent!.id);
@@ -64,7 +59,7 @@ export const parentCenterModule: AppModule = {
     );
 
     app.get(
-      '/public/:tenantSlug/me/orders',
+      '/public/me/orders',
       { preHandler: app.authenticateParent },
       async (request) => {
         const orders = await app.db
@@ -77,7 +72,7 @@ export const parentCenterModule: AppModule = {
     );
 
     app.get(
-      '/public/:tenantSlug/me/notifications',
+      '/public/me/notifications',
       { preHandler: app.authenticateParent },
       async (request) => {
         const items = await notificationsRepo.listForRecipient(app.db, {
@@ -89,7 +84,7 @@ export const parentCenterModule: AppModule = {
     );
 
     app.post(
-      '/public/:tenantSlug/me/notifications/:notificationId/read',
+      '/public/me/notifications/:notificationId/read',
       { preHandler: app.authenticateParent },
       async (request) => {
         const { notificationId } = request.params as { notificationId: string };

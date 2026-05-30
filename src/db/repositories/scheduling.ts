@@ -3,12 +3,8 @@ import { and, asc, eq, ne } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
 
-export async function listClasses(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.classes)
-    .where(eq(schema.classes.tenantId, tenantId))
-    .orderBy(asc(schema.classes.createdAt));
+export async function listClasses(db: Database) {
+  return db.select().from(schema.classes).orderBy(asc(schema.classes.createdAt));
 }
 
 export async function createClass(db: Database, values: typeof schema.classes.$inferInsert) {
@@ -18,20 +14,19 @@ export async function createClass(db: Database, values: typeof schema.classes.$i
 
 export async function updateClass(
   db: Database,
-  tenantId: string,
   classId: string,
   patch: Partial<typeof schema.classes.$inferInsert>,
 ) {
   const [classGroup] = await db
     .update(schema.classes)
     .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(schema.classes.tenantId, tenantId), eq(schema.classes.id, classId)))
+    .where(eq(schema.classes.id, classId))
     .returning();
   return classGroup ?? null;
 }
 
-export async function archiveClass(db: Database, tenantId: string, classId: string) {
-  return updateClass(db, tenantId, classId, { status: 'archived' });
+export async function archiveClass(db: Database, classId: string) {
+  return updateClass(db, classId, { status: 'archived' });
 }
 
 export async function countActiveEnrollments(db: Database, classId: string) {
@@ -44,12 +39,8 @@ export async function countActiveEnrollments(db: Database, classId: string) {
   return rows.length;
 }
 
-export async function listClassSessions(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.classSessions)
-    .where(eq(schema.classSessions.tenantId, tenantId))
-    .orderBy(asc(schema.classSessions.startsAt));
+export async function listClassSessions(db: Database) {
+  return db.select().from(schema.classSessions).orderBy(asc(schema.classSessions.startsAt));
 }
 
 export async function createClassSession(
@@ -62,14 +53,13 @@ export async function createClassSession(
 
 export async function updateClassSession(
   db: Database,
-  tenantId: string,
   sessionId: string,
   patch: Partial<typeof schema.classSessions.$inferInsert>,
 ) {
   const [session] = await db
     .update(schema.classSessions)
     .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(schema.classSessions.tenantId, tenantId), eq(schema.classSessions.id, sessionId)))
+    .where(eq(schema.classSessions.id, sessionId))
     .returning();
   return session ?? null;
 }
@@ -82,7 +72,6 @@ export async function updateClassSession(
 export async function findScheduleConflict(
   db: Database,
   input: {
-    tenantId: string;
     startsAt: Date;
     endsAt: Date;
     classroomId: string;
@@ -93,12 +82,7 @@ export async function findScheduleConflict(
   const candidates = await db
     .select()
     .from(schema.classSessions)
-    .where(
-      and(
-        eq(schema.classSessions.tenantId, input.tenantId),
-        ne(schema.classSessions.status, 'cancelled'),
-      ),
-    );
+    .where(ne(schema.classSessions.status, 'cancelled'));
 
   return (
     candidates.find(
@@ -118,15 +102,15 @@ export async function markSessionCompleted(db: Database, sessionId: string) {
     .where(eq(schema.classSessions.id, sessionId));
 }
 
-export async function cancelClassSession(db: Database, tenantId: string, sessionId: string) {
-  return updateClassSession(db, tenantId, sessionId, { status: 'cancelled' });
+export async function cancelClassSession(db: Database, sessionId: string) {
+  return updateClassSession(db, sessionId, { status: 'cancelled' });
 }
 
-export async function findSession(db: Database, tenantId: string, sessionId: string) {
+export async function findSession(db: Database, sessionId: string) {
   const [session] = await db
     .select()
     .from(schema.classSessions)
-    .where(and(eq(schema.classSessions.tenantId, tenantId), eq(schema.classSessions.id, sessionId)))
+    .where(eq(schema.classSessions.id, sessionId))
     .limit(1);
   return session ?? null;
 }
@@ -140,13 +124,12 @@ export async function findClass(db: Database, classId: string) {
   return classGroup ?? null;
 }
 
-export async function listEnrollments(db: Database, tenantId: string, classId: string) {
+export async function listEnrollments(db: Database, classId: string) {
   return db
     .select()
     .from(schema.classEnrollments)
     .where(
       and(
-        eq(schema.classEnrollments.tenantId, tenantId),
         eq(schema.classEnrollments.classId, classId),
         eq(schema.classEnrollments.active, true),
       ),
@@ -163,7 +146,6 @@ export async function createEnrollment(
     .from(schema.classEnrollments)
     .where(
       and(
-        eq(schema.classEnrollments.tenantId, values.tenantId),
         eq(schema.classEnrollments.classId, values.classId),
         eq(schema.classEnrollments.studentId, values.studentId),
       ),
@@ -183,18 +165,12 @@ export async function createEnrollment(
   return enrollment;
 }
 
-export async function removeEnrollment(
-  db: Database,
-  tenantId: string,
-  classId: string,
-  enrollmentId: string,
-) {
+export async function removeEnrollment(db: Database, classId: string, enrollmentId: string) {
   const [enrollment] = await db
     .update(schema.classEnrollments)
     .set({ active: false })
     .where(
       and(
-        eq(schema.classEnrollments.tenantId, tenantId),
         eq(schema.classEnrollments.classId, classId),
         eq(schema.classEnrollments.id, enrollmentId),
       ),

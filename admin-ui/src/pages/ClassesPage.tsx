@@ -10,10 +10,9 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 
-const CLASSES = () => `/v1/tenants/${tenantId}/classes`;
+const CLASSES = () => '/v1/classes';
 
 interface ClassForm {
   campusId: string;
@@ -44,20 +43,11 @@ const emptyClassForm: ClassForm = {
 export function ClassesPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<ClassGroup>(CLASSES(), 'classes');
-  const { data: campuses } = useApiResource<Campus>(`/v1/tenants/${tenantId}/campuses`, 'campuses');
-  const { data: courses } = useApiResource<Course>(`/v1/tenants/${tenantId}/courses`, 'courses');
-  const { data: teachers } = useApiResource<Teacher>(
-    `/v1/tenants/${tenantId}/teachers`,
-    'teachers',
-  );
-  const { data: classrooms } = useApiResource<Classroom>(
-    `/v1/tenants/${tenantId}/classrooms`,
-    'classrooms',
-  );
-  const { data: students } = useApiResource<Student>(
-    `/v1/tenants/${tenantId}/students`,
-    'students',
-  );
+  const { data: campuses } = useApiResource<Campus>('/v1/campuses', 'campuses');
+  const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
+  const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
+  const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
+  const { data: students } = useApiResource<Student>('/v1/students', 'students');
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ClassGroup | null>(null);

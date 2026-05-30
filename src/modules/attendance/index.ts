@@ -18,12 +18,12 @@ export const attendanceModule: AppModule = {
   name: 'attendance',
   async register(app) {
     app.post(
-      '/v1/tenants/:tenantId/class-sessions/:sessionId/attendance',
+      '/v1/class-sessions/:sessionId/attendance',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId, sessionId } = request.params as { tenantId: string; sessionId: string };
+        const { sessionId } = request.params as { sessionId: string };
 
-        const session = await schedulingRepo.findSession(app.db, tenantId, sessionId);
+        const session = await schedulingRepo.findSession(app.db, sessionId);
         if (!session) {
           throw Object.assign(new Error('Class session not found'), { statusCode: 404 });
         }
@@ -35,7 +35,6 @@ export const attendanceModule: AppModule = {
 
         const body = attendanceSchema.parse(request.body);
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
-          tenantId,
           sessionId,
           courseId: classGroup.courseId,
           records: body.records,

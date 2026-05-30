@@ -2,12 +2,11 @@ import type { Order } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
-import { tenantId } from '@/lib/foundation';
 import { money } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
 
 export function OrdersPage() {
-  const { data } = useApiResource<Order>(`/v1/tenants/${tenantId}/orders`, 'orders');
+  const { data } = useApiResource<Order>('/v1/orders', 'orders');
 
   return (
     <PageFrame section="orders">

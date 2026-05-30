@@ -10,11 +10,10 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { formatDateTime } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
 
-const TRIALS = () => `/v1/tenants/${tenantId}/trial-sessions`;
+const TRIALS = () => '/v1/trial-sessions';
 
 interface TrialForm {
   campusId: string;
@@ -53,8 +52,8 @@ function defaultForm(campuses: Campus[], courses: Course[]): TrialForm {
 export function TrialsPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<TrialSession>(TRIALS(), 'trialSessions');
-  const { data: campuses } = useApiResource<Campus>(`/v1/tenants/${tenantId}/campuses`, 'campuses');
-  const { data: courses } = useApiResource<Course>(`/v1/tenants/${tenantId}/courses`, 'courses');
+  const { data: campuses } = useApiResource<Campus>('/v1/campuses', 'campuses');
+  const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TrialSession | null>(null);
   const [form, setForm] = useState<TrialForm>(defaultForm([], []));

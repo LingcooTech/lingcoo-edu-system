@@ -1,6 +1,7 @@
 import type { Database } from '../db/client.js';
 import * as settingsRepo from '../db/repositories/settings.js';
 import type { AppEnv } from './env.js';
+import { httpError } from './http-error.js';
 import { Mailer, type MailerConfig } from './mailer.js';
 import { decryptJson, encryptJson } from './settings-crypto.js';
 
@@ -29,6 +30,10 @@ function fromEnv(env: AppEnv): MailerConfig | null {
     password,
     from: normalizeString(env.SMTP_FROM) || user,
   };
+}
+
+function hasSecret(value: string | undefined) {
+  return Boolean(value?.trim());
 }
 
 export class SmtpSettingsService {
@@ -65,6 +70,28 @@ export class SmtpSettingsService {
     return (await this.getDatabaseSettings()) ?? fromEnv(this.env);
   }
 
+  async getOverview() {
+    const databaseSettings = await this.getDatabaseSettings();
+    const envSettings = fromEnv(this.env);
+    const effective = databaseSettings ?? envSettings;
+    const source = databaseSettings ? 'database' : envSettings ? 'env' : 'none';
+
+    return {
+      configured: Boolean(effective?.host && effective.user && effective.password),
+      source,
+      values: {
+        host: effective?.host ?? '',
+        port: effective?.port ?? 465,
+        secure: effective?.secure ?? true,
+        user: effective?.user ?? '',
+        from: effective?.from ?? '',
+      },
+      secrets: {
+        password: { configured: hasSecret(effective?.password) },
+      },
+    };
+  }
+
   async upsertSettings(input: Partial<MailerConfig>, updatedBy?: string) {
     const existing = (await this.getDatabaseSettings()) ?? fromEnv(this.env);
     const next: MailerConfig = {
@@ -81,7 +108,40 @@ export class SmtpSettingsService {
       isEncrypted: true,
       updatedBy,
     });
-    return { configured: Boolean(next.host && next.user && next.password) };
+    return this.getOverview();
+  }
+
+  async testConnection(input: Partial<MailerConfig> & { testTo?: string }) {
+    const existing = (await this.getDatabaseSettings()) ?? fromEnv(this.env);
+    const config: MailerConfig = {
+      host: normalizeString(input.host) || existing?.host || '',
+      port: typeof input.port === 'number' ? input.port : (existing?.port ?? 465),
+      secure: input.secure ?? existing?.secure ?? true,
+      user: normalizeString(input.user) || existing?.user || '',
+      password: normalizeString(input.password) || existing?.password || '',
+      from: normalizeString(input.from) || existing?.from || '',
+    };
+
+    const to = normalizeString(input.testTo);
+    if (!config.host || !config.user || !config.password) {
+      throw httpError(422, 'SMTP 配置不完整，请先填写 host、user 和 password');
+    }
+    if (!to) {
+      throw httpError(422, '请填写测试收件人邮箱');
+    }
+
+    const mailer = new Mailer(config);
+    await mailer.send({
+      to,
+      subject: 'FD-edu SMTP 测试邮件',
+      text: '这是一封来自 FD-edu 系统设置的 SMTP 测试邮件。',
+      html: '<p>这是一封来自 FD-edu 系统设置的 SMTP 测试邮件。</p>',
+    });
+    return { ok: true, to };
+  }
+
+  async clearSettings() {
+    await settingsRepo.deleteSetting(this.db, SMTP_SETTING_KEY);
   }
 
   async createMailer(): Promise<Mailer> {

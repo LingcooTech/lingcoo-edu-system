@@ -1,7 +1,6 @@
 import * as crmRepo from '../../db/repositories/crm.js';
 import type { Lead } from '../../db/repositories/crm.js';
 import * as marketingRepo from '../../db/repositories/marketing.js';
-import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 // Stage counts + new→paid conversion rate for an arbitrary slice of leads.
@@ -26,17 +25,11 @@ function funnelOf(leads: Lead[]) {
 export const reportModule: AppModule = {
   name: 'report',
   async register(app) {
-    app.get(
-      '/v1/tenants/:tenantId/reports/funnel',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-
+    app.get('/v1/reports/funnel', { preHandler: app.authenticate }, async () => {
         const [leads, channels, campaigns] = await Promise.all([
-          crmRepo.listLeads(app.db, tenantId),
-          marketingRepo.listChannels(app.db, tenantId),
-          marketingRepo.listCampaigns(app.db, tenantId),
+          crmRepo.listLeads(app.db),
+          marketingRepo.listChannels(app.db),
+          marketingRepo.listCampaigns(app.db),
         ]);
 
         return {
@@ -89,7 +82,6 @@ export const reportModule: AppModule = {
             };
           }),
         };
-      },
-    );
+    });
   },
 };

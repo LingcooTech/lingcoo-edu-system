@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { getTenantSlug, publicApi } from '@/api/client';
+import { publicApi } from '@/api/client';
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -12,13 +12,12 @@ export function ForgotPasswordPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const slug = getTenantSlug();
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();
     setError('');
     try {
-      await publicApi(`/public/${slug}/auth/forgot-password`, {
+      await publicApi('/public/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim() }),
       });
@@ -33,7 +32,7 @@ export function ForgotPasswordPage() {
     event.preventDefault();
     setError('');
     try {
-      await publicApi(`/public/${slug}/auth/reset-password`, {
+      await publicApi('/public/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim(), code: code.trim(), password }),
       });

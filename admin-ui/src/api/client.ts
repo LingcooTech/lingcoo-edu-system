@@ -1,8 +1,10 @@
 import type {
   AlipayPaymentSettingsInput,
+  OrganizationSettings,
   PaymentProviderOverview,
-  Tenant,
-  TenantPublicProfile,
+  QiniuSettingsInput,
+  SmtpSettingsInput,
+  SystemSettingOverview,
   WechatPaymentSettingsInput,
 } from './types';
 
@@ -63,38 +65,77 @@ export async function login(email: string, password: string) {
   return payload;
 }
 
-export async function fetchTenants() {
-  return (await api<{ tenants: Tenant[] }>('/v1/tenants')).tenants;
+export async function fetchPaymentSettings() {
+  return api<PaymentProviderOverview>('/v1/payment-settings');
 }
 
-export async function fetchPaymentSettings(tid: string) {
-  return api<PaymentProviderOverview>(`/v1/tenants/${tid}/payment-settings`);
+export async function fetchOrganization() {
+  return (await api<{ organization: OrganizationSettings }>('/v1/organization')).organization;
 }
 
-export async function fetchTenantPublicProfile(tid: string) {
-  return (await api<{ publicProfile: TenantPublicProfile }>(`/v1/tenants/${tid}/public-profile`))
-    .publicProfile;
-}
-
-export async function saveTenantPublicProfile(tid: string, input: TenantPublicProfile) {
+export async function saveOrganization(input: Partial<OrganizationSettings>) {
   return (
-    await api<{ publicProfile: TenantPublicProfile }>(`/v1/tenants/${tid}/public-profile`, {
+    await api<{ organization: OrganizationSettings }>('/v1/organization', {
       method: 'PUT',
       body: JSON.stringify(input),
     })
-  ).publicProfile;
+  ).organization;
 }
 
-export async function saveWechatSettings(tid: string, input: WechatPaymentSettingsInput) {
-  return api<unknown>(`/v1/tenants/${tid}/payment-settings/wechat`, {
+export async function saveWechatSettings(input: WechatPaymentSettingsInput) {
+  return api<unknown>('/v1/payment-settings/wechat', {
     method: 'PUT',
     body: JSON.stringify(input),
   });
 }
 
-export async function saveAlipaySettings(tid: string, input: AlipayPaymentSettingsInput) {
-  return api<unknown>(`/v1/tenants/${tid}/payment-settings/alipay`, {
+export async function saveAlipaySettings(input: AlipayPaymentSettingsInput) {
+  return api<unknown>('/v1/payment-settings/alipay', {
     method: 'PUT',
     body: JSON.stringify(input),
   });
+}
+
+export async function fetchSmtpSettings() {
+  return api<SystemSettingOverview>('/v1/system-settings/smtp');
+}
+
+export async function saveSmtpSettings(input: SmtpSettingsInput) {
+  return api<SystemSettingOverview>('/v1/system-settings/smtp', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function testSmtpSettings(input: SmtpSettingsInput & { testTo: string }) {
+  return api<{ ok: boolean; to: string }>('/v1/system-settings/smtp/test', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function clearSmtpSettings() {
+  return api<{ ok: boolean }>('/v1/system-settings/smtp', { method: 'DELETE' });
+}
+
+export async function fetchQiniuSettings() {
+  return api<SystemSettingOverview>('/v1/system-settings/qiniu');
+}
+
+export async function saveQiniuSettings(input: QiniuSettingsInput) {
+  return api<SystemSettingOverview>('/v1/system-settings/qiniu', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function testQiniuSettings(input: QiniuSettingsInput) {
+  return api<{ ok: boolean }>('/v1/system-settings/qiniu/test', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function clearQiniuSettings() {
+  return api<{ ok: boolean }>('/v1/system-settings/qiniu', { method: 'DELETE' });
 }

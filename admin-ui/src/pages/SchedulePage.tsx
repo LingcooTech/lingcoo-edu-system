@@ -10,11 +10,10 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { formatDateTime } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
 
-const SESSIONS = () => `/v1/tenants/${tenantId}/class-sessions`;
+const SESSIONS = () => '/v1/class-sessions';
 
 interface SessionForm {
   classId: string;
@@ -54,15 +53,9 @@ function defaultForm(classes: ClassGroup[], teachers: Teacher[], classrooms: Cla
 export function SchedulePage() {
   const toast = useToast();
   const { data, setData } = useApiResource<ClassSession>(SESSIONS(), 'classSessions');
-  const { data: classes } = useApiResource<ClassGroup>(`/v1/tenants/${tenantId}/classes`, 'classes');
-  const { data: teachers } = useApiResource<Teacher>(
-    `/v1/tenants/${tenantId}/teachers`,
-    'teachers',
-  );
-  const { data: classrooms } = useApiResource<Classroom>(
-    `/v1/tenants/${tenantId}/classrooms`,
-    'classrooms',
-  );
+  const { data: classes } = useApiResource<ClassGroup>('/v1/classes', 'classes');
+  const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
+  const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ClassSession | null>(null);

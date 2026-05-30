@@ -1,12 +1,11 @@
 import type { LessonAccount } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 
 export function LessonsPage() {
   const { data } = useApiResource<LessonAccount>(
-    `/v1/tenants/${tenantId}/lesson-accounts`,
+    '/v1/lesson-accounts',
     'lessonAccounts',
   );
 

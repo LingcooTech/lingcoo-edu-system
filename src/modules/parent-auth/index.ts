@@ -2,7 +2,6 @@ import { createHash, randomInt } from 'node:crypto';
 import { z } from 'zod';
 
 import * as parentsRepo from '../../db/repositories/parents.js';
-import { findTenantBySlug } from '../../db/repositories/tenant.js';
 import { httpError } from '../../lib/http-error.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { issueParentToken } from '../../lib/parent-token.js';
@@ -65,11 +64,7 @@ export const parentAuthModule: AppModule = {
     // Issues an email verification / password reset code, throttled to one per
     // minute. Silently succeeds (sent:false) when SMTP is not configured so the
     // flow still works in dev.
-    async function sendCode(
-      tenantId: string,
-      parent: parentsRepo.Parent,
-      purpose: 'email_verify' | 'password_reset',
-    ) {
+    async function sendCode(parent: parentsRepo.Parent, purpose: 'email_verify' | 'password_reset') {
       const latest = await parentsRepo.findLatestSecurityCode(app.db, parent.id, purpose);
       if (latest && Date.now() - latest.createdAt.getTime() < 60_000) {
         throw httpError(429, '请稍后再请求新的验证码');
@@ -97,34 +92,23 @@ export const parentAuthModule: AppModule = {
       return { sent: true };
     }
 
-    async function requireTenantBySlug(tenantSlug: string) {
-      const tenant = await findTenantBySlug(app.db, tenantSlug);
-      if (!tenant) {
-        throw httpError(404, 'Tenant not found');
-      }
-      return tenant;
-    }
-
-    app.post('/public/:tenantSlug/auth/register', async (request, reply) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await requireTenantBySlug(tenantSlug);
+    app.post('/public/auth/register', async (request, reply) => {
       const body = registerSchema.parse(request.body);
       const email = normalizeEmail(body.email);
 
-      const existing = await parentsRepo.findParentByEmail(app.db, tenant.id, email);
+      const existing = await parentsRepo.findParentByEmail(app.db, email);
       if (existing) {
         throw httpError(409, '该邮箱已注册');
       }
 
       const parent = await parentsRepo.createParent(app.db, {
-        tenantId: tenant.id,
         email,
         phone: body.phone,
         passwordHash: hashPassword(body.password),
         displayName: body.displayName,
       });
 
-      const codeResult = await sendCode(tenant.id, parent, 'email_verify');
+      const codeResult = await sendCode(parent, 'email_verify');
       const token = issueParentToken(parent.id, secret);
       reply.setCookie(PARENT_COOKIE, token, {
         path: '/',
@@ -135,13 +119,11 @@ export const parentAuthModule: AppModule = {
       return { token, parent: publicParent(parent), verificationSent: codeResult.sent };
     });
 
-    app.post('/public/:tenantSlug/auth/login', async (request, reply) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await requireTenantBySlug(tenantSlug);
+    app.post('/public/auth/login', async (request, reply) => {
       const body = loginSchema.parse(request.body);
       const email = normalizeEmail(body.email);
 
-      const parent = await parentsRepo.findParentByEmail(app.db, tenant.id, email);
+      const parent = await parentsRepo.findParentByEmail(app.db, email);
       if (!parent || parent.status !== 'active' || !verifyPassword(body.password, parent.passwordHash)) {
         return reply.unauthorized('邮箱或密码不正确');
       }
@@ -156,13 +138,13 @@ export const parentAuthModule: AppModule = {
       return { token, parent: publicParent(parent) };
     });
 
-    app.post('/public/:tenantSlug/auth/logout', async (_request, reply) => {
+    app.post('/public/auth/logout', async (_request, reply) => {
       reply.clearCookie(PARENT_COOKIE, { path: '/' });
       return { ok: true };
     });
 
     app.get(
-      '/public/:tenantSlug/auth/me',
+      '/public/auth/me',
       { preHandler: app.authenticateParent },
       async (request) => {
         const parent = await parentsRepo.findParentById(app.db, request.parent!.id);
@@ -171,7 +153,7 @@ export const parentAuthModule: AppModule = {
     );
 
     app.post(
-      '/public/:tenantSlug/auth/resend-verification',
+      '/public/auth/resend-verification',
       { preHandler: app.authenticateParent },
       async (request) => {
         const parent = await parentsRepo.findParentById(app.db, request.parent!.id);
@@ -181,13 +163,13 @@ export const parentAuthModule: AppModule = {
         if (parent.emailVerifiedAt) {
           return { sent: false, alreadyVerified: true };
         }
-        const result = await sendCode(parent.tenantId, parent, 'email_verify');
+        const result = await sendCode(parent, 'email_verify');
         return { sent: result.sent };
       },
     );
 
     app.post(
-      '/public/:tenantSlug/auth/verify-email',
+      '/public/auth/verify-email',
       { preHandler: app.authenticateParent },
       async (request) => {
         const body = verifyEmailSchema.parse(request.body);
@@ -212,31 +194,19 @@ export const parentAuthModule: AppModule = {
       },
     );
 
-    app.post('/public/:tenantSlug/auth/forgot-password', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await requireTenantBySlug(tenantSlug);
+    app.post('/public/auth/forgot-password', async (request) => {
       const body = forgotPasswordSchema.parse(request.body);
-      const parent = await parentsRepo.findParentByEmail(
-        app.db,
-        tenant.id,
-        normalizeEmail(body.email),
-      );
+      const parent = await parentsRepo.findParentByEmail(app.db, normalizeEmail(body.email));
       // Always return ok to avoid leaking which emails are registered.
       if (parent) {
-        await sendCode(tenant.id, parent, 'password_reset');
+        await sendCode(parent, 'password_reset');
       }
       return { ok: true };
     });
 
-    app.post('/public/:tenantSlug/auth/reset-password', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await requireTenantBySlug(tenantSlug);
+    app.post('/public/auth/reset-password', async (request) => {
       const body = resetPasswordSchema.parse(request.body);
-      const parent = await parentsRepo.findParentByEmail(
-        app.db,
-        tenant.id,
-        normalizeEmail(body.email),
-      );
+      const parent = await parentsRepo.findParentByEmail(app.db, normalizeEmail(body.email));
       if (!parent) {
         throw httpError(400, '验证码无效或已过期');
       }

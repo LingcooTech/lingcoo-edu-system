@@ -10,11 +10,10 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 
-const TEACHERS = () => `/v1/tenants/${tenantId}/teachers`;
-const CLASSROOMS = () => `/v1/tenants/${tenantId}/classrooms`;
+const TEACHERS = () => '/v1/teachers';
+const CLASSROOMS = () => '/v1/classrooms';
 
 interface TeacherForm {
   name: string;
@@ -54,10 +53,7 @@ export function ResourcesPage() {
     CLASSROOMS(),
     'classrooms',
   );
-  const { data: campuses } = useApiResource<Campus>(
-    `/v1/tenants/${tenantId}/campuses`,
-    'campuses',
-  );
+  const { data: campuses } = useApiResource<Campus>('/v1/campuses', 'campuses');
   const campusName = useMemo(() => new Map(campuses.map((item) => [item.id, item.name])), [campuses]);
 
   const [teacherOpen, setTeacherOpen] = useState(false);

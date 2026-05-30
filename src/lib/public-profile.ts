@@ -1,11 +1,11 @@
-export interface TenantPublicProfile {
+export interface PublicProfile {
   headline: string;
   introduction: string;
   highlights: string[];
   promises: string[];
 }
 
-export const defaultTenantPublicProfile: TenantPublicProfile = {
+export const defaultPublicProfile: PublicProfile = {
   headline: '社区里的儿童成长教室',
   introduction:
     '围绕儿童表达、专注、审美和动手能力设计小班课程，让孩子在熟悉的社区环境里稳定成长。',
@@ -38,27 +38,27 @@ function normalizeStringList(value: unknown, fallback: string[], limit: number) 
   return items.length > 0 ? items : fallback;
 }
 
-export function readTenantPublicProfile(settings: unknown): TenantPublicProfile {
+export function readPublicProfile(settings: unknown): PublicProfile {
   const raw = isRecord(settings) && isRecord(settings.publicProfile) ? settings.publicProfile : {};
 
   return {
-    headline: normalizeString(raw.headline) || defaultTenantPublicProfile.headline,
-    introduction: normalizeString(raw.introduction) || defaultTenantPublicProfile.introduction,
-    highlights: normalizeStringList(raw.highlights, defaultTenantPublicProfile.highlights, 6),
-    promises: normalizeStringList(raw.promises, defaultTenantPublicProfile.promises, 6),
+    headline: normalizeString(raw.headline) || defaultPublicProfile.headline,
+    introduction: normalizeString(raw.introduction) || defaultPublicProfile.introduction,
+    highlights: normalizeStringList(raw.highlights, defaultPublicProfile.highlights, 6),
+    promises: normalizeStringList(raw.promises, defaultPublicProfile.promises, 6),
   };
 }
 
-export function normalizeTenantPublicProfile(input: Partial<TenantPublicProfile>) {
+export function normalizePublicProfile(input: Partial<PublicProfile>) {
   return {
-    headline: normalizeString(input.headline) || defaultTenantPublicProfile.headline,
-    introduction: normalizeString(input.introduction) || defaultTenantPublicProfile.introduction,
-    highlights: normalizeStringList(input.highlights, defaultTenantPublicProfile.highlights, 6),
-    promises: normalizeStringList(input.promises, defaultTenantPublicProfile.promises, 6),
+    headline: normalizeString(input.headline) || defaultPublicProfile.headline,
+    introduction: normalizeString(input.introduction) || defaultPublicProfile.introduction,
+    highlights: normalizeStringList(input.highlights, defaultPublicProfile.highlights, 6),
+    promises: normalizeStringList(input.promises, defaultPublicProfile.promises, 6),
   };
 }
 
-export function mergeTenantPublicProfile(settings: unknown, publicProfile: TenantPublicProfile) {
+export function mergePublicProfile(settings: unknown, publicProfile: PublicProfile) {
   return {
     ...(isRecord(settings) ? settings : {}),
     publicProfile,

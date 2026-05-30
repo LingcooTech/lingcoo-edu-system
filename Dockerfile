@@ -17,7 +17,6 @@ RUN cd public-web && npm ci
 FROM deps AS build
 
 ARG VITE_API_BASE_URL=
-ARG VITE_TENANT_SLUG=meizhi
 
 COPY tsconfig.json ./
 COPY drizzle.config.ts ./
@@ -29,7 +28,7 @@ COPY admin-ui ./admin-ui
 RUN cd admin-ui && VITE_API_BASE_URL="${VITE_API_BASE_URL}" npm run build
 
 COPY public-web ./public-web
-RUN cd public-web && VITE_API_BASE_URL="${VITE_API_BASE_URL}" VITE_TENANT_SLUG="${VITE_TENANT_SLUG}" npm run build
+RUN cd public-web && VITE_API_BASE_URL="${VITE_API_BASE_URL}" npm run build
 
 RUN npm run build
 

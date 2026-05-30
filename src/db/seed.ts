@@ -1,10 +1,8 @@
 /**
- * Idempotent seed for the demo tenant (美智优品成长教室).
+ * Idempotent seed for the single-institution demo deployment.
  *
- * Re-runnable: every entity is matched on a natural key (slug / email / code /
- * tenant-scoped name) and inserted only when absent. Running twice does not
- * create duplicates. This preserves the live demo data when the in-memory store
- * is retired in favour of PostgreSQL.
+ * Re-runnable: every entity is matched on a natural key (email / code / slug /
+ * name) and inserted only when absent.
  */
 import { and, eq } from 'drizzle-orm';
 
@@ -17,7 +15,6 @@ async function findOne<T>(rows: Promise<T[]>): Promise<T | undefined> {
 }
 
 async function seed(): Promise<void> {
-  // Admin user (auth reads this row once auth is DB-backed).
   let admin = await findOne(
     db.select().from(schema.users).where(eq(schema.users.email, 'admin@fd-edu.local')).limit(1),
   );
@@ -34,65 +31,50 @@ async function seed(): Promise<void> {
     );
   }
 
-  // Tenant.
-  let tenant = await findOne(
-    db.select().from(schema.tenants).where(eq(schema.tenants.slug, 'meizhi')).limit(1),
-  );
-  if (!tenant) {
-    tenant = await findOne(
+  let organization = await findOne(db.select().from(schema.organization).limit(1));
+  if (!organization) {
+    organization = await findOne(
       db
-        .insert(schema.tenants)
+        .insert(schema.organization)
         .values({
-          slug: 'meizhi',
           name: '美智优品成长教室',
           brandName: '美智优品儿童成长教室',
           phone: '13800000000',
           address: '社区门店一楼成长教室',
-          status: 'active',
+          settings: {
+            publicProfile: {
+              headline: '社区里的儿童成长课堂',
+              introduction: '专注硬笔书法、创意美术与幼小衔接，让孩子在稳定陪伴中建立学习习惯。',
+              highlights: ['小班教学', '课后反馈', '社区近距离服务'],
+              promises: ['透明课消', '安全环境', '及时沟通'],
+            },
+            branding: {
+              primaryColor: '#1f6f5b',
+              secondaryColor: '#f2a65a',
+              backgroundColor: '#fbf7ef',
+              cardColor: '#ffffff',
+              textColor: '#23312b',
+              radius: '18px',
+            },
+          },
         })
         .returning(),
     );
   }
-  const tenantId = tenant!.id;
 
-  // Membership.
-  const membership = await findOne(
-    db
-      .select()
-      .from(schema.tenantMemberships)
-      .where(
-        and(
-          eq(schema.tenantMemberships.tenantId, tenantId),
-          eq(schema.tenantMemberships.userId, admin!.id),
-        ),
-      )
-      .limit(1),
-  );
-  if (!membership) {
-    await db
-      .insert(schema.tenantMemberships)
-      .values({ tenantId, userId: admin!.id, role: 'owner' });
-  }
-
-  // Campus.
   let campus = await findOne(
-    db
-      .select()
-      .from(schema.campuses)
-      .where(and(eq(schema.campuses.tenantId, tenantId), eq(schema.campuses.name, '一里城校区')))
-      .limit(1),
+    db.select().from(schema.campuses).where(eq(schema.campuses.name, '一里城校区')).limit(1),
   );
   if (!campus) {
     campus = await findOne(
       db
         .insert(schema.campuses)
-        .values({ tenantId, name: '一里城校区', address: '社区门店一楼成长教室' })
+        .values({ name: '一里城校区', address: '社区门店一楼成长教室' })
         .returning(),
     );
   }
   const campusId = campus!.id;
 
-  // Channels.
   const channelIds: Record<string, string> = {};
   for (const channel of [
     { code: 'door_poster', name: '门口海报' },
@@ -100,21 +82,14 @@ async function seed(): Promise<void> {
     { code: 'wechat_group', name: '微信群' },
   ]) {
     let existing = await findOne(
-      db
-        .select()
-        .from(schema.channels)
-        .where(and(eq(schema.channels.tenantId, tenantId), eq(schema.channels.code, channel.code)))
-        .limit(1),
+      db.select().from(schema.channels).where(eq(schema.channels.code, channel.code)).limit(1),
     );
     if (!existing) {
-      existing = await findOne(
-        db.insert(schema.channels).values({ tenantId, ...channel }).returning(),
-      );
+      existing = await findOne(db.insert(schema.channels).values(channel).returning());
     }
     channelIds[channel.code] = existing!.id;
   }
 
-  // Courses.
   const courseDefs = [
     {
       slug: 'hard-pen-calligraphy',
@@ -142,17 +117,13 @@ async function seed(): Promise<void> {
   const courseIds: Record<string, string> = {};
   for (const def of courseDefs) {
     let course = await findOne(
-      db
-        .select()
-        .from(schema.courses)
-        .where(and(eq(schema.courses.tenantId, tenantId), eq(schema.courses.slug, def.slug)))
-        .limit(1),
+      db.select().from(schema.courses).where(eq(schema.courses.slug, def.slug)).limit(1),
     );
     if (!course) {
       course = await findOne(
         db
           .insert(schema.courses)
-          .values({ tenantId, campusId, ...def })
+          .values({ campusId, ...def })
           .returning(),
       );
     }
@@ -160,7 +131,6 @@ async function seed(): Promise<void> {
   }
   const calligraphyCourseId = courseIds['hard-pen-calligraphy'];
 
-  // Campaigns with QR landing URLs (marketing acquisition attribution).
   for (const campaign of [
     {
       channelId: channelIds.door_poster,
@@ -188,34 +158,23 @@ async function seed(): Promise<void> {
     },
   ]) {
     const existing = await findOne(
-      db
-        .select()
-        .from(schema.campaigns)
-        .where(and(eq(schema.campaigns.tenantId, tenantId), eq(schema.campaigns.code, campaign.code)))
-        .limit(1),
+      db.select().from(schema.campaigns).where(eq(schema.campaigns.code, campaign.code)).limit(1),
     );
     if (!existing) {
-      await db.insert(schema.campaigns).values({ tenantId, ...campaign });
+      await db.insert(schema.campaigns).values(campaign);
     }
   }
 
-  // Open trial session (周六硬笔书法公开课).
   const trialTitle = '周六硬笔书法公开课';
   const existingTrial = await findOne(
     db
       .select()
       .from(schema.trialSessions)
-      .where(
-        and(
-          eq(schema.trialSessions.tenantId, tenantId),
-          eq(schema.trialSessions.title, trialTitle),
-        ),
-      )
+      .where(eq(schema.trialSessions.title, trialTitle))
       .limit(1),
   );
   if (!existingTrial) {
     await db.insert(schema.trialSessions).values({
-      tenantId,
       campusId,
       courseId: calligraphyCourseId,
       title: trialTitle,
@@ -227,20 +186,14 @@ async function seed(): Promise<void> {
     });
   }
 
-  // Teacher.
   let teacher = await findOne(
-    db
-      .select()
-      .from(schema.teachers)
-      .where(and(eq(schema.teachers.tenantId, tenantId), eq(schema.teachers.name, '王老师')))
-      .limit(1),
+    db.select().from(schema.teachers).where(eq(schema.teachers.name, '王老师')).limit(1),
   );
   if (!teacher) {
     teacher = await findOne(
       db
         .insert(schema.teachers)
         .values({
-          tenantId,
           name: '王老师',
           phone: '13600000000',
           specialties: ['硬笔书法', '控笔训练'],
@@ -249,55 +202,43 @@ async function seed(): Promise<void> {
     );
   }
 
-  // Classroom.
   let classroom = await findOne(
     db
       .select()
       .from(schema.classrooms)
-      .where(
-        and(eq(schema.classrooms.tenantId, tenantId), eq(schema.classrooms.name, '成长教室 A')),
-      )
+      .where(eq(schema.classrooms.name, '成长教室 A'))
       .limit(1),
   );
   if (!classroom) {
     classroom = await findOne(
       db
         .insert(schema.classrooms)
-        .values({ tenantId, campusId, name: '成长教室 A', capacity: 8 })
+        .values({ campusId, name: '成长教室 A', capacity: 8 })
         .returning(),
     );
   }
 
-  // Guardian + student.
   let guardian = await findOne(
     db
       .select()
       .from(schema.guardians)
-      .where(and(eq(schema.guardians.tenantId, tenantId), eq(schema.guardians.phone, '13900000000')))
+      .where(eq(schema.guardians.phone, '13900000000'))
       .limit(1),
   );
   if (!guardian) {
     guardian = await findOne(
-      db
-        .insert(schema.guardians)
-        .values({ tenantId, name: '李女士', phone: '13900000000' })
-        .returning(),
+      db.insert(schema.guardians).values({ name: '李女士', phone: '13900000000' }).returning(),
     );
   }
 
   let student = await findOne(
-    db
-      .select()
-      .from(schema.students)
-      .where(and(eq(schema.students.tenantId, tenantId), eq(schema.students.name, '小宇')))
-      .limit(1),
+    db.select().from(schema.students).where(eq(schema.students.name, '小宇')).limit(1),
   );
   if (!student) {
     student = await findOne(
       db
         .insert(schema.students)
         .values({
-          tenantId,
           guardianId: guardian!.id,
           name: '小宇',
           grade: '一年级',
@@ -308,7 +249,6 @@ async function seed(): Promise<void> {
     );
   }
 
-  // Lesson account + opening transactions (purchase 12, consume 1 → balance 11).
   let account = await findOne(
     db
       .select()
@@ -326,7 +266,6 @@ async function seed(): Promise<void> {
       db
         .insert(schema.lessonAccounts)
         .values({
-          tenantId,
           studentId: student!.id,
           courseId: calligraphyCourseId,
           balance: 11,
@@ -335,7 +274,6 @@ async function seed(): Promise<void> {
     );
     await db.insert(schema.lessonTransactions).values([
       {
-        tenantId,
         lessonAccountId: account!.id,
         studentId: student!.id,
         type: 'purchase',
@@ -344,7 +282,6 @@ async function seed(): Promise<void> {
         relatedEntityType: 'order',
       },
       {
-        tenantId,
         lessonAccountId: account!.id,
         studentId: student!.id,
         type: 'consume',
@@ -355,7 +292,6 @@ async function seed(): Promise<void> {
     ]);
   }
 
-  // Demo paid order.
   const order = await findOne(
     db
       .select()
@@ -365,7 +301,6 @@ async function seed(): Promise<void> {
   );
   if (!order) {
     await db.insert(schema.orders).values({
-      tenantId,
       studentId: student!.id,
       courseId: calligraphyCourseId,
       orderNo: 'EDU202605280001',
@@ -377,7 +312,7 @@ async function seed(): Promise<void> {
     });
   }
 
-  console.log(JSON.stringify({ msg: 'seed completed', tenantId, slug: 'meizhi' }));
+  console.log(JSON.stringify({ msg: 'seed completed', organizationId: organization!.id }));
 }
 
 seed()

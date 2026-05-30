@@ -250,7 +250,6 @@ export class PaymentService {
     }
 
     await new NotificationsService(this.app.db).create({
-      tenantId: order.tenantId,
       recipientType: 'parent',
       recipientId: order.parentId,
       category: 'payment',

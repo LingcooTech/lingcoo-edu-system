@@ -15,11 +15,10 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 
-const CHANNELS = () => `/v1/tenants/${tenantId}/channels`;
-const CAMPAIGNS = () => `/v1/tenants/${tenantId}/campaigns`;
+const CHANNELS = () => '/v1/channels';
+const CAMPAIGNS = () => '/v1/campaigns';
 
 const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
@@ -30,13 +29,13 @@ export function MarketingPage() {
     CAMPAIGNS(),
     'campaigns',
   );
-  const { data: courses } = useApiResource<Course>(`/v1/tenants/${tenantId}/courses`, 'courses');
+  const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
   const [funnel, setFunnel] = useState<CampaignFunnelRow[]>([]);
   const [channelFunnel, setChannelFunnel] = useState<ChannelFunnelRow[]>([]);
 
   useEffect(() => {
     api<{ byCampaign: CampaignFunnelRow[]; byChannel: ChannelFunnelRow[] }>(
-      `/v1/tenants/${tenantId}/reports/funnel`,
+      '/v1/reports/funnel',
     )
       .then((payload) => {
         setFunnel(payload.byCampaign ?? []);

@@ -115,7 +115,7 @@ export async function buildApp(env: AppEnv) {
     if (!parent || parent.status !== 'active') {
       return reply.unauthorized('Parent account is not available');
     }
-    request.parent = { id: parent.id, tenantId: parent.tenantId };
+    request.parent = { id: parent.id };
   });
 
   for (const module of appModules) {

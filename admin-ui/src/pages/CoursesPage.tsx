@@ -10,12 +10,11 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 import { money } from '@/lib/utils';
 
-const COURSE_BASE = () => `/v1/tenants/${tenantId}/courses`;
-const PKG_BASE = () => `/v1/tenants/${tenantId}/course-packages`;
+const COURSE_BASE = () => '/v1/courses';
+const PKG_BASE = () => '/v1/course-packages';
 
 interface CourseForm {
   slug: string;

@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -7,19 +7,15 @@ function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
 }
 
-export async function listGuardians(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.guardians)
-    .where(eq(schema.guardians.tenantId, tenantId))
-    .orderBy(desc(schema.guardians.createdAt));
+export async function listGuardians(db: Database) {
+  return db.select().from(schema.guardians).orderBy(desc(schema.guardians.createdAt));
 }
 
-export async function findGuardianByPhone(db: Database, tenantId: string, phone: string) {
+export async function findGuardianByPhone(db: Database, phone: string) {
   const [guardian] = await db
     .select()
     .from(schema.guardians)
-    .where(and(eq(schema.guardians.tenantId, tenantId), eq(schema.guardians.phone, phone)))
+    .where(eq(schema.guardians.phone, phone))
     .limit(1);
   return guardian ?? null;
 }
@@ -29,12 +25,8 @@ export async function createGuardian(db: Database, values: typeof schema.guardia
   return guardian;
 }
 
-export async function listStudents(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.students)
-    .where(eq(schema.students.tenantId, tenantId))
-    .orderBy(desc(schema.students.createdAt));
+export async function listStudents(db: Database) {
+  return db.select().from(schema.students).orderBy(desc(schema.students.createdAt));
 }
 
 export async function createStudent(db: Database, values: typeof schema.students.$inferInsert) {
@@ -44,23 +36,22 @@ export async function createStudent(db: Database, values: typeof schema.students
 
 export async function updateStudent(
   db: Database,
-  tenantId: string,
   studentId: string,
   patch: Partial<typeof schema.students.$inferInsert>,
 ) {
   const [student] = await db
     .update(schema.students)
     .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(schema.students.tenantId, tenantId), eq(schema.students.id, studentId)))
+    .where(eq(schema.students.id, studentId))
     .returning();
   return student ?? null;
 }
 
-export async function requireStudent(db: Database, tenantId: string, studentId: string) {
+export async function requireStudent(db: Database, studentId: string) {
   const [student] = await db
     .select()
     .from(schema.students)
-    .where(and(eq(schema.students.tenantId, tenantId), eq(schema.students.id, studentId)))
+    .where(eq(schema.students.id, studentId))
     .limit(1);
   if (!student) {
     throw notFound('Student not found');

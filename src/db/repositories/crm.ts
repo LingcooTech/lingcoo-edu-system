@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -10,12 +10,8 @@ function notFound(message: string): Error {
 export type NewLead = typeof schema.leads.$inferInsert;
 export type Lead = typeof schema.leads.$inferSelect;
 
-export async function listLeads(db: Database, tenantId: string) {
-  return db
-    .select()
-    .from(schema.leads)
-    .where(eq(schema.leads.tenantId, tenantId))
-    .orderBy(desc(schema.leads.createdAt));
+export async function listLeads(db: Database) {
+  return db.select().from(schema.leads).orderBy(desc(schema.leads.createdAt));
 }
 
 export async function createLead(db: Database, values: NewLead) {
@@ -23,11 +19,11 @@ export async function createLead(db: Database, values: NewLead) {
   return lead;
 }
 
-export async function requireLead(db: Database, tenantId: string, leadId: string) {
+export async function requireLead(db: Database, leadId: string) {
   const [lead] = await db
     .select()
     .from(schema.leads)
-    .where(and(eq(schema.leads.tenantId, tenantId), eq(schema.leads.id, leadId)))
+    .where(eq(schema.leads.id, leadId))
     .limit(1);
   if (!lead) {
     throw notFound('Lead not found');
@@ -53,15 +49,10 @@ export async function addFollowUp(db: Database, values: typeof schema.followUpRe
   return record;
 }
 
-export async function listFollowUps(db: Database, tenantId: string, leadId: string) {
+export async function listFollowUps(db: Database, leadId: string) {
   return db
     .select()
     .from(schema.followUpRecords)
-    .where(
-      and(
-        eq(schema.followUpRecords.tenantId, tenantId),
-        eq(schema.followUpRecords.leadId, leadId),
-      ),
-    )
+    .where(eq(schema.followUpRecords.leadId, leadId))
     .orderBy(desc(schema.followUpRecords.createdAt));
 }

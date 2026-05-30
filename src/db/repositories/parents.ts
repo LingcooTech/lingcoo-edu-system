@@ -6,11 +6,11 @@ import * as schema from '../schema.js';
 export type Parent = typeof schema.parents.$inferSelect;
 type SecurityPurpose = (typeof schema.parentSecurityPurposeEnum.enumValues)[number];
 
-export async function findParentByEmail(db: Database, tenantId: string, email: string) {
+export async function findParentByEmail(db: Database, email: string) {
   const [parent] = await db
     .select()
     .from(schema.parents)
-    .where(and(eq(schema.parents.tenantId, tenantId), eq(schema.parents.email, email)))
+    .where(eq(schema.parents.email, email))
     .limit(1);
   return parent ?? null;
 }

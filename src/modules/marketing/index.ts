@@ -3,7 +3,6 @@ import QRCode from 'qrcode';
 
 import * as marketingRepo from '../../db/repositories/marketing.js';
 import type { Campaign } from '../../db/repositories/marketing.js';
-import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
 const channelSchema = z.object({
@@ -54,32 +53,23 @@ export const marketingModule: AppModule = {
   async register(app) {
     // --- Channels (渠道) ---
 
-    app.get('/v1/tenants/:tenantId/channels', { preHandler: app.authenticate }, async (request) => {
-      const { tenantId } = request.params as { tenantId: string };
-      await requireTenant(app.db, tenantId);
-      return { channels: await marketingRepo.listChannels(app.db, tenantId) };
+    app.get('/v1/channels', { preHandler: app.authenticate }, async () => {
+      return { channels: await marketingRepo.listChannels(app.db) };
     });
 
-    app.post(
-      '/v1/tenants/:tenantId/channels',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-        const body = channelSchema.parse(request.body);
-        const channel = await marketingRepo.createChannel(app.db, { tenantId, ...body });
-        return { channel };
-      },
-    );
+    app.post('/v1/channels', { preHandler: app.authenticate }, async (request) => {
+      const body = channelSchema.parse(request.body);
+      const channel = await marketingRepo.createChannel(app.db, body);
+      return { channel };
+    });
 
     app.patch(
-      '/v1/tenants/:tenantId/channels/:channelId',
+      '/v1/channels/:channelId',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId, channelId } = request.params as { tenantId: string; channelId: string };
-        await requireTenant(app.db, tenantId);
+        const { channelId } = request.params as { channelId: string };
         const body = channelUpdateSchema.parse(request.body);
-        const channel = await marketingRepo.updateChannel(app.db, tenantId, channelId, body);
+        const channel = await marketingRepo.updateChannel(app.db, channelId, body);
         if (!channel) throw notFound('Channel not found');
         return { channel };
       },
@@ -87,45 +77,29 @@ export const marketingModule: AppModule = {
 
     // --- Campaigns (活动) ---
 
-    app.get(
-      '/v1/tenants/:tenantId/campaigns',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-        return { campaigns: await marketingRepo.listCampaigns(app.db, tenantId) };
-      },
-    );
+    app.get('/v1/campaigns', { preHandler: app.authenticate }, async () => {
+      return { campaigns: await marketingRepo.listCampaigns(app.db) };
+    });
 
-    app.post(
-      '/v1/tenants/:tenantId/campaigns',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
-        const body = campaignSchema.parse(request.body);
-        const channel = await marketingRepo.findChannel(app.db, tenantId, body.channelId);
-        if (!channel) throw notFound('Channel not found');
-        const campaign = await marketingRepo.createCampaign(app.db, { tenantId, ...body });
-        return { campaign };
-      },
-    );
+    app.post('/v1/campaigns', { preHandler: app.authenticate }, async (request) => {
+      const body = campaignSchema.parse(request.body);
+      const channel = await marketingRepo.findChannel(app.db, body.channelId);
+      if (!channel) throw notFound('Channel not found');
+      const campaign = await marketingRepo.createCampaign(app.db, body);
+      return { campaign };
+    });
 
     app.patch(
-      '/v1/tenants/:tenantId/campaigns/:campaignId',
+      '/v1/campaigns/:campaignId',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId, campaignId } = request.params as {
-          tenantId: string;
-          campaignId: string;
-        };
-        await requireTenant(app.db, tenantId);
+        const { campaignId } = request.params as { campaignId: string };
         const body = campaignUpdateSchema.parse(request.body);
         if (body.channelId) {
-          const channel = await marketingRepo.findChannel(app.db, tenantId, body.channelId);
+          const channel = await marketingRepo.findChannel(app.db, body.channelId);
           if (!channel) throw notFound('Channel not found');
         }
-        const campaign = await marketingRepo.updateCampaign(app.db, tenantId, campaignId, body);
+        const campaign = await marketingRepo.updateCampaign(app.db, campaignId, body);
         if (!campaign) throw notFound('Campaign not found');
         return { campaign };
       },
@@ -133,16 +107,12 @@ export const marketingModule: AppModule = {
 
     // Generates the QR code (PNG data URL) + the landing URL for a campaign.
     app.get(
-      '/v1/tenants/:tenantId/campaigns/:campaignId/qrcode',
+      '/v1/campaigns/:campaignId/qrcode',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId, campaignId } = request.params as {
-          tenantId: string;
-          campaignId: string;
-        };
-        await requireTenant(app.db, tenantId);
-        const campaign = await marketingRepo.requireCampaign(app.db, tenantId, campaignId);
-        const channel = await marketingRepo.findChannel(app.db, tenantId, campaign.channelId);
+        const { campaignId } = request.params as { campaignId: string };
+        const campaign = await marketingRepo.requireCampaign(app.db, campaignId);
+        const channel = await marketingRepo.findChannel(app.db, campaign.channelId);
         const landingUrl = buildLandingUrl(
           app.appEnv.PUBLIC_WEB_BASE_URL,
           channel?.code ?? null,

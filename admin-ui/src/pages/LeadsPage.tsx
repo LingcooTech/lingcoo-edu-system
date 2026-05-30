@@ -9,11 +9,10 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
-import { tenantId } from '@/lib/foundation';
 import { useApiResource } from '@/lib/useApiResource';
 import { formatDateTime } from '@/lib/utils';
 
-const LEADS_BASE = () => `/v1/tenants/${tenantId}/leads`;
+const LEADS_BASE = () => '/v1/leads';
 
 const statusOptions: LeadStatus[] = [
   'new',
@@ -38,11 +37,8 @@ const statusLabels: Record<LeadStatus, string> = {
 export function LeadsPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<Lead>(LEADS_BASE(), 'leads');
-  const { data: channels } = useApiResource<Channel>(`/v1/tenants/${tenantId}/channels`, 'channels');
-  const { data: campaigns } = useApiResource<Campaign>(
-    `/v1/tenants/${tenantId}/campaigns`,
-    'campaigns',
-  );
+  const { data: channels } = useApiResource<Channel>('/v1/channels', 'channels');
+  const { data: campaigns } = useApiResource<Campaign>('/v1/campaigns', 'campaigns');
 
   const channelName = useMemo(() => {
     const map = new Map(channels.map((c) => [c.id, c.name]));

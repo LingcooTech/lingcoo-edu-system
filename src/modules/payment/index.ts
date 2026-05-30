@@ -1,12 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-import type { Database } from '../../db/client.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import { findParentById } from '../../db/repositories/parents.js';
 import { requireCourse } from '../../db/repositories/catalog.js';
-import { findTenantBySlug, requireTenant } from '../../db/repositories/tenant.js';
 import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
 import type { AppModule } from '../types.js';
@@ -62,29 +60,19 @@ function getRawBody(body: unknown) {
   return '';
 }
 
-async function resolveTenantForParent(db: Database, tenantSlug: string, parentTenantId: string) {
-  const tenant = await findTenantBySlug(db, tenantSlug);
-  if (!tenant || tenant.id !== parentTenantId) {
-    throw httpError(404, 'Tenant not found');
-  }
-  return tenant;
-}
-
 export const paymentModule: AppModule = {
   name: 'payment',
   async register(app) {
     // --- Parent checkout (course-package purchase) ---
 
     app.post(
-      '/public/:tenantSlug/orders',
+      '/public/orders',
       { preHandler: app.authenticateParent },
       async (request) => {
-        const { tenantSlug } = request.params as { tenantSlug: string };
         const parent = request.parent!;
-        await resolveTenantForParent(app.db, tenantSlug, parent.tenantId);
 
         const body = createOrderSchema.parse(request.body);
-        const pkg = await packagesRepo.requirePackage(app.db, parent.tenantId, body.packageId);
+        const pkg = await packagesRepo.requirePackage(app.db, body.packageId);
         if (pkg.status !== 'active') {
           throw httpError(422, '该课时包已下架');
         }
@@ -100,7 +88,6 @@ export const paymentModule: AppModule = {
           .where(
             and(
               eq(schema.students.id, body.studentId),
-              eq(schema.students.tenantId, parent.tenantId),
               eq(schema.students.guardianId, parentRow.guardianId),
             ),
           )
@@ -113,12 +100,9 @@ export const paymentModule: AppModule = {
         if (!courseId) {
           throw httpError(422, '该课时包未绑定课程，请选择要购买的课程');
         }
-        // Validates the resolved course exists in this tenant (also guards a
-        // parent-supplied courseId from pointing at another tenant's course).
-        await requireCourse(app.db, parent.tenantId, courseId);
+        await requireCourse(app.db, courseId);
 
         const order = await financeRepo.createPackageOrder(app.db, {
-          tenantId: parent.tenantId,
           parentId: parent.id,
           packageId: pkg.id,
           studentId: student.id,
@@ -133,11 +117,10 @@ export const paymentModule: AppModule = {
     );
 
     app.post(
-      '/public/:tenantSlug/orders/:orderNo/payment-intent',
+      '/public/orders/:orderNo/payment-intent',
       { preHandler: app.authenticateParent },
       async (request) => {
-        const { tenantSlug, orderNo } = request.params as { tenantSlug: string; orderNo: string };
-        await resolveTenantForParent(app.db, tenantSlug, request.parent!.tenantId);
+        const { orderNo } = request.params as { orderNo: string };
         const payload = paymentIntentSchema.parse(request.body ?? {});
         return new PaymentService(app).createPaymentIntent({
           orderNo,
@@ -149,11 +132,10 @@ export const paymentModule: AppModule = {
     );
 
     app.post(
-      '/public/:tenantSlug/orders/:orderNo/payment-sync',
+      '/public/orders/:orderNo/payment-sync',
       { preHandler: app.authenticateParent },
       async (request) => {
-        const { tenantSlug, orderNo } = request.params as { tenantSlug: string; orderNo: string };
-        await resolveTenantForParent(app.db, tenantSlug, request.parent!.tenantId);
+        const { orderNo } = request.params as { orderNo: string };
         return new PaymentService(app).syncProviderPayment({
           orderNo,
           parentId: request.parent!.id,
@@ -163,11 +145,10 @@ export const paymentModule: AppModule = {
 
     // Development-only shortcut to drive the buy→credit loop without a provider.
     app.post(
-      '/public/:tenantSlug/orders/:orderNo/mock-pay',
+      '/public/orders/:orderNo/mock-pay',
       { preHandler: app.authenticateParent },
       async (request) => {
-        const { tenantSlug, orderNo } = request.params as { tenantSlug: string; orderNo: string };
-        await resolveTenantForParent(app.db, tenantSlug, request.parent!.tenantId);
+        const { orderNo } = request.params as { orderNo: string };
         return new PaymentService(app).markMockPaid({
           orderNo,
           parentId: request.parent!.id,
@@ -175,13 +156,7 @@ export const paymentModule: AppModule = {
       },
     );
 
-    app.get('/public/:tenantSlug/payment-providers', async (request) => {
-      const { tenantSlug } = request.params as { tenantSlug: string };
-      const tenant = await findTenantBySlug(app.db, tenantSlug);
-      if (!tenant) {
-        throw httpError(404, 'Tenant not found');
-      }
-
+    app.get('/public/payment-providers', async () => {
       const overview = await new PaymentSettingsService(app).getOverview({
         includeMock: app.appEnv.NODE_ENV !== 'production',
       });
@@ -272,31 +247,25 @@ export const paymentModule: AppModule = {
     // --- Admin payment configuration ---
 
     app.get(
-      '/v1/tenants/:tenantId/payment-providers',
+      '/v1/payment-providers',
       { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
+      async () => {
         return new PaymentSettingsService(app).getOverview({ includeMock: true });
       },
     );
 
     app.get(
-      '/v1/tenants/:tenantId/payment-settings',
+      '/v1/payment-settings',
       { preHandler: app.authenticate },
-      async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
+      async () => {
         return new PaymentSettingsService(app).getOverview();
       },
     );
 
     app.put(
-      '/v1/tenants/:tenantId/payment-settings/wechat',
+      '/v1/payment-settings/wechat',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
         const payload = wechatSettingsSchema.parse(request.body);
         const updatedBy = (request.user as { sub?: string }).sub;
         return new PaymentSettingsService(app).upsertWechatSettings(payload, updatedBy);
@@ -304,11 +273,9 @@ export const paymentModule: AppModule = {
     );
 
     app.put(
-      '/v1/tenants/:tenantId/payment-settings/alipay',
+      '/v1/payment-settings/alipay',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
         const payload = alipaySettingsSchema.parse(request.body);
         const updatedBy = (request.user as { sub?: string }).sub;
         return new PaymentSettingsService(app).upsertAlipaySettings(payload, updatedBy);
@@ -316,11 +283,9 @@ export const paymentModule: AppModule = {
     );
 
     app.delete(
-      '/v1/tenants/:tenantId/payment-settings/:provider',
+      '/v1/payment-settings/:provider',
       { preHandler: app.authenticate },
       async (request) => {
-        const { tenantId } = request.params as { tenantId: string };
-        await requireTenant(app.db, tenantId);
         const { provider } = providerParamSchema.parse(request.params);
         await new PaymentSettingsService(app).clearProviderSettings(provider);
         return { ok: true };

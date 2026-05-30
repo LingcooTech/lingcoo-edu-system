@@ -2,24 +2,24 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, BookOpenCheck, CheckCircle2, MapPin, Phone, ShieldCheck } from 'lucide-react';
 
-import { getTenantSlug, publicApi, type Course, type HomePayload } from '@/api/client';
+import { loadHome, type Course, type HomePayload } from '@/api/client';
 
 export function AboutPage() {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const tenantSlug = getTenantSlug();
 
   useEffect(() => {
-    publicApi<HomePayload>(`/public/${tenantSlug}/home`)
+    loadHome()
       .then(setHome)
       .finally(() => setLoading(false));
-  }, [tenantSlug]);
+  }, []);
 
   if (loading) {
     return <main className="px-5 py-10 text-center text-sm text-slate-500">加载中...</main>;
   }
 
-  const profile = home?.tenant.publicProfile;
+  const organization = home?.organization;
+  const profile = organization?.publicProfile;
   const courses = home?.featuredCourses ?? [];
   const campuses = home?.campuses ?? [];
 
@@ -39,7 +39,7 @@ export function AboutPage() {
           </Link>
           <div className="pt-16">
             <div className="text-sm font-semibold text-blue-100">
-              {home?.tenant.brandName ?? '儿童成长教室'}
+              {organization?.brandName ?? '儿童成长教室'}
             </div>
             <h1 className="mt-3 max-w-2xl text-4xl leading-tight font-bold">
               {profile?.headline ?? '社区里的儿童成长教室'}
@@ -108,7 +108,7 @@ export function AboutPage() {
           <div className="mt-4 space-y-3 text-sm text-slate-700">
             <div className="flex items-start gap-2">
               <MapPin className="mt-0.5 h-4 w-4 text-blue-600" />
-              <span>{home?.tenant.address ?? campuses[0]?.address ?? '社区门店一楼成长教室'}</span>
+              <span>{organization?.address ?? campuses[0]?.address ?? '社区门店一楼成长教室'}</span>
             </div>
             {campuses.map((campus) => (
               <div key={campus.id} className="ml-6 text-xs text-slate-500">
@@ -118,7 +118,7 @@ export function AboutPage() {
             ))}
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-blue-600" />
-              <span>{home?.tenant.phone ?? '请通过预约表单联系机构'}</span>
+              <span>{organization?.phone ?? '请通过预约表单联系机构'}</span>
             </div>
           </div>
           <Link

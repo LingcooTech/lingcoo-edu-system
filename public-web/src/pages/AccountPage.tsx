@@ -10,7 +10,6 @@ import {
   getParentToken,
   parentLogout,
   publicApi,
-  getTenantSlug,
   type ChildStudent,
   type ParentLessonAccount,
   type ParentOrder,
@@ -67,7 +66,7 @@ export function AccountPage() {
   async function verifyEmail() {
     setVerifyMessage('');
     try {
-      await publicApi(`/public/${getTenantSlug()}/auth/verify-email`, {
+      await publicApi('/public/auth/verify-email', {
         method: 'POST',
         body: JSON.stringify({ code: verifyCode.trim() }),
       });

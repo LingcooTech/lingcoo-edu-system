@@ -5,7 +5,6 @@ import { PageFrame } from '@/components/layout/PageFrame';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
-import { tenantId } from '@/lib/foundation';
 import { formatDateTime, money } from '@/lib/utils';
 import type { ClassSession } from '@/api/types';
 
@@ -27,7 +26,7 @@ export function DashboardPage() {
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
 
   useEffect(() => {
-    api<DashboardPayload>(`/v1/tenants/${tenantId}/dashboard`)
+    api<DashboardPayload>('/v1/dashboard')
       .then(setPayload)
       .catch(console.error);
   }, []);
