@@ -12,6 +12,7 @@ export interface Course {
   durationMinutes: number;
   priceAmount: number;
   summary: string;
+  content?: string;
 }
 
 export interface TrialSession {
@@ -186,6 +187,59 @@ export async function fetchCoursePackages() {
   return (
     await publicApi<{ coursePackages: CoursePackage[] }>(`/public/${TENANT_SLUG}/course-packages`)
   ).coursePackages;
+}
+
+// --- Acquisition funnel: course browsing + trial registration (no login) ---
+
+// The home payload feeds the homepage, the shared Layout (brand/contact) and
+// the About page, so it is fetched once and shared.
+let homeCache: Promise<HomePayload> | null = null;
+
+export function loadHome(): Promise<HomePayload> {
+  if (!homeCache) {
+    homeCache = publicApi<HomePayload>(`/public/${TENANT_SLUG}/home`);
+  }
+  return homeCache;
+}
+
+export async function fetchCourses() {
+  return (await publicApi<{ courses: Course[] }>(`/public/${TENANT_SLUG}/courses`)).courses;
+}
+
+export interface CourseDetail {
+  course: Course;
+  coursePackages: CoursePackage[];
+}
+
+export async function fetchCourse(slug: string) {
+  return publicApi<CourseDetail>(`/public/${TENANT_SLUG}/courses/${slug}`);
+}
+
+export async function fetchTrialSessions() {
+  return (
+    await publicApi<{ trialSessions: TrialSession[] }>(`/public/${TENANT_SLUG}/trial-sessions`)
+  ).trialSessions;
+}
+
+export interface TrialRegistrationInput {
+  guardianName: string;
+  phone: string;
+  studentName: string;
+  grade: string;
+  courseId?: string;
+  trialSessionId?: string;
+  // Attribution forwarded from the scanned QR landing URL.
+  source?: string;
+  campaign?: string;
+  course?: string;
+  medium?: string;
+}
+
+export async function submitTrialRegistration(input: TrialRegistrationInput) {
+  return publicApi<{ message: string }>(`/public/${TENANT_SLUG}/trial-registrations`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 // --- Checkout / payment ---

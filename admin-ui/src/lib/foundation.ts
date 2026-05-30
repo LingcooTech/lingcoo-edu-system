@@ -47,7 +47,7 @@ export const adminSections = [
     items: [
       { key: 'orders', label: '订单', path: '/orders', icon: ReceiptText },
       { key: 'resources', label: '老师教室', path: '/resources', icon: Users },
-      { key: 'marketing', label: '渠道', path: '/marketing', icon: Megaphone },
+      { key: 'marketing', label: '营销获客', path: '/marketing', icon: Megaphone },
       { key: 'settings', label: '设置', path: '/settings', icon: Settings },
     ],
   },
@@ -106,8 +106,8 @@ export const pageMeta: Record<string, { title: string; description: string; eyeb
   },
   marketing: {
     eyebrow: 'Marketing',
-    title: '渠道统计',
-    description: '跟踪海报、传单、微信群等招生来源。',
+    title: '营销获客',
+    description: '管理渠道、活动二维码与扫码报名的转化漏斗。',
   },
   settings: {
     eyebrow: 'Settings',

@@ -45,11 +45,16 @@ export const classStatusEnum = pgEnum('class_status', [
   'active',
   'completed',
   'paused',
+  'archived',
 ]);
 export const classSessionStatusEnum = pgEnum('class_session_status', [
   'scheduled',
   'completed',
   'cancelled',
+]);
+export const teachingResourceStatusEnum = pgEnum('teaching_resource_status', [
+  'active',
+  'archived',
 ]);
 export const attendanceStatusEnum = pgEnum('attendance_status', [
   'present',
@@ -143,6 +148,35 @@ export const channels = pgTable(
   },
   (table) => ({
     tenantCodeUnique: uniqueIndex('channels_tenant_code_idx').on(table.tenantId, table.code),
+  }),
+);
+
+export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'paused', 'archived']);
+
+// A campaign is a concrete acquisition push under a channel: a poster, a flyer,
+// a WeChat-group drop. Each carries a QR code that lands on the public web with
+// ?source=<channel.code>&campaign=<campaign.code>&course=<courseSlug>.
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    channelId: uuid('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    code: varchar('code', { length: 80 }).notNull(),
+    name: varchar('name', { length: 160 }).notNull(),
+    courseSlug: varchar('course_slug', { length: 120 }),
+    medium: varchar('medium', { length: 40 }).notNull().default('qr_code'),
+    status: campaignStatusEnum('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantCodeUnique: uniqueIndex('campaigns_tenant_code_idx').on(table.tenantId, table.code),
+    tenantChannelIdx: index('campaigns_tenant_channel_idx').on(table.tenantId, table.channelId),
   }),
 );
 
@@ -255,6 +289,9 @@ export const leads = pgTable(
     grade: varchar('grade', { length: 80 }).notNull(),
     status: leadStatusEnum('status').notNull().default('new'),
     source: varchar('source', { length: 80 }).notNull().default('unknown'),
+    channelId: uuid('channel_id').references(() => channels.id, { onDelete: 'set null' }),
+    campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
+    medium: varchar('medium', { length: 40 }),
     nextFollowUpAt: timestamp('next_follow_up_at', { withTimezone: true }),
     convertedStudentId: uuid('converted_student_id').references(() => students.id, {
       onDelete: 'set null',
@@ -265,6 +302,7 @@ export const leads = pgTable(
   (table) => ({
     tenantStatusIdx: index('leads_tenant_status_idx').on(table.tenantId, table.status),
     tenantSourceIdx: index('leads_tenant_source_idx').on(table.tenantId, table.source),
+    tenantChannelIdx: index('leads_tenant_channel_idx').on(table.tenantId, table.channelId),
   }),
 );
 
@@ -299,11 +337,13 @@ export const teachers = pgTable(
     specialties: jsonb('specialties')
       .notNull()
       .default(sql`'[]'::jsonb`),
+    status: teachingResourceStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     tenantIdx: index('teachers_tenant_idx').on(table.tenantId),
+    tenantStatusIdx: index('teachers_tenant_status_idx').on(table.tenantId, table.status),
   }),
 );
 
@@ -319,11 +359,13 @@ export const classrooms = pgTable(
       .references(() => campuses.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 120 }).notNull(),
     capacity: integer('capacity').notNull().default(8),
+    status: teachingResourceStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     tenantCampusIdx: index('classrooms_tenant_campus_idx').on(table.tenantId, table.campusId),
+    tenantStatusIdx: index('classrooms_tenant_status_idx').on(table.tenantId, table.status),
   }),
 );
 

@@ -41,6 +41,19 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+// Generic write helpers reused by resource CRUD pages (courses, campaigns, …).
+export function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return api<T>(path, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  return api<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export function apiDelete<T>(path: string): Promise<T> {
+  return api<T>(path, { method: 'DELETE' });
+}
+
 export async function login(email: string, password: string) {
   const payload = await api<{ token: string; user: unknown }>('/v1/auth/login', {
     method: 'POST',

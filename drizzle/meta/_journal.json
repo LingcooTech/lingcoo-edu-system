@@ -22,6 +22,20 @@
       "when": 1780041608067,
       "tag": "0002_high_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780118358984,
+      "tag": "0003_foamy_pretty_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780119103587,
+      "tag": "0004_vengeful_luke_cage",
+      "breakpoints": true
     }
   ]
 }

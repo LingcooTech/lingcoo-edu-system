@@ -6,7 +6,7 @@ import { findTenantBySlug, requireTenant } from '../../db/repositories/tenant.js
 import type { AppModule } from '../types.js';
 
 const courseSchema = z.object({
-  campusId: z.string(),
+  campusId: z.string().optional(),
   slug: z.string().min(2),
   name: z.string().min(1),
   category: z.string().min(1),
@@ -15,8 +15,11 @@ const courseSchema = z.object({
   durationMinutes: z.number().int().positive(),
   priceAmount: z.number().int().nonnegative(),
   summary: z.string().default(''),
+  content: z.string().default(''),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
 });
+
+const courseUpdateSchema = courseSchema.partial();
 
 const packageSchema = z.object({
   courseId: z.string().optional(),
@@ -45,6 +48,36 @@ export const catalogModule: AppModule = {
       const course = await catalogRepo.createCourse(app.db, { tenantId, ...body });
       return { course };
     });
+
+    app.patch(
+      '/v1/tenants/:tenantId/courses/:courseId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, courseId } = request.params as { tenantId: string; courseId: string };
+        await requireTenant(app.db, tenantId);
+        const body = courseUpdateSchema.parse(request.body);
+        const course = await catalogRepo.updateCourse(app.db, tenantId, courseId, body);
+        if (!course) {
+          throw Object.assign(new Error('Course not found'), { statusCode: 404 });
+        }
+        return { course };
+      },
+    );
+
+    // Soft delete (archive). Courses are referenced by orders/leads/classes.
+    app.delete(
+      '/v1/tenants/:tenantId/courses/:courseId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, courseId } = request.params as { tenantId: string; courseId: string };
+        await requireTenant(app.db, tenantId);
+        const course = await catalogRepo.archiveCourse(app.db, tenantId, courseId);
+        if (!course) {
+          throw Object.assign(new Error('Course not found'), { statusCode: 404 });
+        }
+        return { course };
+      },
+    );
 
     // --- Course packages (课时包) ---
 
@@ -88,6 +121,23 @@ export const catalogModule: AppModule = {
       },
     );
 
+    app.delete(
+      '/v1/tenants/:tenantId/course-packages/:packageId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, packageId } = request.params as {
+          tenantId: string;
+          packageId: string;
+        };
+        await requireTenant(app.db, tenantId);
+        const coursePackage = await packagesRepo.archivePackage(app.db, tenantId, packageId);
+        if (!coursePackage) {
+          throw Object.assign(new Error('Course package not found'), { statusCode: 404 });
+        }
+        return { coursePackage };
+      },
+    );
+
     // Public: active packages for a tenant (parent purchase surface).
     app.get('/public/:tenantSlug/course-packages', async (request) => {
       const { tenantSlug } = request.params as { tenantSlug: string };
@@ -96,6 +146,28 @@ export const catalogModule: AppModule = {
         throw Object.assign(new Error('Tenant not found'), { statusCode: 404 });
       }
       return { coursePackages: await packagesRepo.listActivePackages(app.db, tenant.id) };
+    });
+
+    // Public: a single published course by slug (parent course-detail page).
+    app.get('/public/:tenantSlug/courses/:courseSlug', async (request) => {
+      const { tenantSlug, courseSlug } = request.params as {
+        tenantSlug: string;
+        courseSlug: string;
+      };
+      const tenant = await findTenantBySlug(app.db, tenantSlug);
+      if (!tenant) {
+        throw Object.assign(new Error('Tenant not found'), { statusCode: 404 });
+      }
+      const course = await catalogRepo.findPublishedCourseBySlug(app.db, tenant.id, courseSlug);
+      if (!course) {
+        throw Object.assign(new Error('Course not found'), { statusCode: 404 });
+      }
+      const coursePackages = await packagesRepo.listActivePackagesForCourse(
+        app.db,
+        tenant.id,
+        course.id,
+      );
+      return { course, coursePackages };
     });
   },
 };

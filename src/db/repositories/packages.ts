@@ -31,6 +31,24 @@ export async function listActivePackages(db: Database, tenantId: string) {
     .orderBy(desc(schema.coursePackages.createdAt));
 }
 
+export async function listActivePackagesForCourse(
+  db: Database,
+  tenantId: string,
+  courseId: string,
+) {
+  return db
+    .select()
+    .from(schema.coursePackages)
+    .where(
+      and(
+        eq(schema.coursePackages.tenantId, tenantId),
+        eq(schema.coursePackages.courseId, courseId),
+        eq(schema.coursePackages.status, 'active'),
+      ),
+    )
+    .orderBy(desc(schema.coursePackages.createdAt));
+}
+
 export async function createPackage(db: Database, values: NewCoursePackage) {
   const [pkg] = await db.insert(schema.coursePackages).values(values).returning();
   return pkg;
@@ -53,6 +71,10 @@ export async function updatePackage(
     )
     .returning();
   return pkg ?? null;
+}
+
+export async function archivePackage(db: Database, tenantId: string, packageId: string) {
+  return updatePackage(db, tenantId, packageId, { status: 'archived' });
 }
 
 export async function requirePackage(db: Database, tenantId: string, packageId: string) {

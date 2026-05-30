@@ -16,6 +16,24 @@ export async function createClass(db: Database, values: typeof schema.classes.$i
   return classGroup;
 }
 
+export async function updateClass(
+  db: Database,
+  tenantId: string,
+  classId: string,
+  patch: Partial<typeof schema.classes.$inferInsert>,
+) {
+  const [classGroup] = await db
+    .update(schema.classes)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(and(eq(schema.classes.tenantId, tenantId), eq(schema.classes.id, classId)))
+    .returning();
+  return classGroup ?? null;
+}
+
+export async function archiveClass(db: Database, tenantId: string, classId: string) {
+  return updateClass(db, tenantId, classId, { status: 'archived' });
+}
+
 export async function countActiveEnrollments(db: Database, classId: string) {
   const rows = await db
     .select({ id: schema.classEnrollments.id })
@@ -42,6 +60,20 @@ export async function createClassSession(
   return session;
 }
 
+export async function updateClassSession(
+  db: Database,
+  tenantId: string,
+  sessionId: string,
+  patch: Partial<typeof schema.classSessions.$inferInsert>,
+) {
+  const [session] = await db
+    .update(schema.classSessions)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(and(eq(schema.classSessions.tenantId, tenantId), eq(schema.classSessions.id, sessionId)))
+    .returning();
+  return session ?? null;
+}
+
 /**
  * Detects a classroom/teacher time overlap for a non-cancelled session.
  * Mirrors the in-memory overlap rule: aStart < bEnd && bStart < aEnd, where a
@@ -55,6 +87,7 @@ export async function findScheduleConflict(
     endsAt: Date;
     classroomId: string;
     teacherId: string;
+    ignoreSessionId?: string;
   },
 ) {
   const candidates = await db
@@ -70,6 +103,7 @@ export async function findScheduleConflict(
   return (
     candidates.find(
       (session) =>
+        session.id !== input.ignoreSessionId &&
         input.startsAt < session.endsAt &&
         session.startsAt < input.endsAt &&
         (session.classroomId === input.classroomId || session.teacherId === input.teacherId),
@@ -82,6 +116,10 @@ export async function markSessionCompleted(db: Database, sessionId: string) {
     .update(schema.classSessions)
     .set({ status: 'completed', updatedAt: new Date() })
     .where(eq(schema.classSessions.id, sessionId));
+}
+
+export async function cancelClassSession(db: Database, tenantId: string, sessionId: string) {
+  return updateClassSession(db, tenantId, sessionId, { status: 'cancelled' });
 }
 
 export async function findSession(db: Database, tenantId: string, sessionId: string) {
@@ -100,4 +138,67 @@ export async function findClass(db: Database, classId: string) {
     .where(eq(schema.classes.id, classId))
     .limit(1);
   return classGroup ?? null;
+}
+
+export async function listEnrollments(db: Database, tenantId: string, classId: string) {
+  return db
+    .select()
+    .from(schema.classEnrollments)
+    .where(
+      and(
+        eq(schema.classEnrollments.tenantId, tenantId),
+        eq(schema.classEnrollments.classId, classId),
+        eq(schema.classEnrollments.active, true),
+      ),
+    )
+    .orderBy(asc(schema.classEnrollments.createdAt));
+}
+
+export async function createEnrollment(
+  db: Database,
+  values: typeof schema.classEnrollments.$inferInsert,
+) {
+  const [existing] = await db
+    .select()
+    .from(schema.classEnrollments)
+    .where(
+      and(
+        eq(schema.classEnrollments.tenantId, values.tenantId),
+        eq(schema.classEnrollments.classId, values.classId),
+        eq(schema.classEnrollments.studentId, values.studentId),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    const [enrollment] = await db
+      .update(schema.classEnrollments)
+      .set({ active: true })
+      .where(eq(schema.classEnrollments.id, existing.id))
+      .returning();
+    return enrollment;
+  }
+
+  const [enrollment] = await db.insert(schema.classEnrollments).values(values).returning();
+  return enrollment;
+}
+
+export async function removeEnrollment(
+  db: Database,
+  tenantId: string,
+  classId: string,
+  enrollmentId: string,
+) {
+  const [enrollment] = await db
+    .update(schema.classEnrollments)
+    .set({ active: false })
+    .where(
+      and(
+        eq(schema.classEnrollments.tenantId, tenantId),
+        eq(schema.classEnrollments.classId, classId),
+        eq(schema.classEnrollments.id, enrollmentId),
+      ),
+    )
+    .returning();
+  return enrollment ?? null;
 }

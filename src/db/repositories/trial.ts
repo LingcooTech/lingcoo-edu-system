@@ -32,6 +32,29 @@ export async function createTrialSession(db: Database, values: NewTrialSession) 
   return session;
 }
 
+export async function updateTrialSession(
+  db: Database,
+  tenantId: string,
+  trialSessionId: string,
+  patch: Partial<NewTrialSession>,
+) {
+  const [session] = await db
+    .update(schema.trialSessions)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.trialSessions.tenantId, tenantId),
+        eq(schema.trialSessions.id, trialSessionId),
+      ),
+    )
+    .returning();
+  return session ?? null;
+}
+
+export async function cancelTrialSession(db: Database, tenantId: string, trialSessionId: string) {
+  return updateTrialSession(db, tenantId, trialSessionId, { status: 'cancelled' });
+}
+
 export async function incrementBookedCount(db: Database, trialSessionId: string) {
   const [session] = await db
     .select()

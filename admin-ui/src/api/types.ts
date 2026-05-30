@@ -9,6 +9,8 @@ export type LeadStatus =
 
 export interface Course {
   id: string;
+  slug: string;
+  campusId?: string | null;
   name: string;
   category: string;
   ageRange: string;
@@ -17,14 +19,38 @@ export interface Course {
   priceAmount: number;
   status: string;
   summary: string;
+  content?: string;
 }
 
 export interface CoursePackage {
   id: string;
+  courseId?: string | null;
   name: string;
   description: string;
   lessonCount: number;
   priceAmount: number;
+  status: string;
+}
+
+export interface Campus {
+  id: string;
+  name: string;
+  address?: string | null;
+}
+
+export interface Teacher {
+  id: string;
+  name: string;
+  phone?: string | null;
+  specialties: string[];
+  status: string;
+}
+
+export interface Classroom {
+  id: string;
+  campusId: string;
+  name: string;
+  capacity: number;
   status: string;
 }
 
@@ -36,12 +62,74 @@ export interface Lead {
   grade: string;
   status: LeadStatus;
   source: string;
+  courseId?: string | null;
+  trialSessionId?: string | null;
+  channelId?: string | null;
+  campaignId?: string | null;
+  medium?: string | null;
+  nextFollowUpAt?: string | null;
+  convertedStudentId?: string | null;
   createdAt: string;
+}
+
+export interface FollowUp {
+  id: string;
+  content: string;
+  nextFollowUpAt?: string | null;
+  createdAt: string;
+}
+
+export interface Channel {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface Campaign {
+  id: string;
+  channelId: string;
+  code: string;
+  name: string;
+  courseSlug?: string | null;
+  medium: string;
+  status: string;
+}
+
+export interface CampaignFunnelRow {
+  campaignId: string;
+  code: string;
+  name: string;
+  channelCode: string | null;
+  channelName: string | null;
+  courseSlug?: string | null;
+  medium: string;
+  status: string;
+  total: number;
+  new: number;
+  contacted: number;
+  trialBooked: number;
+  trialAttended: number;
+  paid: number;
+  conversionRate: number;
+}
+
+export interface ChannelFunnelRow {
+  channelId: string;
+  code: string;
+  name: string;
+  total: number;
+  new: number;
+  contacted: number;
+  trialBooked: number;
+  trialAttended: number;
+  paid: number;
+  conversionRate: number;
 }
 
 export interface TrialSession {
   id: string;
   title: string;
+  campusId: string;
   courseId: string;
   startsAt: string;
   endsAt: string;
@@ -52,8 +140,10 @@ export interface TrialSession {
 
 export interface Student {
   id: string;
+  guardianId?: string | null;
   name: string;
   grade: string;
+  school?: string | null;
   status: string;
   guardian?: { name: string; phone: string };
   lessonAccounts?: Array<{ balance: number; courseId: string }>;
@@ -61,6 +151,10 @@ export interface Student {
 
 export interface ClassGroup {
   id: string;
+  campusId: string;
+  courseId: string;
+  teacherId: string;
+  classroomId: string;
   name: string;
   status: string;
   capacity: number;
@@ -72,6 +166,9 @@ export interface ClassGroup {
 
 export interface ClassSession {
   id: string;
+  classId: string;
+  teacherId: string;
+  classroomId: string;
   startsAt: string;
   endsAt: string;
   topic: string;

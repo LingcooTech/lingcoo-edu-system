@@ -69,6 +69,16 @@ export const crmModule: AppModule = {
       },
     );
 
+    app.get(
+      '/v1/tenants/:tenantId/leads/:leadId/follow-ups',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, leadId } = request.params as { tenantId: string; leadId: string };
+        await crmRepo.requireLead(app.db, tenantId, leadId);
+        return { followUps: await crmRepo.listFollowUps(app.db, tenantId, leadId) };
+      },
+    );
+
     app.post(
       '/v1/tenants/:tenantId/leads/:leadId/convert',
       { preHandler: app.authenticate },

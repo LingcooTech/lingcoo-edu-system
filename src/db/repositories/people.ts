@@ -42,6 +42,20 @@ export async function createStudent(db: Database, values: typeof schema.students
   return student;
 }
 
+export async function updateStudent(
+  db: Database,
+  tenantId: string,
+  studentId: string,
+  patch: Partial<typeof schema.students.$inferInsert>,
+) {
+  const [student] = await db
+    .update(schema.students)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(and(eq(schema.students.tenantId, tenantId), eq(schema.students.id, studentId)))
+    .returning();
+  return student ?? null;
+}
+
 export async function requireStudent(db: Database, tenantId: string, studentId: string) {
   const [student] = await db
     .select()

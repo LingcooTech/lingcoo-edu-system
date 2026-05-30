@@ -52,3 +52,16 @@ export async function addFollowUp(db: Database, values: typeof schema.followUpRe
   const [record] = await db.insert(schema.followUpRecords).values(values).returning();
   return record;
 }
+
+export async function listFollowUps(db: Database, tenantId: string, leadId: string) {
+  return db
+    .select()
+    .from(schema.followUpRecords)
+    .where(
+      and(
+        eq(schema.followUpRecords.tenantId, tenantId),
+        eq(schema.followUpRecords.leadId, leadId),
+      ),
+    )
+    .orderBy(desc(schema.followUpRecords.createdAt));
+}

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as peopleRepo from '../../db/repositories/people.js';
 import { requireTenant } from '../../db/repositories/tenant.js';
 import type { AppModule } from '../types.js';
 
@@ -13,8 +14,12 @@ const classSchema = z.object({
   classroomId: z.string(),
   name: z.string().min(1),
   capacity: z.number().int().positive().default(8),
-  status: z.enum(['recruiting', 'active', 'completed', 'paused']).default('recruiting'),
+  status: z
+    .enum(['recruiting', 'active', 'completed', 'paused', 'archived'])
+    .default('recruiting'),
 });
+
+const classUpdateSchema = classSchema.partial();
 
 const sessionSchema = z.object({
   classId: z.string(),
@@ -23,7 +28,23 @@ const sessionSchema = z.object({
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
   topic: z.string().min(1),
+  status: z.enum(['scheduled', 'completed', 'cancelled']).default('scheduled'),
 });
+
+const sessionCreateSchema = sessionSchema.omit({ status: true });
+const sessionUpdateSchema = sessionSchema.partial();
+
+const enrollmentSchema = z.object({
+  studentId: z.string(),
+});
+
+function notFound(message: string): Error {
+  return Object.assign(new Error(message), { statusCode: 404 });
+}
+
+function conflict(message = 'Classroom or teacher time conflict'): Error {
+  return Object.assign(new Error(message), { statusCode: 409 });
+}
 
 export const schedulingModule: AppModule = {
   name: 'scheduling',
@@ -63,6 +84,31 @@ export const schedulingModule: AppModule = {
       return { class: classGroup };
     });
 
+    app.patch(
+      '/v1/tenants/:tenantId/classes/:classId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, classId } = request.params as { tenantId: string; classId: string };
+        await requireTenant(app.db, tenantId);
+        const body = classUpdateSchema.parse(request.body);
+        const classGroup = await schedulingRepo.updateClass(app.db, tenantId, classId, body);
+        if (!classGroup) throw notFound('Class not found');
+        return { class: classGroup };
+      },
+    );
+
+    app.delete(
+      '/v1/tenants/:tenantId/classes/:classId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, classId } = request.params as { tenantId: string; classId: string };
+        await requireTenant(app.db, tenantId);
+        const classGroup = await schedulingRepo.archiveClass(app.db, tenantId, classId);
+        if (!classGroup) throw notFound('Class not found');
+        return { class: classGroup };
+      },
+    );
+
     app.get(
       '/v1/tenants/:tenantId/class-sessions',
       { preHandler: app.authenticate },
@@ -97,7 +143,7 @@ export const schedulingModule: AppModule = {
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
         await requireTenant(app.db, tenantId);
-        const body = sessionSchema.parse(request.body);
+        const body = sessionCreateSchema.parse(request.body);
 
         const startsAt = new Date(body.startsAt);
         const endsAt = new Date(body.endsAt);
@@ -124,6 +170,136 @@ export const schedulingModule: AppModule = {
           status: 'scheduled',
         });
         return { classSession };
+      },
+    );
+
+    app.patch(
+      '/v1/tenants/:tenantId/class-sessions/:sessionId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, sessionId } = request.params as {
+          tenantId: string;
+          sessionId: string;
+        };
+        await requireTenant(app.db, tenantId);
+        const current = await schedulingRepo.findSession(app.db, tenantId, sessionId);
+        if (!current) throw notFound('Class session not found');
+        const body = sessionUpdateSchema.parse(request.body);
+
+        const startsAt = body.startsAt ? new Date(body.startsAt) : current.startsAt;
+        const endsAt = body.endsAt ? new Date(body.endsAt) : current.endsAt;
+        const classroomId = body.classroomId ?? current.classroomId;
+        const teacherId = body.teacherId ?? current.teacherId;
+        const nextStatus = body.status ?? current.status;
+
+        if (nextStatus !== 'cancelled') {
+          const overlap = await schedulingRepo.findScheduleConflict(app.db, {
+            tenantId,
+            startsAt,
+            endsAt,
+            classroomId,
+            teacherId,
+            ignoreSessionId: sessionId,
+          });
+          if (overlap) throw conflict();
+        }
+
+        const classSession = await schedulingRepo.updateClassSession(app.db, tenantId, sessionId, {
+          ...body,
+          startsAt,
+          endsAt,
+          classroomId,
+          teacherId,
+          status: nextStatus,
+        });
+        if (!classSession) throw notFound('Class session not found');
+        return { classSession };
+      },
+    );
+
+    app.delete(
+      '/v1/tenants/:tenantId/class-sessions/:sessionId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, sessionId } = request.params as {
+          tenantId: string;
+          sessionId: string;
+        };
+        await requireTenant(app.db, tenantId);
+        const classSession = await schedulingRepo.cancelClassSession(app.db, tenantId, sessionId);
+        if (!classSession) throw notFound('Class session not found');
+        return { classSession };
+      },
+    );
+
+    app.get(
+      '/v1/tenants/:tenantId/classes/:classId/enrollments',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, classId } = request.params as { tenantId: string; classId: string };
+        await requireTenant(app.db, tenantId);
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup || classGroup.tenantId !== tenantId) throw notFound('Class not found');
+        const [enrollments, students] = await Promise.all([
+          schedulingRepo.listEnrollments(app.db, tenantId, classId),
+          peopleRepo.listStudents(app.db, tenantId),
+        ]);
+        const studentById = new Map(students.map((student) => [student.id, student]));
+        return {
+          enrollments: enrollments.map((enrollment) => ({
+            ...enrollment,
+            student: studentById.get(enrollment.studentId),
+          })),
+        };
+      },
+    );
+
+    app.post(
+      '/v1/tenants/:tenantId/classes/:classId/enrollments',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, classId } = request.params as { tenantId: string; classId: string };
+        await requireTenant(app.db, tenantId);
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup || classGroup.tenantId !== tenantId) throw notFound('Class not found');
+        const body = enrollmentSchema.parse(request.body);
+        await peopleRepo.requireStudent(app.db, tenantId, body.studentId);
+
+        const enrolledCount = await schedulingRepo.countActiveEnrollments(app.db, classId);
+        if (enrolledCount >= classGroup.capacity) {
+          throw conflict('Class capacity reached');
+        }
+
+        const enrollment = await schedulingRepo.createEnrollment(app.db, {
+          tenantId,
+          classId,
+          studentId: body.studentId,
+          active: true,
+        });
+        return { enrollment };
+      },
+    );
+
+    app.delete(
+      '/v1/tenants/:tenantId/classes/:classId/enrollments/:enrollmentId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, classId, enrollmentId } = request.params as {
+          tenantId: string;
+          classId: string;
+          enrollmentId: string;
+        };
+        await requireTenant(app.db, tenantId);
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup || classGroup.tenantId !== tenantId) throw notFound('Class not found');
+        const enrollment = await schedulingRepo.removeEnrollment(
+          app.db,
+          tenantId,
+          classId,
+          enrollmentId,
+        );
+        if (!enrollment) throw notFound('Enrollment not found');
+        return { enrollment };
       },
     );
   },

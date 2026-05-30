@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as marketingRepo from '../../db/repositories/marketing.js';
 import { findTenantBySlug, listCampuses, requireTenant } from '../../db/repositories/tenant.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import { readTenantPublicProfile } from '../../lib/public-profile.js';
@@ -17,6 +18,8 @@ const trialSessionSchema = z.object({
   status: z.enum(['open', 'closed', 'cancelled']).default('open'),
 });
 
+const trialSessionUpdateSchema = trialSessionSchema.partial();
+
 const registrationSchema = z.object({
   courseId: z.string().optional(),
   trialSessionId: z.string().optional(),
@@ -25,10 +28,22 @@ const registrationSchema = z.object({
   studentName: z.string().min(1),
   grade: z.string().min(1),
   source: z.string().default('unknown'),
+  // Attribution forwarded from the scanned QR landing URL.
+  campaign: z.string().optional(),
+  course: z.string().optional(),
+  medium: z.string().optional(),
 });
 
 function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
+}
+
+function normalizeTrialSessionPatch(body: z.infer<typeof trialSessionUpdateSchema>) {
+  return {
+    ...body,
+    startsAt: body.startsAt ? new Date(body.startsAt) : undefined,
+    endsAt: body.endsAt ? new Date(body.endsAt) : undefined,
+  };
 }
 
 export const trialModule: AppModule = {
@@ -82,16 +97,32 @@ export const trialModule: AppModule = {
       const body = registrationSchema.parse(request.body);
       const campusId = await trialRepo.firstCampusId(app.db, tenant.id);
 
+      // Prefer the explicit form selection; fall back to the course slug carried
+      // in the QR attribution when the form had no course picker.
+      let courseId = body.courseId ?? null;
+      if (!courseId && body.course) {
+        const course = await catalogRepo.findPublishedCourseBySlug(app.db, tenant.id, body.course);
+        courseId = course?.id ?? null;
+      }
+
+      const { channelId, campaignId } = await marketingRepo.resolveAttribution(app.db, tenant.id, {
+        source: body.source,
+        campaignCode: body.campaign,
+      });
+
       const lead = await crmRepo.createLead(app.db, {
         tenantId: tenant.id,
         campusId,
-        courseId: body.courseId,
+        courseId: courseId ?? undefined,
         trialSessionId: body.trialSessionId,
         guardianName: body.guardianName,
         phone: body.phone,
         studentName: body.studentName,
         grade: body.grade,
         source: body.source,
+        channelId,
+        campaignId,
+        medium: body.medium ?? null,
         status: 'new',
       });
 
@@ -132,6 +163,45 @@ export const trialModule: AppModule = {
           status: body.status,
           bookedCount: 0,
         });
+        return { trialSession };
+      },
+    );
+
+    app.patch(
+      '/v1/tenants/:tenantId/trial-sessions/:trialSessionId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, trialSessionId } = request.params as {
+          tenantId: string;
+          trialSessionId: string;
+        };
+        await requireTenant(app.db, tenantId);
+        const body = trialSessionUpdateSchema.parse(request.body);
+        if (body.courseId) {
+          await catalogRepo.requireCourse(app.db, tenantId, body.courseId);
+        }
+        const trialSession = await trialRepo.updateTrialSession(
+          app.db,
+          tenantId,
+          trialSessionId,
+          normalizeTrialSessionPatch(body),
+        );
+        if (!trialSession) throw notFound('Trial session not found');
+        return { trialSession };
+      },
+    );
+
+    app.delete(
+      '/v1/tenants/:tenantId/trial-sessions/:trialSessionId',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId, trialSessionId } = request.params as {
+          tenantId: string;
+          trialSessionId: string;
+        };
+        await requireTenant(app.db, tenantId);
+        const trialSession = await trialRepo.cancelTrialSession(app.db, tenantId, trialSessionId);
+        if (!trialSession) throw notFound('Trial session not found');
         return { trialSession };
       },
     );

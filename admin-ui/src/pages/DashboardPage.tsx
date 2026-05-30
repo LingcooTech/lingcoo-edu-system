@@ -17,6 +17,8 @@ interface DashboardPayload {
     paidStudents: number;
     monthlyRevenue: number;
     lowLessonAccounts: number;
+    attributedLeads: number;
+    activeCampaigns: number;
   };
   todaySessions: ClassSession[];
 }
@@ -36,6 +38,8 @@ export function DashboardPage() {
         <MetricCard label="总线索" value={payload?.metrics.totalLeads ?? '-'} />
         <MetricCard label="待跟进" value={payload?.metrics.pendingFollowUps ?? '-'} />
         <MetricCard label="已预约试听" value={payload?.metrics.bookedTrials ?? '-'} />
+        <MetricCard label="归因线索" value={payload?.metrics.attributedLeads ?? '-'} />
+        <MetricCard label="投放活动" value={payload?.metrics.activeCampaigns ?? '-'} />
         <MetricCard
           label="本月收入"
           value={payload ? money(payload.metrics.monthlyRevenue) : '-'}

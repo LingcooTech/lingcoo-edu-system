@@ -4,6 +4,7 @@ import * as peopleRepo from '../../db/repositories/people.js';
 import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
+import * as marketingRepo from '../../db/repositories/marketing.js';
 import {
   mergeTenantPublicProfile,
   normalizeTenantPublicProfile,
@@ -26,6 +27,16 @@ export const tenantModule: AppModule = {
       const subject = (request.user as { sub: string }).sub;
       return { tenants: await tenantRepo.listTenantsForUser(app.db, subject) };
     });
+
+    app.get(
+      '/v1/tenants/:tenantId/campuses',
+      { preHandler: app.authenticate },
+      async (request) => {
+        const { tenantId } = request.params as { tenantId: string };
+        await tenantRepo.requireTenant(app.db, tenantId);
+        return { campuses: await tenantRepo.listCampuses(app.db, tenantId) };
+      },
+    );
 
     app.get(
       '/v1/tenants/:tenantId/public-profile',
@@ -58,13 +69,17 @@ export const tenantModule: AppModule = {
       async (request) => {
         const { tenantId } = request.params as { tenantId: string };
 
-        const [leads, students, accounts, sessions, monthlyRevenue] = await Promise.all([
-          crmRepo.listLeads(app.db, tenantId),
-          peopleRepo.listStudents(app.db, tenantId),
-          lessonRepo.listLessonAccounts(app.db, tenantId),
-          schedulingRepo.listClassSessions(app.db, tenantId),
-          financeRepo.sumPaidRevenue(app.db, tenantId),
-        ]);
+        const [leads, students, accounts, sessions, classes, campaigns, monthlyRevenue] =
+          await Promise.all([
+            crmRepo.listLeads(app.db, tenantId),
+            peopleRepo.listStudents(app.db, tenantId),
+            lessonRepo.listLessonAccounts(app.db, tenantId),
+            schedulingRepo.listClassSessions(app.db, tenantId),
+            schedulingRepo.listClasses(app.db, tenantId),
+            marketingRepo.listCampaigns(app.db, tenantId),
+            financeRepo.sumPaidRevenue(app.db, tenantId),
+          ]);
+        const classById = new Map(classes.map((item) => [item.id, item]));
 
         return {
           metrics: {
@@ -75,8 +90,13 @@ export const tenantModule: AppModule = {
             paidStudents: students.length,
             monthlyRevenue,
             lowLessonAccounts: accounts.filter((item) => item.balance <= 3).length,
+            attributedLeads: leads.filter((item) => item.channelId || item.campaignId).length,
+            activeCampaigns: campaigns.filter((item) => item.status === 'active').length,
           },
-          todaySessions: sessions.slice(0, 5),
+          todaySessions: sessions.slice(0, 5).map((session) => ({
+            ...session,
+            class: classById.get(session.classId),
+          })),
         };
       },
     );

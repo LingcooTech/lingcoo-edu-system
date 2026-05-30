@@ -93,12 +93,13 @@ async function seed(): Promise<void> {
   const campusId = campus!.id;
 
   // Channels.
+  const channelIds: Record<string, string> = {};
   for (const channel of [
     { code: 'door_poster', name: '门口海报' },
     { code: 'flyer', name: '传单' },
     { code: 'wechat_group', name: '微信群' },
   ]) {
-    const existing = await findOne(
+    let existing = await findOne(
       db
         .select()
         .from(schema.channels)
@@ -106,8 +107,11 @@ async function seed(): Promise<void> {
         .limit(1),
     );
     if (!existing) {
-      await db.insert(schema.channels).values({ tenantId, ...channel });
+      existing = await findOne(
+        db.insert(schema.channels).values({ tenantId, ...channel }).returning(),
+      );
     }
+    channelIds[channel.code] = existing!.id;
   }
 
   // Courses.
@@ -155,6 +159,45 @@ async function seed(): Promise<void> {
     courseIds[def.slug] = course!.id;
   }
   const calligraphyCourseId = courseIds['hard-pen-calligraphy'];
+
+  // Campaigns with QR landing URLs (marketing acquisition attribution).
+  for (const campaign of [
+    {
+      channelId: channelIds.door_poster,
+      code: 'summer_bridge',
+      name: '暑期幼小衔接海报',
+      courseSlug: 'hard-pen-calligraphy',
+      medium: 'qr_code',
+      status: 'active' as const,
+    },
+    {
+      channelId: channelIds.flyer,
+      code: 'art_flyer',
+      name: '创意美术传单',
+      courseSlug: 'creative-art',
+      medium: 'qr_code',
+      status: 'active' as const,
+    },
+    {
+      channelId: channelIds.wechat_group,
+      code: 'weekend_trial',
+      name: '周末公开课微信群',
+      courseSlug: 'hard-pen-calligraphy',
+      medium: 'wechat_group',
+      status: 'active' as const,
+    },
+  ]) {
+    const existing = await findOne(
+      db
+        .select()
+        .from(schema.campaigns)
+        .where(and(eq(schema.campaigns.tenantId, tenantId), eq(schema.campaigns.code, campaign.code)))
+        .limit(1),
+    );
+    if (!existing) {
+      await db.insert(schema.campaigns).values({ tenantId, ...campaign });
+    }
+  }
 
   // Open trial session (周六硬笔书法公开课).
   const trialTitle = '周六硬笔书法公开课';
