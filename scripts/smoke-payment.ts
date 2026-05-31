@@ -59,28 +59,29 @@ async function main() {
       status: 'active',
     }));
 
-  // find-or-create a parent linked to the student's guardian
-  let [parent] = await db
+  // find-or-create a parent account linked to the student's guardian
+  let [account] = await db
     .select()
-    .from(schema.parents)
-    .where(eq(schema.parents.email, 'smoke-parent@fd-edu.local'))
+    .from(schema.accounts)
+    .where(eq(schema.accounts.email, 'smoke-parent@fd-edu.local'))
     .limit(1);
-  if (!parent) {
-    [parent] = await db
-      .insert(schema.parents)
+  if (!account) {
+    [account] = await db
+      .insert(schema.accounts)
       .values({
+        role: 'parent',
         email: 'smoke-parent@fd-edu.local',
-        passwordHash: await hashPassword('smoke123456'),
+        passwordHash: hashPassword('smoke123456'),
         displayName: '冒烟测试家长',
         guardianId: student.guardianId,
         emailVerifiedAt: new Date(),
       })
       .returning();
-  } else if (parent.guardianId !== student.guardianId) {
-    [parent] = await db
-      .update(schema.parents)
+  } else if (account.guardianId !== student.guardianId) {
+    [account] = await db
+      .update(schema.accounts)
       .set({ guardianId: student.guardianId })
-      .where(eq(schema.parents.id, parent.id))
+      .where(eq(schema.accounts.id, account.id))
       .returning();
   }
 
@@ -94,7 +95,7 @@ async function main() {
 
   console.log('\n[1] create pending package order');
   const order = await financeRepo.createPackageOrder(db, {
-    parentId: parent.id,
+    accountId: account.id,
     packageId: pkg.id,
     studentId: student.id,
     courseId: course.id,
@@ -108,7 +109,7 @@ async function main() {
 
   console.log('\n[2] mock-pay → settle');
   const service = new PaymentService(appStub);
-  const paid = await service.markMockPaid({ orderNo: order.orderNo, parentId: parent.id });
+  const paid = await service.markMockPaid({ orderNo: order.orderNo });
   check('order now paid', paid.item.status === 'paid', `(status=${paid.item.status})`);
   check('paidAmount set', paid.item.paidAmount === pkg.priceAmount);
 
@@ -145,7 +146,7 @@ async function main() {
   check('exactly one paid notification', notifs.length === 1, `(found=${notifs.length})`);
 
   console.log('\n[3] replay mock-pay → idempotent (no double credit / no dup rows)');
-  const replay = await service.markMockPaid({ orderNo: order.orderNo, parentId: parent.id });
+  const replay = await service.markMockPaid({ orderNo: order.orderNo });
   check('replay still reports paid', replay.item.status === 'paid');
 
   const [accountReplay] = await db

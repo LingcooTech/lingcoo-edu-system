@@ -64,6 +64,13 @@
       "when": 1780120300000,
       "tag": "0008_drop_course_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780120400000,
+      "tag": "0009_unified_accounts",
+      "breakpoints": true
     }
   ]
 }
