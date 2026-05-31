@@ -17,7 +17,7 @@ export function ForgotPasswordPage() {
     event.preventDefault();
     setError('');
     try {
-      await publicApi('/public/auth/forgot-password', {
+      await publicApi('/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim() }),
       });
@@ -32,7 +32,7 @@ export function ForgotPasswordPage() {
     event.preventDefault();
     setError('');
     try {
-      await publicApi('/public/auth/reset-password', {
+      await publicApi('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim(), code: code.trim(), password }),
       });

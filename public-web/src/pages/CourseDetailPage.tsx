@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Clock, GraduationCap, Layers } from 'lucide-react';
+import { ChevronLeft, Clock, Layers } from 'lucide-react';
 
 import { fetchCourse, type Course, type CoursePackage } from '@/api/client';
 import { Layout } from '@/components/Layout';
@@ -62,15 +62,11 @@ export function CourseDetailPage() {
         <div className="text-ink-soft mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
           <span className="inline-flex items-center gap-1.5">
             <Layers className="h-4 w-4" />
-            {course.lessonCount} 节
+            {packages.length > 0 ? `${packages.length} 个课时包` : '暂未上架课时包'}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Clock className="h-4 w-4" />
             单节 {course.durationMinutes} 分钟
-          </span>
-          <span className="text-ink inline-flex items-center gap-1.5 font-semibold">
-            <GraduationCap className="h-4 w-4" />
-            {money(course.priceAmount)}
           </span>
         </div>
 

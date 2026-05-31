@@ -5,6 +5,13 @@ import { fetchCourses, type Course } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { money } from '@/lib/utils';
 
+function coursePriceLabel(course: Course) {
+  if (!course.packageCount || course.startingPriceAmount === null || course.startingPriceAmount === undefined) {
+    return '可预约试听';
+  }
+  return `${money(course.startingPriceAmount)} 起`;
+}
+
 export function CourseListPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,12 +77,13 @@ export function CourseListPage() {
                     </div>
                   </div>
                   <div className="text-ink shrink-0 text-sm font-semibold">
-                    {money(course.priceAmount)}
+                    {coursePriceLabel(course)}
                   </div>
                 </div>
                 <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">{course.summary}</p>
                 <div className="text-muted mt-2 text-xs">
-                  {course.lessonCount} 节 · 单节 {course.durationMinutes} 分钟
+                  {course.packageCount ? `${course.packageCount} 个课时包` : '暂未上架课时包'} · 单节{' '}
+                  {course.durationMinutes} 分钟
                 </div>
               </Link>
             ))

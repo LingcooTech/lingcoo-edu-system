@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 
 import {
   createOrder,
   createPaymentIntent,
-  fetchChildren,
   fetchCoursePackages,
   fetchPaymentProviders,
-  getParentToken,
   mockPayOrder,
   syncPayment,
-  type ChildStudent,
+  type CheckoutInfo,
   type CoursePackage,
   type PaymentIntent,
   type PaymentProvider,
   type PaymentProviderStatus,
 } from '@/api/client';
+import { getAttribution } from '@/lib/attribution';
 import { money } from '@/lib/utils';
 
 type Step = 'select' | 'pay' | 'done';
@@ -42,42 +41,37 @@ if (import.meta.env.DEV) {
 }
 
 export function CheckoutPage() {
-  const navigate = useNavigate();
   const { packageId = '' } = useParams();
   const [pkg, setPkg] = useState<CoursePackage | null>(null);
-  const [children, setChildren] = useState<ChildStudent[]>([]);
-  const [studentId, setStudentId] = useState('');
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [grade, setGrade] = useState('');
   const [step, setStep] = useState<Step>('select');
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [providers, setProviders] = useState<PaymentProviderStatus[]>(DEFAULT_PROVIDERS);
   const [orderNo, setOrderNo] = useState('');
+  const [checkout, setCheckout] = useState<CheckoutInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!getParentToken()) {
-      navigate(`/login?redirect=/checkout/${packageId}`);
-      return;
-    }
     Promise.all([
       fetchCoursePackages(),
-      fetchChildren().catch(() => []),
       fetchPaymentProviders().catch(() => DEFAULT_PROVIDERS),
     ])
-      .then(([packages, kids, paymentProviders]) => {
+      .then(([packages, paymentProviders]) => {
         setPkg(packages.find((p) => p.id === packageId) ?? null);
-        setChildren(kids);
         setProviders(paymentProviders);
-        setStudentId(kids[0]?.id ?? '');
       })
       .finally(() => setLoading(false));
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [navigate, packageId]);
+  }, [packageId]);
 
   function startPolling(no: string) {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -89,26 +83,38 @@ export function CheckoutPage() {
           setStep('done');
         }
       } catch {
-        // transient; keep polling
+        // Keep polling through short provider/network hiccups.
       }
     }, 3000);
   }
 
-  async function pay(provider: PaymentProvider) {
-    if (!studentId) {
-      setError('请先选择孩子');
-      return;
+  async function ensureOrder() {
+    if (orderNo) return orderNo;
+    const phone = guardianPhone.trim();
+    if (phone.length < 6 || !studentName.trim()) {
+      throw new Error('请填写家长手机号和孩子姓名');
     }
+    const attribution = getAttribution();
+    const created = await createOrder({
+      packageId,
+      guardianName: guardianName.trim() || undefined,
+      guardianPhone: phone,
+      studentName: studentName.trim(),
+      grade: grade.trim() || undefined,
+      source: attribution.source,
+      campaign: attribution.campaign,
+      medium: attribution.medium,
+    });
+    setOrderNo(created.order.orderNo);
+    setCheckout(created.checkout);
+    return created.order.orderNo;
+  }
+
+  async function pay(provider: PaymentProvider) {
     setBusy(true);
     setError('');
     try {
-      let currentOrderNo = orderNo;
-      if (!currentOrderNo) {
-        const order = await createOrder(packageId, studentId);
-        currentOrderNo = order.orderNo;
-        setOrderNo(currentOrderNo);
-      }
-
+      const currentOrderNo = await ensureOrder();
       const created = await createPaymentIntent(currentOrderNo, provider);
       setIntent(created);
       setStep('pay');
@@ -134,11 +140,11 @@ export function CheckoutPage() {
   }
 
   async function payMock() {
-    if (!orderNo) return;
     setBusy(true);
     setError('');
     try {
-      await mockPayOrder(orderNo);
+      const currentOrderNo = await ensureOrder();
+      await mockPayOrder(currentOrderNo);
       if (pollRef.current) clearInterval(pollRef.current);
       setStep('done');
     } catch (err) {
@@ -191,6 +197,12 @@ export function CheckoutPage() {
           </div>
           <div className="mt-3 text-lg font-bold text-green-800">支付成功</div>
           <p className="mt-1 text-sm text-green-700">{pkg.lessonCount} 课时已到账。</p>
+          {checkout?.defaultPassword && (
+            <p className="mt-3 rounded-xl bg-white p-3 text-sm text-green-800">
+              可用手机号 {checkout.loginIdentifier} 和默认密码 {checkout.defaultPassword}{' '}
+              登录，首次登录需修改密码。
+            </p>
+          )}
           <Link
             to="/account"
             className="mt-4 inline-block rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white"
@@ -198,40 +210,39 @@ export function CheckoutPage() {
             查看课时余额
           </Link>
         </div>
-      ) : children.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <div className="text-sm font-semibold text-amber-800">尚未关联孩子</div>
-          <p className="mt-1 text-xs text-amber-700">
-            购买课时包前，请先联系机构将您的账号与孩子档案关联。
-          </p>
-          <Link to="/account" className="mt-3 inline-block text-sm font-medium text-amber-800">
-            前往家长中心 →
-          </Link>
-        </div>
       ) : (
         <>
-          <section className="mt-6">
-            <div className="mb-2 text-sm font-semibold text-slate-700">选择孩子</div>
-            <div className="grid gap-2">
-              {children.map((child) => (
-                <label
-                  key={child.id}
-                  className={`flex items-center justify-between rounded-2xl border bg-white p-4 ${
-                    studentId === child.id ? 'border-blue-500 ring-1 ring-blue-500' : ''
-                  }`}
-                >
-                  <div>
-                    <div className="text-sm font-semibold">{child.name}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{child.grade}</div>
-                  </div>
-                  <input
-                    type="radio"
-                    name="student"
-                    checked={studentId === child.id}
-                    onChange={() => setStudentId(child.id)}
-                  />
-                </label>
-              ))}
+          <section className="mt-6 rounded-2xl border bg-white p-5">
+            <div className="text-sm font-semibold text-slate-700">购买信息</div>
+            <div className="mt-4 grid gap-3">
+              <input
+                className="rounded-xl border px-3 py-2 text-sm"
+                placeholder="家长称呼（可选）"
+                value={guardianName}
+                onChange={(e) => setGuardianName(e.target.value)}
+                disabled={Boolean(orderNo)}
+              />
+              <input
+                className="rounded-xl border px-3 py-2 text-sm"
+                placeholder="家长手机号"
+                value={guardianPhone}
+                onChange={(e) => setGuardianPhone(e.target.value)}
+                disabled={Boolean(orderNo)}
+              />
+              <input
+                className="rounded-xl border px-3 py-2 text-sm"
+                placeholder="孩子姓名"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                disabled={Boolean(orderNo)}
+              />
+              <input
+                className="rounded-xl border px-3 py-2 text-sm"
+                placeholder="年级（可选）"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                disabled={Boolean(orderNo)}
+              />
             </div>
           </section>
 

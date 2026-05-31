@@ -34,42 +34,42 @@ export const systemModule: AppModule = {
     app.get('/ready', async () => ({ ok: true, checks: { api: true } }));
     app.get('/v1/system/modules', async () => ({ modules: getModuleNames() }));
 
-    app.get('/v1/system-settings/smtp', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/system-settings/smtp', { preHandler: app.requireAdmin }, async () => {
       return new SmtpSettingsService(app.db, app.appEnv).getOverview();
     });
 
-    app.put('/v1/system-settings/smtp', { preHandler: app.authenticate }, async (request) => {
+    app.put('/v1/system-settings/smtp', { preHandler: app.requireAdmin }, async (request) => {
       const payload = smtpSettingsSchema.parse(request.body);
-      const updatedBy = (request.user as { sub?: string }).sub;
+      const updatedBy = request.account!.id;
       return new SmtpSettingsService(app.db, app.appEnv).upsertSettings(payload, updatedBy);
     });
 
-    app.post('/v1/system-settings/smtp/test', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/system-settings/smtp/test', { preHandler: app.requireAdmin }, async (request) => {
       const payload = smtpTestSchema.parse(request.body);
       return new SmtpSettingsService(app.db, app.appEnv).testConnection(payload);
     });
 
-    app.delete('/v1/system-settings/smtp', { preHandler: app.authenticate }, async () => {
+    app.delete('/v1/system-settings/smtp', { preHandler: app.requireAdmin }, async () => {
       await new SmtpSettingsService(app.db, app.appEnv).clearSettings();
       return { ok: true };
     });
 
-    app.get('/v1/system-settings/qiniu', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/system-settings/qiniu', { preHandler: app.requireAdmin }, async () => {
       return new QiniuSettingsService(app.db, app.appEnv).getOverview();
     });
 
-    app.put('/v1/system-settings/qiniu', { preHandler: app.authenticate }, async (request) => {
+    app.put('/v1/system-settings/qiniu', { preHandler: app.requireAdmin }, async (request) => {
       const payload = qiniuSettingsSchema.parse(request.body);
-      const updatedBy = (request.user as { sub?: string }).sub;
+      const updatedBy = request.account!.id;
       return new QiniuSettingsService(app.db, app.appEnv).upsertSettings(payload, updatedBy);
     });
 
-    app.post('/v1/system-settings/qiniu/test', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/system-settings/qiniu/test', { preHandler: app.requireAdmin }, async (request) => {
       const payload = qiniuSettingsSchema.parse(request.body ?? {});
       return new QiniuSettingsService(app.db, app.appEnv).testConnection(payload);
     });
 
-    app.delete('/v1/system-settings/qiniu', { preHandler: app.authenticate }, async () => {
+    app.delete('/v1/system-settings/qiniu', { preHandler: app.requireAdmin }, async () => {
       await new QiniuSettingsService(app.db, app.appEnv).clearSettings();
       return { ok: true };
     });

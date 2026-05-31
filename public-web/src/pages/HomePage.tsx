@@ -6,6 +6,13 @@ import { loadHome, type Course, type HomePayload, type TrialSession } from '@/ap
 import { Layout } from '@/components/Layout';
 import { formatDateTime, money } from '@/lib/utils';
 
+function coursePriceLabel(course: Course) {
+  if (!course.packageCount || course.startingPriceAmount === null || course.startingPriceAmount === undefined) {
+    return '可预约试听';
+  }
+  return `${money(course.startingPriceAmount)} 起`;
+}
+
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
 
@@ -92,7 +99,7 @@ export function HomePage() {
                   </div>
                 </div>
                 <div className="text-ink shrink-0 text-sm font-semibold">
-                  {money(course.priceAmount)}
+                  {coursePriceLabel(course)}
                 </div>
               </div>
               <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">{course.summary}</p>

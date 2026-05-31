@@ -16,13 +16,14 @@ async function findOne<T>(rows: Promise<T[]>): Promise<T | undefined> {
 
 async function seed(): Promise<void> {
   let admin = await findOne(
-    db.select().from(schema.users).where(eq(schema.users.email, 'admin@fd-edu.local')).limit(1),
+    db.select().from(schema.accounts).where(eq(schema.accounts.email, 'admin@fd-edu.local')).limit(1),
   );
   if (!admin) {
     admin = await findOne(
       db
-        .insert(schema.users)
+        .insert(schema.accounts)
         .values({
+          role: 'admin',
           email: 'admin@fd-edu.local',
           displayName: '系统管理员',
           passwordHash: hashPassword('admin123456'),

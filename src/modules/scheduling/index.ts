@@ -48,7 +48,7 @@ function conflict(message = 'Classroom or teacher time conflict'): Error {
 export const schedulingModule: AppModule = {
   name: 'scheduling',
   async register(app) {
-    app.get('/v1/classes', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/classes', { preHandler: app.requireAdmin }, async () => {
       const [classes, courses, teachers, classrooms] = await Promise.all([
         schedulingRepo.listClasses(app.db),
         catalogRepo.listCourses(app.db),
@@ -72,7 +72,7 @@ export const schedulingModule: AppModule = {
       return { classes: enriched };
     });
 
-    app.post('/v1/classes', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/classes', { preHandler: app.requireAdmin }, async (request) => {
       const body = classSchema.parse(request.body);
       const classGroup = await schedulingRepo.createClass(app.db, body);
       return { class: classGroup };
@@ -80,7 +80,7 @@ export const schedulingModule: AppModule = {
 
     app.patch(
       '/v1/classes/:classId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { classId } = request.params as { classId: string };
         const body = classUpdateSchema.parse(request.body);
@@ -92,7 +92,7 @@ export const schedulingModule: AppModule = {
 
     app.delete(
       '/v1/classes/:classId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { classId } = request.params as { classId: string };
         const classGroup = await schedulingRepo.archiveClass(app.db, classId);
@@ -103,7 +103,7 @@ export const schedulingModule: AppModule = {
 
     app.get(
       '/v1/class-sessions',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async () => {
         const [sessions, classes, teachers, classrooms] = await Promise.all([
           schedulingRepo.listClassSessions(app.db),
@@ -128,7 +128,7 @@ export const schedulingModule: AppModule = {
 
     app.post(
       '/v1/class-sessions',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const body = sessionCreateSchema.parse(request.body);
 
@@ -160,7 +160,7 @@ export const schedulingModule: AppModule = {
 
     app.patch(
       '/v1/class-sessions/:sessionId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { sessionId } = request.params as { sessionId: string };
         const current = await schedulingRepo.findSession(app.db, sessionId);
@@ -199,7 +199,7 @@ export const schedulingModule: AppModule = {
 
     app.delete(
       '/v1/class-sessions/:sessionId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { sessionId } = request.params as { sessionId: string };
         const classSession = await schedulingRepo.cancelClassSession(app.db, sessionId);
@@ -210,7 +210,7 @@ export const schedulingModule: AppModule = {
 
     app.get(
       '/v1/classes/:classId/enrollments',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { classId } = request.params as { classId: string };
         const classGroup = await schedulingRepo.findClass(app.db, classId);
@@ -231,7 +231,7 @@ export const schedulingModule: AppModule = {
 
     app.post(
       '/v1/classes/:classId/enrollments',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { classId } = request.params as { classId: string };
         const classGroup = await schedulingRepo.findClass(app.db, classId);
@@ -255,7 +255,7 @@ export const schedulingModule: AppModule = {
 
     app.delete(
       '/v1/classes/:classId/enrollments/:enrollmentId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { classId, enrollmentId } = request.params as {
           classId: string;

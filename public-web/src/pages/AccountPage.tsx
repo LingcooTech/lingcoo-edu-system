@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, LogOut, Receipt, Wallet } from 'lucide-react';
+import { BookOpen, LogOut, Receipt, Shield, Wallet } from 'lucide-react';
 
 import {
   fetchChildren,
@@ -10,10 +10,10 @@ import {
   getParentToken,
   parentLogout,
   publicApi,
+  type AuthAccount,
   type ChildStudent,
   type ParentLessonAccount,
   type ParentOrder,
-  type ParentProfile,
 } from '@/api/client';
 import { money } from '@/lib/utils';
 
@@ -26,7 +26,7 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
 
 export function AccountPage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<ParentProfile | null>(null);
+  const [profile, setProfile] = useState<AuthAccount | null>(null);
   const [children, setChildren] = useState<ChildStudent[]>([]);
   const [accounts, setAccounts] = useState<ParentLessonAccount[]>([]);
   const [orders, setOrders] = useState<ParentOrder[]>([]);
@@ -50,6 +50,10 @@ export function AccountPage() {
           navigate('/login');
           return;
         }
+        if (profileResult.mustChangePassword) {
+          navigate('/change-password');
+          return;
+        }
         setProfile(profileResult);
         setChildren(childrenResult);
         setAccounts(accountsResult);
@@ -66,7 +70,7 @@ export function AccountPage() {
   async function verifyEmail() {
     setVerifyMessage('');
     try {
-      await publicApi('/public/auth/verify-email', {
+      await publicApi('/auth/verify-email', {
         method: 'POST',
         body: JSON.stringify({ code: verifyCode.trim() }),
       });
@@ -87,7 +91,9 @@ export function AccountPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">家长中心</h1>
-          <p className="mt-1 text-sm text-slate-500">{profile?.displayName} · {profile?.email}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {profile?.displayName} · {profile?.email ?? profile?.phone}
+          </p>
         </div>
         <button
           onClick={logout}
@@ -98,7 +104,17 @@ export function AccountPage() {
         </button>
       </div>
 
-      {profile && !profile.emailVerified && (
+      {profile?.role === 'admin' && (
+        <a
+          href="/admin"
+          className="mt-5 flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-700"
+        >
+          <Shield className="h-4 w-4" />
+          进入管理后台
+        </a>
+      )}
+
+      {profile && profile.email && !profile.emailVerified && (
         <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <div className="text-sm font-semibold text-amber-800">邮箱待验证</div>
           <p className="mt-1 text-xs text-amber-700">

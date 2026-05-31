@@ -28,11 +28,11 @@ const convertSchema = z.object({
 export const crmModule: AppModule = {
   name: 'crm',
   async register(app) {
-    app.get('/v1/leads', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/leads', { preHandler: app.requireAdmin }, async () => {
       return { leads: await crmRepo.listLeads(app.db) };
     });
 
-    app.patch('/v1/leads/:leadId/status', { preHandler: app.authenticate }, async (request) => {
+    app.patch('/v1/leads/:leadId/status', { preHandler: app.requireAdmin }, async (request) => {
       const { leadId } = request.params as { leadId: string };
       const body = statusSchema.parse(request.body);
       await crmRepo.requireLead(app.db, leadId);
@@ -40,7 +40,7 @@ export const crmModule: AppModule = {
       return { lead };
     });
 
-    app.post('/v1/leads/:leadId/follow-ups', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/leads/:leadId/follow-ups', { preHandler: app.requireAdmin }, async (request) => {
       const { leadId } = request.params as { leadId: string };
       await crmRepo.requireLead(app.db, leadId);
       const body = followUpSchema.parse(request.body);
@@ -59,13 +59,13 @@ export const crmModule: AppModule = {
       return { followUp, lead };
     });
 
-    app.get('/v1/leads/:leadId/follow-ups', { preHandler: app.authenticate }, async (request) => {
+    app.get('/v1/leads/:leadId/follow-ups', { preHandler: app.requireAdmin }, async (request) => {
       const { leadId } = request.params as { leadId: string };
       await crmRepo.requireLead(app.db, leadId);
       return { followUps: await crmRepo.listFollowUps(app.db, leadId) };
     });
 
-    app.post('/v1/leads/:leadId/convert', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/leads/:leadId/convert', { preHandler: app.requireAdmin }, async (request) => {
       const { leadId } = request.params as { leadId: string };
       const body = convertSchema.parse(request.body);
       const lead = await crmRepo.requireLead(app.db, leadId);

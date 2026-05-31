@@ -14,9 +14,7 @@ export interface Course {
   name: string;
   category: string;
   ageRange: string;
-  lessonCount: number;
   durationMinutes: number;
-  priceAmount: number;
   status: string;
   summary: string;
   content?: string;

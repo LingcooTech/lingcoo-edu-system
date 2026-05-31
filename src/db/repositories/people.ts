@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -23,6 +23,15 @@ export async function findGuardianByPhone(db: Database, phone: string) {
 export async function createGuardian(db: Database, values: typeof schema.guardians.$inferInsert) {
   const [guardian] = await db.insert(schema.guardians).values(values).returning();
   return guardian;
+}
+
+export async function findStudentForGuardian(db: Database, input: { guardianId: string; name: string }) {
+  const [student] = await db
+    .select()
+    .from(schema.students)
+    .where(and(eq(schema.students.guardianId, input.guardianId), eq(schema.students.name, input.name)))
+    .limit(1);
+  return student ?? null;
 }
 
 export async function listStudents(db: Database) {

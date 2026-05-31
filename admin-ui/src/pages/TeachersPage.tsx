@@ -1,0 +1,214 @@
+import { useState } from 'react';
+import { Archive, Pencil, Plus } from 'lucide-react';
+
+import { apiDelete, apiPatch, apiPost } from '@/api/client';
+import type { Teacher } from '@/api/types';
+import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { DataTable } from '@/components/shared/DataTable';
+import { Drawer } from '@/components/shared/Drawer';
+import { Field } from '@/components/shared/FormField';
+import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { useToast } from '@/components/shared/Toast';
+import { useApiResource } from '@/lib/useApiResource';
+
+const TEACHERS = () => '/v1/teachers';
+
+interface TeacherForm {
+  name: string;
+  phone: string;
+  specialties: string;
+  status: 'active' | 'archived';
+}
+
+const emptyTeacherForm: TeacherForm = {
+  name: '',
+  phone: '',
+  specialties: '',
+  status: 'active',
+};
+
+export function TeachersPage() {
+  const toast = useToast();
+  const { data: teachers, setData: setTeachers } = useApiResource<Teacher>(TEACHERS(), 'teachers');
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Teacher | null>(null);
+  const [form, setForm] = useState<TeacherForm>(emptyTeacherForm);
+  const [saving, setSaving] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Teacher | null>(null);
+
+  function openEditor(teacher?: Teacher) {
+    setEditing(teacher ?? null);
+    setForm(
+      teacher
+        ? {
+            name: teacher.name,
+            phone: teacher.phone ?? '',
+            specialties: teacher.specialties.join('、'),
+            status: teacher.status as TeacherForm['status'],
+          }
+        : emptyTeacherForm,
+    );
+    setOpen(true);
+  }
+
+  async function submit() {
+    if (!form.name.trim()) {
+      toast.error('老师姓名必填');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        specialties: form.specialties
+          .split(/[、,，]/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+        status: form.status,
+      };
+      if (editing) {
+        const { teacher } = await apiPatch<{ teacher: Teacher }>(
+          `${TEACHERS()}/${editing.id}`,
+          payload,
+        );
+        setTeachers(teachers.map((item) => (item.id === teacher.id ? teacher : item)));
+      } else {
+        const { teacher } = await apiPost<{ teacher: Teacher }>(TEACHERS(), payload);
+        setTeachers([teacher, ...teachers]);
+      }
+      toast.success('老师已保存');
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function archive() {
+    if (!archiveTarget) return;
+    try {
+      const { teacher } = await apiDelete<{ teacher: Teacher }>(`${TEACHERS()}/${archiveTarget.id}`);
+      setTeachers(teachers.map((item) => (item.id === teacher.id ? teacher : item)));
+      setArchiveTarget(null);
+      toast.success('老师已归档');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '归档失败');
+    }
+  }
+
+  return (
+    <PageFrame
+      section="teachers"
+      actions={
+        <button type="button" className="btn btn-primary" onClick={() => openEditor()}>
+          <Plus className="h-4 w-4" />
+          新增老师
+        </button>
+      }
+    >
+      <DataTable
+        columns={[
+          { key: 'name', header: '老师', cell: (row) => row.name },
+          { key: 'phone', header: '电话', cell: (row) => row.phone ?? '-' },
+          { key: 'spec', header: '擅长', cell: (row) => row.specialties.join('、') || '-' },
+          {
+            key: 'status',
+            header: '状态',
+            cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+          },
+          {
+            key: 'actions',
+            header: '操作',
+            cell: (row) => (
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => openEditor(row)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  编辑
+                </button>
+                {row.status !== 'archived' && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1 text-red-600"
+                    onClick={() => setArchiveTarget(row)}
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                    归档
+                  </button>
+                )}
+              </div>
+            ),
+          },
+        ]}
+        data={teachers}
+      />
+
+      <Drawer
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editing ? '编辑老师' : '新增老师'}
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+              取消
+            </button>
+            <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </>
+        }
+      >
+        <Field label="姓名" required>
+          <input
+            className="form-input"
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+        </Field>
+        <Field label="电话">
+          <input
+            className="form-input"
+            value={form.phone}
+            onChange={(event) => setForm({ ...form, phone: event.target.value })}
+          />
+        </Field>
+        <Field label="擅长" hint="用顿号或逗号分隔">
+          <input
+            className="form-input"
+            value={form.specialties}
+            onChange={(event) => setForm({ ...form, specialties: event.target.value })}
+          />
+        </Field>
+        <Field label="状态">
+          <select
+            className="form-input"
+            value={form.status}
+            onChange={(event) =>
+              setForm({ ...form, status: event.target.value as TeacherForm['status'] })
+            }
+          >
+            <option value="active">active</option>
+            <option value="archived">archived</option>
+          </select>
+        </Field>
+      </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(archiveTarget)}
+        title="归档老师？"
+        message={`「${archiveTarget?.name ?? ''}」归档后不建议继续排课，历史课次仍保留。`}
+        confirmLabel="归档"
+        danger
+        onConfirm={archive}
+        onCancel={() => setArchiveTarget(null)}
+      />
+    </PageFrame>
+  );
+}

@@ -14,7 +14,8 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const userStatusEnum = pgEnum('user_status', ['active', 'suspended']);
+export const accountRoleEnum = pgEnum('account_role', ['admin', 'teacher', 'parent']);
+export const accountStatusEnum = pgEnum('account_status', ['active', 'suspended']);
 export const courseStatusEnum = pgEnum('course_status', ['draft', 'published', 'archived']);
 export const leadStatusEnum = pgEnum('lead_status', [
   'new',
@@ -63,15 +64,42 @@ export const lessonTransactionTypeEnum = pgEnum('lesson_transaction_type', [
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'refunded', 'cancelled']);
 export const auditOutcomeEnum = pgEnum('audit_outcome', ['succeeded', 'failed']);
 
-export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  displayName: varchar('display_name', { length: 120 }).notNull(),
-  passwordHash: varchar('password_hash', { length: 255 }),
-  status: userStatusEnum('status').notNull().default('active'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+// Unified identity: a single account table + role. One login endpoint, the JWT
+// carries the role. Replaces the former split `users` (admin) / `parents` tables.
+// `guardians` / `students` / `teachers` stay as profile records; a parent account
+// links to its guardian record via `guardianId`, a teacher account to `teacherId`.
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    role: accountRoleEnum('role').notNull(),
+    // Either email or phone (or both) can identify an account at login; both are
+    // optional individually but at least one must be present (enforced in code).
+    email: varchar('email', { length: 255 }),
+    phone: varchar('phone', { length: 40 }),
+    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    displayName: varchar('display_name', { length: 120 }).notNull(),
+    status: accountStatusEnum('status').notNull().default('active'),
+    // Set when an account is provisioned with a default password (e.g. a parent
+    // created on checkout with phone-suffix password); forces a change on first login.
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Partial unique indexes: email / phone are unique only among rows that have them.
+    emailUnique: uniqueIndex('accounts_email_idx')
+      .on(table.email)
+      .where(sql`${table.email} is not null`),
+    phoneUnique: uniqueIndex('accounts_phone_idx')
+      .on(table.phone)
+      .where(sql`${table.phone} is not null`),
+    roleIdx: index('accounts_role_idx').on(table.role),
+  }),
+);
 
 // Single-institution deployment: this table holds exactly one row describing the
 // organization that owns the deployment (its identity + brand/profile settings).
@@ -453,7 +481,7 @@ export const orders = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     studentId: uuid('student_id').references(() => students.id, { onDelete: 'restrict' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'restrict' }),
-    parentId: uuid('parent_id').references(() => parents.id, { onDelete: 'set null' }),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
     packageId: uuid('package_id').references(() => coursePackages.id, { onDelete: 'set null' }),
     orderNo: varchar('order_no', { length: 64 }).notNull().unique(),
     amount: integer('amount').notNull(),
@@ -464,12 +492,18 @@ export const orders = pgTable(
     providerOrderId: varchar('provider_order_id', { length: 120 }),
     status: orderStatusEnum('status').notNull().default('pending'),
     paidAt: timestamp('paid_at', { withTimezone: true }),
+    source: varchar('source', { length: 80 }).notNull().default('unknown'),
+    channelId: uuid('channel_id').references(() => channels.id, { onDelete: 'set null' }),
+    campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
+    medium: varchar('medium', { length: 40 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     statusIdx: index('orders_status_idx').on(table.status),
-    parentIdx: index('orders_parent_idx').on(table.parentId),
+    accountIdx: index('orders_account_idx').on(table.accountId),
+    channelIdx: index('orders_channel_idx').on(table.channelId),
+    campaignIdx: index('orders_campaign_idx').on(table.campaignId),
   }),
 );
 
@@ -477,7 +511,7 @@ export const auditLogs = pgTable(
   'audit_logs',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    actorAccountId: uuid('actor_account_id').references(() => accounts.id, { onDelete: 'set null' }),
     action: varchar('action', { length: 160 }).notNull(),
     resourceType: varchar('resource_type', { length: 80 }).notNull(),
     resourceId: varchar('resource_id', { length: 120 }),
@@ -560,49 +594,29 @@ export const notifications = pgTable(
   }),
 );
 
-// --- Parent (家长) accounts ---
+// --- Account security codes (email verify / password reset) ---
 
-export const parentStatusEnum = pgEnum('parent_status', ['active', 'suspended']);
-export const parentSecurityPurposeEnum = pgEnum('parent_security_purpose', [
+export const accountSecurityPurposeEnum = pgEnum('account_security_purpose', [
   'email_verify',
   'password_reset',
 ]);
 
-export const parents = pgTable(
-  'parents',
+export const accountSecurityCodes = pgTable(
+  'account_security_codes',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    email: varchar('email', { length: 255 }).notNull(),
-    phone: varchar('phone', { length: 40 }),
-    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-    displayName: varchar('display_name', { length: 120 }).notNull(),
-    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
-    guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
-    status: parentStatusEnum('status').notNull().default('active'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    emailUnique: uniqueIndex('parents_email_idx').on(table.email),
-  }),
-);
-
-export const parentSecurityCodes = pgTable(
-  'parent_security_codes',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    parentId: uuid('parent_id')
+    accountId: uuid('account_id')
       .notNull()
-      .references(() => parents.id, { onDelete: 'cascade' }),
-    purpose: parentSecurityPurposeEnum('purpose').notNull(),
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    purpose: accountSecurityPurposeEnum('purpose').notNull(),
     codeHash: varchar('code_hash', { length: 255 }).notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    parentPurposeIdx: index('parent_security_codes_parent_purpose_idx').on(
-      table.parentId,
+    accountPurposeIdx: index('account_security_codes_account_purpose_idx').on(
+      table.accountId,
       table.purpose,
       table.createdAt,
     ),

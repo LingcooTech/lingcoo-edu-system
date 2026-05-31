@@ -6,7 +6,7 @@ import type { AppModule } from '../types.js';
 export const lessonModule: AppModule = {
   name: 'lesson',
   async register(app) {
-    app.get('/v1/lesson-accounts', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/lesson-accounts', { preHandler: app.requireAdmin }, async () => {
       const [accounts, students, courses] = await Promise.all([
         lessonRepo.listLessonAccounts(app.db),
         peopleRepo.listStudents(app.db),
@@ -24,7 +24,7 @@ export const lessonModule: AppModule = {
       };
     });
 
-    app.get('/v1/lesson-transactions', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/lesson-transactions', { preHandler: app.requireAdmin }, async () => {
       return { lessonTransactions: await lessonRepo.listLessonTransactions(app.db) };
     });
   },

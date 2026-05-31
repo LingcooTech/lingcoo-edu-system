@@ -17,7 +17,7 @@ const orderSchema = z.object({
 export const financeModule: AppModule = {
   name: 'finance',
   async register(app) {
-    app.get('/v1/orders', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/orders', { preHandler: app.requireAdmin }, async () => {
       const [orders, students, courses] = await Promise.all([
         financeRepo.listOrders(app.db),
         peopleRepo.listStudents(app.db),
@@ -35,7 +35,7 @@ export const financeModule: AppModule = {
       };
     });
 
-    app.post('/v1/orders', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/orders', { preHandler: app.requireAdmin }, async (request) => {
       const body = orderSchema.parse(request.body);
       await peopleRepo.requireStudent(app.db, body.studentId);
       await catalogRepo.requireCourse(app.db, body.courseId);

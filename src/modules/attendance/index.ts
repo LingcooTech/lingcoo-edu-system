@@ -19,7 +19,7 @@ export const attendanceModule: AppModule = {
   async register(app) {
     app.post(
       '/v1/class-sessions/:sessionId/attendance',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { sessionId } = request.params as { sessionId: string };
 

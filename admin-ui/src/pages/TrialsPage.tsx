@@ -139,7 +139,7 @@ export function TrialsPage() {
     >
       <DataTable
         columns={[
-          { key: 'title', header: '公开课', cell: (row) => row.title },
+          { key: 'title', header: '试听课', cell: (row) => row.title },
           { key: 'time', header: '时间', cell: (row) => formatDateTime(row.startsAt) },
           { key: 'capacity', header: '报名', cell: (row) => `${row.bookedCount}/${row.capacity}` },
           {

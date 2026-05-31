@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { db, pool } from './client.js';
 import * as schema from './schema.js';
+import { hashPassword } from '../lib/password.js';
 import { addFollowUp, createLead } from './repositories/crm.js';
 import {
   createClass,
@@ -154,6 +155,31 @@ async function seedDemo(): Promise<void> {
           .returning(),
       ),
       'student insert failed',
+    );
+  }
+
+  // A parent login account linked to a guardian (CRM contact). Default password
+  // is the phone's last 6 digits, with a forced change on first login.
+  async function ensureParentAccount(guardianId: string, displayName: string, phone: string) {
+    const existing = await findOne(
+      db.select().from(schema.accounts).where(eq(schema.accounts.phone, phone)).limit(1),
+    );
+    if (existing) return existing;
+    return required(
+      await findOne(
+        db
+          .insert(schema.accounts)
+          .values({
+            role: 'parent',
+            phone,
+            displayName,
+            passwordHash: hashPassword(phone.slice(-6)),
+            mustChangePassword: true,
+            guardianId,
+          })
+          .returning(),
+      ),
+      'parent account insert failed',
     );
   }
 
@@ -384,6 +410,8 @@ async function seedDemo(): Promise<void> {
 
   const zhengGuardian = await ensureGuardian('郑女士', '13911110006');
   const zheng = await ensureStudent(zhengGuardian.id, '郑可欣', '一年级', '附近小学');
+  // Demo parent login: 手机号 13911110006 / 默认密码 110006(首登强制改密)
+  await ensureParentAccount(zhengGuardian.id, '郑女士', '13911110006');
   const fengGuardian = await ensureGuardian('冯先生', '13911110007');
   const feng = await ensureStudent(fengGuardian.id, '冯子墨', '二年级', '附近小学');
 

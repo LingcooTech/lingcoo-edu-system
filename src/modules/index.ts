@@ -6,7 +6,6 @@ import { financeModule } from './finance/index.js';
 import { lessonModule } from './lesson/index.js';
 import { marketingModule } from './marketing/index.js';
 import { notificationsModule } from './notifications/index.js';
-import { parentAuthModule } from './parent-auth/index.js';
 import { parentCenterModule } from './parent-center/index.js';
 import { paymentModule } from './payment/index.js';
 import { peopleModule } from './people/index.js';
@@ -34,7 +33,6 @@ export const appModules: AppModule[] = [
   marketingModule,
   reportModule,
   notificationsModule,
-  parentAuthModule,
   parentCenterModule,
   paymentModule,
 ];

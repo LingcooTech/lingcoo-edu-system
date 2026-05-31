@@ -9,6 +9,7 @@ export function AuthPage() {
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') ?? '/account';
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -22,11 +23,27 @@ export function AuthPage() {
     setError('');
     try {
       if (mode === 'login') {
-        await parentLogin(email.trim(), password);
+        const { account } = await parentLogin(identifier.trim(), password);
+        if (account.mustChangePassword) {
+          navigate('/change-password');
+        } else if (account.role === 'admin') {
+          // Admins continue into the back office — /admin is a separate app
+          // under the same origin sharing the login cookie.
+          window.location.href = '/admin';
+        } else if (account.role === 'teacher') {
+          navigate(redirectTo === '/account' ? '/teacher' : redirectTo);
+        } else {
+          navigate(redirectTo);
+        }
       } else {
-        await parentRegister({ email: email.trim(), password, displayName: displayName.trim(), phone: phone.trim() || undefined });
+        await parentRegister({
+          email: email.trim(),
+          password,
+          displayName: displayName.trim(),
+          phone: phone.trim() || undefined,
+        });
+        navigate(redirectTo);
       }
-      navigate(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败，请稍后再试');
     } finally {
@@ -67,14 +84,24 @@ export function AuthPage() {
               required
             />
           )}
-          <input
-            className="rounded-xl border px-3 py-2 text-sm"
-            type="email"
-            placeholder="邮箱"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
+          {mode === 'login' ? (
+            <input
+              className="rounded-xl border px-3 py-2 text-sm"
+              placeholder="邮箱或手机号"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              required
+            />
+          ) : (
+            <input
+              className="rounded-xl border px-3 py-2 text-sm"
+              type="email"
+              placeholder="邮箱"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          )}
           <input
             className="rounded-xl border px-3 py-2 text-sm"
             type="password"

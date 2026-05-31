@@ -8,6 +8,8 @@ import { httpError } from '../../lib/http-error.js';
 import { applyLessonDelta } from './lesson.js';
 
 export type Order = typeof schema.orders.$inferSelect;
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+type DbOrTx = Database | Tx;
 
 export async function listOrders(db: Database) {
   return db.select().from(schema.orders).orderBy(desc(schema.orders.createdAt));
@@ -96,22 +98,26 @@ export async function createOrder(
  * credit the right lesson account. Nothing is charged or credited yet.
  */
 export async function createPackageOrder(
-  db: Database,
+  db: DbOrTx,
   input: {
-    parentId: string;
+    accountId: string;
     packageId: string;
     studentId: string;
     courseId: string;
     amount: number;
     lessonCount: number;
     currency?: string;
+    source?: string;
+    channelId?: string | null;
+    campaignId?: string | null;
+    medium?: string | null;
   },
 ): Promise<Order> {
   const orderNo = `EDU${Date.now()}${randomBytes(2).toString('hex').toUpperCase()}`;
   const [order] = await db
     .insert(schema.orders)
     .values({
-      parentId: input.parentId,
+      accountId: input.accountId,
       packageId: input.packageId,
       studentId: input.studentId,
       courseId: input.courseId,
@@ -121,6 +127,10 @@ export async function createPackageOrder(
       lessonCount: input.lessonCount,
       currency: input.currency ?? 'CNY',
       status: 'pending',
+      source: input.source ?? 'unknown',
+      channelId: input.channelId ?? null,
+      campaignId: input.campaignId ?? null,
+      medium: input.medium ?? null,
     })
     .returning();
   return order;

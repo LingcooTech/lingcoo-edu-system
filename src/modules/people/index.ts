@@ -25,11 +25,11 @@ function notFound(message: string): Error {
 export const peopleModule: AppModule = {
   name: 'people',
   async register(app) {
-    app.get('/v1/guardians', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/guardians', { preHandler: app.requireAdmin }, async () => {
       return { guardians: await peopleRepo.listGuardians(app.db) };
     });
 
-    app.get('/v1/students', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/students', { preHandler: app.requireAdmin }, async () => {
       const [students, guardians, accounts] = await Promise.all([
         peopleRepo.listStudents(app.db),
         peopleRepo.listGuardians(app.db),
@@ -46,7 +46,7 @@ export const peopleModule: AppModule = {
       };
     });
 
-    app.post('/v1/students', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/students', { preHandler: app.requireAdmin }, async (request) => {
       const body = studentSchema.parse(request.body);
 
       let guardianId = body.guardianId ?? null;
@@ -71,7 +71,7 @@ export const peopleModule: AppModule = {
       return { student };
     });
 
-    app.patch('/v1/students/:studentId', { preHandler: app.authenticate }, async (request) => {
+    app.patch('/v1/students/:studentId', { preHandler: app.requireAdmin }, async (request) => {
       const { studentId } = request.params as { studentId: string };
       const body = studentUpdateSchema.parse(request.body);
       const student = await peopleRepo.updateStudent(app.db, studentId, body);

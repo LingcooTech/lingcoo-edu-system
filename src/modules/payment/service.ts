@@ -61,14 +61,13 @@ export class PaymentService {
 
   async createPaymentIntent(input: {
     orderNo: string;
-    parentId: string;
     provider?: PaymentProviderCode;
     clientIp?: string;
   }) {
     const provider = input.provider ?? 'mock';
     const order = await financeRepo.findOrderByOrderNo(this.app.db, input.orderNo);
 
-    if (!order || order.parentId !== input.parentId) {
+    if (!order) {
       throw httpError(404, 'Order not found');
     }
 
@@ -124,13 +123,13 @@ export class PaymentService {
     return { item: intent };
   }
 
-  async markMockPaid(input: { orderNo: string; parentId: string }) {
+  async markMockPaid(input: { orderNo: string }) {
     if (this.app.appEnv.NODE_ENV === 'production') {
       throw httpError(404, 'Mock payment is disabled in production');
     }
 
     const order = await financeRepo.findOrderByOrderNo(this.app.db, input.orderNo);
-    if (!order || order.parentId !== input.parentId) {
+    if (!order) {
       throw httpError(404, 'Order not found');
     }
 
@@ -177,10 +176,10 @@ export class PaymentService {
     return { order: result.order, alreadyPaid: false as const };
   }
 
-  async syncProviderPayment(input: { orderNo: string; parentId: string }) {
+  async syncProviderPayment(input: { orderNo: string }) {
     const order = await financeRepo.findOrderByOrderNo(this.app.db, input.orderNo);
 
-    if (!order || order.parentId !== input.parentId) {
+    if (!order) {
       throw httpError(404, 'Order not found');
     }
 
@@ -245,13 +244,13 @@ export class PaymentService {
   }
 
   private async notifyPaid(order: Order, provider: PaymentProviderCode, providerOrderId: string) {
-    if (!order.parentId) {
+    if (!order.accountId) {
       return;
     }
 
     await new NotificationsService(this.app.db).create({
       recipientType: 'parent',
-      recipientId: order.parentId,
+      recipientId: order.accountId,
       category: 'payment',
       level: 'success',
       title: '支付成功',

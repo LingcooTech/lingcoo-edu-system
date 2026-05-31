@@ -5,6 +5,7 @@ import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as marketingRepo from '../../db/repositories/marketing.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
+import * as packagesRepo from '../../db/repositories/packages.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
@@ -46,17 +47,31 @@ function normalizeTrialSessionPatch(body: z.infer<typeof trialSessionUpdateSchem
   };
 }
 
+async function attachPackageSummary(app: Parameters<AppModule['register']>[0], courses: Awaited<ReturnType<typeof catalogRepo.listPublishedCourses>>) {
+  const packages = await packagesRepo.listActivePackages(app.db);
+  return courses.map((course) => {
+    const coursePackages = packages.filter((item) => item.courseId === course.id);
+    const prices = coursePackages.map((item) => item.priceAmount);
+    return {
+      ...course,
+      packageCount: coursePackages.length,
+      startingPriceAmount: prices.length > 0 ? Math.min(...prices) : null,
+    };
+  });
+}
+
 export const trialModule: AppModule = {
   name: 'trial',
   async register(app) {
     app.get('/public/home', async () => {
       const organization = await organizationRepo.requireOrganization(app.db);
 
-      const [featuredCourses, trialSessions, campuses] = await Promise.all([
+      const [courses, trialSessions, campuses] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db),
         trialRepo.listOpenTrialSessions(app.db),
         organizationRepo.listCampuses(app.db),
       ]);
+      const featuredCourses = await attachPackageSummary(app, courses);
       return {
         organization: {
           id: organization.id,
@@ -73,7 +88,8 @@ export const trialModule: AppModule = {
     });
 
     app.get('/public/courses', async () => {
-      return { courses: await catalogRepo.listPublishedCourses(app.db) };
+      const courses = await catalogRepo.listPublishedCourses(app.db);
+      return { courses: await attachPackageSummary(app, courses) };
     });
 
     app.get('/public/trial-sessions', async () => {
@@ -121,7 +137,7 @@ export const trialModule: AppModule = {
 
     app.get(
       '/v1/trial-sessions',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async () => {
         return { trialSessions: await trialRepo.listTrialSessions(app.db) };
       },
@@ -129,7 +145,7 @@ export const trialModule: AppModule = {
 
     app.post(
       '/v1/trial-sessions',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const body = trialSessionSchema.parse(request.body);
         await catalogRepo.requireCourse(app.db, body.courseId);
@@ -150,7 +166,7 @@ export const trialModule: AppModule = {
 
     app.patch(
       '/v1/trial-sessions/:trialSessionId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { trialSessionId } = request.params as {
           trialSessionId: string;
@@ -171,7 +187,7 @@ export const trialModule: AppModule = {
 
     app.delete(
       '/v1/trial-sessions/:trialSessionId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { trialSessionId } = request.params as {
           trialSessionId: string;

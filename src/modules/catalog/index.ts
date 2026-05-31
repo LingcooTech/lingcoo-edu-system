@@ -10,9 +10,7 @@ const courseSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
   ageRange: z.string().min(1),
-  lessonCount: z.number().int().nonnegative(),
   durationMinutes: z.number().int().positive(),
-  priceAmount: z.number().int().nonnegative(),
   summary: z.string().default(''),
   content: z.string().default(''),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
@@ -34,17 +32,17 @@ const packageUpdateSchema = packageSchema.partial();
 export const catalogModule: AppModule = {
   name: 'catalog',
   async register(app) {
-    app.get('/v1/courses', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/courses', { preHandler: app.requireAdmin }, async () => {
       return { courses: await catalogRepo.listCourses(app.db) };
     });
 
-    app.post('/v1/courses', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/courses', { preHandler: app.requireAdmin }, async (request) => {
       const body = courseSchema.parse(request.body);
       const course = await catalogRepo.createCourse(app.db, body);
       return { course };
     });
 
-    app.patch('/v1/courses/:courseId', { preHandler: app.authenticate }, async (request) => {
+    app.patch('/v1/courses/:courseId', { preHandler: app.requireAdmin }, async (request) => {
       const { courseId } = request.params as { courseId: string };
       const body = courseUpdateSchema.parse(request.body);
       const course = await catalogRepo.updateCourse(app.db, courseId, body);
@@ -55,7 +53,7 @@ export const catalogModule: AppModule = {
     });
 
     // Soft delete (archive). Courses are referenced by orders/leads/classes.
-    app.delete('/v1/courses/:courseId', { preHandler: app.authenticate }, async (request) => {
+    app.delete('/v1/courses/:courseId', { preHandler: app.requireAdmin }, async (request) => {
       const { courseId } = request.params as { courseId: string };
       const course = await catalogRepo.archiveCourse(app.db, courseId);
       if (!course) {
@@ -66,11 +64,11 @@ export const catalogModule: AppModule = {
 
     // --- Course packages (课时包) ---
 
-    app.get('/v1/course-packages', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/course-packages', { preHandler: app.requireAdmin }, async () => {
       return { coursePackages: await packagesRepo.listPackages(app.db) };
     });
 
-    app.post('/v1/course-packages', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/course-packages', { preHandler: app.requireAdmin }, async (request) => {
       const body = packageSchema.parse(request.body);
       const coursePackage = await packagesRepo.createPackage(app.db, body);
       return { coursePackage };
@@ -78,7 +76,7 @@ export const catalogModule: AppModule = {
 
     app.patch(
       '/v1/course-packages/:packageId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { packageId } = request.params as { packageId: string };
         const body = packageUpdateSchema.parse(request.body);
@@ -92,7 +90,7 @@ export const catalogModule: AppModule = {
 
     app.delete(
       '/v1/course-packages/:packageId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { packageId } = request.params as { packageId: string };
         const coursePackage = await packagesRepo.archivePackage(app.db, packageId);

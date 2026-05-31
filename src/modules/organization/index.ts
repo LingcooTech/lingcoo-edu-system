@@ -54,7 +54,7 @@ function readSettings(settings: unknown) {
 export const organizationModule: AppModule = {
   name: 'organization',
   async register(app) {
-    app.get('/v1/organization', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/organization', { preHandler: app.requireAdmin }, async () => {
       const organization = await organizationRepo.requireOrganization(app.db);
       const settings = readSettings(organization.settings);
 
@@ -67,7 +67,7 @@ export const organizationModule: AppModule = {
       };
     });
 
-    app.put('/v1/organization', { preHandler: app.authenticate }, async (request) => {
+    app.put('/v1/organization', { preHandler: app.requireAdmin }, async (request) => {
       const organization = await organizationRepo.requireOrganization(app.db);
       const body = organizationSchema.parse(request.body);
       let settings = readSettings(organization.settings);
@@ -97,11 +97,11 @@ export const organizationModule: AppModule = {
       };
     });
 
-    app.get('/v1/campuses', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/campuses', { preHandler: app.requireAdmin }, async () => {
       return { campuses: await organizationRepo.listCampuses(app.db) };
     });
 
-    app.get('/v1/dashboard', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/dashboard', { preHandler: app.requireAdmin }, async () => {
         const [leads, students, accounts, sessions, classes, campaigns, monthlyRevenue] =
           await Promise.all([
             crmRepo.listLeads(app.db),

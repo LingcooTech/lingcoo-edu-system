@@ -1,12 +1,14 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as financeRepo from '../../db/repositories/finance.js';
+import * as marketingRepo from '../../db/repositories/marketing.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
-import { findParentById } from '../../db/repositories/parents.js';
 import { requireCourse } from '../../db/repositories/catalog.js';
 import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
+import { hashPassword } from '../../lib/password.js';
 import type { AppModule } from '../types.js';
 import { getPaymentProvider } from './providers/index.js';
 import { PaymentService } from './service.js';
@@ -18,8 +20,13 @@ import {
 
 const createOrderSchema = z.object({
   packageId: z.string().uuid(),
-  studentId: z.string().uuid(),
-  courseId: z.string().uuid().optional(),
+  guardianName: z.string().min(1).max(120).optional(),
+  guardianPhone: z.string().min(6).max(40),
+  studentName: z.string().min(1).max(120),
+  grade: z.string().max(80).optional().default(''),
+  source: z.string().max(80).optional(),
+  campaign: z.string().max(80).optional(),
+  medium: z.string().max(40).optional(),
 });
 
 const paymentIntentSchema = z.object({
@@ -60,98 +67,187 @@ function getRawBody(body: unknown) {
   return '';
 }
 
+function normalizePhone(phone: string) {
+  return phone.trim();
+}
+
+function defaultPasswordForPhone(phone: string) {
+  return phone.slice(-6);
+}
+
 export const paymentModule: AppModule = {
   name: 'payment',
   async register(app) {
     // --- Parent checkout (course-package purchase) ---
 
-    app.post(
-      '/public/orders',
-      { preHandler: app.authenticateParent },
-      async (request) => {
-        const parent = request.parent!;
+    app.post('/public/orders', async (request) => {
+      const body = createOrderSchema.parse(request.body);
+      const pkg = await packagesRepo.requirePackage(app.db, body.packageId);
+      if (pkg.status !== 'active') {
+        throw httpError(422, '该课时包已下架');
+      }
+      const courseId = pkg.courseId;
+      if (!courseId) {
+        throw httpError(422, '该课时包未绑定课程，暂不能购买');
+      }
+      await requireCourse(app.db, courseId);
+      const phone = normalizePhone(body.guardianPhone);
+      const defaultPassword = defaultPasswordForPhone(phone);
+      const attribution = await marketingRepo.resolveAttribution(app.db, {
+        source: body.source,
+        campaignCode: body.campaign,
+      });
 
-        const body = createOrderSchema.parse(request.body);
-        const pkg = await packagesRepo.requirePackage(app.db, body.packageId);
-        if (pkg.status !== 'active') {
-          throw httpError(422, '该课时包已下架');
-        }
+      const result = await app.db.transaction(async (tx) => {
+        const [existingGuardian] = await tx
+          .select()
+          .from(schema.guardians)
+          .where(eq(schema.guardians.phone, phone))
+          .limit(1);
+        const guardian =
+          existingGuardian ??
+          (
+            await tx
+              .insert(schema.guardians)
+              .values({
+                name: body.guardianName?.trim() || `${phone} 家长`,
+                phone,
+              })
+              .returning()
+          )[0];
 
-        const parentRow = await findParentById(app.db, parent.id);
-        if (!parentRow?.guardianId) {
-          throw httpError(422, '请先联系机构将账号关联到学员后再购买');
-        }
-
-        const [student] = await app.db
+        const [existingStudent] = await tx
           .select()
           .from(schema.students)
           .where(
             and(
-              eq(schema.students.id, body.studentId),
-              eq(schema.students.guardianId, parentRow.guardianId),
+              eq(schema.students.guardianId, guardian.id),
+              eq(schema.students.name, body.studentName.trim()),
             ),
           )
           .limit(1);
-        if (!student) {
-          throw httpError(404, '学员不存在或不属于该家长');
+        const student =
+          existingStudent ??
+          (
+            await tx
+              .insert(schema.students)
+              .values({
+                guardianId: guardian.id,
+                name: body.studentName.trim(),
+                grade: body.grade?.trim() || '未填写',
+                status: 'active',
+              })
+              .returning()
+          )[0];
+
+        await tx
+          .insert(schema.studentGuardians)
+          .values({ studentId: student.id, guardianId: guardian.id, relation: 'guardian' })
+          .onConflictDoNothing();
+
+        const [existingAccount] = await tx
+          .select()
+          .from(schema.accounts)
+          .where(eq(schema.accounts.phone, phone))
+          .limit(1);
+        const account =
+          existingAccount ??
+          (
+            await tx
+              .insert(schema.accounts)
+              .values({
+                role: 'parent',
+                phone,
+                passwordHash: hashPassword(defaultPassword),
+                displayName: guardian.name,
+                guardianId: guardian.id,
+                mustChangePassword: true,
+              })
+              .returning()
+          )[0];
+
+        if (!account.guardianId) {
+          await tx
+            .update(schema.accounts)
+            .set({ guardianId: guardian.id, updatedAt: new Date() })
+            .where(eq(schema.accounts.id, account.id));
         }
 
-        const courseId = body.courseId ?? pkg.courseId;
-        if (!courseId) {
-          throw httpError(422, '该课时包未绑定课程，请选择要购买的课程');
+        const [lead] = await tx
+          .select()
+          .from(schema.leads)
+          .where(eq(schema.leads.phone, phone))
+          .orderBy(desc(schema.leads.createdAt))
+          .limit(1);
+        if (lead) {
+          await tx
+            .update(schema.leads)
+            .set({
+              status: 'paid',
+              convertedStudentId: student.id,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.leads.id, lead.id));
         }
-        await requireCourse(app.db, courseId);
 
-        const order = await financeRepo.createPackageOrder(app.db, {
-          parentId: parent.id,
+        const order = await financeRepo.createPackageOrder(tx, {
+          accountId: account.id,
           packageId: pkg.id,
           studentId: student.id,
           courseId,
           amount: pkg.priceAmount,
           lessonCount: pkg.lessonCount,
           currency: 'CNY',
+          source: body.source ?? lead?.source ?? 'unknown',
+          channelId: attribution.channelId ?? lead?.channelId ?? null,
+          campaignId: attribution.campaignId ?? lead?.campaignId ?? null,
+          medium: body.medium ?? lead?.medium ?? null,
         });
 
-        return { order };
-      },
-    );
+        return {
+          order,
+          account,
+          guardian,
+          student,
+          accountCreated: !existingAccount,
+        };
+      });
 
-    app.post(
-      '/public/orders/:orderNo/payment-intent',
-      { preHandler: app.authenticateParent },
-      async (request) => {
-        const { orderNo } = request.params as { orderNo: string };
-        const payload = paymentIntentSchema.parse(request.body ?? {});
-        return new PaymentService(app).createPaymentIntent({
-          orderNo,
-          parentId: request.parent!.id,
-          provider: payload.provider,
-          clientIp: request.ip,
-        });
-      },
-    );
+      return {
+        order: result.order,
+        checkout: {
+          loginIdentifier: phone,
+          defaultPassword: result.accountCreated ? defaultPassword : null,
+          accountCreated: result.accountCreated,
+          mustChangePassword: result.account.mustChangePassword,
+        },
+      };
+    });
 
-    app.post(
-      '/public/orders/:orderNo/payment-sync',
-      { preHandler: app.authenticateParent },
-      async (request) => {
-        const { orderNo } = request.params as { orderNo: string };
-        return new PaymentService(app).syncProviderPayment({
-          orderNo,
-          parentId: request.parent!.id,
-        });
-      },
-    );
+    app.post('/public/orders/:orderNo/payment-intent', async (request) => {
+      const { orderNo } = request.params as { orderNo: string };
+      const payload = paymentIntentSchema.parse(request.body ?? {});
+      return new PaymentService(app).createPaymentIntent({
+        orderNo,
+        provider: payload.provider,
+        clientIp: request.ip,
+      });
+    });
+
+    app.post('/public/orders/:orderNo/payment-sync', async (request) => {
+      const { orderNo } = request.params as { orderNo: string };
+      return new PaymentService(app).syncProviderPayment({
+        orderNo,
+      });
+    });
 
     // Development-only shortcut to drive the buy→credit loop without a provider.
     app.post(
       '/public/orders/:orderNo/mock-pay',
-      { preHandler: app.authenticateParent },
       async (request) => {
         const { orderNo } = request.params as { orderNo: string };
         return new PaymentService(app).markMockPaid({
           orderNo,
-          parentId: request.parent!.id,
         });
       },
     );
@@ -246,50 +342,30 @@ export const paymentModule: AppModule = {
 
     // --- Admin payment configuration ---
 
-    app.get(
-      '/v1/payment-providers',
-      { preHandler: app.authenticate },
-      async () => {
-        return new PaymentSettingsService(app).getOverview({ includeMock: true });
-      },
-    );
+    app.get('/v1/payment-providers', { preHandler: app.requireAdmin }, async () => {
+      return new PaymentSettingsService(app).getOverview({ includeMock: true });
+    });
 
-    app.get(
-      '/v1/payment-settings',
-      { preHandler: app.authenticate },
-      async () => {
-        return new PaymentSettingsService(app).getOverview();
-      },
-    );
+    app.get('/v1/payment-settings', { preHandler: app.requireAdmin }, async () => {
+      return new PaymentSettingsService(app).getOverview();
+    });
 
-    app.put(
-      '/v1/payment-settings/wechat',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const payload = wechatSettingsSchema.parse(request.body);
-        const updatedBy = (request.user as { sub?: string }).sub;
-        return new PaymentSettingsService(app).upsertWechatSettings(payload, updatedBy);
-      },
-    );
+    app.put('/v1/payment-settings/wechat', { preHandler: app.requireAdmin }, async (request) => {
+      const payload = wechatSettingsSchema.parse(request.body);
+      const updatedBy = request.account!.id;
+      return new PaymentSettingsService(app).upsertWechatSettings(payload, updatedBy);
+    });
 
-    app.put(
-      '/v1/payment-settings/alipay',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const payload = alipaySettingsSchema.parse(request.body);
-        const updatedBy = (request.user as { sub?: string }).sub;
-        return new PaymentSettingsService(app).upsertAlipaySettings(payload, updatedBy);
-      },
-    );
+    app.put('/v1/payment-settings/alipay', { preHandler: app.requireAdmin }, async (request) => {
+      const payload = alipaySettingsSchema.parse(request.body);
+      const updatedBy = request.account!.id;
+      return new PaymentSettingsService(app).upsertAlipaySettings(payload, updatedBy);
+    });
 
-    app.delete(
-      '/v1/payment-settings/:provider',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const { provider } = providerParamSchema.parse(request.params);
-        await new PaymentSettingsService(app).clearProviderSettings(provider);
-        return { ok: true };
-      },
-    );
+    app.delete('/v1/payment-settings/:provider', { preHandler: app.requireAdmin }, async (request) => {
+      const { provider } = providerParamSchema.parse(request.params);
+      await new PaymentSettingsService(app).clearProviderSettings(provider);
+      return { ok: true };
+    });
   },
 };

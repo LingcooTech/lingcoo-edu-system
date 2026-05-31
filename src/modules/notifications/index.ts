@@ -22,8 +22,8 @@ export const notificationsModule: AppModule = {
   name: 'notifications',
   async register(app) {
     // --- Staff notifications ---
-    app.get('/v1/notifications', { preHandler: app.authenticate }, async (request) => {
-      const recipientId = (request.user as { sub: string }).sub;
+    app.get('/v1/notifications', { preHandler: app.requireAdmin }, async (request) => {
+      const recipientId = request.account!.id;
       const service = new NotificationsService(app.db);
       const query = request.query as { status?: 'unread' | 'read' | 'archived'; limit?: string };
       const items = await service.listForRecipient({
@@ -35,17 +35,17 @@ export const notificationsModule: AppModule = {
       return { notifications: items };
     });
 
-    app.get('/v1/notifications/unread-count', { preHandler: app.authenticate }, async (request) => {
-      const recipientId = (request.user as { sub: string }).sub;
+    app.get('/v1/notifications/unread-count', { preHandler: app.requireAdmin }, async (request) => {
+      const recipientId = request.account!.id;
       const service = new NotificationsService(app.db);
       return { unreadCount: await service.countUnread('staff', recipientId) };
     });
 
     app.post(
       '/v1/notifications/:notificationId/read',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
-        const recipientId = (request.user as { sub: string }).sub;
+        const recipientId = request.account!.id;
         const { notificationId } = request.params as { notificationId: string };
         const service = new NotificationsService(app.db);
         const item = await service.markAsRead(notificationId, recipientId);
@@ -56,32 +56,32 @@ export const notificationsModule: AppModule = {
       },
     );
 
-    app.post('/v1/notifications/read-all', { preHandler: app.authenticate }, async (request) => {
-      const recipientId = (request.user as { sub: string }).sub;
+    app.post('/v1/notifications/read-all', { preHandler: app.requireAdmin }, async (request) => {
+      const recipientId = request.account!.id;
       const service = new NotificationsService(app.db);
       return { updatedCount: await service.markAllAsRead('staff', recipientId) };
     });
 
     // --- Qiniu storage config + upload tokens (admin) ---
-    app.get('/v1/storage/qiniu', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/storage/qiniu', { preHandler: app.requireAdmin }, async () => {
       const service = new QiniuSettingsService(app.db, app.appEnv);
       return { overview: await service.getOverview() };
     });
 
-    app.put('/v1/storage/qiniu', { preHandler: app.authenticate }, async (request) => {
+    app.put('/v1/storage/qiniu', { preHandler: app.requireAdmin }, async (request) => {
       const body = qiniuSettingsSchema.parse(request.body);
-      const recipientId = (request.user as { sub: string }).sub;
+      const recipientId = request.account!.id;
       const service = new QiniuSettingsService(app.db, app.appEnv);
       return { overview: await service.upsertSettings(body, recipientId) };
     });
 
-    app.post('/v1/storage/qiniu/test', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/storage/qiniu/test', { preHandler: app.requireAdmin }, async (request) => {
       const body = qiniuSettingsSchema.parse(request.body);
       const service = new QiniuSettingsService(app.db, app.appEnv);
       return service.testConnection(body);
     });
 
-    app.get('/v1/storage/qiniu/images', { preHandler: app.authenticate }, async (request) => {
+    app.get('/v1/storage/qiniu/images', { preHandler: app.requireAdmin }, async (request) => {
       const query = request.query as { prefix?: string; marker?: string; limit?: string };
       const service = new QiniuSettingsService(app.db, app.appEnv);
       return service.listImages({
@@ -91,7 +91,7 @@ export const notificationsModule: AppModule = {
       });
     });
 
-    app.post('/v1/storage/qiniu/upload-token', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/storage/qiniu/upload-token', { preHandler: app.requireAdmin }, async (request) => {
       const body = uploadTokenSchema.parse(request.body);
       const service = new QiniuSettingsService(app.db, app.appEnv);
       return service.createUploadToken(body);

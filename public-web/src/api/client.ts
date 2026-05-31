@@ -7,9 +7,9 @@ export interface Course {
   name: string;
   category: string;
   ageRange: string;
-  lessonCount: number;
   durationMinutes: number;
-  priceAmount: number;
+  packageCount?: number;
+  startingPriceAmount?: number | null;
   summary: string;
   content?: string;
 }
@@ -46,26 +46,33 @@ export interface HomePayload {
   trialSessions: TrialSession[];
 }
 
-const PARENT_TOKEN_KEY = 'fd_edu_parent_token';
+// Unified identity: one token + one cookie (`fd_edu_token`) shared with /admin
+// under the same origin. localStorage caches the token for Bearer auth; the
+// httpOnly cookie set on login is what /admin reads.
+const AUTH_TOKEN_KEY = 'fd_edu_token';
 
 export function getParentToken(): string | null {
-  return localStorage.getItem(PARENT_TOKEN_KEY);
+  return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
 export function setParentToken(token: string): void {
-  localStorage.setItem(PARENT_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 
 export function clearParentToken(): void {
-  localStorage.removeItem(PARENT_TOKEN_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
-export interface ParentProfile {
+export type AccountRole = 'admin' | 'teacher' | 'parent';
+
+export interface AuthAccount {
   id: string;
-  email: string;
+  role: AccountRole;
+  email: string | null;
   displayName: string;
   phone: string | null;
   emailVerified: boolean;
+  mustChangePassword: boolean;
 }
 
 export async function publicApi<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -77,6 +84,7 @@ export async function publicApi<T>(path: string, init: RequestInit = {}): Promis
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -87,41 +95,50 @@ export async function publicApi<T>(path: string, init: RequestInit = {}): Promis
   return (await response.json()) as T;
 }
 
+// --- Unified auth (login accepts email OR phone as identifier) ---
+
 export async function parentRegister(input: {
   email: string;
   password: string;
   displayName: string;
   phone?: string;
 }) {
-  const payload = await publicApi<{ token: string; parent: ParentProfile }>(
-    '/public/auth/register',
-    { method: 'POST', body: JSON.stringify(input) },
-  );
+  const payload = await publicApi<{ token: string; account: AuthAccount }>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
   setParentToken(payload.token);
   return payload;
 }
 
-export async function parentLogin(email: string, password: string) {
-  const payload = await publicApi<{ token: string; parent: ParentProfile }>(
-    '/public/auth/login',
-    { method: 'POST', body: JSON.stringify({ email, password }) },
-  );
+export async function parentLogin(identifier: string, password: string) {
+  const payload = await publicApi<{ token: string; account: AuthAccount }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password }),
+  });
   setParentToken(payload.token);
   return payload;
 }
 
 export async function parentLogout() {
-  await publicApi('/public/auth/logout', { method: 'POST' }).catch(() => undefined);
+  await publicApi('/auth/logout', { method: 'POST' }).catch(() => undefined);
   clearParentToken();
 }
 
-export async function fetchParentProfile(): Promise<ParentProfile | null> {
+export async function changeParentPassword(currentPassword: string, newPassword: string) {
+  return publicApi<{ ok: boolean }>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+export async function fetchParentProfile(): Promise<AuthAccount | null> {
   if (!getParentToken()) {
     return null;
   }
   try {
-    const payload = await publicApi<{ parent: ParentProfile | null }>('/public/auth/me');
-    return payload.parent;
+    const payload = await publicApi<{ account: AuthAccount | null }>('/auth/me');
+    return payload.account;
   } catch {
     clearParentToken();
     return null;
@@ -148,6 +165,13 @@ export interface ParentOrder {
   status: string;
   lessonCount: number;
   createdAt: string;
+}
+
+export interface CheckoutInfo {
+  loginIdentifier: string;
+  defaultPassword: string | null;
+  accountCreated: boolean;
+  mustChangePassword: boolean;
 }
 
 export async function fetchChildren() {
@@ -263,13 +287,22 @@ export interface PaymentIntent {
   };
 }
 
-export async function createOrder(packageId: string, studentId: string) {
-  return (
-    await publicApi<{ order: ParentOrder }>('/public/orders', {
+export interface CreateOrderInput {
+  packageId: string;
+  guardianName?: string;
+  guardianPhone: string;
+  studentName: string;
+  grade?: string;
+  source?: string;
+  campaign?: string;
+  medium?: string;
+}
+
+export async function createOrder(input: CreateOrderInput) {
+  return await publicApi<{ order: ParentOrder; checkout: CheckoutInfo }>('/public/orders', {
       method: 'POST',
-      body: JSON.stringify({ packageId, studentId }),
-    })
-  ).order;
+      body: JSON.stringify(input),
+    });
 }
 
 export async function fetchPaymentProviders() {
@@ -305,4 +338,34 @@ export async function syncPayment(orderNo: string) {
   return publicApi<PaymentSyncResult>(`/public/orders/${orderNo}/payment-sync`, {
     method: 'POST',
   });
+}
+
+// --- Teacher front-office read-only views ---
+
+export interface TeacherClassSession {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  topic: string;
+  status: string;
+  class?: { name: string };
+  course?: { name: string };
+  classroom?: { name: string };
+}
+
+export interface TeacherClass {
+  id: string;
+  name: string;
+  status: string;
+  capacity: number;
+  course?: { name: string };
+  classroom?: { name: string };
+  students: Array<{ id: string; name: string; grade: string }>;
+}
+
+export async function fetchTeacherDashboard() {
+  return publicApi<{
+    sessions: TeacherClassSession[];
+    classes: TeacherClass[];
+  }>('/public/teacher/dashboard');
 }

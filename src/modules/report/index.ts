@@ -25,7 +25,7 @@ function funnelOf(leads: Lead[]) {
 export const reportModule: AppModule = {
   name: 'report',
   async register(app) {
-    app.get('/v1/reports/funnel', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/reports/funnel', { preHandler: app.requireAdmin }, async () => {
         const [leads, channels, campaigns] = await Promise.all([
           crmRepo.listLeads(app.db),
           marketingRepo.listChannels(app.db),

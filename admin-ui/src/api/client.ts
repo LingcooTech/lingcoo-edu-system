@@ -36,6 +36,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+    }
     const payload = (await response.json().catch(() => null)) as { message?: string } | null;
     throw new Error(payload?.message ?? `Request failed: ${response.status}`);
   }
@@ -56,13 +59,29 @@ export function apiDelete<T>(path: string): Promise<T> {
   return api<T>(path, { method: 'DELETE' });
 }
 
-export async function login(email: string, password: string) {
-  const payload = await api<{ token: string; user: unknown }>('/v1/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-  setToken(payload.token);
-  return payload;
+export type AccountRole = 'admin' | 'teacher' | 'parent';
+
+export interface AuthAccount {
+  id: string;
+  role: AccountRole;
+  email: string | null;
+  displayName: string;
+  phone: string | null;
+  emailVerified: boolean;
+  mustChangePassword: boolean;
+}
+
+// The back office no longer has its own login page — login happens on the
+// public web (the single front door). Here we only read the current account
+// (to gate /admin on role) and clear the shared session on logout.
+export async function fetchMe(): Promise<AuthAccount | null> {
+  const payload = await api<{ account: AuthAccount | null }>('/auth/me');
+  return payload.account;
+}
+
+export async function logout() {
+  await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
+  clearToken();
 }
 
 export async function fetchPaymentSettings() {

@@ -53,11 +53,11 @@ export const marketingModule: AppModule = {
   async register(app) {
     // --- Channels (渠道) ---
 
-    app.get('/v1/channels', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/channels', { preHandler: app.requireAdmin }, async () => {
       return { channels: await marketingRepo.listChannels(app.db) };
     });
 
-    app.post('/v1/channels', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/channels', { preHandler: app.requireAdmin }, async (request) => {
       const body = channelSchema.parse(request.body);
       const channel = await marketingRepo.createChannel(app.db, body);
       return { channel };
@@ -65,7 +65,7 @@ export const marketingModule: AppModule = {
 
     app.patch(
       '/v1/channels/:channelId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { channelId } = request.params as { channelId: string };
         const body = channelUpdateSchema.parse(request.body);
@@ -77,11 +77,11 @@ export const marketingModule: AppModule = {
 
     // --- Campaigns (活动) ---
 
-    app.get('/v1/campaigns', { preHandler: app.authenticate }, async () => {
+    app.get('/v1/campaigns', { preHandler: app.requireAdmin }, async () => {
       return { campaigns: await marketingRepo.listCampaigns(app.db) };
     });
 
-    app.post('/v1/campaigns', { preHandler: app.authenticate }, async (request) => {
+    app.post('/v1/campaigns', { preHandler: app.requireAdmin }, async (request) => {
       const body = campaignSchema.parse(request.body);
       const channel = await marketingRepo.findChannel(app.db, body.channelId);
       if (!channel) throw notFound('Channel not found');
@@ -91,7 +91,7 @@ export const marketingModule: AppModule = {
 
     app.patch(
       '/v1/campaigns/:campaignId',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { campaignId } = request.params as { campaignId: string };
         const body = campaignUpdateSchema.parse(request.body);
@@ -108,7 +108,7 @@ export const marketingModule: AppModule = {
     // Generates the QR code (PNG data URL) + the landing URL for a campaign.
     app.get(
       '/v1/campaigns/:campaignId/qrcode',
-      { preHandler: app.authenticate },
+      { preHandler: app.requireAdmin },
       async (request) => {
         const { campaignId } = request.params as { campaignId: string };
         const campaign = await marketingRepo.requireCampaign(app.db, campaignId);
