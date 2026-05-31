@@ -57,6 +57,13 @@
       "when": 1780120200000,
       "tag": "0007_order_attribution",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780120300000,
+      "tag": "0008_drop_course_pricing",
+      "breakpoints": true
     }
   ]
 }
