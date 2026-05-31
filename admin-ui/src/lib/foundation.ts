@@ -149,7 +149,7 @@ export const pageMeta: Record<string, { title: string; description: string; eyeb
   campuses: {
     eyebrow: 'Resource',
     title: '校区管理',
-    description: '查看机构校区列表。新增 / 编辑校区待后端接口开放。',
+    description: '维护机构校区与地址，供教室、排课和公开展示引用。',
   },
   orders: {
     eyebrow: 'Finance',
