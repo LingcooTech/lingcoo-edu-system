@@ -18,6 +18,13 @@ const studentUpdateSchema = studentSchema
   .omit({ guardianName: true, guardianPhone: true })
   .partial();
 
+const guardianSchema = z.object({
+  name: z.string().min(1).max(120),
+  phone: z.string().min(6).max(40),
+});
+
+const guardianUpdateSchema = guardianSchema.partial();
+
 function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
 }
@@ -27,6 +34,37 @@ export const peopleModule: AppModule = {
   async register(app) {
     app.get('/v1/guardians', { preHandler: app.requireAdmin }, async () => {
       return { guardians: await peopleRepo.listGuardians(app.db) };
+    });
+
+    app.post('/v1/guardians', { preHandler: app.requireAdmin }, async (request) => {
+      const body = guardianSchema.parse(request.body);
+      const existing = await peopleRepo.findGuardianByPhone(app.db, body.phone.trim());
+      if (existing) {
+        throw Object.assign(new Error('该手机号已有家长档案'), { statusCode: 409 });
+      }
+      const guardian = await peopleRepo.createGuardian(app.db, {
+        name: body.name.trim(),
+        phone: body.phone.trim(),
+      });
+      return { guardian };
+    });
+
+    app.patch('/v1/guardians/:guardianId', { preHandler: app.requireAdmin }, async (request) => {
+      const { guardianId } = request.params as { guardianId: string };
+      const body = guardianUpdateSchema.parse(request.body);
+      const phone = body.phone?.trim();
+      if (phone) {
+        const existing = await peopleRepo.findGuardianByPhone(app.db, phone);
+        if (existing && existing.id !== guardianId) {
+          throw Object.assign(new Error('该手机号已有家长档案'), { statusCode: 409 });
+        }
+      }
+      const guardian = await peopleRepo.updateGuardian(app.db, guardianId, {
+        name: body.name?.trim(),
+        phone,
+      });
+      if (!guardian) throw notFound('Guardian not found');
+      return { guardian };
     });
 
     app.get('/v1/students', { preHandler: app.requireAdmin }, async () => {

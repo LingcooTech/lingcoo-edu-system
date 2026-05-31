@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -13,13 +13,17 @@ function lessonDeltaForStatus(status: AttendanceStatus): number {
   return 0;
 }
 
-function conflict(message: string): Error {
-  return Object.assign(new Error(message), { statusCode: 409 });
+export async function listAttendanceForSession(db: Database, sessionId: string) {
+  return db
+    .select()
+    .from(schema.attendanceRecords)
+    .where(eq(schema.attendanceRecords.classSessionId, sessionId))
+    .orderBy(desc(schema.attendanceRecords.createdAt));
 }
 
 /**
  * Records attendance for a session in one transaction:
- * - rejects if any student already has a record for the session (409)
+ * - existing session+student rows are returned as-is and never re-deduct
  * - writes attendance rows
  * - for present/absent/makeup, consumes one lesson (signed -1) from the
  *   student's account on the class's course, writing a lesson transaction
@@ -48,7 +52,8 @@ export async function recordAttendance(
         )
         .limit(1);
       if (existing) {
-        throw conflict('Attendance already recorded');
+        created.push(existing);
+        continue;
       }
 
       const lessonDelta = lessonDeltaForStatus(record.status);

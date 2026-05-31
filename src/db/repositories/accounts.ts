@@ -75,6 +75,10 @@ export async function listByRole(db: Database, role: AccountRole) {
     .orderBy(desc(schema.accounts.createdAt));
 }
 
+export async function listAccounts(db: Database) {
+  return db.select().from(schema.accounts).orderBy(desc(schema.accounts.createdAt));
+}
+
 // --- Security codes (email verify / password reset) ---
 
 export async function findLatestSecurityCode(

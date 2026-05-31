@@ -25,6 +25,19 @@ export async function createGuardian(db: Database, values: typeof schema.guardia
   return guardian;
 }
 
+export async function updateGuardian(
+  db: Database,
+  guardianId: string,
+  patch: Partial<typeof schema.guardians.$inferInsert>,
+) {
+  const [guardian] = await db
+    .update(schema.guardians)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(schema.guardians.id, guardianId))
+    .returning();
+  return guardian ?? null;
+}
+
 export async function findStudentForGuardian(db: Database, input: { guardianId: string; name: string }) {
   const [student] = await db
     .select()

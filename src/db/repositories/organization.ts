@@ -59,3 +59,21 @@ export async function updateOrganizationSettings(
 export async function listCampuses(db: Database) {
   return db.select().from(schema.campuses);
 }
+
+export async function createCampus(db: Database, values: typeof schema.campuses.$inferInsert) {
+  const [campus] = await db.insert(schema.campuses).values(values).returning();
+  return campus;
+}
+
+export async function updateCampus(
+  db: Database,
+  campusId: string,
+  patch: Partial<typeof schema.campuses.$inferInsert>,
+) {
+  const [campus] = await db
+    .update(schema.campuses)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(schema.campuses.id, campusId))
+    .returning();
+  return campus ?? null;
+}

@@ -45,6 +45,13 @@ const organizationSchema = z.object({
   branding: brandingSchema,
 });
 
+const campusSchema = z.object({
+  name: z.string().min(1).max(120),
+  address: z.string().max(255).optional().nullable(),
+});
+
+const campusUpdateSchema = campusSchema.partial();
+
 function readSettings(settings: unknown) {
   return settings && typeof settings === 'object' && !Array.isArray(settings)
     ? (settings as Record<string, unknown>)
@@ -99,6 +106,28 @@ export const organizationModule: AppModule = {
 
     app.get('/v1/campuses', { preHandler: app.requireAdmin }, async () => {
       return { campuses: await organizationRepo.listCampuses(app.db) };
+    });
+
+    app.post('/v1/campuses', { preHandler: app.requireAdmin }, async (request) => {
+      const body = campusSchema.parse(request.body);
+      const campus = await organizationRepo.createCampus(app.db, {
+        name: body.name.trim(),
+        address: body.address?.trim() || null,
+      });
+      return { campus };
+    });
+
+    app.patch('/v1/campuses/:campusId', { preHandler: app.requireAdmin }, async (request) => {
+      const { campusId } = request.params as { campusId: string };
+      const body = campusUpdateSchema.parse(request.body);
+      const campus = await organizationRepo.updateCampus(app.db, campusId, {
+        name: body.name?.trim(),
+        address: body.address === undefined ? undefined : body.address?.trim() || null,
+      });
+      if (!campus) {
+        throw Object.assign(new Error('Campus not found'), { statusCode: 404 });
+      }
+      return { campus };
     });
 
     app.get('/v1/dashboard', { preHandler: app.requireAdmin }, async () => {

@@ -17,6 +17,21 @@ const attendanceSchema = z.object({
 export const attendanceModule: AppModule = {
   name: 'attendance',
   async register(app) {
+    app.get(
+      '/v1/class-sessions/:sessionId/attendance',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) {
+          throw Object.assign(new Error('Class session not found'), { statusCode: 404 });
+        }
+        return {
+          attendanceRecords: await attendanceRepo.listAttendanceForSession(app.db, sessionId),
+        };
+      },
+    );
+
     app.post(
       '/v1/class-sessions/:sessionId/attendance',
       { preHandler: app.requireAdmin },

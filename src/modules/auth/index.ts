@@ -2,6 +2,8 @@ import { createHash, randomInt } from 'node:crypto';
 import { z } from 'zod';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
+import * as peopleRepo from '../../db/repositories/people.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
 import { httpError } from '../../lib/http-error.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { SmtpSettingsService } from '../../lib/smtp-settings.js';
@@ -35,8 +37,33 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8),
 });
 
+const adminAccountCreateSchema = z.object({
+  role: z.enum(['admin', 'teacher', 'parent']),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().optional(),
+  displayName: z.string().min(1),
+  status: z.enum(['active', 'suspended']).default('active'),
+  guardianId: z.string().uuid().optional().nullable(),
+  teacherId: z.string().uuid().optional().nullable(),
+  password: z.string().min(6).optional(),
+});
+
+const adminAccountUpdateSchema = adminAccountCreateSchema
+  .omit({ password: true })
+  .partial();
+
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function normalizeOptionalEmail(email: string | null | undefined) {
+  const value = email?.trim();
+  return value ? normalizeEmail(value) : null;
+}
+
+function normalizeOptionalPhone(phone: string | null | undefined) {
+  const value = phone?.trim();
+  return value || null;
 }
 
 // One login field accepts both: emails are lowercased, phone numbers are kept verbatim.
@@ -53,6 +80,14 @@ function generateCode() {
   return String(randomInt(0, 1_000_000)).padStart(6, '0');
 }
 
+function generateDefaultPassword(phone: string | null | undefined) {
+  const normalizedPhone = normalizeOptionalPhone(phone);
+  if (normalizedPhone && normalizedPhone.length >= 6) {
+    return normalizedPhone.slice(-6);
+  }
+  return String(randomInt(10_000_000, 100_000_000));
+}
+
 function publicAccount(account: accountsRepo.Account) {
   return {
     id: account.id,
@@ -62,6 +97,17 @@ function publicAccount(account: accountsRepo.Account) {
     displayName: account.displayName,
     emailVerified: Boolean(account.emailVerifiedAt),
     mustChangePassword: account.mustChangePassword,
+  };
+}
+
+function adminAccount(account: accountsRepo.Account) {
+  return {
+    ...publicAccount(account),
+    status: account.status,
+    guardianId: account.guardianId,
+    teacherId: account.teacherId,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
   };
 }
 
@@ -143,6 +189,147 @@ export const authModule: AppModule = {
     app.get('/auth/me', { preHandler: app.authenticate }, async (request) => {
       const account = await accountsRepo.findById(app.db, request.account!.id);
       return { account: account ? publicAccount(account) : null };
+    });
+
+    // --- Admin account management ---
+
+    async function ensureUniqueIdentifiers(input: {
+      email?: string | null;
+      phone?: string | null;
+      ignoreAccountId?: string;
+    }) {
+      if (input.email) {
+        const existing = await accountsRepo.findByEmail(app.db, input.email);
+        if (existing && existing.id !== input.ignoreAccountId) {
+          throw httpError(409, '该邮箱已被其他账号使用');
+        }
+      }
+      if (input.phone) {
+        const existing = await accountsRepo.findByPhone(app.db, input.phone);
+        if (existing && existing.id !== input.ignoreAccountId) {
+          throw httpError(409, '该手机号已被其他账号使用');
+        }
+      }
+    }
+
+    async function validateProfileLinks(input: {
+      role?: accountsRepo.AccountRole;
+      guardianId?: string | null;
+      teacherId?: string | null;
+    }) {
+      if (input.role === 'teacher') {
+        if (!input.teacherId) {
+          throw httpError(422, '老师账号必须关联老师档案');
+        }
+        const teacher = await teachingRepo.findTeacher(app.db, input.teacherId);
+        if (!teacher) {
+          throw httpError(404, '老师档案不存在');
+        }
+      }
+      if (input.role === 'parent' && input.guardianId) {
+        const guardian = await peopleRepo.findGuardian(app.db, input.guardianId);
+        if (!guardian) {
+          throw httpError(404, '家长档案不存在');
+        }
+      }
+    }
+
+    app.get('/v1/accounts', { preHandler: app.requireAdmin }, async () => {
+      const [accounts, guardians, teachers] = await Promise.all([
+        accountsRepo.listAccounts(app.db),
+        peopleRepo.listGuardians(app.db),
+        teachingRepo.listTeachers(app.db),
+      ]);
+      const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
+      const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+
+      return {
+        accounts: accounts.map((account) => ({
+          ...adminAccount(account),
+          guardian: account.guardianId ? guardianById.get(account.guardianId) : undefined,
+          teacher: account.teacherId ? teacherById.get(account.teacherId) : undefined,
+        })),
+      };
+    });
+
+    app.post('/v1/accounts', { preHandler: app.requireAdmin }, async (request) => {
+      const body = adminAccountCreateSchema.parse(request.body);
+      const email = normalizeOptionalEmail(body.email);
+      const phone = normalizeOptionalPhone(body.phone);
+      if (!email && !phone) {
+        throw httpError(422, '邮箱和手机号至少填写一个');
+      }
+
+      await ensureUniqueIdentifiers({ email, phone });
+      await validateProfileLinks({
+        role: body.role,
+        guardianId: body.guardianId ?? null,
+        teacherId: body.teacherId ?? null,
+      });
+
+      const defaultPassword = body.password ?? generateDefaultPassword(phone);
+      const account = await accountsRepo.createAccount(app.db, {
+        role: body.role,
+        email,
+        phone,
+        displayName: body.displayName.trim(),
+        status: body.status,
+        guardianId: body.role === 'parent' ? (body.guardianId ?? null) : null,
+        teacherId: body.role === 'teacher' ? (body.teacherId ?? null) : null,
+        passwordHash: hashPassword(defaultPassword),
+        mustChangePassword: true,
+      });
+
+      return { account: adminAccount(account), defaultPassword };
+    });
+
+    app.patch('/v1/accounts/:accountId', { preHandler: app.requireAdmin }, async (request) => {
+      const { accountId } = request.params as { accountId: string };
+      const current = await accountsRepo.findById(app.db, accountId);
+      if (!current) {
+        throw httpError(404, '账号不存在');
+      }
+      const body = adminAccountUpdateSchema.parse(request.body);
+      const nextRole = body.role ?? current.role;
+      const email = body.email === undefined ? current.email : normalizeOptionalEmail(body.email);
+      const phone = body.phone === undefined ? current.phone : normalizeOptionalPhone(body.phone);
+      if (!email && !phone) {
+        throw httpError(422, '邮箱和手机号至少填写一个');
+      }
+
+      const guardianId =
+        nextRole === 'parent' ? (body.guardianId === undefined ? current.guardianId : body.guardianId) : null;
+      const teacherId =
+        nextRole === 'teacher' ? (body.teacherId === undefined ? current.teacherId : body.teacherId) : null;
+
+      await ensureUniqueIdentifiers({ email, phone, ignoreAccountId: accountId });
+      await validateProfileLinks({ role: nextRole, guardianId, teacherId });
+
+      const updated = await accountsRepo.updateAccount(app.db, accountId, {
+        role: nextRole,
+        email,
+        phone,
+        displayName: body.displayName?.trim() ?? current.displayName,
+        status: body.status ?? current.status,
+        guardianId,
+        teacherId,
+      });
+
+      return { account: adminAccount(updated!) };
+    });
+
+    app.post('/v1/accounts/:accountId/reset-password', { preHandler: app.requireAdmin }, async (request) => {
+      const { accountId } = request.params as { accountId: string };
+      const account = await accountsRepo.findById(app.db, accountId);
+      if (!account) {
+        throw httpError(404, '账号不存在');
+      }
+      const defaultPassword = generateDefaultPassword(account.phone);
+      const updated = await accountsRepo.updateAccount(app.db, accountId, {
+        passwordHash: hashPassword(defaultPassword),
+        mustChangePassword: true,
+      });
+      return { account: adminAccount(updated!), defaultPassword };
     });
 
     // --- Parent self-registration ---

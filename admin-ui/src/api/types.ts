@@ -44,6 +44,30 @@ export interface Teacher {
   status: string;
 }
 
+export interface Guardian {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export type AccountRole = 'admin' | 'teacher' | 'parent';
+
+export interface Account {
+  id: string;
+  role: AccountRole;
+  email?: string | null;
+  phone?: string | null;
+  displayName: string;
+  status: 'active' | 'suspended';
+  mustChangePassword: boolean;
+  emailVerified: boolean;
+  guardianId?: string | null;
+  teacherId?: string | null;
+  guardian?: Guardian;
+  teacher?: Teacher;
+  createdAt: string;
+}
+
 export interface Classroom {
   id: string;
   campusId: string;
@@ -174,6 +198,17 @@ export interface ClassSession {
   class?: { name: string };
   teacher?: { name: string };
   classroom?: { name: string };
+}
+
+export type AttendanceStatus = 'present' | 'leave' | 'absent' | 'makeup' | 'trial';
+
+export interface AttendanceRecord {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  lessonDelta: number;
+  note?: string | null;
 }
 
 export interface LessonAccount {

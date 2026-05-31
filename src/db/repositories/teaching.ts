@@ -7,6 +7,18 @@ export async function listTeachers(db: Database) {
   return db.select().from(schema.teachers).orderBy(desc(schema.teachers.createdAt));
 }
 
+export async function findTeacher(db: Database, teacherId: string | null) {
+  if (!teacherId) {
+    return null;
+  }
+  const [teacher] = await db
+    .select()
+    .from(schema.teachers)
+    .where(eq(schema.teachers.id, teacherId))
+    .limit(1);
+  return teacher ?? null;
+}
+
 export async function createTeacher(db: Database, values: typeof schema.teachers.$inferInsert) {
   const [teacher] = await db.insert(schema.teachers).values(values).returning();
   return teacher;
