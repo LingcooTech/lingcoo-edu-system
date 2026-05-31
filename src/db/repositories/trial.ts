@@ -26,6 +26,18 @@ export async function createTrialSession(db: Database, values: NewTrialSession) 
   return session;
 }
 
+export async function requireTrialSession(db: Database, trialSessionId: string) {
+  const [session] = await db
+    .select()
+    .from(schema.trialSessions)
+    .where(eq(schema.trialSessions.id, trialSessionId))
+    .limit(1);
+  if (!session) {
+    throw notFound('Trial session not found');
+  }
+  return session;
+}
+
 export async function updateTrialSession(
   db: Database,
   trialSessionId: string,

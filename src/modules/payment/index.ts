@@ -1,9 +1,8 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-import * as accountsRepo from '../../db/repositories/accounts.js';
+import * as crmRepo from '../../db/repositories/crm.js';
 import * as financeRepo from '../../db/repositories/finance.js';
-import * as marketingRepo from '../../db/repositories/marketing.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import { requireCourse } from '../../db/repositories/catalog.js';
 import * as schema from '../../db/schema.js';
@@ -93,7 +92,7 @@ export const paymentModule: AppModule = {
       await requireCourse(app.db, courseId);
       const phone = normalizePhone(body.guardianPhone);
       const defaultPassword = defaultPasswordForPhone(phone);
-      const attribution = await marketingRepo.resolveAttribution(app.db, {
+      const attribution = await crmRepo.resolveAttribution(app.db, {
         source: body.source,
         campaignCode: body.campaign,
       });
@@ -242,15 +241,12 @@ export const paymentModule: AppModule = {
     });
 
     // Development-only shortcut to drive the buy→credit loop without a provider.
-    app.post(
-      '/public/orders/:orderNo/mock-pay',
-      async (request) => {
-        const { orderNo } = request.params as { orderNo: string };
-        return new PaymentService(app).markMockPaid({
-          orderNo,
-        });
-      },
-    );
+    app.post('/public/orders/:orderNo/mock-pay', async (request) => {
+      const { orderNo } = request.params as { orderNo: string };
+      return new PaymentService(app).markMockPaid({
+        orderNo,
+      });
+    });
 
     app.get('/public/payment-providers', async () => {
       const overview = await new PaymentSettingsService(app).getOverview({
@@ -362,10 +358,14 @@ export const paymentModule: AppModule = {
       return new PaymentSettingsService(app).upsertAlipaySettings(payload, updatedBy);
     });
 
-    app.delete('/v1/payment-settings/:provider', { preHandler: app.requireAdmin }, async (request) => {
-      const { provider } = providerParamSchema.parse(request.params);
-      await new PaymentSettingsService(app).clearProviderSettings(provider);
-      return { ok: true };
-    });
+    app.delete(
+      '/v1/payment-settings/:provider',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { provider } = providerParamSchema.parse(request.params);
+        await new PaymentSettingsService(app).clearProviderSettings(provider);
+        return { ok: true };
+      },
+    );
   },
 };

@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
-import * as marketingRepo from '../../db/repositories/marketing.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
@@ -47,7 +46,10 @@ function normalizeTrialSessionPatch(body: z.infer<typeof trialSessionUpdateSchem
   };
 }
 
-async function attachPackageSummary(app: Parameters<AppModule['register']>[0], courses: Awaited<ReturnType<typeof catalogRepo.listPublishedCourses>>) {
+async function attachPackageSummary(
+  app: Parameters<AppModule['register']>[0],
+  courses: Awaited<ReturnType<typeof catalogRepo.listPublishedCourses>>,
+) {
   const packages = await packagesRepo.listActivePackages(app.db);
   return courses.map((course) => {
     const coursePackages = packages.filter((item) => item.courseId === course.id);
@@ -108,7 +110,7 @@ export const trialModule: AppModule = {
         courseId = course?.id ?? null;
       }
 
-      const { channelId, campaignId } = await marketingRepo.resolveAttribution(app.db, {
+      const { channelId, campaignId } = await crmRepo.resolveAttribution(app.db, {
         source: body.source,
         campaignCode: body.campaign,
       });
@@ -125,7 +127,7 @@ export const trialModule: AppModule = {
         channelId,
         campaignId,
         medium: body.medium ?? null,
-        status: 'new',
+        status: body.trialSessionId ? 'trial_booked' : 'new',
       });
 
       if (body.trialSessionId) {
@@ -135,34 +137,26 @@ export const trialModule: AppModule = {
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
     });
 
-    app.get(
-      '/v1/trial-sessions',
-      { preHandler: app.requireAdmin },
-      async () => {
-        return { trialSessions: await trialRepo.listTrialSessions(app.db) };
-      },
-    );
+    app.get('/v1/trial-sessions', { preHandler: app.requireAdmin }, async () => {
+      return { trialSessions: await trialRepo.listTrialSessions(app.db) };
+    });
 
-    app.post(
-      '/v1/trial-sessions',
-      { preHandler: app.requireAdmin },
-      async (request) => {
-        const body = trialSessionSchema.parse(request.body);
-        await catalogRepo.requireCourse(app.db, body.courseId);
+    app.post('/v1/trial-sessions', { preHandler: app.requireAdmin }, async (request) => {
+      const body = trialSessionSchema.parse(request.body);
+      await catalogRepo.requireCourse(app.db, body.courseId);
 
-        const trialSession = await trialRepo.createTrialSession(app.db, {
-          campusId: body.campusId,
-          courseId: body.courseId,
-          title: body.title,
-          startsAt: new Date(body.startsAt),
-          endsAt: new Date(body.endsAt),
-          capacity: body.capacity,
-          status: body.status,
-          bookedCount: 0,
-        });
-        return { trialSession };
-      },
-    );
+      const trialSession = await trialRepo.createTrialSession(app.db, {
+        campusId: body.campusId,
+        courseId: body.courseId,
+        title: body.title,
+        startsAt: new Date(body.startsAt),
+        endsAt: new Date(body.endsAt),
+        capacity: body.capacity,
+        status: body.status,
+        bookedCount: 0,
+      });
+      return { trialSession };
+    });
 
     app.patch(
       '/v1/trial-sessions/:trialSessionId',

@@ -4,7 +4,6 @@ import * as peopleRepo from '../../db/repositories/people.js';
 import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
-import * as marketingRepo from '../../db/repositories/marketing.js';
 import {
   mergePublicProfile,
   normalizePublicProfile,
@@ -131,35 +130,35 @@ export const organizationModule: AppModule = {
     });
 
     app.get('/v1/dashboard', { preHandler: app.requireAdmin }, async () => {
-        const [leads, students, accounts, sessions, classes, campaigns, monthlyRevenue] =
-          await Promise.all([
-            crmRepo.listLeads(app.db),
-            peopleRepo.listStudents(app.db),
-            lessonRepo.listLessonAccounts(app.db),
-            schedulingRepo.listClassSessions(app.db),
-            schedulingRepo.listClasses(app.db),
-            marketingRepo.listCampaigns(app.db),
-            financeRepo.sumPaidRevenue(app.db),
-          ]);
-        const classById = new Map(classes.map((item) => [item.id, item]));
+      const [leads, students, accounts, sessions, classes, campaigns, monthlyRevenue] =
+        await Promise.all([
+          crmRepo.listLeads(app.db),
+          peopleRepo.listStudents(app.db),
+          lessonRepo.listLessonAccounts(app.db),
+          schedulingRepo.listClassSessions(app.db),
+          schedulingRepo.listClasses(app.db),
+          crmRepo.listCampaigns(app.db),
+          financeRepo.sumPaidRevenue(app.db),
+        ]);
+      const classById = new Map(classes.map((item) => [item.id, item]));
 
-        return {
-          metrics: {
-            totalLeads: leads.length,
-            pendingFollowUps: leads.filter((item) => ['new', 'follow_up'].includes(item.status))
-              .length,
-            bookedTrials: leads.filter((item) => item.status === 'trial_booked').length,
-            paidStudents: students.length,
-            monthlyRevenue,
-            lowLessonAccounts: accounts.filter((item) => item.balance <= 3).length,
-            attributedLeads: leads.filter((item) => item.channelId || item.campaignId).length,
-            activeCampaigns: campaigns.filter((item) => item.status === 'active').length,
-          },
-          todaySessions: sessions.slice(0, 5).map((session) => ({
-            ...session,
-            class: classById.get(session.classId),
-          })),
-        };
+      return {
+        metrics: {
+          totalLeads: leads.length,
+          pendingFollowUps: leads.filter((item) => ['new', 'follow_up'].includes(item.status))
+            .length,
+          bookedTrials: leads.filter((item) => item.status === 'trial_booked').length,
+          paidStudents: students.length,
+          monthlyRevenue,
+          lowLessonAccounts: accounts.filter((item) => item.balance <= 3).length,
+          attributedLeads: leads.filter((item) => item.channelId || item.campaignId).length,
+          activeCampaigns: campaigns.filter((item) => item.status === 'active').length,
+        },
+        todaySessions: sessions.slice(0, 5).map((session) => ({
+          ...session,
+          class: classById.get(session.classId),
+        })),
+      };
     });
   },
 };
