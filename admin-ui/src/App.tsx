@@ -8,13 +8,12 @@ import { AttendancePage } from '@/pages/AttendancePage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
+import { CrmPage } from '@/pages/CrmPage';
 import { CoursesPage } from '@/pages/CoursesPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ForbiddenPage } from '@/pages/ForbiddenPage';
 import { GuardiansPage } from '@/pages/GuardiansPage';
-import { LeadsPage } from '@/pages/LeadsPage';
 import { LessonsPage } from '@/pages/LessonsPage';
-import { MarketingPage } from '@/pages/MarketingPage';
 import { OrdersPage } from '@/pages/OrdersPage';
 import { PackagesPage } from '@/pages/PackagesPage';
 import { ReportsPage } from '@/pages/ReportsPage';
@@ -76,9 +75,10 @@ const router = createBrowserRouter(
         { index: true, element: <DashboardPage /> },
         { path: 'reports', element: <ReportsPage /> },
         // 招生获客
-        { path: 'leads', element: <LeadsPage /> },
+        { path: 'crm', element: <CrmPage /> },
+        { path: 'leads', element: <CrmPage /> },
         { path: 'trials', element: <TrialsPage /> },
-        { path: 'marketing', element: <MarketingPage /> },
+        { path: 'marketing', element: <CrmPage /> },
         // 课程商品
         { path: 'courses', element: <CoursesPage /> },
         { path: 'packages', element: <PackagesPage /> },

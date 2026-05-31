@@ -5,16 +5,15 @@ import {
   CalendarDays,
   ClipboardCheck,
   Contact,
+  ContactRound,
   DoorOpen,
   GraduationCap,
   LayoutDashboard,
-  Megaphone,
   Package,
   PieChart,
   ReceiptText,
   Settings,
   ShieldCheck,
-  Users,
 } from 'lucide-react';
 
 // 分组 / 归类 / 顺序只在此处定义一处，Sidebar 数据驱动渲染，调整菜单只改这里。
@@ -27,11 +26,10 @@ export const adminSections = [
     ],
   },
   {
-    group: '招生获客',
+    group: '招生 CRM',
     items: [
-      { key: 'leads', label: '线索', path: '/leads', icon: Users },
-      { key: 'trials', label: '试听课', path: '/trials', icon: Megaphone },
-      { key: 'marketing', label: '渠道活动', path: '/marketing', icon: Megaphone },
+      { key: 'crm', label: 'CRM', path: '/crm', icon: ContactRound },
+      { key: 'trials', label: '试听课', path: '/trials', icon: ClipboardCheck },
     ],
   },
   {
@@ -81,10 +79,15 @@ export const pageMeta: Record<string, { title: string; description: string; eyeb
     title: '经营报表',
     description: '招生漏斗、收入与课消报表，按渠道 / 活动复盘 ROI。',
   },
+  crm: {
+    eyebrow: 'CRM',
+    title: '招生 CRM',
+    description: '从活动获客、留资线索、跟进联系到试听核销、成交签约和推荐转化。',
+  },
   leads: {
     eyebrow: 'CRM',
-    title: '线索管理',
-    description: '跟进扫码报名、试听预约和转化状态。',
+    title: '招生 CRM',
+    description: '从活动获客、留资线索、跟进联系到试听核销、成交签约和推荐转化。',
   },
   trials: {
     eyebrow: 'Trial',
@@ -92,9 +95,9 @@ export const pageMeta: Record<string, { title: string; description: string; eyeb
     description: '管理试听课、报名名额与到课转化。',
   },
   marketing: {
-    eyebrow: 'Marketing',
-    title: '渠道活动',
-    description: '管理渠道、活动二维码与扫码报名的转化漏斗。',
+    eyebrow: 'CRM',
+    title: '招生 CRM',
+    description: '从活动获客、留资线索、跟进联系到试听核销、成交签约和推荐转化。',
   },
   courses: {
     eyebrow: 'Catalog',
