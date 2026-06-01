@@ -8,6 +8,7 @@ import { AttendancePage } from '@/pages/AttendancePage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
+import { CourseResourcesPage } from '@/pages/CourseResourcesPage';
 import { CoursesPage } from '@/pages/CoursesPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ForbiddenPage } from '@/pages/ForbiddenPage';
@@ -25,6 +26,7 @@ import { StudentsPage } from '@/pages/StudentsPage';
 import { TeachersPage } from '@/pages/TeachersPage';
 import { TodoPage } from '@/pages/TodoPage';
 import { TrialsPage } from '@/pages/TrialsPage';
+import { VenueResourcesPage } from '@/pages/VenueResourcesPage';
 
 type GateState =
   | { status: 'loading' }
@@ -83,10 +85,10 @@ const router = createBrowserRouter(
         // 机构主页
         { path: 'institution', element: <InstitutionHomePage /> },
         // 教学资源
-        { path: 'resources/venues', element: <CampusesPage /> },
+        { path: 'resources/venues', element: <VenueResourcesPage /> },
         { path: 'resources/classrooms', element: <ClassroomsPage /> },
         { path: 'resources/teachers', element: <TeachersPage /> },
-        { path: 'resources/courses', element: <CoursesPage /> },
+        { path: 'resources/courses', element: <CourseResourcesPage /> },
         { path: 'resources/packages', element: <PackagesPage /> },
         // 招生转化
         { path: 'admissions/marketing', element: <MarketingPage /> },
@@ -105,7 +107,6 @@ const router = createBrowserRouter(
         // 系统设置
         { path: 'system/brand', element: <SettingsPage /> },
         { path: 'system/integrations', element: <SettingsPage /> },
-        { path: 'system/security', element: <SettingsPage /> },
         // Legacy routes
         { path: 'leads', element: <LeadsPage /> },
         { path: 'trials', element: <TrialsPage /> },

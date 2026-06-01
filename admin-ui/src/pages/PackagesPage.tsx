@@ -32,7 +32,7 @@ const emptyPackageForm: PackageForm = {
   status: 'active',
 };
 
-export function PackagesPage() {
+export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const { data: packages, setData: setPackages } = useApiResource<CoursePackage>(
     PKG_BASE(),
@@ -120,7 +120,7 @@ export function PackagesPage() {
     }
   }
 
-  return (
+  const page = (
     <PageFrame
       section="packages"
       actions={
@@ -248,5 +248,11 @@ export function PackagesPage() {
         </Field>
       </Drawer>
     </PageFrame>
+  );
+
+  return embedded ? (
+    <div className="[&_.page-header]:hidden [&_.page-shell]:p-0">{page}</div>
+  ) : (
+    page
   );
 }

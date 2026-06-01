@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
 import { api, apiPost } from '@/api/client';
-import type {
-  AttendanceRecord,
-  AttendanceStatus,
-  ClassSession,
-  Student,
-} from '@/api/types';
+import type { AttendanceRecord, AttendanceStatus, ClassSession, Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
@@ -70,7 +65,9 @@ export function AttendancePage() {
 
   useEffect(() => {
     if (!sessionId && sessions.length > 0) {
-      setSessionId(sessions.find((session) => session.status !== 'cancelled')?.id ?? sessions[0].id);
+      setSessionId(
+        sessions.find((session) => session.status !== 'cancelled')?.id ?? sessions[0].id,
+      );
     }
   }, [sessionId, sessions]);
 
@@ -167,8 +164,12 @@ export function AttendancePage() {
           onClick={submit}
           disabled={!selectedSession || loading || saving || enrollments.length === 0}
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          提交签到
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
+          手动补签/核销
         </button>
       }
     >
@@ -188,9 +189,13 @@ export function AttendancePage() {
         </select>
         {selectedSession && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <StatusPill tone={statusToTone(selectedSession.status)} label={selectedSession.status} />
+            <StatusPill
+              tone={statusToTone(selectedSession.status)}
+              label={selectedSession.status}
+            />
             <span className="text-muted-foreground">
-              {selectedSession.teacher?.name ?? '老师'} · {selectedSession.classroom?.name ?? '教室'}
+              {selectedSession.teacher?.name ?? '老师'} ·{' '}
+              {selectedSession.classroom?.name ?? '教室'}
             </span>
           </div>
         )}
@@ -198,9 +203,10 @@ export function AttendancePage() {
 
       <div className="resource-card">
         <div className="border-b px-4 py-3">
-          <div className="text-sm font-semibold">学员签到</div>
+          <div className="text-sm font-semibold">后台补签与核销</div>
           <div className="text-muted-foreground mt-1 text-xs">
-            到课、缺勤、补课会扣 1 课时；请假和试听不扣课时。已签到记录不会重复扣课时。
+            老师端用于老师到岗打卡，家长端用于学员到课确认；后台用于总览、补签和异常核销。到课、缺勤、补课会扣
+            1 课时；请假和试听不扣课时。
           </div>
         </div>
         {loading ? (

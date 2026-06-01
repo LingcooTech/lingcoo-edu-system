@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import {
   clearQiniuSettings,
@@ -33,6 +34,7 @@ const tabs = [
 ] as const;
 
 type TabKey = (typeof tabs)[number]['key'];
+const integrationTabs = tabs.filter((tab) => tab.key !== 'brand');
 
 const inputClass = 'mt-1 w-full rounded-lg border px-3 py-2 text-sm';
 const buttonClass =
@@ -82,7 +84,12 @@ function numberValue(overview: SystemSettingOverview | null, key: string, fallba
 }
 
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>('brand');
+  const location = useLocation();
+  const isIntegrationPage = location.pathname.includes('/system/integrations');
+  const visibleTabs = isIntegrationPage
+    ? integrationTabs
+    : tabs.filter((tab) => tab.key === 'brand');
+  const [activeTab, setActiveTab] = useState<TabKey>(isIntegrationPage ? 'payment' : 'brand');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [paymentItems, setPaymentItems] = useState<PaymentProviderItem[]>([]);
@@ -149,6 +156,10 @@ export function SettingsPage() {
   const wechatItem = paymentItems.find((item) => item.code === 'wechat_pay');
   const alipayItem = paymentItems.find((item) => item.code === 'alipay');
 
+  useEffect(() => {
+    setActiveTab(isIntegrationPage ? 'payment' : 'brand');
+  }, [isIntegrationPage]);
+
   function hydratePayment(items: PaymentProviderItem[]) {
     setPaymentItems(items);
     const w = items.find((i) => i.code === 'wechat_pay');
@@ -212,7 +223,12 @@ export function SettingsPage() {
   }
 
   useEffect(() => {
-    Promise.all([fetchOrganization(), fetchPaymentSettings(), fetchSmtpSettings(), fetchQiniuSettings()])
+    Promise.all([
+      fetchOrganization(),
+      fetchPaymentSettings(),
+      fetchSmtpSettings(),
+      fetchQiniuSettings(),
+    ])
       .then(([organization, payment, smtpData, qiniuData]) => {
         setOrg({
           name: organization.name,
@@ -453,7 +469,7 @@ export function SettingsPage() {
           统一维护机构品牌、支付渠道、SMTP 邮件和七牛云存储。密钥字段留空表示保持原值。
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -482,79 +498,158 @@ export function SettingsPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-sm font-medium">机构名称</span>
-                  <input className={inputClass} value={org.name} onChange={(e) => setOrg({ ...org, name: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.name}
+                    onChange={(e) => setOrg({ ...org, name: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">品牌名</span>
-                  <input className={inputClass} value={org.brandName} onChange={(e) => setOrg({ ...org, brandName: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.brandName}
+                    onChange={(e) => setOrg({ ...org, brandName: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">电话</span>
-                  <input className={inputClass} value={org.phone} onChange={(e) => setOrg({ ...org, phone: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.phone}
+                    onChange={(e) => setOrg({ ...org, phone: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">地址</span>
-                  <input className={inputClass} value={org.address} onChange={(e) => setOrg({ ...org, address: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.address}
+                    onChange={(e) => setOrg({ ...org, address: e.target.value })}
+                  />
                 </label>
                 <label className="block sm:col-span-2">
                   <span className="text-sm font-medium">页面主标题</span>
-                  <input className={inputClass} value={org.headline} onChange={(e) => setOrg({ ...org, headline: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.headline}
+                    onChange={(e) => setOrg({ ...org, headline: e.target.value })}
+                  />
                 </label>
                 <label className="block sm:col-span-2">
                   <span className="text-sm font-medium">机构简介</span>
-                  <textarea className={`${inputClass} h-24`} value={org.introduction} onChange={(e) => setOrg({ ...org, introduction: e.target.value })} />
+                  <textarea
+                    className={`${inputClass} h-24`}
+                    value={org.introduction}
+                    onChange={(e) => setOrg({ ...org, introduction: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">教学亮点（每行一条）</span>
-                  <textarea className={`${inputClass} h-28`} value={org.highlightsText} onChange={(e) => setOrg({ ...org, highlightsText: e.target.value })} />
+                  <textarea
+                    className={`${inputClass} h-28`}
+                    value={org.highlightsText}
+                    onChange={(e) => setOrg({ ...org, highlightsText: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">服务承诺（每行一条）</span>
-                  <textarea className={`${inputClass} h-28`} value={org.promisesText} onChange={(e) => setOrg({ ...org, promisesText: e.target.value })} />
+                  <textarea
+                    className={`${inputClass} h-28`}
+                    value={org.promisesText}
+                    onChange={(e) => setOrg({ ...org, promisesText: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">Logo URL</span>
-                  <input className={inputClass} value={org.logoUrl} onChange={(e) => setOrg({ ...org, logoUrl: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.logoUrl}
+                    onChange={(e) => setOrg({ ...org, logoUrl: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">暗色 Logo URL</span>
-                  <input className={inputClass} value={org.darkLogoUrl} onChange={(e) => setOrg({ ...org, darkLogoUrl: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.darkLogoUrl}
+                    onChange={(e) => setOrg({ ...org, darkLogoUrl: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">Favicon URL</span>
-                  <input className={inputClass} value={org.faviconUrl} onChange={(e) => setOrg({ ...org, faviconUrl: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.faviconUrl}
+                    onChange={(e) => setOrg({ ...org, faviconUrl: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">主色</span>
-                  <input className={inputClass} placeholder="#1f6f5b" value={org.primaryColor} onChange={(e) => setOrg({ ...org, primaryColor: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    placeholder="#1f6f5b"
+                    value={org.primaryColor}
+                    onChange={(e) => setOrg({ ...org, primaryColor: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">辅助色</span>
-                  <input className={inputClass} placeholder="#f2a65a" value={org.secondaryColor} onChange={(e) => setOrg({ ...org, secondaryColor: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    placeholder="#f2a65a"
+                    value={org.secondaryColor}
+                    onChange={(e) => setOrg({ ...org, secondaryColor: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">背景色</span>
-                  <input className={inputClass} value={org.backgroundColor} onChange={(e) => setOrg({ ...org, backgroundColor: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.backgroundColor}
+                    onChange={(e) => setOrg({ ...org, backgroundColor: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">卡片色</span>
-                  <input className={inputClass} value={org.cardColor} onChange={(e) => setOrg({ ...org, cardColor: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.cardColor}
+                    onChange={(e) => setOrg({ ...org, cardColor: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">文字色</span>
-                  <input className={inputClass} value={org.textColor} onChange={(e) => setOrg({ ...org, textColor: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.textColor}
+                    onChange={(e) => setOrg({ ...org, textColor: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">标题字体</span>
-                  <input className={inputClass} value={org.headingFont} onChange={(e) => setOrg({ ...org, headingFont: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.headingFont}
+                    onChange={(e) => setOrg({ ...org, headingFont: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">正文字体</span>
-                  <input className={inputClass} value={org.bodyFont} onChange={(e) => setOrg({ ...org, bodyFont: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    value={org.bodyFont}
+                    onChange={(e) => setOrg({ ...org, bodyFont: e.target.value })}
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium">圆角</span>
-                  <input className={inputClass} placeholder="18px" value={org.radius} onChange={(e) => setOrg({ ...org, radius: e.target.value })} />
+                  <input
+                    className={inputClass}
+                    placeholder="18px"
+                    value={org.radius}
+                    onChange={(e) => setOrg({ ...org, radius: e.target.value })}
+                  />
                 </label>
               </div>
               <button className={`${buttonClass} mt-4`} disabled={saving === 'brand'}>
@@ -574,13 +669,58 @@ export function SettingsPage() {
                   <SourceLabel source={wechatItem?.source} />
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="block"><span className="text-sm font-medium">App ID</span><input className={inputClass} value={wechat.appId} onChange={(e) => setWechat({ ...wechat, appId: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">商户号</span><input className={inputClass} value={wechat.mchId} onChange={(e) => setWechat({ ...wechat, mchId: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">App Secret</span><input className={inputClass} type="password" placeholder={wechatItem?.secrets.appSecret?.configured ? '已配置（留空不变）' : ''} value={wechat.appSecret} onChange={(e) => setWechat({ ...wechat, appSecret: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">API Key</span><input className={inputClass} type="password" placeholder={wechatItem?.secrets.apiKey?.configured ? '已配置（留空不变）' : ''} value={wechat.apiKey} onChange={(e) => setWechat({ ...wechat, apiKey: e.target.value })} /></label>
-                  <label className="block sm:col-span-2"><span className="text-sm font-medium">回调地址</span><input className={inputClass} value={wechat.notifyUrl} onChange={(e) => setWechat({ ...wechat, notifyUrl: e.target.value })} /></label>
+                  <label className="block">
+                    <span className="text-sm font-medium">App ID</span>
+                    <input
+                      className={inputClass}
+                      value={wechat.appId}
+                      onChange={(e) => setWechat({ ...wechat, appId: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">商户号</span>
+                    <input
+                      className={inputClass}
+                      value={wechat.mchId}
+                      onChange={(e) => setWechat({ ...wechat, mchId: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">App Secret</span>
+                    <input
+                      className={inputClass}
+                      type="password"
+                      placeholder={
+                        wechatItem?.secrets.appSecret?.configured ? '已配置（留空不变）' : ''
+                      }
+                      value={wechat.appSecret}
+                      onChange={(e) => setWechat({ ...wechat, appSecret: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">API Key</span>
+                    <input
+                      className={inputClass}
+                      type="password"
+                      placeholder={
+                        wechatItem?.secrets.apiKey?.configured ? '已配置（留空不变）' : ''
+                      }
+                      value={wechat.apiKey}
+                      onChange={(e) => setWechat({ ...wechat, apiKey: e.target.value })}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-sm font-medium">回调地址</span>
+                    <input
+                      className={inputClass}
+                      value={wechat.notifyUrl}
+                      onChange={(e) => setWechat({ ...wechat, notifyUrl: e.target.value })}
+                    />
+                  </label>
                 </div>
-                <button className={`${buttonClass} mt-4`} disabled={saving === 'wechat'}>{saving === 'wechat' ? '保存中...' : '保存微信支付'}</button>
+                <button className={`${buttonClass} mt-4`} disabled={saving === 'wechat'}>
+                  {saving === 'wechat' ? '保存中...' : '保存微信支付'}
+                </button>
               </form>
 
               <form className="resource-card p-5" onSubmit={submitAlipay}>
@@ -592,16 +732,85 @@ export function SettingsPage() {
                   <SourceLabel source={alipayItem?.source} />
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="block"><span className="text-sm font-medium">App ID</span><input className={inputClass} value={alipay.appId} onChange={(e) => setAlipay({ ...alipay, appId: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">网关地址</span><input className={inputClass} value={alipay.gateway} onChange={(e) => setAlipay({ ...alipay, gateway: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">密钥类型</span><select className={inputClass} value={alipay.keyType} onChange={(e) => setAlipay({ ...alipay, keyType: e.target.value as 'PKCS1' | 'PKCS8' })}><option value="PKCS1">PKCS1</option><option value="PKCS8">PKCS8</option></select></label>
-                  <label className="flex items-center gap-2 pt-6"><input type="checkbox" checked={alipay.f2fPay} onChange={(e) => setAlipay({ ...alipay, f2fPay: e.target.checked })} /><span className="text-sm font-medium">当面付（扫码）</span></label>
-                  <label className="block sm:col-span-2"><span className="text-sm font-medium">应用私钥 PEM {alipayItem?.secrets.privateKeyPem?.configured ? '（已配置，留空不变）' : ''}</span><textarea className={`${inputClass} h-24 font-mono text-xs`} value={alipay.privateKeyPem} onChange={(e) => setAlipay({ ...alipay, privateKeyPem: e.target.value })} /></label>
-                  <label className="block sm:col-span-2"><span className="text-sm font-medium">支付宝公钥 PEM {alipayItem?.secrets.publicKeyPem?.configured ? '（已配置，留空不变）' : ''}</span><textarea className={`${inputClass} h-24 font-mono text-xs`} value={alipay.publicKeyPem} onChange={(e) => setAlipay({ ...alipay, publicKeyPem: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">异步回调地址</span><input className={inputClass} value={alipay.notifyUrl} onChange={(e) => setAlipay({ ...alipay, notifyUrl: e.target.value })} /></label>
-                  <label className="block"><span className="text-sm font-medium">同步返回地址</span><input className={inputClass} value={alipay.returnUrl} onChange={(e) => setAlipay({ ...alipay, returnUrl: e.target.value })} /></label>
+                  <label className="block">
+                    <span className="text-sm font-medium">App ID</span>
+                    <input
+                      className={inputClass}
+                      value={alipay.appId}
+                      onChange={(e) => setAlipay({ ...alipay, appId: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">网关地址</span>
+                    <input
+                      className={inputClass}
+                      value={alipay.gateway}
+                      onChange={(e) => setAlipay({ ...alipay, gateway: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">密钥类型</span>
+                    <select
+                      className={inputClass}
+                      value={alipay.keyType}
+                      onChange={(e) =>
+                        setAlipay({ ...alipay, keyType: e.target.value as 'PKCS1' | 'PKCS8' })
+                      }
+                    >
+                      <option value="PKCS1">PKCS1</option>
+                      <option value="PKCS8">PKCS8</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 pt-6">
+                    <input
+                      type="checkbox"
+                      checked={alipay.f2fPay}
+                      onChange={(e) => setAlipay({ ...alipay, f2fPay: e.target.checked })}
+                    />
+                    <span className="text-sm font-medium">当面付（扫码）</span>
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-sm font-medium">
+                      应用私钥 PEM{' '}
+                      {alipayItem?.secrets.privateKeyPem?.configured ? '（已配置，留空不变）' : ''}
+                    </span>
+                    <textarea
+                      className={`${inputClass} h-24 font-mono text-xs`}
+                      value={alipay.privateKeyPem}
+                      onChange={(e) => setAlipay({ ...alipay, privateKeyPem: e.target.value })}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-sm font-medium">
+                      支付宝公钥 PEM{' '}
+                      {alipayItem?.secrets.publicKeyPem?.configured ? '（已配置，留空不变）' : ''}
+                    </span>
+                    <textarea
+                      className={`${inputClass} h-24 font-mono text-xs`}
+                      value={alipay.publicKeyPem}
+                      onChange={(e) => setAlipay({ ...alipay, publicKeyPem: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">异步回调地址</span>
+                    <input
+                      className={inputClass}
+                      value={alipay.notifyUrl}
+                      onChange={(e) => setAlipay({ ...alipay, notifyUrl: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">同步返回地址</span>
+                    <input
+                      className={inputClass}
+                      value={alipay.returnUrl}
+                      onChange={(e) => setAlipay({ ...alipay, returnUrl: e.target.value })}
+                    />
+                  </label>
                 </div>
-                <button className={`${buttonClass} mt-4`} disabled={saving === 'alipay'}>{saving === 'alipay' ? '保存中...' : '保存支付宝'}</button>
+                <button className={`${buttonClass} mt-4`} disabled={saving === 'alipay'}>
+                  {saving === 'alipay' ? '保存中...' : '保存支付宝'}
+                </button>
               </form>
             </div>
           )}
@@ -609,22 +818,94 @@ export function SettingsPage() {
           {activeTab === 'smtp' && (
             <form className="resource-card mt-4 p-5" onSubmit={submitSmtp}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><span className="text-sm font-semibold">SMTP 邮件</span><StatusBadge configured={Boolean(smtpOverview?.configured)} /></div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">SMTP 邮件</span>
+                  <StatusBadge configured={Boolean(smtpOverview?.configured)} />
+                </div>
                 <SourceLabel source={smtpOverview?.source} />
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="block"><span className="text-sm font-medium">Host</span><input className={inputClass} value={smtp.host} onChange={(e) => setSmtp({ ...smtp, host: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">Port</span><input className={inputClass} value={smtp.port} onChange={(e) => setSmtp({ ...smtp, port: e.target.value })} /></label>
-                <label className="flex items-center gap-2 pt-6"><input type="checkbox" checked={smtp.secure} onChange={(e) => setSmtp({ ...smtp, secure: e.target.checked })} /><span className="text-sm font-medium">SSL/TLS secure</span></label>
-                <label className="block"><span className="text-sm font-medium">User</span><input className={inputClass} value={smtp.user} onChange={(e) => setSmtp({ ...smtp, user: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">Password</span><input className={inputClass} type="password" placeholder={smtpOverview?.secrets.password?.configured ? '已配置（留空不变）' : ''} value={smtp.password} onChange={(e) => setSmtp({ ...smtp, password: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">From</span><input className={inputClass} value={smtp.from} onChange={(e) => setSmtp({ ...smtp, from: e.target.value })} /></label>
-                <label className="block sm:col-span-2"><span className="text-sm font-medium">测试收件人</span><input className={inputClass} value={smtp.testTo} onChange={(e) => setSmtp({ ...smtp, testTo: e.target.value })} /></label>
+                <label className="block">
+                  <span className="text-sm font-medium">Host</span>
+                  <input
+                    className={inputClass}
+                    value={smtp.host}
+                    onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Port</span>
+                  <input
+                    className={inputClass}
+                    value={smtp.port}
+                    onChange={(e) => setSmtp({ ...smtp, port: e.target.value })}
+                  />
+                </label>
+                <label className="flex items-center gap-2 pt-6">
+                  <input
+                    type="checkbox"
+                    checked={smtp.secure}
+                    onChange={(e) => setSmtp({ ...smtp, secure: e.target.checked })}
+                  />
+                  <span className="text-sm font-medium">SSL/TLS secure</span>
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">User</span>
+                  <input
+                    className={inputClass}
+                    value={smtp.user}
+                    onChange={(e) => setSmtp({ ...smtp, user: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Password</span>
+                  <input
+                    className={inputClass}
+                    type="password"
+                    placeholder={
+                      smtpOverview?.secrets.password?.configured ? '已配置（留空不变）' : ''
+                    }
+                    value={smtp.password}
+                    onChange={(e) => setSmtp({ ...smtp, password: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">From</span>
+                  <input
+                    className={inputClass}
+                    value={smtp.from}
+                    onChange={(e) => setSmtp({ ...smtp, from: e.target.value })}
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-sm font-medium">测试收件人</span>
+                  <input
+                    className={inputClass}
+                    value={smtp.testTo}
+                    onChange={(e) => setSmtp({ ...smtp, testTo: e.target.value })}
+                  />
+                </label>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <button className={buttonClass} disabled={saving === 'smtp'}>{saving === 'smtp' ? '保存中...' : '保存 SMTP'}</button>
-                <button type="button" className={outlineButtonClass} disabled={saving === 'smtp-test'} onClick={testSmtp}>发送测试邮件</button>
-                <button type="button" className={outlineButtonClass} disabled={saving === 'smtp-clear'} onClick={clearSmtp}>清除配置</button>
+                <button className={buttonClass} disabled={saving === 'smtp'}>
+                  {saving === 'smtp' ? '保存中...' : '保存 SMTP'}
+                </button>
+                <button
+                  type="button"
+                  className={outlineButtonClass}
+                  disabled={saving === 'smtp-test'}
+                  onClick={testSmtp}
+                >
+                  发送测试邮件
+                </button>
+                <button
+                  type="button"
+                  className={outlineButtonClass}
+                  disabled={saving === 'smtp-clear'}
+                  onClick={clearSmtp}
+                >
+                  清除配置
+                </button>
               </div>
             </form>
           )}
@@ -632,21 +913,88 @@ export function SettingsPage() {
           {activeTab === 'qiniu' && (
             <form className="resource-card mt-4 p-5" onSubmit={submitQiniu}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><span className="text-sm font-semibold">七牛云存储</span><StatusBadge configured={Boolean(qiniuOverview?.configured)} /></div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">七牛云存储</span>
+                  <StatusBadge configured={Boolean(qiniuOverview?.configured)} />
+                </div>
                 <SourceLabel source={qiniuOverview?.source} />
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="block"><span className="text-sm font-medium">Access Key</span><input className={inputClass} value={qiniu.accessKey} onChange={(e) => setQiniu({ ...qiniu, accessKey: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">Secret Key</span><input className={inputClass} type="password" placeholder={qiniuOverview?.secrets.secretKey?.configured ? '已配置（留空不变）' : ''} value={qiniu.secretKey} onChange={(e) => setQiniu({ ...qiniu, secretKey: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">Bucket</span><input className={inputClass} value={qiniu.bucketName} onChange={(e) => setQiniu({ ...qiniu, bucketName: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">默认目录</span><input className={inputClass} value={qiniu.defaultPrefix} onChange={(e) => setQiniu({ ...qiniu, defaultPrefix: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">公共域名</span><input className={inputClass} placeholder="https://cdn.example.com" value={qiniu.publicBaseUrl} onChange={(e) => setQiniu({ ...qiniu, publicBaseUrl: e.target.value })} /></label>
-                <label className="block"><span className="text-sm font-medium">上传 Host</span><input className={inputClass} placeholder="https://upload.qiniup.com" value={qiniu.uploadHost} onChange={(e) => setQiniu({ ...qiniu, uploadHost: e.target.value })} /></label>
+                <label className="block">
+                  <span className="text-sm font-medium">Access Key</span>
+                  <input
+                    className={inputClass}
+                    value={qiniu.accessKey}
+                    onChange={(e) => setQiniu({ ...qiniu, accessKey: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Secret Key</span>
+                  <input
+                    className={inputClass}
+                    type="password"
+                    placeholder={
+                      qiniuOverview?.secrets.secretKey?.configured ? '已配置（留空不变）' : ''
+                    }
+                    value={qiniu.secretKey}
+                    onChange={(e) => setQiniu({ ...qiniu, secretKey: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Bucket</span>
+                  <input
+                    className={inputClass}
+                    value={qiniu.bucketName}
+                    onChange={(e) => setQiniu({ ...qiniu, bucketName: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">默认目录</span>
+                  <input
+                    className={inputClass}
+                    value={qiniu.defaultPrefix}
+                    onChange={(e) => setQiniu({ ...qiniu, defaultPrefix: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">公共域名</span>
+                  <input
+                    className={inputClass}
+                    placeholder="https://cdn.example.com"
+                    value={qiniu.publicBaseUrl}
+                    onChange={(e) => setQiniu({ ...qiniu, publicBaseUrl: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">上传 Host</span>
+                  <input
+                    className={inputClass}
+                    placeholder="https://upload.qiniup.com"
+                    value={qiniu.uploadHost}
+                    onChange={(e) => setQiniu({ ...qiniu, uploadHost: e.target.value })}
+                  />
+                </label>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <button className={buttonClass} disabled={saving === 'qiniu'}>{saving === 'qiniu' ? '保存中...' : '保存七牛云'}</button>
-                <button type="button" className={outlineButtonClass} disabled={saving === 'qiniu-test'} onClick={testQiniu}>测试连接</button>
-                <button type="button" className={outlineButtonClass} disabled={saving === 'qiniu-clear'} onClick={clearQiniu}>清除配置</button>
+                <button className={buttonClass} disabled={saving === 'qiniu'}>
+                  {saving === 'qiniu' ? '保存中...' : '保存七牛云'}
+                </button>
+                <button
+                  type="button"
+                  className={outlineButtonClass}
+                  disabled={saving === 'qiniu-test'}
+                  onClick={testQiniu}
+                >
+                  测试连接
+                </button>
+                <button
+                  type="button"
+                  className={outlineButtonClass}
+                  disabled={saving === 'qiniu-clear'}
+                  onClick={clearQiniu}
+                >
+                  清除配置
+                </button>
               </div>
             </form>
           )}

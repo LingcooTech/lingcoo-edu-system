@@ -62,7 +62,7 @@ function courseFormToPayload(form: CourseForm) {
   };
 }
 
-export function CoursesPage() {
+export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const { data: courses, setData: setCourses } = useApiResource<Course>(COURSE_BASE(), 'courses');
 
@@ -117,7 +117,9 @@ export function CoursesPage() {
     if (!archiveTarget) return;
     setArchiving(true);
     try {
-      const { course } = await apiDelete<{ course: Course }>(`${COURSE_BASE()}/${archiveTarget.id}`);
+      const { course } = await apiDelete<{ course: Course }>(
+        `${COURSE_BASE()}/${archiveTarget.id}`,
+      );
       setCourses(courses.map((item) => (item.id === course.id ? course : item)));
       toast.success('课程已归档');
       setArchiveTarget(null);
@@ -128,7 +130,7 @@ export function CoursesPage() {
     }
   }
 
-  return (
+  const page = (
     <PageFrame
       section="courses"
       actions={
@@ -284,5 +286,11 @@ export function CoursesPage() {
         onCancel={() => setArchiveTarget(null)}
       />
     </PageFrame>
+  );
+
+  return embedded ? (
+    <div className="[&_.page-header]:hidden [&_.page-shell]:p-0">{page}</div>
+  ) : (
+    page
   );
 }

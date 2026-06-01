@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { Eye, Pencil, Plus } from 'lucide-react';
 
 import { apiPatch, apiPost } from '@/api/client';
 import type { Student } from '@/api/types';
@@ -36,6 +36,7 @@ export function StudentsPage() {
   const { data, setData } = useApiResource<Student>(STUDENTS(), 'students');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
+  const [selected, setSelected] = useState<Student | null>(null);
   const [form, setForm] = useState<StudentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
@@ -120,13 +121,17 @@ export function StudentsPage() {
             key: 'name',
             header: '学员',
             cell: (row) => (
-              <div className="cell-stack">
+              <button
+                type="button"
+                className="cell-stack text-left"
+                onClick={() => setSelected(row)}
+              >
                 <span className="cell-title">{row.name}</span>
                 <span className="cell-subtitle">
                   {row.grade}
                   {row.school ? ` · ${row.school}` : ''}
                 </span>
-              </div>
+              </button>
             ),
           },
           {
@@ -148,14 +153,24 @@ export function StudentsPage() {
             key: 'actions',
             header: '操作',
             cell: (row) => (
-              <button
-                type="button"
-                className="btn btn-ghost px-2 py-1"
-                onClick={() => openEdit(row)}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                编辑
-              </button>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => setSelected(row)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  详情
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => openEdit(row)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  编辑
+                </button>
+              </div>
             ),
           },
         ]}
@@ -230,6 +245,61 @@ export function StudentsPage() {
             <option value="inactive">inactive</option>
           </select>
         </Field>
+      </Drawer>
+
+      <Drawer
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        title={selected ? selected.name : ''}
+        description={
+          selected ? `${selected.grade}${selected.school ? ` · ${selected.school}` : ''}` : ''
+        }
+      >
+        {selected && (
+          <div className="space-y-4">
+            <section className="resource-card p-4">
+              <div className="grid grid-cols-2 gap-y-2 text-sm">
+                <span className="text-muted-foreground">学员姓名</span>
+                <span>{selected.name}</span>
+                <span className="text-muted-foreground">年级 / 年龄</span>
+                <span>{selected.grade}</span>
+                <span className="text-muted-foreground">学校</span>
+                <span>{selected.school ?? '-'}</span>
+                <span className="text-muted-foreground">状态</span>
+                <span>
+                  <StatusPill tone={statusToTone(selected.status)} label={selected.status} />
+                </span>
+              </div>
+            </section>
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">家长与账号</h3>
+              <div className="grid grid-cols-2 gap-y-2 text-sm">
+                <span className="text-muted-foreground">家长</span>
+                <span>{selected.guardian?.name ?? '-'}</span>
+                <span className="text-muted-foreground">手机号</span>
+                <span>{selected.guardian?.phone ?? '-'}</span>
+              </div>
+            </section>
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">课时包 / 课时余额</h3>
+              {selected.lessonAccounts?.length ? (
+                <div className="space-y-2">
+                  {selected.lessonAccounts.map((account) => (
+                    <div
+                      key={account.courseId}
+                      className="flex justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
+                    >
+                      <span>{account.courseId}</span>
+                      <span>{account.balance} 节</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">暂无课时账户</p>
+              )}
+            </section>
+          </div>
+        )}
       </Drawer>
     </PageFrame>
   );

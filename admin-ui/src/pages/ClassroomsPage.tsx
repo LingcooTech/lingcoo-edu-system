@@ -28,7 +28,7 @@ const emptyClassroomForm: ClassroomForm = {
   status: 'active',
 };
 
-export function ClassroomsPage() {
+export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const { data: classrooms, setData: setClassrooms } = useApiResource<Classroom>(
     CLASSROOMS(),
@@ -108,7 +108,7 @@ export function ClassroomsPage() {
     }
   }
 
-  return (
+  const page = (
     <PageFrame
       section="classrooms"
       actions={
@@ -228,5 +228,11 @@ export function ClassroomsPage() {
         onCancel={() => setArchiveTarget(null)}
       />
     </PageFrame>
+  );
+
+  return embedded ? (
+    <div className="[&_.page-header]:hidden [&_.page-shell]:p-0">{page}</div>
+  ) : (
+    page
   );
 }

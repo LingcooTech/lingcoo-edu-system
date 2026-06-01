@@ -27,7 +27,7 @@ function campusToForm(campus: Campus): CampusForm {
   };
 }
 
-export function CampusesPage() {
+export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const { data, setData } = useApiResource<Campus>('/v1/campuses', 'campuses');
   const [open, setOpen] = useState(false);
@@ -78,7 +78,7 @@ export function CampusesPage() {
     }
   }
 
-  return (
+  const page = (
     <PageFrame
       section="campuses"
       actions={
@@ -141,5 +141,11 @@ export function CampusesPage() {
         </Field>
       </Drawer>
     </PageFrame>
+  );
+
+  return embedded ? (
+    <div className="[&_.page-header]:hidden [&_.page-shell]:p-0">{page}</div>
+  ) : (
+    page
   );
 }

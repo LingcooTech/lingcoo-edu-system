@@ -90,7 +90,6 @@ export const adminSections = [
     items: [
       { key: 'brandSettings', label: '品牌设置', path: '/system/brand', icon: Settings },
       { key: 'integrations', label: '接口配置', path: '/system/integrations', icon: DoorOpen },
-      { key: 'security', label: '安全设置', path: '/system/security', icon: ShieldCheck },
     ],
   },
 ] as const;
@@ -163,8 +162,8 @@ export const pageMeta: Record<string, { title: string; description: string; eyeb
   },
   attendance: {
     eyebrow: 'Academic',
-    title: '签到消课',
-    description: '按课次签到、按状态扣减课时并写入课时流水。',
+    title: '签到消课总览',
+    description: '后台总览老师/家长签到结果，并支持管理员手动补签、核销和课时流水校正。',
   },
   lessons: {
     eyebrow: 'Operations',
