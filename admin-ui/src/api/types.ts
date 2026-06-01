@@ -251,6 +251,16 @@ export interface PublicProfile {
   introduction: string;
   highlights: string[];
   promises: string[];
+  bannerImageUrl: string;
+  bannerTitle: string;
+  bannerSubtitle: string;
+  ctaText: string;
+  ctaLink: string;
+  stats: string[];
+  testimonials: string[];
+  gallery: string[];
+  faq: string[];
+  businessHours: string;
 }
 
 export interface OrganizationBranding {

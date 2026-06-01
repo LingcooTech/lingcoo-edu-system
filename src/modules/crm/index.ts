@@ -4,8 +4,10 @@ import { z } from 'zod';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import type { Campaign } from '../../db/repositories/crm.js';
+import * as organizationRepo from '../../db/repositories/organization.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as trialRepo from '../../db/repositories/trial.js';
+import { readPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
 const leadStatuses = [
@@ -96,13 +98,17 @@ function unprocessable(message: string): Error {
 }
 
 function buildLandingUrl(baseUrl: string, channelCode: string | null, campaign: Campaign): string {
-  const path = campaign.courseSlug ? `/courses/${campaign.courseSlug}` : '/';
+  const path = `/campaigns/${campaign.code}`;
   const params = new URLSearchParams();
   if (channelCode) params.set('source', channelCode);
-  params.set('campaign', campaign.code);
   params.set('medium', campaign.medium);
-  if (campaign.courseSlug) params.set('course', campaign.courseSlug);
   return `${baseUrl.replace(/\/$/, '')}${path}?${params.toString()}`;
+}
+
+function readSettings(settings: unknown) {
+  return settings && typeof settings === 'object' && !Array.isArray(settings)
+    ? (settings as Record<string, unknown>)
+    : {};
 }
 
 function toDate(value?: string) {
@@ -170,6 +176,12 @@ async function createLeadFromRegistration(
 
   if (courseResolution.trialSession && courseResolution.trialSession.status !== 'open') {
     throw unprocessable('Trial session is not open');
+  }
+  if (
+    courseResolution.trialSession &&
+    courseResolution.trialSession.bookedCount >= courseResolution.trialSession.capacity
+  ) {
+    throw unprocessable('Trial session is full');
   }
 
   const lead = await crmRepo.createLead(app.db, {
@@ -506,6 +518,36 @@ export const crmModule: AppModule = {
       const campaign = await crmRepo.requireActiveCampaignByCode(app.db, campaignCode);
       const lead = await createLeadFromRegistration(app, body, campaign);
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
+    });
+
+    app.get('/public/campaigns/:campaignCode', async (request) => {
+      const { campaignCode } = request.params as { campaignCode: string };
+      const campaign = await crmRepo.requireActiveCampaignByCode(app.db, campaignCode);
+      const [channel, organization, openTrialSessions] = await Promise.all([
+        crmRepo.findChannel(app.db, campaign.channelId),
+        organizationRepo.requireOrganization(app.db),
+        trialRepo.listOpenTrialSessions(app.db),
+      ]);
+      const course = campaign.courseSlug
+        ? await catalogRepo.findPublishedCourseBySlug(app.db, campaign.courseSlug)
+        : null;
+      return {
+        campaign,
+        channel,
+        course,
+        trialSessions: openTrialSessions.filter((session) =>
+          course ? session.courseId === course.id : true,
+        ),
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          brandName: organization.brandName,
+          phone: organization.phone,
+          address: organization.address,
+          publicProfile: readPublicProfile(organization.settings),
+          branding: readSettings(organization.settings).branding ?? {},
+        },
+      };
     });
   },
 };

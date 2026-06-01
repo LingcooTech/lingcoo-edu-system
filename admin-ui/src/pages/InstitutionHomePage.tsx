@@ -25,6 +25,11 @@ export function InstitutionHomePage() {
           color: branding?.textColor || undefined,
         }}
       >
+        {profile?.bannerImageUrl ? (
+          <div className="h-56 overflow-hidden border-b">
+            <img src={profile.bannerImageUrl} alt="机构 Banner" className="h-full w-full object-cover" />
+          </div>
+        ) : null}
         <div className="grid gap-8 p-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="flex min-h-72 flex-col justify-center">
             <div className="mb-5 flex items-center gap-3">
@@ -48,17 +53,17 @@ export function InstitutionHomePage() {
               )}
             </div>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight">
-              {organization?.brandName ?? '机构品牌名称'}
+              {profile?.bannerTitle || organization?.brandName || '机构品牌名称'}
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7">
-              {profile?.headline || '这里展示机构对外主页的首屏标题。'}
+              {profile?.bannerSubtitle || profile?.headline || '这里展示机构对外主页的首屏标题。'}
             </p>
             <p className="text-muted-foreground mt-4 max-w-2xl text-sm leading-6">
               {profile?.introduction || '在系统设置中完善机构介绍后，这里会同步展示。'}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
-              {(profile?.highlights.length
-                ? profile.highlights
+              {(profile?.stats.length
+                ? profile.stats
                 : ['教学特色', '师资优势', '服务承诺']
               ).map((item) => (
                 <span key={item} className="rounded-full border bg-white/80 px-3 py-1 text-sm">
@@ -78,11 +83,15 @@ export function InstitutionHomePage() {
                 <span className="text-muted-foreground">地址</span>
                 <span className="text-right">{organization?.address || '-'}</span>
               </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">上课时间</span>
+                <span className="text-right">{profile?.businessHours || '-'}</span>
+              </div>
             </div>
-            <div className="mt-6 text-sm font-semibold">承诺</div>
+            <div className="mt-6 text-sm font-semibold">用户评价</div>
             <div className="mt-3 space-y-2">
-              {(profile?.promises.length
-                ? profile.promises
+              {(profile?.testimonials.length
+                ? profile.testimonials
                 : ['透明课消', '安全环境', '及时反馈']
               ).map((item) => (
                 <div key={item} className="rounded-md bg-slate-50 px-3 py-2 text-sm">

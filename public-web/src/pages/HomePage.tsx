@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, MapPin, Phone } from 'lucide-react';
+import { ArrowRight, CalendarDays, MapPin, MessageCircle, Phone, Star } from 'lucide-react';
 
 import { loadHome, type Course, type HomePayload, type TrialSession } from '@/api/client';
 import { Layout } from '@/components/Layout';
@@ -25,41 +25,73 @@ export function HomePage() {
   const organization = home?.organization;
   const courses = home?.featuredCourses ?? [];
   const sessions = home?.trialSessions ?? [];
-  const highlights = organization?.publicProfile.highlights ?? [];
+  const profile = organization?.publicProfile;
+  const highlights = profile?.highlights ?? [];
+  const stats = profile?.stats ?? [];
+  const testimonials = profile?.testimonials ?? [];
 
   return (
     <Layout>
-      {/* Hero */}
       <section className="border-line bg-surface border-b">
-        <div className="container-narrow py-10">
-          <div className="eyebrow">社区小班成长教室</div>
-          <h1 className="text-ink mt-3 text-3xl leading-tight font-bold">
-            {organization?.publicProfile.headline ??
-              organization?.brandName ??
-              '美智优品儿童成长教室'}
-          </h1>
-          <p className="text-ink-soft mt-3 text-sm leading-7">
-            {organization?.publicProfile.introduction ??
-              '书法、美术、手工、阅读表达、幼小衔接等社区小班课程。扫码预约试听，老师会尽快联系确认时间。'}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Link to="/register" className="pwbtn pwbtn-primary">
-              预约试听 / 留资
-            </Link>
-            <Link to="/courses" className="pwbtn pwbtn-outline">
-              浏览课程
-            </Link>
-          </div>
-          {highlights.length > 0 && (
-            <div className="mt-6 flex flex-wrap gap-2">
-              {highlights.map((item) => (
-                <span key={item} className="chip">
-                  {item}
-                </span>
-              ))}
+        <div className="container-narrow hero-grid">
+          <div>
+            <div className="eyebrow">社区小班成长教室</div>
+            <h1 className="text-ink mt-4 text-4xl leading-tight font-bold tracking-tight md:text-5xl">
+              {profile?.bannerTitle || profile?.headline || organization?.brandName || '儿童成长教室'}
+            </h1>
+            <p className="text-ink-soft mt-5 max-w-2xl text-base leading-8">
+              {profile?.bannerSubtitle || profile?.introduction}
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link to={profile?.ctaLink || '/register'} className="pwbtn pwbtn-primary">
+                {profile?.ctaText || '预约试听'}
+              </Link>
+              <Link to="/courses" className="pwbtn pwbtn-outline">
+                浏览课程
+              </Link>
             </div>
-          )}
-          <div className="text-ink-soft mt-6 space-y-2 text-sm">
+            {stats.length > 0 && (
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                {stats.map((item) => (
+                  <div key={item} className="rounded-2xl bg-paper px-4 py-3 text-sm font-semibold">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="hero-media">
+            <img
+              src={profile?.bannerImageUrl}
+              alt={organization?.brandName ?? '机构环境'}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </div>
+      </section>
+
+      {highlights.length > 0 && (
+        <section className="container-narrow py-8">
+          <div className="grid gap-3 md:grid-cols-3">
+            {highlights.map((item, index) => (
+              <article key={item} className="pwcard p-5">
+                <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-2xl">
+                  {index === 0 ? <Star className="h-5 w-5" /> : index === 1 ? <CalendarDays className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
+                </div>
+                <p className="text-ink-soft mt-4 text-sm leading-6">{item}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="container-narrow py-8">
+        <div className="grid gap-4 rounded-[2rem] bg-ink p-6 text-white md:grid-cols-2 md:p-8">
+          <div>
+            <div className="text-sm font-semibold text-white/60">Visit</div>
+            <h2 className="mt-2 text-2xl font-bold">到店前先预约，老师会确认适合的班型</h2>
+          </div>
+          <div className="space-y-3 text-sm text-white/80">
             {organization?.address && (
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
@@ -67,11 +99,9 @@ export function HomePage() {
               </div>
             )}
             {organization?.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                {organization.phone}
-              </div>
+              <div className="flex items-center gap-2"><Phone className="h-4 w-4" />{organization.phone}</div>
             )}
+            {profile?.businessHours && <div>{profile.businessHours}</div>}
           </div>
         </div>
       </section>
@@ -88,7 +118,7 @@ export function HomePage() {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid gap-3">
+        <div className="grid gap-4 md:grid-cols-3">
           {courses.map((course: Course) => (
             <Link key={course.id} to={`/courses/${course.slug}`} className="pwcard block p-4">
               <div className="flex items-start justify-between gap-3">
@@ -121,11 +151,11 @@ export function HomePage() {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid gap-3">
+        <div className="grid gap-4 md:grid-cols-3">
           {sessions.map((session: TrialSession) => (
             <Link
               key={session.id}
-              to={`/register?trial=${session.id}`}
+              to={`/trials/${session.id}`}
               className="pwcard block p-4"
             >
               <div className="text-ink text-sm font-semibold">{session.title}</div>
@@ -140,6 +170,22 @@ export function HomePage() {
           )}
         </div>
       </section>
+
+      {testimonials.length > 0 && (
+        <section className="container-narrow pb-10">
+          <div className="mb-4">
+            <div className="eyebrow">Testimonials</div>
+            <h2 className="section-title mt-1">家长评价</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {testimonials.slice(0, 4).map((item) => (
+              <blockquote key={item} className="pwcard p-5 text-sm leading-7 text-ink-soft">
+                “{item}”
+              </blockquote>
+            ))}
+          </div>
+        </section>
+      )}
     </Layout>
   );
 }

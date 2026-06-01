@@ -3,6 +3,16 @@ export interface PublicProfile {
   introduction: string;
   highlights: string[];
   promises: string[];
+  bannerImageUrl: string;
+  bannerTitle: string;
+  bannerSubtitle: string;
+  ctaText: string;
+  ctaLink: string;
+  stats: string[];
+  testimonials: string[];
+  gallery: string[];
+  faq: string[];
+  businessHours: string;
 }
 
 export const defaultPublicProfile: PublicProfile = {
@@ -15,6 +25,20 @@ export const defaultPublicProfile: PublicProfile = {
     '课后反馈清晰，家长能持续看到进步',
   ],
   promises: ['真实课堂体验', '固定老师跟进', '安全社区空间'],
+  bannerImageUrl:
+    'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1600&q=80',
+  bannerTitle: '在社区里，给孩子一个稳定成长的课堂',
+  bannerSubtitle: '小班教学、固定老师、课后反馈，让家长看得见孩子每一步变化。',
+  ctaText: '预约试听',
+  ctaLink: '/register',
+  stats: ['6-8 人小班', '90 分钟沉浸课堂', '课后反馈可追踪'],
+  testimonials: [
+    '老师反馈很及时，孩子写字习惯比之前稳定很多。',
+    '离家近、班级小，孩子每周都愿意来上课。',
+  ],
+  gallery: [],
+  faq: ['试听课需要提前预约，提交表单后老师会电话确认时间。'],
+  businessHours: '周二至周日 10:00-20:00',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,6 +70,16 @@ export function readPublicProfile(settings: unknown): PublicProfile {
     introduction: normalizeString(raw.introduction) || defaultPublicProfile.introduction,
     highlights: normalizeStringList(raw.highlights, defaultPublicProfile.highlights, 6),
     promises: normalizeStringList(raw.promises, defaultPublicProfile.promises, 6),
+    bannerImageUrl: normalizeString(raw.bannerImageUrl) || defaultPublicProfile.bannerImageUrl,
+    bannerTitle: normalizeString(raw.bannerTitle) || defaultPublicProfile.bannerTitle,
+    bannerSubtitle: normalizeString(raw.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
+    ctaText: normalizeString(raw.ctaText) || defaultPublicProfile.ctaText,
+    ctaLink: normalizeString(raw.ctaLink) || defaultPublicProfile.ctaLink,
+    stats: normalizeStringList(raw.stats, defaultPublicProfile.stats, 6),
+    testimonials: normalizeStringList(raw.testimonials, defaultPublicProfile.testimonials, 8),
+    gallery: normalizeStringList(raw.gallery, defaultPublicProfile.gallery, 12),
+    faq: normalizeStringList(raw.faq, defaultPublicProfile.faq, 8),
+    businessHours: normalizeString(raw.businessHours) || defaultPublicProfile.businessHours,
   };
 }
 
@@ -55,6 +89,16 @@ export function normalizePublicProfile(input: Partial<PublicProfile>) {
     introduction: normalizeString(input.introduction) || defaultPublicProfile.introduction,
     highlights: normalizeStringList(input.highlights, defaultPublicProfile.highlights, 6),
     promises: normalizeStringList(input.promises, defaultPublicProfile.promises, 6),
+    bannerImageUrl: normalizeString(input.bannerImageUrl) || defaultPublicProfile.bannerImageUrl,
+    bannerTitle: normalizeString(input.bannerTitle) || defaultPublicProfile.bannerTitle,
+    bannerSubtitle: normalizeString(input.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
+    ctaText: normalizeString(input.ctaText) || defaultPublicProfile.ctaText,
+    ctaLink: normalizeString(input.ctaLink) || defaultPublicProfile.ctaLink,
+    stats: normalizeStringList(input.stats, defaultPublicProfile.stats, 6),
+    testimonials: normalizeStringList(input.testimonials, defaultPublicProfile.testimonials, 8),
+    gallery: normalizeStringList(input.gallery, defaultPublicProfile.gallery, 12),
+    faq: normalizeStringList(input.faq, defaultPublicProfile.faq, 8),
+    businessHours: normalizeString(input.businessHours) || defaultPublicProfile.businessHours,
   };
 }
 

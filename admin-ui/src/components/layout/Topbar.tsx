@@ -4,13 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 import type { AuthAccount } from '@/api/client';
 import { adminSections, pageMeta } from '@/lib/foundation';
-import { cn, getInitials } from '@/lib/utils';
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员',
-  teacher: '老师',
-  parent: '家长',
-};
+import { cn } from '@/lib/utils';
 
 function detectShortcutLabel(): string {
   if (typeof navigator === 'undefined') return 'Ctrl K';
@@ -20,7 +14,6 @@ function detectShortcutLabel(): string {
 }
 
 export function Topbar({
-  account,
   onMenuClick,
 }: {
   account: AuthAccount;
@@ -141,18 +134,6 @@ export function Topbar({
               {shortcutLabel}
             </kbd>
           </button>
-
-          <div className="border-border/70 ml-1 hidden items-center gap-2 border-l pl-3 sm:flex">
-            <span className="bg-primary text-primary-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px]">
-              {getInitials(account.displayName)}
-            </span>
-            <div className="hidden min-w-0 text-right md:block">
-              <div className="truncate text-[12px] font-medium">{account.displayName}</div>
-              <div className="text-muted-foreground text-[10px]">
-                {ROLE_LABEL[account.role] ?? account.role}
-              </div>
-            </div>
-          </div>
         </div>
       </header>
 

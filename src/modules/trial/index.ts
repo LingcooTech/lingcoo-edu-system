@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import QRCode from 'qrcode';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
@@ -36,6 +38,16 @@ const registrationSchema = z.object({
 
 function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
+}
+
+function unprocessable(message: string): Error {
+  return Object.assign(new Error(message), { statusCode: 422 });
+}
+
+function readSettings(settings: unknown) {
+  return settings && typeof settings === 'object' && !Array.isArray(settings)
+    ? (settings as Record<string, unknown>)
+    : {};
 }
 
 function normalizeTrialSessionPatch(body: z.infer<typeof trialSessionUpdateSchema>) {
@@ -82,6 +94,7 @@ export const trialModule: AppModule = {
           phone: organization.phone,
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
+          branding: readSettings(organization.settings).branding ?? {},
         },
         featuredCourses,
         trialSessions,
@@ -98,6 +111,38 @@ export const trialModule: AppModule = {
       return { trialSessions: await trialRepo.listOpenTrialSessions(app.db) };
     });
 
+    app.get('/public/trial-sessions/:trialSessionId', async (request) => {
+      const { trialSessionId } = request.params as { trialSessionId: string };
+      const trialSession = await trialRepo.requireTrialSession(app.db, trialSessionId);
+      if (trialSession.status !== 'open') {
+        throw notFound('Trial session not found');
+      }
+      const [course, campuses, organization] = await Promise.all([
+        catalogRepo.requireCourse(app.db, trialSession.courseId),
+        organizationRepo.listCampuses(app.db),
+        organizationRepo.requireOrganization(app.db),
+      ]);
+      return {
+        trialSession,
+        course,
+        campus: campuses.find((item) => item.id === trialSession.campusId) ?? null,
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          brandName: organization.brandName,
+          phone: organization.phone,
+          address: organization.address,
+          publicProfile: readPublicProfile(organization.settings),
+          branding: readSettings(organization.settings).branding ?? {},
+        },
+      };
+    });
+
+    app.get('/public/teachers', async () => {
+      const teachers = await teachingRepo.listTeachers(app.db);
+      return { teachers: teachers.filter((teacher) => teacher.status !== 'archived') };
+    });
+
     app.post('/public/trial-registrations', async (request) => {
       const body = registrationSchema.parse(request.body);
       const campusId = await trialRepo.firstCampusId(app.db);
@@ -108,6 +153,17 @@ export const trialModule: AppModule = {
       if (!courseId && body.course) {
         const course = await catalogRepo.findPublishedCourseBySlug(app.db, body.course);
         courseId = course?.id ?? null;
+      }
+
+      if (body.trialSessionId) {
+        const trialSession = await trialRepo.requireTrialSession(app.db, body.trialSessionId);
+        if (trialSession.status !== 'open') {
+          throw unprocessable('Trial session is not open');
+        }
+        if (trialSession.bookedCount >= trialSession.capacity) {
+          throw unprocessable('Trial session is full');
+        }
+        courseId = trialSession.courseId;
       }
 
       const { channelId, campaignId } = await crmRepo.resolveAttribution(app.db, {
@@ -189,6 +245,28 @@ export const trialModule: AppModule = {
         const trialSession = await trialRepo.cancelTrialSession(app.db, trialSessionId);
         if (!trialSession) throw notFound('Trial session not found');
         return { trialSession };
+      },
+    );
+
+    app.get(
+      '/v1/trial-sessions/:trialSessionId/registrations',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { trialSessionId } = request.params as { trialSessionId: string };
+        await trialRepo.requireTrialSession(app.db, trialSessionId);
+        return { leads: await crmRepo.listLeadsByTrialSession(app.db, trialSessionId) };
+      },
+    );
+
+    app.get(
+      '/v1/trial-sessions/:trialSessionId/qrcode',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { trialSessionId } = request.params as { trialSessionId: string };
+        await trialRepo.requireTrialSession(app.db, trialSessionId);
+        const landingUrl = `${app.appEnv.PUBLIC_WEB_BASE_URL.replace(/\/$/, '')}/trials/${trialSessionId}`;
+        const qrCodeDataUrl = await QRCode.toDataURL(landingUrl, { margin: 1, width: 320 });
+        return { landingUrl, qrCodeDataUrl };
       },
     );
   },

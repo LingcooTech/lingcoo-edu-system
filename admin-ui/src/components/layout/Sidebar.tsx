@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronsLeft, ChevronsRight, LogOut } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, LogOut } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { logout, type AuthAccount } from '@/api/client';
@@ -10,6 +10,12 @@ function sectionPrefix(path: string) {
   const [, prefix] = path.split('/');
   return prefix ? `/${prefix}` : path;
 }
+
+const ROLE_LABEL: Record<string, string> = {
+  admin: '管理员',
+  teacher: '老师',
+  parent: '家长',
+};
 
 export function Sidebar({
   collapsed,
@@ -23,6 +29,7 @@ export function Sidebar({
   showCollapseToggle?: boolean;
 }) {
   const location = useLocation();
+  const [accountOpen, setAccountOpen] = useState(false);
   const activeSection = useMemo(
     () =>
       adminSections.find((section) => location.pathname.startsWith(sectionPrefix(section.path))) ??
@@ -53,7 +60,12 @@ export function Sidebar({
         collapsed ? 'w-[72px]' : 'w-[240px]',
       )}
     >
-      <div className={cn('group/brand shrink-0 px-3 pb-3 pt-4', collapsed ? '' : 'flex gap-2.5')}>
+      <div
+        className={cn(
+          'group/brand relative shrink-0 px-3 pb-3 pt-4',
+          collapsed ? 'space-y-0' : 'flex items-center gap-2.5',
+        )}
+      >
         <NavLink
           to="/"
           className={cn('flex items-center gap-2.5 no-underline', collapsed ? 'justify-center' : 'min-w-0 flex-1')}
@@ -159,14 +171,47 @@ export function Sidebar({
       </nav>
 
       <div className="shrink-0 border-t p-2">
+        <div className="relative">
+          {accountOpen && (
+            <div
+              className={cn(
+                'bg-card absolute bottom-full mb-2 w-[260px] rounded-lg border p-1 shadow-lg',
+                collapsed ? 'left-0' : 'right-0',
+              )}
+            >
+              <div className="flex items-center gap-2.5 px-2 pb-2 pt-2">
+                <span className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs">
+                  {getInitials(account.displayName)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-tight">{account.displayName}</p>
+                  <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                    {account.email ?? account.phone ?? ROLE_LABEL[account.role] ?? account.role}
+                  </p>
+                  <p className="text-muted-foreground/70 mt-0.5 truncate text-[10px] font-medium uppercase tracking-wider">
+                    {ROLE_LABEL[account.role] ?? account.role}
+                  </p>
+                </div>
+              </div>
+              <div className="my-1 border-t" />
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4" />
+                退出登录
+              </button>
+            </div>
+          )}
         <button
           type="button"
           className={cn(
             'hover:bg-card/80 w-full rounded-md transition-colors',
             collapsed ? 'flex justify-center p-1.5' : 'flex items-center gap-2.5 px-2 py-1.5',
           )}
-          onClick={handleLogout}
-          title={collapsed ? '退出登录' : undefined}
+          onClick={() => setAccountOpen((current) => !current)}
+          title={collapsed ? account.displayName : undefined}
         >
           <span className="bg-primary text-primary-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px]">
             {getInitials(account.displayName)}
@@ -175,12 +220,15 @@ export function Sidebar({
             <>
               <span className="min-w-0 flex-1 text-left">
                 <span className="block truncate text-[13px] font-medium">{account.displayName}</span>
-                <span className="text-muted-foreground block truncate text-[10px]">{account.role}</span>
+                <span className="text-muted-foreground block truncate text-[10px]">
+                  {account.email ?? ROLE_LABEL[account.role] ?? account.role}
+                </span>
               </span>
-              <LogOut className="text-muted-foreground h-3.5 w-3.5" />
+              <ChevronRight className="text-muted-foreground/60 h-3.5 w-3.5" />
             </>
           )}
         </button>
+        </div>
       </div>
     </aside>
   );

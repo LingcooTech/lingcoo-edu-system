@@ -146,6 +146,14 @@ export async function listLeads(db: Database) {
   return db.select().from(schema.leads).orderBy(desc(schema.leads.createdAt));
 }
 
+export async function listLeadsByTrialSession(db: Database, trialSessionId: string) {
+  return db
+    .select()
+    .from(schema.leads)
+    .where(eq(schema.leads.trialSessionId, trialSessionId))
+    .orderBy(desc(schema.leads.createdAt));
+}
+
 export async function createLead(db: Database, values: NewLead) {
   const [lead] = await db.insert(schema.leads).values(values).returning();
   return lead;

@@ -103,8 +103,18 @@ export function SettingsPage() {
     address: '',
     headline: '',
     introduction: '',
+    bannerImageUrl: '',
+    bannerTitle: '',
+    bannerSubtitle: '',
+    ctaText: '',
+    ctaLink: '',
     highlightsText: '',
     promisesText: '',
+    statsText: '',
+    testimonialsText: '',
+    galleryText: '',
+    faqText: '',
+    businessHours: '',
     fullLogoUrl: '',
     squareLogoUrl: '',
     logoUrl: '',
@@ -239,8 +249,18 @@ export function SettingsPage() {
           address: organization.address ?? '',
           headline: organization.publicProfile.headline,
           introduction: organization.publicProfile.introduction,
+          bannerImageUrl: organization.publicProfile.bannerImageUrl,
+          bannerTitle: organization.publicProfile.bannerTitle,
+          bannerSubtitle: organization.publicProfile.bannerSubtitle,
+          ctaText: organization.publicProfile.ctaText,
+          ctaLink: organization.publicProfile.ctaLink,
           highlightsText: organization.publicProfile.highlights.join('\n'),
           promisesText: organization.publicProfile.promises.join('\n'),
+          statsText: organization.publicProfile.stats.join('\n'),
+          testimonialsText: organization.publicProfile.testimonials.join('\n'),
+          galleryText: organization.publicProfile.gallery.join('\n'),
+          faqText: organization.publicProfile.faq.join('\n'),
+          businessHours: organization.publicProfile.businessHours,
           fullLogoUrl: organization.branding.fullLogoUrl ?? organization.branding.logoUrl ?? '',
           squareLogoUrl: organization.branding.squareLogoUrl ?? '',
           logoUrl: organization.branding.logoUrl ?? organization.branding.fullLogoUrl ?? '',
@@ -276,8 +296,18 @@ export function SettingsPage() {
         publicProfile: {
           headline: org.headline,
           introduction: org.introduction,
+          bannerImageUrl: org.bannerImageUrl,
+          bannerTitle: org.bannerTitle,
+          bannerSubtitle: org.bannerSubtitle,
+          ctaText: org.ctaText,
+          ctaLink: org.ctaLink,
           highlights: linesToList(org.highlightsText),
           promises: linesToList(org.promisesText),
+          stats: linesToList(org.statsText),
+          testimonials: linesToList(org.testimonialsText),
+          gallery: linesToList(org.galleryText),
+          faq: linesToList(org.faqText),
+          businessHours: org.businessHours,
         },
         branding: {
           fullLogoUrl: org.fullLogoUrl,
@@ -299,8 +329,18 @@ export function SettingsPage() {
         ...prev,
         headline: updated.publicProfile.headline,
         introduction: updated.publicProfile.introduction,
+        bannerImageUrl: updated.publicProfile.bannerImageUrl,
+        bannerTitle: updated.publicProfile.bannerTitle,
+        bannerSubtitle: updated.publicProfile.bannerSubtitle,
+        ctaText: updated.publicProfile.ctaText,
+        ctaLink: updated.publicProfile.ctaLink,
         highlightsText: updated.publicProfile.highlights.join('\n'),
         promisesText: updated.publicProfile.promises.join('\n'),
+        statsText: updated.publicProfile.stats.join('\n'),
+        testimonialsText: updated.publicProfile.testimonials.join('\n'),
+        galleryText: updated.publicProfile.gallery.join('\n'),
+        faqText: updated.publicProfile.faq.join('\n'),
+        businessHours: updated.publicProfile.businessHours,
       }));
       setMessage('品牌 VI 已保存');
     } catch (err) {
@@ -550,6 +590,49 @@ export function SettingsPage() {
                     onChange={(e) => setOrg({ ...org, introduction: e.target.value })}
                   />
                 </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-sm font-medium">Banner 图片 URL</span>
+                  <input
+                    className={inputClass}
+                    placeholder="机构主页首屏大图"
+                    value={org.bannerImageUrl}
+                    onChange={(e) => setOrg({ ...org, bannerImageUrl: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Banner 标题</span>
+                  <input
+                    className={inputClass}
+                    value={org.bannerTitle}
+                    onChange={(e) => setOrg({ ...org, bannerTitle: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">Banner 副标题</span>
+                  <input
+                    className={inputClass}
+                    value={org.bannerSubtitle}
+                    onChange={(e) => setOrg({ ...org, bannerSubtitle: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">主按钮文案</span>
+                  <input
+                    className={inputClass}
+                    placeholder="预约试听"
+                    value={org.ctaText}
+                    onChange={(e) => setOrg({ ...org, ctaText: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">主按钮链接</span>
+                  <input
+                    className={inputClass}
+                    placeholder="/register"
+                    value={org.ctaLink}
+                    onChange={(e) => setOrg({ ...org, ctaLink: e.target.value })}
+                  />
+                </label>
                 <label className="block">
                   <span className="text-sm font-medium">教学亮点（每行一条）</span>
                   <textarea
@@ -564,6 +647,46 @@ export function SettingsPage() {
                     className={`${inputClass} h-28`}
                     value={org.promisesText}
                     onChange={(e) => setOrg({ ...org, promisesText: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">运营数据（每行一条）</span>
+                  <textarea
+                    className={`${inputClass} h-28`}
+                    value={org.statsText}
+                    onChange={(e) => setOrg({ ...org, statsText: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">用户评价（每行一条）</span>
+                  <textarea
+                    className={`${inputClass} h-28`}
+                    value={org.testimonialsText}
+                    onChange={(e) => setOrg({ ...org, testimonialsText: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">环境/作品图片 URL（每行一条）</span>
+                  <textarea
+                    className={`${inputClass} h-28`}
+                    value={org.galleryText}
+                    onChange={(e) => setOrg({ ...org, galleryText: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">常见问题（每行一条）</span>
+                  <textarea
+                    className={`${inputClass} h-28`}
+                    value={org.faqText}
+                    onChange={(e) => setOrg({ ...org, faqText: e.target.value })}
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-sm font-medium">营业/上课时间</span>
+                  <input
+                    className={inputClass}
+                    value={org.businessHours}
+                    onChange={(e) => setOrg({ ...org, businessHours: e.target.value })}
                   />
                 </label>
                 <label className="block">

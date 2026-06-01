@@ -17,6 +17,16 @@ const publicProfileSchema = z.object({
   introduction: z.string().max(1000).optional(),
   highlights: z.array(z.string().min(1).max(120)).max(6).optional(),
   promises: z.array(z.string().min(1).max(120)).max(6).optional(),
+  bannerImageUrl: z.string().max(500).optional(),
+  bannerTitle: z.string().max(120).optional(),
+  bannerSubtitle: z.string().max(240).optional(),
+  ctaText: z.string().max(40).optional(),
+  ctaLink: z.string().max(160).optional(),
+  stats: z.array(z.string().min(1).max(80)).max(6).optional(),
+  testimonials: z.array(z.string().min(1).max(240)).max(8).optional(),
+  gallery: z.array(z.string().min(1).max(500)).max(12).optional(),
+  faq: z.array(z.string().min(1).max(240)).max(8).optional(),
+  businessHours: z.string().max(120).optional(),
 });
 
 const brandingSchema = z

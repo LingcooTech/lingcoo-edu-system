@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Ban, Pencil, Plus } from 'lucide-react';
+import { Ban, Pencil, Plus, QrCode, Users } from 'lucide-react';
 
-import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Campus, Course, TrialSession } from '@/api/types';
+import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
+import type { Campus, Course, Lead, TrialSession } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -59,6 +59,12 @@ export function TrialsPage() {
   const [form, setForm] = useState<TrialForm>(defaultForm([], []));
   const [saving, setSaving] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<TrialSession | null>(null);
+  const [qrSession, setQrSession] = useState<TrialSession | null>(null);
+  const [qr, setQr] = useState<{ landingUrl: string; qrCodeDataUrl: string } | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [registrationSession, setRegistrationSession] = useState<TrialSession | null>(null);
+  const [registrations, setRegistrations] = useState<Lead[]>([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(false);
 
   function openCreate() {
     setEditing(null);
@@ -127,6 +133,47 @@ export function TrialsPage() {
     }
   }
 
+  async function openQr(session: TrialSession) {
+    setQrSession(session);
+    setQr(null);
+    setQrLoading(true);
+    try {
+      setQr(
+        await api<{ landingUrl: string; qrCodeDataUrl: string }>(
+          `${TRIALS()}/${session.id}/qrcode`,
+        ),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '生成二维码失败');
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
+  async function copyLanding() {
+    if (!qr) return;
+    try {
+      await navigator.clipboard.writeText(qr.landingUrl);
+      toast.success('试听链接已复制');
+    } catch {
+      toast.error('复制失败，请手动选择');
+    }
+  }
+
+  async function openRegistrations(session: TrialSession) {
+    setRegistrationSession(session);
+    setRegistrations([]);
+    setRegistrationsLoading(true);
+    try {
+      const payload = await api<{ leads: Lead[] }>(`${TRIALS()}/${session.id}/registrations`);
+      setRegistrations(payload.leads);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '读取报名失败');
+    } finally {
+      setRegistrationsLoading(false);
+    }
+  }
+
   return (
     <PageFrame
       section="trials"
@@ -152,6 +199,22 @@ export function TrialsPage() {
             header: '操作',
             cell: (row) => (
               <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => openRegistrations(row)}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  名单
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => openQr(row)}
+                >
+                  <QrCode className="h-3.5 w-3.5" />
+                  二维码
+                </button>
                 <button
                   type="button"
                   className="btn btn-ghost px-2 py-1"
@@ -270,6 +333,74 @@ export function TrialsPage() {
             </select>
           </Field>
         </FieldRow>
+      </Drawer>
+
+      <Drawer
+        open={Boolean(registrationSession)}
+        onClose={() => setRegistrationSession(null)}
+        title="试听报名名单"
+        description={registrationSession?.title}
+      >
+        {registrationsLoading ? (
+          <p className="text-muted-foreground text-sm">加载中...</p>
+        ) : (
+          <DataTable
+            columns={[
+              {
+                key: 'student',
+                header: '学员',
+                cell: (row) => (
+                  <div className="cell-stack">
+                    <span className="cell-title">{row.studentName}</span>
+                    <span className="cell-subtitle">{row.grade}</span>
+                  </div>
+                ),
+              },
+              { key: 'guardian', header: '家长', cell: (row) => row.guardianName },
+              { key: 'phone', header: '手机号', cell: (row) => row.phone },
+              {
+                key: 'status',
+                header: '阶段',
+                cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+              },
+              { key: 'source', header: '来源', cell: (row) => row.source },
+            ]}
+            data={registrations}
+            emptyMessage="还没有家长报名这节试听课。"
+          />
+        )}
+      </Drawer>
+
+      <Drawer
+        open={Boolean(qrSession)}
+        onClose={() => setQrSession(null)}
+        title="试听课报名二维码"
+        description={qrSession?.title}
+      >
+        {qrLoading ? (
+          <p className="text-muted-foreground text-sm">生成中...</p>
+        ) : qr ? (
+          <div className="space-y-4">
+            <div className="flex justify-center rounded-xl border bg-white p-4">
+              <img src={qr.qrCodeDataUrl} alt="试听课二维码" className="h-56 w-56" />
+            </div>
+            <Field label="报名链接">
+              <textarea className="form-input h-16" readOnly value={qr.landingUrl} />
+            </Field>
+            <div className="flex gap-2">
+              <button type="button" className="btn btn-secondary flex-1" onClick={copyLanding}>
+                复制链接
+              </button>
+              <a
+                className="btn btn-primary flex-1"
+                href={qr.qrCodeDataUrl}
+                download={`${qrSession?.id ?? 'trial'}-qrcode.png`}
+              >
+                下载二维码
+              </a>
+            </div>
+          </div>
+        ) : null}
       </Drawer>
 
       <ConfirmDialog

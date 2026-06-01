@@ -43,7 +43,7 @@ export function TrialListPage() {
                       <span className="text-muted text-xs">名额已满</span>
                     ) : (
                       <Link
-                        to={`/register?trial=${session.id}`}
+                        to={`/trials/${session.id}`}
                         className="pwbtn pwbtn-primary px-4 py-2"
                       >
                         预约

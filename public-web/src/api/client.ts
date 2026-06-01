@@ -4,6 +4,7 @@ const API_BASE_URL =
 export interface Course {
   id: string;
   slug: string;
+  campusId?: string | null;
   name: string;
   category: string;
   ageRange: string;
@@ -26,6 +27,7 @@ export interface TrialSession {
 
 export interface HomePayload {
   organization: {
+    id: string;
     name: string;
     brandName: string;
     phone: string | null;
@@ -35,6 +37,26 @@ export interface HomePayload {
       introduction: string;
       highlights: string[];
       promises: string[];
+      bannerImageUrl: string;
+      bannerTitle: string;
+      bannerSubtitle: string;
+      ctaText: string;
+      ctaLink: string;
+      stats: string[];
+      testimonials: string[];
+      gallery: string[];
+      faq: string[];
+      businessHours: string;
+    };
+    branding: {
+      fullLogoUrl?: string;
+      squareLogoUrl?: string;
+      logoUrl?: string;
+      primaryColor?: string;
+      secondaryColor?: string;
+      backgroundColor?: string;
+      cardColor?: string;
+      textColor?: string;
     };
   };
   campuses: Array<{
@@ -236,6 +258,37 @@ export async function fetchTrialSessions() {
   ).trialSessions;
 }
 
+export interface TrialDetail {
+  trialSession: TrialSession;
+  course: Course;
+  campus: { id: string; name: string; address: string | null } | null;
+  organization: HomePayload['organization'];
+}
+
+export async function fetchTrialSession(id: string) {
+  return publicApi<TrialDetail>(`/public/trial-sessions/${id}`);
+}
+
+export interface CampaignLandingPayload {
+  campaign: {
+    id: string;
+    channelId: string;
+    code: string;
+    name: string;
+    courseSlug?: string | null;
+    medium: string;
+    status: string;
+  };
+  channel: { id: string; code: string; name: string } | null;
+  course: Course | null;
+  trialSessions: TrialSession[];
+  organization: HomePayload['organization'];
+}
+
+export async function fetchCampaignLanding(code: string) {
+  return publicApi<CampaignLandingPayload>(`/public/campaigns/${code}`);
+}
+
 export interface TrialRegistrationInput {
   guardianName: string;
   phone: string;
@@ -255,6 +308,25 @@ export async function submitTrialRegistration(input: TrialRegistrationInput) {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export async function submitCampaignParticipation(code: string, input: TrialRegistrationInput) {
+  return publicApi<{ message: string }>(`/public/crm/campaigns/${code}/participations`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export interface PublicTeacher {
+  id: string;
+  name: string;
+  phone?: string | null;
+  specialties: string[];
+  status: string;
+}
+
+export async function fetchPublicTeachers() {
+  return (await publicApi<{ teachers: PublicTeacher[] }>('/public/teachers')).teachers;
 }
 
 // --- Checkout / payment ---

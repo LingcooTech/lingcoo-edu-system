@@ -291,7 +291,7 @@ export function MarketingPage() {
                 </div>
               ),
             },
-            { key: 'course', header: '落地课程', cell: (row) => row.courseSlug ?? '首页' },
+            { key: 'course', header: '默认课程', cell: (row) => row.courseSlug ?? '不限课程' },
             { key: 'medium', header: '触点', cell: (row) => row.medium },
             {
               key: 'status',
@@ -409,7 +409,7 @@ export function MarketingPage() {
         open={campaignOpen}
         onClose={() => setCampaignOpen(false)}
         title={campaignEditing ? '编辑活动' : '新建活动'}
-        description="活动绑定渠道后，可生成专属唯一二维码用于留资归因。"
+        description="活动绑定渠道后，会生成独立活动落地页二维码；家长提交表单后自动形成线索。"
         footer={
           <>
             <button
@@ -470,7 +470,7 @@ export function MarketingPage() {
           />
         </Field>
         <FieldRow>
-          <Field label="落地课程">
+          <Field label="默认课程">
             <select
               className="form-input"
               value={campaignForm.courseSlug}
@@ -478,7 +478,7 @@ export function MarketingPage() {
                 setCampaignForm({ ...campaignForm, courseSlug: event.target.value })
               }
             >
-              <option value="">首页</option>
+              <option value="">不限课程</option>
               {courses.map((course) => (
                 <option key={course.id} value={course.slug}>
                   {course.name}

@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AccountPage } from '@/pages/AccountPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { AuthPage } from '@/pages/AuthPage';
+import { CampaignLandingPage } from '@/pages/CampaignLandingPage';
 import { ChangePasswordPage } from '@/pages/ChangePasswordPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { CourseDetailPage } from '@/pages/CourseDetailPage';
@@ -12,7 +13,10 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { HomePage } from '@/pages/HomePage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { RegisterSuccessPage } from '@/pages/RegisterSuccessPage';
+import { StudentStoriesPage } from '@/pages/StudentStoriesPage';
 import { TeacherPage } from '@/pages/TeacherPage';
+import { TeachersPage } from '@/pages/TeachersPage';
+import { TrialDetailPage } from '@/pages/TrialDetailPage';
 import { TrialListPage } from '@/pages/TrialListPage';
 import { captureAttribution } from '@/lib/attribution';
 
@@ -30,8 +34,12 @@ export function App() {
         <Route path="/courses" element={<CourseListPage />} />
         <Route path="/courses/:slug" element={<CourseDetailPage />} />
         <Route path="/trials" element={<TrialListPage />} />
+        <Route path="/trials/:trialId" element={<TrialDetailPage />} />
+        <Route path="/campaigns/:campaignCode" element={<CampaignLandingPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/register/success" element={<RegisterSuccessPage />} />
+        <Route path="/teachers" element={<TeachersPage />} />
+        <Route path="/students" element={<StudentStoriesPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
