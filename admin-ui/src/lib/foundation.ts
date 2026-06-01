@@ -22,6 +22,7 @@ export const adminSections = [
   {
     key: 'overview',
     label: '业务概览',
+    path: '/overview/dashboard',
     icon: LayoutDashboard,
     items: [
       { key: 'dashboard', label: '经营看板', path: '/overview/dashboard', icon: LayoutDashboard },
@@ -32,12 +33,14 @@ export const adminSections = [
   {
     key: 'institution',
     label: '机构主页',
+    path: '/institution',
     icon: Home,
-    items: [{ key: 'institutionHome', label: '机构主页', path: '/institution', icon: Home }],
+    items: [],
   },
   {
     key: 'resources',
     label: '教学资源',
+    path: '/resources/venues',
     icon: BookOpen,
     items: [
       { key: 'venues', label: '场地资源', path: '/resources/venues', icon: Building2 },
@@ -48,6 +51,7 @@ export const adminSections = [
   {
     key: 'admissions',
     label: '招生转化',
+    path: '/admissions/marketing',
     icon: Megaphone,
     items: [
       { key: 'marketing', label: '营销活动', path: '/admissions/marketing', icon: Megaphone },
@@ -58,6 +62,7 @@ export const adminSections = [
   {
     key: 'academic',
     label: '教务管理',
+    path: '/academic/students',
     icon: CalendarDays,
     items: [
       { key: 'students', label: '学员档案', path: '/academic/students', icon: GraduationCap },
@@ -69,6 +74,7 @@ export const adminSections = [
   {
     key: 'operations',
     label: '运营管理',
+    path: '/operations/orders',
     icon: BarChart3,
     items: [
       { key: 'orders', label: '订单收款', path: '/operations/orders', icon: ReceiptText },
@@ -79,6 +85,7 @@ export const adminSections = [
   {
     key: 'system',
     label: '系统设置',
+    path: '/system/brand',
     icon: Settings,
     items: [
       { key: 'brandSettings', label: '品牌设置', path: '/system/brand', icon: Settings },
