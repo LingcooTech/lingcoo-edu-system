@@ -14,6 +14,13 @@ import { useApiResource } from '@/lib/useApiResource';
 
 const TEACHERS = () => '/v1/teachers';
 
+interface TeacherSaveResponse {
+  teacher: Teacher;
+  accountCreated?: boolean;
+  defaultPassword?: string;
+  accountWarning?: string;
+}
+
 interface TeacherForm {
   name: string;
   phone: string;
@@ -70,21 +77,34 @@ export function TeachersPage() {
         status: form.status,
       };
       if (editing) {
-        const { teacher } = await apiPatch<{ teacher: Teacher }>(
-          `${TEACHERS()}/${editing.id}`,
-          payload,
-        );
-        setTeachers(teachers.map((item) => (item.id === teacher.id ? teacher : item)));
+        const result = await apiPatch<TeacherSaveResponse>(`${TEACHERS()}/${editing.id}`, payload);
+        setTeachers(teachers.map((item) => (item.id === result.teacher.id ? result.teacher : item)));
+        surfaceSave(result);
       } else {
-        const { teacher } = await apiPost<{ teacher: Teacher }>(TEACHERS(), payload);
-        setTeachers([teacher, ...teachers]);
+        const result = await apiPost<TeacherSaveResponse>(TEACHERS(), payload);
+        setTeachers([result.teacher, ...teachers]);
+        surfaceSave(result);
       }
-      toast.success('老师已保存');
       setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // A teacher with a phone number gets a login account auto-provisioned; show
+  // the generated password (or a collision warning) so staff can hand it over.
+  function surfaceSave(result: TeacherSaveResponse) {
+    if (result.accountCreated && result.defaultPassword) {
+      toast.success(
+        `老师已保存；已自动创建登录账号，初始密码：${result.defaultPassword}（登录后请尽快修改）`,
+      );
+    } else {
+      toast.success('老师已保存');
+    }
+    if (result.accountWarning) {
+      toast.error(result.accountWarning);
     }
   }
 

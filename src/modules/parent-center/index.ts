@@ -1,6 +1,7 @@
 import { desc, eq, inArray } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
+import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as notificationsRepo from '../../db/repositories/notifications.js';
 import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
@@ -57,6 +58,21 @@ export const parentCenterModule: AppModule = {
         .where(eq(schema.orders.accountId, request.account!.id))
         .orderBy(desc(schema.orders.createdAt));
       return { orders };
+    });
+
+    app.get('/public/me/attendance', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = students.map((s) => s.id);
+      const records = await attendanceRepo.listAttendanceForStudents(app.db, studentIds);
+      const studentById = new Map(students.map((s) => [s.id, s]));
+      return {
+        attendance: records.map((row) => ({
+          ...row,
+          student: studentById.get(row.studentId)
+            ? { id: row.studentId, name: studentById.get(row.studentId)!.name }
+            : undefined,
+        })),
+      };
     });
 
     app.get('/public/me/notifications', { preHandler: app.requireParent }, async (request) => {

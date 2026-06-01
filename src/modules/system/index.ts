@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
@@ -31,7 +32,18 @@ export const systemModule: AppModule = {
   name: 'system',
   async register(app) {
     app.get('/health', async () => ({ ok: true }));
-    app.get('/ready', async () => ({ ok: true, checks: { api: true } }));
+    // Readiness must reflect whether the app can actually serve traffic, so it
+    // probes the database. A failing probe returns 503 so the deploy health
+    // gate (and any orchestrator) treats the instance as not-ready.
+    app.get('/ready', async (request, reply) => {
+      try {
+        await app.db.execute(sql`select 1`);
+        return { ok: true, checks: { api: true, db: true } };
+      } catch (error) {
+        request.log.error({ err: error }, 'readiness probe failed');
+        return reply.code(503).send({ ok: false, checks: { api: true, db: false } });
+      }
+    });
     app.get('/v1/system/modules', async () => ({ modules: getModuleNames() }));
 
     app.get('/v1/system-settings/smtp', { preHandler: app.requireAdmin }, async () => {

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, Phone, UserRound, X } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, Phone, Shield, UserRound, X } from 'lucide-react';
 
 import { loadHome, type HomePayload } from '@/api/client';
+import { useSession } from '@/features/session';
 
 const navItems = [
   { to: '/', label: '首页', end: true },
@@ -13,6 +14,12 @@ const navItems = [
   { to: '/students', label: '学员', end: false },
   { to: '/about', label: '关于', end: false },
 ];
+
+const ROLE_LABEL: Record<string, string> = {
+  admin: '管理员',
+  teacher: '老师',
+  parent: '家长',
+};
 
 function Brand({ organization }: { organization?: HomePayload['organization'] }) {
   const logoUrl =
@@ -37,7 +44,10 @@ export function Layout({ children }: { children: ReactNode }) {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
+  const { account, openAuth, logout } = useSession();
 
   useEffect(() => {
     loadHome()
@@ -52,10 +62,25 @@ export function Layout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Close the account dropdown when clicking outside it.
+  useEffect(() => {
+    if (!accountOpen) {
+      return;
+    }
+    function onClick(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    window.addEventListener('mousedown', onClick);
+    return () => window.removeEventListener('mousedown', onClick);
+  }, [accountOpen]);
+
   const organization = home?.organization;
 
   useEffect(() => {
     setDrawerOpen(false);
+    setAccountOpen(false);
   }, [location.pathname, location.search]);
 
   return (
@@ -95,9 +120,61 @@ export function Layout({ children }: { children: ReactNode }) {
                 <span>{organization.phone}</span>
               </a>
             ) : null}
-            <Link to="/account" className="site-icon-btn" aria-label="家长中心">
-              <UserRound className="h-5 w-5" />
-            </Link>
+            {account ? (
+              <div className="relative" ref={accountRef}>
+                <button
+                  type="button"
+                  className="site-account-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded={accountOpen}
+                  onClick={() => setAccountOpen((open) => !open)}
+                >
+                  <span className="site-avatar">
+                    {(account.displayName || '账').slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="hidden max-w-24 truncate sm:inline">{account.displayName}</span>
+                  <ChevronDown className="text-muted h-4 w-4" />
+                </button>
+                {accountOpen ? (
+                  <div className="site-account-menu" role="menu">
+                    <div className="site-account-menu-head">
+                      <div className="text-ink font-semibold">{account.displayName}</div>
+                      <div className="text-muted text-xs">{ROLE_LABEL[account.role] ?? '账号'}</div>
+                    </div>
+                    <Link to="/account" role="menuitem" className="site-account-menu-item">
+                      <UserRound className="h-4 w-4" />
+                      个人中心
+                    </Link>
+                    {account.role === 'admin' ? (
+                      <a href="/admin" role="menuitem" className="site-account-menu-item">
+                        <Shield className="h-4 w-4" />
+                        管理后台
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="site-account-menu-item w-full text-left"
+                      onClick={() => {
+                        setAccountOpen(false);
+                        void logout();
+                      }}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      退出登录
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pwbtn pwbtn-primary px-4 py-2"
+                onClick={() => openAuth('login')}
+              >
+                登录 / 注册
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -139,6 +216,31 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/register" className="pwbtn pwbtn-primary mt-8 w-full">
               预约试听
             </Link>
+            {account ? (
+              <div className="mt-3 grid gap-2">
+                <Link to="/account" className="pwbtn pwbtn-outline w-full">
+                  个人中心
+                </Link>
+                <button
+                  type="button"
+                  className="pwbtn pwbtn-outline w-full"
+                  onClick={() => void logout()}
+                >
+                  退出登录
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pwbtn pwbtn-outline mt-3 w-full"
+                onClick={() => {
+                  setDrawerOpen(false);
+                  openAuth('login');
+                }}
+              >
+                登录 / 注册
+              </button>
+            )}
           </aside>
         </div>
       ) : null}

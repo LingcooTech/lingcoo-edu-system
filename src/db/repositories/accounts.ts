@@ -34,6 +34,15 @@ export async function findByPhone(db: Database, phone: string) {
   return account ?? null;
 }
 
+export async function findByTeacherId(db: Database, teacherId: string) {
+  const [account] = await db
+    .select()
+    .from(schema.accounts)
+    .where(eq(schema.accounts.teacherId, teacherId))
+    .limit(1);
+  return account ?? null;
+}
+
 /**
  * Looks up an account by its login identifier — matches against either email or
  * phone. The caller is responsible for normalizing the identifier (lowercasing

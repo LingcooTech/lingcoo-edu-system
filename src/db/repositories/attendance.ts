@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -19,6 +19,39 @@ export async function listAttendanceForSession(db: Database, sessionId: string) 
     .from(schema.attendanceRecords)
     .where(eq(schema.attendanceRecords.classSessionId, sessionId))
     .orderBy(desc(schema.attendanceRecords.createdAt));
+}
+
+/**
+ * Attendance history for a set of students, enriched with the session time /
+ * topic and the course + class names — drives the parent's "签到记录" view.
+ */
+export async function listAttendanceForStudents(db: Database, studentIds: string[]) {
+  if (studentIds.length === 0) {
+    return [];
+  }
+  return db
+    .select({
+      id: schema.attendanceRecords.id,
+      studentId: schema.attendanceRecords.studentId,
+      status: schema.attendanceRecords.status,
+      lessonDelta: schema.attendanceRecords.lessonDelta,
+      note: schema.attendanceRecords.note,
+      createdAt: schema.attendanceRecords.createdAt,
+      sessionId: schema.classSessions.id,
+      startsAt: schema.classSessions.startsAt,
+      topic: schema.classSessions.topic,
+      className: schema.classes.name,
+      courseName: schema.courses.name,
+    })
+    .from(schema.attendanceRecords)
+    .innerJoin(
+      schema.classSessions,
+      eq(schema.attendanceRecords.classSessionId, schema.classSessions.id),
+    )
+    .innerJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
+    .innerJoin(schema.courses, eq(schema.classes.courseId, schema.courses.id))
+    .where(inArray(schema.attendanceRecords.studentId, studentIds))
+    .orderBy(desc(schema.classSessions.startsAt));
 }
 
 /**

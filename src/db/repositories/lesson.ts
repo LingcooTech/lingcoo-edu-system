@@ -27,7 +27,10 @@ async function findOrCreateAccount(tx: DbOrTx, input: { studentId: string; cours
         eq(schema.lessonAccounts.courseId, input.courseId),
       ),
     )
-    .limit(1);
+    .limit(1)
+    // Lock the account row for the duration of the enclosing transaction so two
+    // concurrent consumes can't both read the same balance and lose an update.
+    .for('update');
   if (existing) {
     return existing;
   }

@@ -26,7 +26,7 @@ test('serves health and readiness probes', async () => {
 
     const ready = await app.inject({ method: 'GET', url: '/ready' });
     assert.equal(ready.statusCode, 200);
-    assert.deepEqual(ready.json(), { ok: true, checks: { api: true } });
+    assert.deepEqual(ready.json(), { ok: true, checks: { api: true, db: true } });
   } finally {
     await app.close();
   }

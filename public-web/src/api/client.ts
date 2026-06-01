@@ -441,3 +441,63 @@ export async function fetchTeacherDashboard() {
     classes: TeacherClass[];
   }>('/public/teacher/dashboard');
 }
+
+export type AttendanceStatus = 'present' | 'leave' | 'absent' | 'makeup' | 'trial';
+
+export interface SessionAttendanceRecord {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  lessonDelta: number;
+  note: string | null;
+}
+
+export interface TeacherRosterStudent {
+  id: string;
+  name: string;
+  grade: string;
+}
+
+export interface TeacherSessionAttendance {
+  session: TeacherClassSession;
+  class: { id: string; name: string } | null;
+  roster: TeacherRosterStudent[];
+  attendanceRecords: SessionAttendanceRecord[];
+}
+
+export async function fetchTeacherSessionAttendance(sessionId: string) {
+  return publicApi<TeacherSessionAttendance>(`/public/teacher/sessions/${sessionId}/attendance`);
+}
+
+export async function recordTeacherAttendance(
+  sessionId: string,
+  records: Array<{ studentId: string; status: AttendanceStatus; note?: string }>,
+) {
+  return publicApi<{ attendanceRecords: SessionAttendanceRecord[] }>(
+    `/public/teacher/sessions/${sessionId}/attendance`,
+    { method: 'POST', body: JSON.stringify({ records }) },
+  );
+}
+
+// --- Parent: children attendance history (签到记录) ---
+
+export interface ParentAttendanceRecord {
+  id: string;
+  studentId: string;
+  status: AttendanceStatus;
+  lessonDelta: number;
+  note: string | null;
+  createdAt: string;
+  sessionId: string;
+  startsAt: string;
+  topic: string;
+  className: string;
+  courseName: string;
+  student?: { id: string; name: string };
+}
+
+export async function fetchParentAttendance() {
+  return (await publicApi<{ attendance: ParentAttendanceRecord[] }>('/public/me/attendance'))
+    .attendance;
+}

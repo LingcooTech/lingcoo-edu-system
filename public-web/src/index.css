@@ -112,6 +112,26 @@ body {
     @apply border-line bg-surface text-ink hidden items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium no-underline transition-colors hover:bg-brand-soft sm:inline-flex;
   }
 
+  .site-account-trigger {
+    @apply border-line bg-surface text-ink hover:bg-brand-soft inline-flex items-center gap-2 rounded-full border py-1 pr-2.5 pl-1 text-sm font-medium transition-colors;
+  }
+
+  .site-avatar {
+    @apply bg-brand flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white;
+  }
+
+  .site-account-menu {
+    @apply border-line bg-surface absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border p-1.5 shadow-lg;
+  }
+
+  .site-account-menu-head {
+    @apply border-line mb-1 border-b px-3 py-2;
+  }
+
+  .site-account-menu-item {
+    @apply text-ink hover:bg-paper flex items-center gap-2 rounded-xl px-3 py-2 text-sm no-underline;
+  }
+
   .site-main {
     @apply flex-1;
   }

@@ -22,3 +22,18 @@ export function verifyPassword(password: string, passwordHash: string | null | u
   const actual = scryptSync(password, salt, KEY_LENGTH);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
+
+/**
+ * Default provisioning password derived from a phone number: the last 6
+ * characters. Returns null when there is no usable phone (< 6 chars), so the
+ * caller can decide whether to fall back to something else or skip creation.
+ * Used for accounts provisioned on the user's behalf (parent on checkout,
+ * teacher on resource creation) together with `mustChangePassword`.
+ */
+export function defaultPasswordFromPhone(phone: string | null | undefined): string | null {
+  const normalized = phone?.trim();
+  if (normalized && normalized.length >= 6) {
+    return normalized.slice(-6);
+  }
+  return null;
+}

@@ -151,8 +151,7 @@ jobs:
             printf '%q' "$1"
           }
 
-          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "ACR_PASSWORD=$(escape "${ACR_PASSWORD}") \
+          remote_cmd="ACR_PASSWORD=$(escape "${ACR_PASSWORD}") \
              ACR_REGISTRY=$(escape "${ACR_REGISTRY}") \
              ACR_USERNAME=$(escape "${ACR_USERNAME}") \
              DEPLOY_COMPOSE_FILE=$(escape "${DEPLOY_COMPOSE_FILE}") \
@@ -160,4 +159,38 @@ jobs:
              DEPLOY_PATH=$(escape "${DEPLOY_PATH}") \
              FD_EDU_IMAGE_NAME=$(escape "${FD_EDU_IMAGE_NAME}") \
              IMAGE_TAG=$(escape "${IMAGE_TAG}") \
-             sh -s" < ./scripts/deploy/deploy.sh
+             sh -s"
+
+          # Keep the control connection alive and fail fast on a dead host so a
+          # transient drop surfaces as exit 255 rather than hanging.
+          ssh_opts="-o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
+
+          # deploy.sh is idempotent (git reset --hard + image pull by digest +
+          # migrate + health-check), so it is safe to re-run after a dropped SSH
+          # session. Retry ONLY on exit 255 (SSH transport failure: connection
+          # closed before/at handshake or mid-session). Any other code is the
+          # remote script's own exit status and must surface immediately.
+          attempt=1
+          max_attempts=3
+          while true; do
+            set +e
+            ssh $ssh_opts "${DEPLOY_USER}@${DEPLOY_HOST}" "${remote_cmd}" < ./scripts/deploy/deploy.sh
+            code=$?
+            set -e
+
+            if [ "$code" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$code" -ne 255 ]; then
+              echo "deploy.sh exited with ${code} (not an SSH transport error) — not retrying"
+              exit "$code"
+            fi
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "SSH transport failed (255) after ${attempt} attempts — giving up"
+              exit 255
+            fi
+            wait_s=$((attempt * 10))
+            echo "SSH transport drop (255), attempt ${attempt}/${max_attempts} — retrying in ${wait_s}s"
+            sleep "${wait_s}"
+            attempt=$((attempt + 1))
+          done

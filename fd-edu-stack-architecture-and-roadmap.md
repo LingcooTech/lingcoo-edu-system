@@ -1,5 +1,13 @@
 # fd-edu-stack 教育系统架构与实施计划
 
+> ⚠️ **本文档为 2026-05-28 的初始规划，部分内容已被取代（SUPERSEDED）。**
+> 当前系统已演进为**单机构自部署**形态：多租户（`tenants` / `campuses` /
+> `tenant_memberships` / `tenant_id`）已于 2026-05-30 拆除（迁移 `0005_single_institution`），
+> `organization` 改为单行单例；账号已统一为单张 `accounts` 表 + 角色（`admin` /
+> `teacher` / `parent`，迁移 `0009_unified_accounts`），不再有独立 `users` / `parents`；
+> 课程定价已移至 `course_packages`（迁移 `0008`）。涉及多租户、独立 `api/` 目录、
+> 旧数据模型的章节请以 `src/db/schema.ts` 与 `drizzle/` 迁移为准。下文保留以记录设计意图与路线图。
+
 ## 1. 产品定位
 
 `fd-edu-stack` 是一套独立的社区教室 / 小型培训机构招生、排课、消课和运营系统。

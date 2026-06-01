@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
+import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as schema from '../../db/schema.js';
+import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import type { AppModule } from '../types.js';
 
 const teacherSchema = z.object({
@@ -24,6 +27,16 @@ const classroomSchema = z.object({
 });
 
 const classroomUpdateSchema = classroomSchema.partial();
+
+const teacherAttendanceSchema = z.object({
+  records: z.array(
+    z.object({
+      studentId: z.string(),
+      status: z.enum(['present', 'leave', 'absent', 'makeup', 'trial']),
+      note: z.string().optional(),
+    }),
+  ),
+});
 
 function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
@@ -86,14 +99,123 @@ export const teachingModule: AppModule = {
       };
     });
 
+    // Resolves the authenticated teacher's session and asserts they own it, so a
+    // teacher can only read/record attendance for their own class sessions.
+    async function requireOwnedSession(accountId: string, sessionId: string) {
+      const account = await accountsRepo.findById(app.db, accountId);
+      if (!account?.teacherId) {
+        throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
+      }
+      const session = await schedulingRepo.findSession(app.db, sessionId);
+      if (!session) {
+        throw notFound('Class session not found');
+      }
+      if (session.teacherId !== account.teacherId) {
+        throw Object.assign(new Error('无权操作该课次'), { statusCode: 403 });
+      }
+      return { account, session };
+    }
+
+    app.get(
+      '/public/teacher/sessions/:sessionId/attendance',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const { session } = await requireOwnedSession(request.account!.id, sessionId);
+        const [classGroup, attendanceRecords, allStudents, enrollments] = await Promise.all([
+          schedulingRepo.findClass(app.db, session.classId),
+          attendanceRepo.listAttendanceForSession(app.db, sessionId),
+          peopleRepo.listStudents(app.db),
+          schedulingRepo.listEnrollments(app.db, session.classId),
+        ]);
+        const studentById = new Map(allStudents.map((s) => [s.id, s]));
+        const roster = enrollments
+          .map((enrollment) => studentById.get(enrollment.studentId))
+          .filter(Boolean)
+          .map((student) => ({ id: student!.id, name: student!.name, grade: student!.grade }));
+        return {
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          roster,
+          attendanceRecords,
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/sessions/:sessionId/attendance',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const { session } = await requireOwnedSession(request.account!.id, sessionId);
+        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        if (!classGroup) {
+          throw notFound('Class not found');
+        }
+        const body = teacherAttendanceSchema.parse(request.body);
+        const enrollments = await schedulingRepo.listEnrollments(app.db, session.classId);
+        const rosterStudentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
+        const invalidRecord = body.records.find((record) => !rosterStudentIds.has(record.studentId));
+        if (invalidRecord) {
+          throw Object.assign(new Error('只能为本班学员点名'), { statusCode: 400 });
+        }
+        const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
+          sessionId,
+          courseId: classGroup.courseId,
+          records: body.records,
+        });
+        return { attendanceRecords };
+      },
+    );
+
     app.get('/v1/teachers', { preHandler: app.requireAdmin }, async () => {
       return { teachers: await teachingRepo.listTeachers(app.db) };
     });
 
+    // When a teacher resource carries a phone number, provision a teacher login
+    // account: password = last 6 of the phone, forced change on first login.
+    // Idempotent — skips when the teacher already has an account; refuses (with a
+    // warning, not a hard error) when the phone already belongs to someone else.
+    async function ensureTeacherAccount(teacher: typeof schema.teachers.$inferSelect): Promise<{
+      accountCreated: boolean;
+      defaultPassword?: string;
+      accountWarning?: string;
+    }> {
+      const phone = teacher.phone?.trim();
+      const password = defaultPasswordFromPhone(phone);
+      if (!phone || !password) {
+        return { accountCreated: false };
+      }
+      if (await accountsRepo.findByTeacherId(app.db, teacher.id)) {
+        return { accountCreated: false };
+      }
+      if (await accountsRepo.findByPhone(app.db, phone)) {
+        return {
+          accountCreated: false,
+          accountWarning: '该手机号已被其他账号占用，未自动创建老师账号',
+        };
+      }
+      try {
+        await accountsRepo.createAccount(app.db, {
+          role: 'teacher',
+          phone,
+          displayName: teacher.name,
+          passwordHash: hashPassword(password),
+          teacherId: teacher.id,
+          mustChangePassword: true,
+        });
+        return { accountCreated: true, defaultPassword: password };
+      } catch (error) {
+        app.log.error({ err: error, teacherId: teacher.id }, 'failed to auto-create teacher account');
+        return { accountCreated: false, accountWarning: '自动创建老师账号失败，请在账号管理中手动创建' };
+      }
+    }
+
     app.post('/v1/teachers', { preHandler: app.requireAdmin }, async (request) => {
       const body = teacherSchema.parse(request.body);
       const teacher = await teachingRepo.createTeacher(app.db, body);
-      return { teacher };
+      const account = await ensureTeacherAccount(teacher);
+      return { teacher, ...account };
     });
 
     app.patch('/v1/teachers/:teacherId', { preHandler: app.requireAdmin }, async (request) => {
@@ -101,7 +223,8 @@ export const teachingModule: AppModule = {
       const body = teacherUpdateSchema.parse(request.body);
       const teacher = await teachingRepo.updateTeacher(app.db, teacherId, body);
       if (!teacher) throw notFound('Teacher not found');
-      return { teacher };
+      const account = await ensureTeacherAccount(teacher);
+      return { teacher, ...account };
     });
 
     app.delete('/v1/teachers/:teacherId', { preHandler: app.requireAdmin }, async (request) => {

@@ -5,7 +5,7 @@ import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import { httpError } from '../../lib/http-error.js';
-import { hashPassword, verifyPassword } from '../../lib/password.js';
+import { hashPassword, verifyPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import { SmtpSettingsService } from '../../lib/smtp-settings.js';
 import type { AppModule } from '../types.js';
 
@@ -81,11 +81,7 @@ function generateCode() {
 }
 
 function generateDefaultPassword(phone: string | null | undefined) {
-  const normalizedPhone = normalizeOptionalPhone(phone);
-  if (normalizedPhone && normalizedPhone.length >= 6) {
-    return normalizedPhone.slice(-6);
-  }
-  return String(randomInt(10_000_000, 100_000_000));
+  return defaultPasswordFromPhone(phone) ?? String(randomInt(10_000_000, 100_000_000));
 }
 
 function publicAccount(account: accountsRepo.Account) {
