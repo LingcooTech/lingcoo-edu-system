@@ -30,7 +30,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-none',
+        'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] leading-none font-medium',
         toneStyles[tone],
         className,
       )}
@@ -42,7 +42,12 @@ export function StatusPill({
 }
 
 export function statusToTone(status: string): Tone {
-  if (['active', 'paid', 'published', 'completed', 'open', 'present'].includes(status)) return 'ok';
+  if (
+    ['active', 'paid', 'course_delivery', 'published', 'completed', 'open', 'present'].includes(
+      status,
+    )
+  )
+    return 'ok';
   if (['new', 'trial_booked', 'follow_up', 'scheduled', 'pending', 'recruiting'].includes(status))
     return 'warn';
   if (['invalid', 'cancelled', 'archived', 'absent', 'refunded'].includes(status)) return 'danger';

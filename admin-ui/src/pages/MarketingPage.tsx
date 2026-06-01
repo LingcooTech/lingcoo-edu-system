@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, QrCode } from 'lucide-react';
+import { Trash2, Plus, QrCode } from 'lucide-react';
 
-import { api, apiPatch, apiPost } from '@/api/client';
-import type {
-  Campaign,
-  CampaignFunnelRow,
-  Channel,
-  ChannelFunnelRow,
-  Course,
-} from '@/api/types';
+import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
+import type { Campaign, CampaignFunnelRow, Channel, ChannelFunnelRow, Course } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
@@ -17,8 +12,8 @@ import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
-const CHANNELS = () => '/v1/channels';
-const CAMPAIGNS = () => '/v1/campaigns';
+const CHANNELS = () => '/v1/crm/channels';
+const CAMPAIGNS = () => '/v1/crm/campaigns';
 
 const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
@@ -34,9 +29,7 @@ export function MarketingPage() {
   const [channelFunnel, setChannelFunnel] = useState<ChannelFunnelRow[]>([]);
 
   useEffect(() => {
-    api<{ byCampaign: CampaignFunnelRow[]; byChannel: ChannelFunnelRow[] }>(
-      '/v1/reports/funnel',
-    )
+    api<{ byCampaign: CampaignFunnelRow[]; byChannel: ChannelFunnelRow[] }>('/v1/reports/funnel')
       .then((payload) => {
         setFunnel(payload.byCampaign ?? []);
         setChannelFunnel(payload.byChannel ?? []);
@@ -54,6 +47,7 @@ export function MarketingPage() {
   const [channelEditing, setChannelEditing] = useState<Channel | null>(null);
   const [channelForm, setChannelForm] = useState({ code: '', name: '' });
   const [savingChannel, setSavingChannel] = useState(false);
+  const [channelDeleteTarget, setChannelDeleteTarget] = useState<Channel | null>(null);
 
   function openChannel(channel?: Channel) {
     setChannelEditing(channel ?? null);
@@ -87,6 +81,20 @@ export function MarketingPage() {
     }
   }
 
+  async function deleteChannel() {
+    if (!channelDeleteTarget) return;
+    try {
+      const { channel } = await apiDelete<{ channel: Channel }>(
+        `${CHANNELS()}/${channelDeleteTarget.id}`,
+      );
+      setChannels(channels.filter((item) => item.id !== channel.id));
+      setChannelDeleteTarget(null);
+      toast.success('渠道已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    }
+  }
+
   // --- Campaign editor ---
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [campaignEditing, setCampaignEditing] = useState<Campaign | null>(null);
@@ -99,6 +107,7 @@ export function MarketingPage() {
     status: 'active' as Campaign['status'],
   });
   const [savingCampaign, setSavingCampaign] = useState(false);
+  const [campaignDeleteTarget, setCampaignDeleteTarget] = useState<Campaign | null>(null);
 
   function openCampaign(campaign?: Campaign) {
     setCampaignEditing(campaign ?? null);
@@ -155,6 +164,20 @@ export function MarketingPage() {
     }
   }
 
+  async function deleteCampaign() {
+    if (!campaignDeleteTarget) return;
+    try {
+      const { campaign } = await apiDelete<{ campaign: Campaign }>(
+        `${CAMPAIGNS()}/${campaignDeleteTarget.id}`,
+      );
+      setCampaigns(campaigns.filter((item) => item.id !== campaign.id));
+      setCampaignDeleteTarget(null);
+      toast.success('活动已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    }
+  }
+
   // --- QR drawer ---
   const [qrCampaign, setQrCampaign] = useState<Campaign | null>(null);
   const [qr, setQr] = useState<{ landingUrl: string; qrCodeDataUrl: string } | null>(null);
@@ -196,7 +219,6 @@ export function MarketingPage() {
         </button>
       }
     >
-      {/* Channels */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-700">渠道</h2>
         <button type="button" className="btn btn-secondary" onClick={() => openChannel()}>
@@ -212,13 +234,23 @@ export function MarketingPage() {
             key: 'actions',
             header: '操作',
             cell: (row) => (
-              <button
-                type="button"
-                className="btn btn-ghost px-2 py-1"
-                onClick={() => openChannel(row)}
-              >
-                编辑
-              </button>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => openChannel(row)}
+                >
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setChannelDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
+              </div>
             ),
           },
         ]}
@@ -226,7 +258,6 @@ export function MarketingPage() {
         emptyMessage="还没有渠道，先新建一个(如 door_poster 门店海报)"
       />
 
-      {/* Campaigns */}
       <div className="mt-8 mb-3">
         <h2 className="text-sm font-semibold text-slate-700">活动 / 二维码</h2>
       </div>
@@ -271,6 +302,14 @@ export function MarketingPage() {
                 >
                   编辑
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setCampaignDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -279,7 +318,6 @@ export function MarketingPage() {
         emptyMessage="还没有活动，点右上角「新建活动」生成第一张获客二维码"
       />
 
-      {/* Channel funnel */}
       <div className="mt-8 mb-3">
         <h2 className="text-sm font-semibold text-slate-700">渠道转化漏斗</h2>
       </div>
@@ -333,7 +371,6 @@ export function MarketingPage() {
         emptyMessage="暂无活动归因数据"
       />
 
-      {/* Channel editor */}
       <Drawer
         open={channelOpen}
         onClose={() => setChannelOpen(false)}
@@ -375,7 +412,6 @@ export function MarketingPage() {
         </Field>
       </Drawer>
 
-      {/* Campaign editor */}
       <Drawer
         open={campaignOpen}
         onClose={() => setCampaignOpen(false)}
@@ -469,7 +505,6 @@ export function MarketingPage() {
         </FieldRow>
       </Drawer>
 
-      {/* QR drawer */}
       <Drawer
         open={Boolean(qrCampaign)}
         onClose={() => setQrCampaign(null)}
@@ -504,6 +539,30 @@ export function MarketingPage() {
           </div>
         ) : null}
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(channelDeleteTarget)}
+        title="删除渠道"
+        message={
+          channelDeleteTarget
+            ? `确认删除「${channelDeleteTarget.name}」？该渠道下的活动会一并删除。`
+            : ''
+        }
+        confirmLabel="删除"
+        danger
+        onCancel={() => setChannelDeleteTarget(null)}
+        onConfirm={deleteChannel}
+      />
+
+      <ConfirmDialog
+        open={Boolean(campaignDeleteTarget)}
+        title="删除活动"
+        message={campaignDeleteTarget ? `确认删除「${campaignDeleteTarget.name}」？` : ''}
+        confirmLabel="删除"
+        danger
+        onCancel={() => setCampaignDeleteTarget(null)}
+        onConfirm={deleteCampaign}
+      />
     </PageFrame>
   );
 }

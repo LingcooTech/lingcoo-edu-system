@@ -12,9 +12,10 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-5 overflow-auto p-3">
         {adminSections.map((group) => (
-          <div key={group.group}>
-            <div className="text-muted-foreground px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide">
-              {group.group}
+          <div key={group.key}>
+            <div className="text-foreground flex items-center gap-2 px-2 pb-2 text-xs font-semibold">
+              <group.icon className="h-4 w-4" />
+              {group.label}
             </div>
             <div className="space-y-1">
               {group.items.map((item) => (

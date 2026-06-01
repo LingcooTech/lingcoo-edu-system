@@ -24,6 +24,7 @@ export const leadStatusEnum = pgEnum('lead_status', [
   'trial_attended',
   'paid',
   'follow_up',
+  'course_delivery',
   'invalid',
 ]);
 export const trialSessionStatusEnum = pgEnum('trial_session_status', [
@@ -509,7 +510,9 @@ export const auditLogs = pgTable(
   'audit_logs',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    actorAccountId: uuid('actor_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    actorAccountId: uuid('actor_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
     action: varchar('action', { length: 160 }).notNull(),
     resourceType: varchar('resource_type', { length: 80 }).notNull(),
     resourceId: varchar('resource_id', { length: 120 }),

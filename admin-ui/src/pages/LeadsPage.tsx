@@ -12,33 +12,35 @@ import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 import { formatDateTime } from '@/lib/utils';
 
-const LEADS_BASE = () => '/v1/leads';
+const LEADS_BASE = () => '/v1/crm/leads';
 
 const statusOptions: LeadStatus[] = [
   'new',
   'contacted',
   'trial_booked',
   'trial_attended',
-  'paid',
   'follow_up',
+  'paid',
+  'course_delivery',
   'invalid',
 ];
 
 const statusLabels: Record<LeadStatus, string> = {
   new: '待联系',
-  contacted: '已联系',
-  trial_booked: '已约试听',
-  trial_attended: '已到店',
-  paid: '已缴费',
-  follow_up: '跟进中',
+  contacted: '初步沟通',
+  trial_booked: '预约试听',
+  trial_attended: '试听结束',
+  follow_up: '订单跟进',
+  paid: '报名缴费',
+  course_delivery: '课程交付',
   invalid: '无效',
 };
 
 export function LeadsPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<Lead>(LEADS_BASE(), 'leads');
-  const { data: channels } = useApiResource<Channel>('/v1/channels', 'channels');
-  const { data: campaigns } = useApiResource<Campaign>('/v1/campaigns', 'campaigns');
+  const { data: channels } = useApiResource<Channel>('/v1/crm/channels', 'channels');
+  const { data: campaigns } = useApiResource<Campaign>('/v1/crm/campaigns', 'campaigns');
 
   const channelName = useMemo(() => {
     const map = new Map(channels.map((c) => [c.id, c.name]));

@@ -15,6 +15,7 @@ const leadStatuses = [
   'trial_attended',
   'paid',
   'follow_up',
+  'course_delivery',
   'invalid',
 ] as const;
 
@@ -255,6 +256,17 @@ export const crmModule: AppModule = {
           return { channel };
         },
       );
+
+      app.delete(
+        `${prefix}/channels/:channelId`,
+        { preHandler: app.requireAdmin },
+        async (request) => {
+          const { channelId } = request.params as { channelId: string };
+          const channel = await crmRepo.deleteChannel(app.db, channelId);
+          if (!channel) throw notFound('Channel not found');
+          return { channel };
+        },
+      );
     }
 
     function registerCampaignRoutes(prefix: string) {
@@ -300,6 +312,17 @@ export const crmModule: AppModule = {
           );
           const qrCodeDataUrl = await QRCode.toDataURL(landingUrl, { margin: 1, width: 320 });
           return { landingUrl, qrCodeDataUrl };
+        },
+      );
+
+      app.delete(
+        `${prefix}/campaigns/:campaignId`,
+        { preHandler: app.requireAdmin },
+        async (request) => {
+          const { campaignId } = request.params as { campaignId: string };
+          const campaign = await crmRepo.deleteCampaign(app.db, campaignId);
+          if (!campaign) throw notFound('Campaign not found');
+          return { campaign };
         },
       );
     }

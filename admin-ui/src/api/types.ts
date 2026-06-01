@@ -5,6 +5,7 @@ export type LeadStatus =
   | 'trial_attended'
   | 'paid'
   | 'follow_up'
+  | 'course_delivery'
   | 'invalid';
 
 export interface Course {

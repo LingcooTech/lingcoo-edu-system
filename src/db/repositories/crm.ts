@@ -35,6 +35,14 @@ export async function updateChannel(db: Database, channelId: string, patch: Part
   return channel ?? null;
 }
 
+export async function deleteChannel(db: Database, channelId: string) {
+  const [channel] = await db
+    .delete(schema.channels)
+    .where(eq(schema.channels.id, channelId))
+    .returning();
+  return channel ?? null;
+}
+
 export async function findChannelByCode(db: Database, code: string) {
   const [channel] = await db
     .select()
@@ -72,6 +80,14 @@ export async function updateCampaign(
   const [campaign] = await db
     .update(schema.campaigns)
     .set({ ...patch, updatedAt: new Date() })
+    .where(eq(schema.campaigns.id, campaignId))
+    .returning();
+  return campaign ?? null;
+}
+
+export async function deleteCampaign(db: Database, campaignId: string) {
+  const [campaign] = await db
+    .delete(schema.campaigns)
     .where(eq(schema.campaigns.id, campaignId))
     .returning();
   return campaign ?? null;
