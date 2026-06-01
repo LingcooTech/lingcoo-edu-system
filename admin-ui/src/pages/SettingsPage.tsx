@@ -105,6 +105,8 @@ export function SettingsPage() {
     introduction: '',
     highlightsText: '',
     promisesText: '',
+    fullLogoUrl: '',
+    squareLogoUrl: '',
     logoUrl: '',
     darkLogoUrl: '',
     faviconUrl: '',
@@ -239,7 +241,9 @@ export function SettingsPage() {
           introduction: organization.publicProfile.introduction,
           highlightsText: organization.publicProfile.highlights.join('\n'),
           promisesText: organization.publicProfile.promises.join('\n'),
-          logoUrl: organization.branding.logoUrl ?? '',
+          fullLogoUrl: organization.branding.fullLogoUrl ?? organization.branding.logoUrl ?? '',
+          squareLogoUrl: organization.branding.squareLogoUrl ?? '',
+          logoUrl: organization.branding.logoUrl ?? organization.branding.fullLogoUrl ?? '',
           darkLogoUrl: organization.branding.darkLogoUrl ?? '',
           faviconUrl: organization.branding.faviconUrl ?? '',
           primaryColor: organization.branding.primaryColor ?? '',
@@ -276,7 +280,9 @@ export function SettingsPage() {
           promises: linesToList(org.promisesText),
         },
         branding: {
-          logoUrl: org.logoUrl,
+          fullLogoUrl: org.fullLogoUrl,
+          squareLogoUrl: org.squareLogoUrl,
+          logoUrl: org.fullLogoUrl || org.logoUrl,
           darkLogoUrl: org.darkLogoUrl,
           faviconUrl: org.faviconUrl,
           primaryColor: org.primaryColor,
@@ -561,11 +567,21 @@ export function SettingsPage() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium">Logo URL</span>
+                  <span className="text-sm font-medium">完整 Logo URL</span>
                   <input
                     className={inputClass}
-                    value={org.logoUrl}
-                    onChange={(e) => setOrg({ ...org, logoUrl: e.target.value })}
+                    placeholder="横版完整 logo，适合页眉/官网使用"
+                    value={org.fullLogoUrl}
+                    onChange={(e) => setOrg({ ...org, fullLogoUrl: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">方形 Logo URL</span>
+                  <input
+                    className={inputClass}
+                    placeholder="方形图标，适合头像/小程序/应用图标"
+                    value={org.squareLogoUrl}
+                    onChange={(e) => setOrg({ ...org, squareLogoUrl: e.target.value })}
                   />
                 </label>
                 <label className="block">
@@ -574,6 +590,15 @@ export function SettingsPage() {
                     className={inputClass}
                     value={org.darkLogoUrl}
                     onChange={(e) => setOrg({ ...org, darkLogoUrl: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium">兼容 Logo URL</span>
+                  <input
+                    className={inputClass}
+                    placeholder="历史字段；为空时保存完整 Logo"
+                    value={org.logoUrl}
+                    onChange={(e) => setOrg({ ...org, logoUrl: e.target.value })}
                   />
                 </label>
                 <label className="block">

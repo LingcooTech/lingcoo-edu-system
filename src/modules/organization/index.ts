@@ -21,6 +21,8 @@ const publicProfileSchema = z.object({
 
 const brandingSchema = z
   .object({
+    fullLogoUrl: z.string().max(500).optional(),
+    squareLogoUrl: z.string().max(500).optional(),
     logoUrl: z.string().max(500).optional(),
     darkLogoUrl: z.string().max(500).optional(),
     faviconUrl: z.string().max(500).optional(),

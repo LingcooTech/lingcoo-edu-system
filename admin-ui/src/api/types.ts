@@ -254,6 +254,8 @@ export interface PublicProfile {
 }
 
 export interface OrganizationBranding {
+  fullLogoUrl?: string;
+  squareLogoUrl?: string;
   logoUrl?: string;
   darkLogoUrl?: string;
   faviconUrl?: string;

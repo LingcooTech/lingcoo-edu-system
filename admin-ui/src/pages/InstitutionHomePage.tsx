@@ -13,6 +13,8 @@ export function InstitutionHomePage() {
 
   const profile = organization?.publicProfile;
   const branding = organization?.branding;
+  const fullLogoUrl = branding?.fullLogoUrl || branding?.logoUrl;
+  const squareLogoUrl = branding?.squareLogoUrl || fullLogoUrl;
 
   return (
     <PageFrame section="institutionHome">
@@ -25,7 +27,26 @@ export function InstitutionHomePage() {
       >
         <div className="grid gap-8 p-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="flex min-h-72 flex-col justify-center">
-            <div className="text-muted-foreground text-sm">{organization?.name ?? '机构名称'}</div>
+            <div className="mb-5 flex items-center gap-3">
+              {squareLogoUrl ? (
+                <img
+                  src={squareLogoUrl}
+                  alt={`${organization?.brandName ?? organization?.name ?? '机构'} 方形 Logo`}
+                  className="h-12 w-12 rounded-xl border bg-white object-contain p-1.5"
+                />
+              ) : null}
+              {fullLogoUrl ? (
+                <img
+                  src={fullLogoUrl}
+                  alt={`${organization?.brandName ?? organization?.name ?? '机构'} 完整 Logo`}
+                  className="h-10 max-w-48 object-contain"
+                />
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  {organization?.name ?? '机构名称'}
+                </div>
+              )}
+            </div>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight">
               {organization?.brandName ?? '机构品牌名称'}
             </h2>
