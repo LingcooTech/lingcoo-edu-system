@@ -95,7 +95,7 @@ export const schedulingModule: AppModule = {
       { preHandler: app.requireAdmin },
       async (request) => {
         const { classId } = request.params as { classId: string };
-        const classGroup = await schedulingRepo.archiveClass(app.db, classId);
+        const classGroup = await schedulingRepo.deleteClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
         return { class: classGroup };
       },

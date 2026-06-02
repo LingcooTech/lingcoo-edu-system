@@ -69,6 +69,14 @@ export async function updateStudent(
   return student ?? null;
 }
 
+export async function deleteStudent(db: Database, studentId: string) {
+  const [student] = await db
+    .delete(schema.students)
+    .where(eq(schema.students.id, studentId))
+    .returning();
+  return student ?? null;
+}
+
 export async function requireStudent(db: Database, studentId: string) {
   const [student] = await db
     .select()

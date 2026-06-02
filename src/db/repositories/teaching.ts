@@ -37,8 +37,12 @@ export async function updateTeacher(
   return teacher ?? null;
 }
 
-export async function archiveTeacher(db: Database, teacherId: string) {
-  return updateTeacher(db, teacherId, { status: 'archived' });
+export async function deleteTeacher(db: Database, teacherId: string) {
+  const [teacher] = await db
+    .delete(schema.teachers)
+    .where(eq(schema.teachers.id, teacherId))
+    .returning();
+  return teacher ?? null;
 }
 
 export async function listClassrooms(db: Database) {
@@ -63,6 +67,10 @@ export async function updateClassroom(
   return classroom ?? null;
 }
 
-export async function archiveClassroom(db: Database, classroomId: string) {
-  return updateClassroom(db, classroomId, { status: 'archived' });
+export async function deleteClassroom(db: Database, classroomId: string) {
+  const [classroom] = await db
+    .delete(schema.classrooms)
+    .where(eq(schema.classrooms.id, classroomId))
+    .returning();
+  return classroom ?? null;
 }

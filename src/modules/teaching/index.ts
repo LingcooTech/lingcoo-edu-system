@@ -229,7 +229,7 @@ export const teachingModule: AppModule = {
 
     app.delete('/v1/teachers/:teacherId', { preHandler: app.requireAdmin }, async (request) => {
       const { teacherId } = request.params as { teacherId: string };
-      const teacher = await teachingRepo.archiveTeacher(app.db, teacherId);
+      const teacher = await teachingRepo.deleteTeacher(app.db, teacherId);
       if (!teacher) throw notFound('Teacher not found');
       return { teacher };
     });
@@ -261,7 +261,7 @@ export const teachingModule: AppModule = {
       { preHandler: app.requireAdmin },
       async (request) => {
         const { classroomId } = request.params as { classroomId: string };
-        const classroom = await teachingRepo.archiveClassroom(app.db, classroomId);
+        const classroom = await teachingRepo.deleteClassroom(app.db, classroomId);
         if (!classroom) throw notFound('Classroom not found');
         return { classroom };
       },

@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Archive, Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { apiPatch, apiPost } from '@/api/client';
+import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Course, CoursePackage } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 import { money } from '@/lib/utils';
@@ -49,6 +50,7 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PackageForm>(emptyPackageForm);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CoursePackage | null>(null);
 
   function openCreate() {
     setEditing(null);
@@ -107,16 +109,17 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }
 
-  async function archive(pkg: CoursePackage) {
+  async function deletePackage() {
+    if (!deleteTarget) return;
     try {
-      const { coursePackage } = await apiPatch<{ coursePackage: CoursePackage }>(
-        `${PKG_BASE()}/${pkg.id}`,
-        { status: 'archived' },
+      const { coursePackage } = await apiDelete<{ coursePackage: CoursePackage }>(
+        `${PKG_BASE()}/${deleteTarget.id}`,
       );
-      setPackages(packages.map((item) => (item.id === coursePackage.id ? coursePackage : item)));
-      toast.success('课时包已归档');
+      setPackages(packages.filter((item) => item.id !== coursePackage.id));
+      setDeleteTarget(null);
+      toast.success('课时包已删除');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '归档失败');
+      toast.error(err instanceof Error ? err.message : '删除失败');
     }
   }
 
@@ -167,16 +170,14 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
                   <Pencil className="h-3.5 w-3.5" />
                   编辑
                 </button>
-                {row.status !== 'archived' && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost px-2 py-1 text-red-600"
-                    onClick={() => archive(row)}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    归档
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -239,6 +240,18 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
             />
           </Field>
         </FieldRow>
+        <Field label="状态">
+          <select
+            className="form-input"
+            value={form.status}
+            onChange={(event) =>
+              setForm({ ...form, status: event.target.value as PackageForm['status'] })
+            }
+          >
+            <option value="active">{statusLabel('active')}</option>
+            <option value="archived">{statusLabel('archived')}</option>
+          </select>
+        </Field>
         <Field label="说明">
           <textarea
             className="form-input h-20"
@@ -247,6 +260,15 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
           />
         </Field>
       </Drawer>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除课时包？"
+        message={`确认删除「${deleteTarget?.name ?? ''}」？如果已被订单引用，系统会阻止删除。`}
+        confirmLabel="删除"
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={deletePackage}
+      />
     </PageFrame>
   );
 

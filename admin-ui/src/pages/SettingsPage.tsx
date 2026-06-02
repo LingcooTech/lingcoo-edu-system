@@ -508,19 +508,18 @@ export function SettingsPage() {
   }
 
   return (
-    <PageFrame section="settings">
-      <div className="resource-card p-5">
-        <div className="text-sm font-semibold">系统设置</div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          统一维护机构品牌、支付渠道、SMTP 邮件和七牛云存储。密钥字段留空表示保持原值。
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+    <PageFrame
+      section="settings"
+      actions={
+        <div className="border-border/70 bg-muted/40 flex flex-wrap rounded-lg border p-1">
           {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
-              className={`rounded-full px-4 py-2 text-sm font-medium ${
-                activeTab === tab.key ? 'bg-primary text-primary-foreground' : 'bg-muted'
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
               }`}
               onClick={() => setActiveTab(tab.key)}
             >
@@ -528,6 +527,10 @@ export function SettingsPage() {
             </button>
           ))}
         </div>
+      }
+    >
+      <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm">
+        密钥字段留空表示保持原值；支付、SMTP 和七牛云可优先读取环境变量配置。
       </div>
 
       {message && (

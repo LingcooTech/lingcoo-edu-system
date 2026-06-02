@@ -255,7 +255,9 @@ export function LeadsPage() {
           {
             key: 'status',
             header: '状态',
-            cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+            cell: (row) => (
+              <StatusPill tone={statusToTone(row.status)} label={statusLabels[row.status]} />
+            ),
           },
           {
             key: 'action',
@@ -300,7 +302,10 @@ export function LeadsPage() {
                 <span>{selected.medium ?? '—'}</span>
                 <span className="text-muted-foreground">状态</span>
                 <span>
-                  <StatusPill tone={statusToTone(selected.status)} label={selected.status} />
+                  <StatusPill
+                    tone={statusToTone(selected.status)}
+                    label={statusLabels[selected.status]}
+                  />
                 </span>
               </div>
             </section>

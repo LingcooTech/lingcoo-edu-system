@@ -52,10 +52,9 @@ export const catalogModule: AppModule = {
       return { course };
     });
 
-    // Soft delete (archive). Courses are referenced by orders/leads/classes.
     app.delete('/v1/courses/:courseId', { preHandler: app.requireAdmin }, async (request) => {
       const { courseId } = request.params as { courseId: string };
-      const course = await catalogRepo.archiveCourse(app.db, courseId);
+      const course = await catalogRepo.deleteCourse(app.db, courseId);
       if (!course) {
         throw Object.assign(new Error('Course not found'), { statusCode: 404 });
       }
@@ -93,7 +92,7 @@ export const catalogModule: AppModule = {
       { preHandler: app.requireAdmin },
       async (request) => {
         const { packageId } = request.params as { packageId: string };
-        const coursePackage = await packagesRepo.archivePackage(app.db, packageId);
+        const coursePackage = await packagesRepo.deletePackage(app.db, packageId);
         if (!coursePackage) {
           throw Object.assign(new Error('Course package not found'), { statusCode: 404 });
         }

@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -492,9 +492,11 @@ export function MarketingPage() {
               value={campaignForm.status}
               onChange={(event) => setCampaignForm({ ...campaignForm, status: event.target.value })}
             >
-              <option value="active">active</option>
-              <option value="paused">paused</option>
-              <option value="archived">archived</option>
+              {(['active', 'paused', 'archived'] as const).map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
             </select>
           </Field>
         </FieldRow>

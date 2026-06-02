@@ -116,5 +116,12 @@ export const peopleModule: AppModule = {
       if (!student) throw notFound('Student not found');
       return { student };
     });
+
+    app.delete('/v1/students/:studentId', { preHandler: app.requireAdmin }, async (request) => {
+      const { studentId } = request.params as { studentId: string };
+      const student = await peopleRepo.deleteStudent(app.db, studentId);
+      if (!student) throw notFound('Student not found');
+      return { student };
+    });
   },
 };

@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
@@ -297,9 +297,11 @@ export function SchedulePage() {
                 setForm({ ...form, status: event.target.value as SessionForm['status'] })
               }
             >
-              <option value="scheduled">scheduled</option>
-              <option value="completed">completed</option>
-              <option value="cancelled">cancelled</option>
+              {(['scheduled', 'completed', 'cancelled'] as const).map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
             </select>
           </Field>
         )}
@@ -308,7 +310,7 @@ export function SchedulePage() {
       <ConfirmDialog
         open={Boolean(cancelTarget)}
         title="取消课次？"
-        message={`「${cancelTarget?.topic ?? ''}」会标记为 cancelled，历史排课记录仍保留。`}
+        message={`确认取消「${cancelTarget?.topic ?? ''}」？历史排课记录仍保留。`}
         confirmLabel="取消课次"
         danger
         onConfirm={cancelSession}

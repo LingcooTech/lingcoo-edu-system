@@ -88,6 +88,14 @@ export async function listAccounts(db: Database) {
   return db.select().from(schema.accounts).orderBy(desc(schema.accounts.createdAt));
 }
 
+export async function deleteAccount(db: Database, accountId: string) {
+  const [account] = await db
+    .delete(schema.accounts)
+    .where(eq(schema.accounts.id, accountId))
+    .returning();
+  return account ?? null;
+}
+
 // --- Security codes (email verify / password reset) ---
 
 export async function findLatestSecurityCode(

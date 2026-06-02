@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { KeyRound, Pencil, Plus } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { apiPatch, apiPost } from '@/api/client';
+import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Account, AccountRole, Guardian, Teacher } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -81,6 +82,7 @@ export function AccountsPage() {
   const [form, setForm] = useState<AccountForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [defaultPassword, setDefaultPassword] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
 
   const teacherOptions = useMemo(
     () => teachers.filter((teacher) => teacher.status !== 'archived'),
@@ -159,6 +161,18 @@ export function AccountsPage() {
     }
   }
 
+  async function deleteAccount() {
+    if (!deleteTarget) return;
+    try {
+      const { account } = await apiDelete<{ account: Account }>(`${ACCOUNTS()}/${deleteTarget.id}`);
+      setAccounts(accounts.filter((item) => item.id !== account.id));
+      setDeleteTarget(null);
+      toast.success('账号已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    }
+  }
+
   return (
     <PageFrame
       section="accounts"
@@ -225,6 +239,14 @@ export function AccountsPage() {
                   <KeyRound className="h-3.5 w-3.5" />
                   重置
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -275,8 +297,8 @@ export function AccountsPage() {
                 setForm({ ...form, status: event.target.value as AccountForm['status'] })
               }
             >
-              <option value="active">active 可登录</option>
-              <option value="suspended">suspended 停用</option>
+              <option value="active">{statusLabel('active')} / 可登录</option>
+              <option value="suspended">{statusLabel('suspended')}</option>
             </select>
           </Field>
         </FieldRow>
@@ -346,6 +368,15 @@ export function AccountsPage() {
           </Field>
         )}
       </Drawer>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除账号？"
+        message={`确认删除「${deleteTarget?.displayName ?? ''}」？该账号将无法继续登录。`}
+        confirmLabel="删除"
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={deleteAccount}
+      />
     </PageFrame>
   );
 }

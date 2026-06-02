@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Eye, Pencil, Plus } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { apiPatch, apiPost } from '@/api/client';
+import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -39,6 +40,7 @@ export function StudentsPage() {
   const [selected, setSelected] = useState<Student | null>(null);
   const [form, setForm] = useState<StudentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
 
   function openCreate() {
     setEditing(null);
@@ -102,6 +104,19 @@ export function StudentsPage() {
       toast.error(err instanceof Error ? err.message : '保存失败');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteStudent() {
+    if (!deleteTarget) return;
+    try {
+      const { student } = await apiDelete<{ student: Student }>(`${STUDENTS()}/${deleteTarget.id}`);
+      setData(data.filter((item) => item.id !== student.id));
+      setDeleteTarget(null);
+      setSelected((current) => (current?.id === student.id ? null : current));
+      toast.success('学员已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
     }
   }
 
@@ -169,6 +184,14 @@ export function StudentsPage() {
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   编辑
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
                 </button>
               </div>
             ),
@@ -241,8 +264,8 @@ export function StudentsPage() {
               setForm({ ...form, status: event.target.value as StudentForm['status'] })
             }
           >
-            <option value="active">active</option>
-            <option value="inactive">inactive</option>
+            <option value="active">{statusLabel('active')}</option>
+            <option value="inactive">{statusLabel('inactive')}</option>
           </select>
         </Field>
       </Drawer>
@@ -301,6 +324,15 @@ export function StudentsPage() {
           </div>
         )}
       </Drawer>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除学员？"
+        message={`确认删除「${deleteTarget?.name ?? ''}」？相关课时、考勤和订单引用会按系统约束处理。`}
+        confirmLabel="删除"
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={deleteStudent}
+      />
     </PageFrame>
   );
 }

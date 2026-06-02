@@ -141,6 +141,15 @@ export const organizationModule: AppModule = {
       return { campus };
     });
 
+    app.delete('/v1/campuses/:campusId', { preHandler: app.requireAdmin }, async (request) => {
+      const { campusId } = request.params as { campusId: string };
+      const campus = await organizationRepo.deleteCampus(app.db, campusId);
+      if (!campus) {
+        throw Object.assign(new Error('Campus not found'), { statusCode: 404 });
+      }
+      return { campus };
+    });
+
     app.get('/v1/dashboard', { preHandler: app.requireAdmin }, async () => {
       const [leads, students, accounts, sessions, classes, campaigns, monthlyRevenue] =
         await Promise.all([

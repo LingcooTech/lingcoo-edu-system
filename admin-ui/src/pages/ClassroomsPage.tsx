@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Campus, Classroom } from '@/api/types';
@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -45,7 +45,7 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
   const [editing, setEditing] = useState<Classroom | null>(null);
   const [form, setForm] = useState<ClassroomForm>(emptyClassroomForm);
   const [saving, setSaving] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState<Classroom | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Classroom | null>(null);
 
   function openEditor(classroom?: Classroom) {
     setEditing(classroom ?? null);
@@ -94,17 +94,17 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  async function archive() {
-    if (!archiveTarget) return;
+  async function deleteClassroom() {
+    if (!deleteTarget) return;
     try {
       const { classroom } = await apiDelete<{ classroom: Classroom }>(
-        `${CLASSROOMS()}/${archiveTarget.id}`,
+        `${CLASSROOMS()}/${deleteTarget.id}`,
       );
-      setClassrooms(classrooms.map((item) => (item.id === classroom.id ? classroom : item)));
-      setArchiveTarget(null);
-      toast.success('教室已归档');
+      setClassrooms(classrooms.filter((item) => item.id !== classroom.id));
+      setDeleteTarget(null);
+      toast.success('教室已删除');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '归档失败');
+      toast.error(err instanceof Error ? err.message : '删除失败');
     }
   }
 
@@ -141,16 +141,14 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
                   <Pencil className="h-3.5 w-3.5" />
                   编辑
                 </button>
-                {row.status !== 'archived' && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost px-2 py-1 text-red-600"
-                    onClick={() => setArchiveTarget(row)}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    归档
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -211,21 +209,21 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
                 setForm({ ...form, status: event.target.value as ClassroomForm['status'] })
               }
             >
-              <option value="active">active</option>
-              <option value="archived">archived</option>
+              <option value="active">{statusLabel('active')}</option>
+              <option value="archived">{statusLabel('archived')}</option>
             </select>
           </Field>
         </FieldRow>
       </Drawer>
 
       <ConfirmDialog
-        open={Boolean(archiveTarget)}
-        title="归档教室？"
-        message={`「${archiveTarget?.name ?? ''}」归档后不建议继续排课，历史课次仍保留。`}
-        confirmLabel="归档"
+        open={Boolean(deleteTarget)}
+        title="删除教室？"
+        message={`确认删除「${deleteTarget?.name ?? ''}」？如果教室已被班级或课次引用，系统会阻止删除。`}
+        confirmLabel="删除"
         danger
-        onConfirm={archive}
-        onCancel={() => setArchiveTarget(null)}
+        onConfirm={deleteClassroom}
+        onCancel={() => setDeleteTarget(null)}
       />
     </PageFrame>
   );

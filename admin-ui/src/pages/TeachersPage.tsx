@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Teacher } from '@/api/types';
@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -43,7 +43,7 @@ export function TeachersPage() {
   const [editing, setEditing] = useState<Teacher | null>(null);
   const [form, setForm] = useState<TeacherForm>(emptyTeacherForm);
   const [saving, setSaving] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState<Teacher | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Teacher | null>(null);
 
   function openEditor(teacher?: Teacher) {
     setEditing(teacher ?? null);
@@ -108,15 +108,15 @@ export function TeachersPage() {
     }
   }
 
-  async function archive() {
-    if (!archiveTarget) return;
+  async function deleteTeacher() {
+    if (!deleteTarget) return;
     try {
-      const { teacher } = await apiDelete<{ teacher: Teacher }>(`${TEACHERS()}/${archiveTarget.id}`);
-      setTeachers(teachers.map((item) => (item.id === teacher.id ? teacher : item)));
-      setArchiveTarget(null);
-      toast.success('老师已归档');
+      const { teacher } = await apiDelete<{ teacher: Teacher }>(`${TEACHERS()}/${deleteTarget.id}`);
+      setTeachers(teachers.filter((item) => item.id !== teacher.id));
+      setDeleteTarget(null);
+      toast.success('老师已删除');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '归档失败');
+      toast.error(err instanceof Error ? err.message : '删除失败');
     }
   }
 
@@ -153,16 +153,14 @@ export function TeachersPage() {
                   <Pencil className="h-3.5 w-3.5" />
                   编辑
                 </button>
-                {row.status !== 'archived' && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost px-2 py-1 text-red-600"
-                    onClick={() => setArchiveTarget(row)}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    归档
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -214,20 +212,20 @@ export function TeachersPage() {
               setForm({ ...form, status: event.target.value as TeacherForm['status'] })
             }
           >
-            <option value="active">active</option>
-            <option value="archived">archived</option>
+            <option value="active">{statusLabel('active')}</option>
+            <option value="archived">{statusLabel('archived')}</option>
           </select>
         </Field>
       </Drawer>
 
       <ConfirmDialog
-        open={Boolean(archiveTarget)}
-        title="归档老师？"
-        message={`「${archiveTarget?.name ?? ''}」归档后不建议继续排课，历史课次仍保留。`}
-        confirmLabel="归档"
+        open={Boolean(deleteTarget)}
+        title="删除老师？"
+        message={`确认删除「${deleteTarget?.name ?? ''}」？如果老师已被班级或课次引用，系统会阻止删除。`}
+        confirmLabel="删除"
         danger
-        onConfirm={archive}
-        onCancel={() => setArchiveTarget(null)}
+        onConfirm={deleteTeacher}
+        onCancel={() => setDeleteTarget(null)}
       />
     </PageFrame>
   );

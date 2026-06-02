@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { apiPatch, apiPost } from '@/api/client';
+import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Campus } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
@@ -34,6 +35,7 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [editing, setEditing] = useState<Campus | null>(null);
   const [form, setForm] = useState<CampusForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Campus | null>(null);
 
   function openCreate() {
     setEditing(null);
@@ -78,6 +80,18 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }
 
+  async function deleteCampus() {
+    if (!deleteTarget) return;
+    try {
+      const { campus } = await apiDelete<{ campus: Campus }>(`/v1/campuses/${deleteTarget.id}`);
+      setData(data.filter((item) => item.id !== campus.id));
+      setDeleteTarget(null);
+      toast.success('校区已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    }
+  }
+
   const page = (
     <PageFrame
       section="campuses"
@@ -96,14 +110,24 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
             key: 'actions',
             header: '操作',
             cell: (row) => (
-              <button
-                type="button"
-                className="btn btn-ghost px-2 py-1"
-                onClick={() => openEdit(row)}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                编辑
-              </button>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  onClick={() => openEdit(row)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
+              </div>
             ),
           },
         ]}
@@ -140,6 +164,15 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
           />
         </Field>
       </Drawer>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除校区？"
+        message={`确认删除「${deleteTarget?.name ?? ''}」？关联教室、班级、试听等数据会按系统约束处理。`}
+        confirmLabel="删除"
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={deleteCampus}
+      />
     </PageFrame>
   );
 

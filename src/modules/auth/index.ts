@@ -328,6 +328,18 @@ export const authModule: AppModule = {
       return { account: adminAccount(updated!), defaultPassword };
     });
 
+    app.delete('/v1/accounts/:accountId', { preHandler: app.requireAdmin }, async (request) => {
+      const { accountId } = request.params as { accountId: string };
+      if (request.account?.id === accountId) {
+        throw httpError(422, '不能删除当前登录账号');
+      }
+      const account = await accountsRepo.deleteAccount(app.db, accountId);
+      if (!account) {
+        throw httpError(404, '账号不存在');
+      }
+      return { account: adminAccount(account) };
+    });
+
     // --- Parent self-registration ---
 
     app.post('/auth/register', async (request, reply) => {

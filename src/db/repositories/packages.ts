@@ -50,8 +50,12 @@ export async function updatePackage(
   return pkg ?? null;
 }
 
-export async function archivePackage(db: Database, packageId: string) {
-  return updatePackage(db, packageId, { status: 'archived' });
+export async function deletePackage(db: Database, packageId: string) {
+  const [pkg] = await db
+    .delete(schema.coursePackages)
+    .where(eq(schema.coursePackages.id, packageId))
+    .returning();
+  return pkg ?? null;
 }
 
 export async function requirePackage(db: Database, packageId: string) {

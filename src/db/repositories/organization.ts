@@ -77,3 +77,11 @@ export async function updateCampus(
     .returning();
   return campus ?? null;
 }
+
+export async function deleteCampus(db: Database, campusId: string) {
+  const [campus] = await db
+    .delete(schema.campuses)
+    .where(eq(schema.campuses.id, campusId))
+    .returning();
+  return campus ?? null;
+}

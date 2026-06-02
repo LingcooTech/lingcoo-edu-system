@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
@@ -327,9 +327,11 @@ export function TrialsPage() {
                 setForm({ ...form, status: event.target.value as TrialForm['status'] })
               }
             >
-              <option value="open">open</option>
-              <option value="closed">closed</option>
-              <option value="cancelled">cancelled</option>
+              {(['open', 'closed', 'cancelled'] as const).map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
             </select>
           </Field>
         </FieldRow>
@@ -406,7 +408,7 @@ export function TrialsPage() {
       <ConfirmDialog
         open={Boolean(cancelTarget)}
         title="取消试听课？"
-        message={`「${cancelTarget?.title ?? ''}」会标记为 cancelled，已有线索记录仍保留。`}
+        message={`确认取消「${cancelTarget?.title ?? ''}」？已有线索记录仍保留。`}
         confirmLabel="取消试听"
         danger
         onConfirm={cancelTrial}

@@ -57,8 +57,10 @@ export async function updateCourse(db: Database, courseId: string, patch: Partia
   return course ?? null;
 }
 
-// Soft delete: courses are referenced by orders/leads/classes, so we archive
-// rather than hard-delete to preserve referential integrity.
-export async function archiveCourse(db: Database, courseId: string) {
-  return updateCourse(db, courseId, { status: 'archived' });
+export async function deleteCourse(db: Database, courseId: string) {
+  const [course] = await db
+    .delete(schema.courses)
+    .where(eq(schema.courses.id, courseId))
+    .returning();
+  return course ?? null;
 }

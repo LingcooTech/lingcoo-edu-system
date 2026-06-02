@@ -25,8 +25,12 @@ export async function updateClass(
   return classGroup ?? null;
 }
 
-export async function archiveClass(db: Database, classId: string) {
-  return updateClass(db, classId, { status: 'archived' });
+export async function deleteClass(db: Database, classId: string) {
+  const [classGroup] = await db
+    .delete(schema.classes)
+    .where(eq(schema.classes.id, classId))
+    .returning();
+  return classGroup ?? null;
 }
 
 export async function countActiveEnrollments(db: Database, classId: string) {

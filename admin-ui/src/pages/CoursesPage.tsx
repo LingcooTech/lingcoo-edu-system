@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Course } from '@/api/types';
@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -70,8 +70,8 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CourseForm>(emptyCourseForm);
   const [saving, setSaving] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState<Course | null>(null);
-  const [archiving, setArchiving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function openCreate() {
     setEditing(null);
@@ -113,20 +113,20 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
     }
   }
 
-  async function confirmArchive() {
-    if (!archiveTarget) return;
-    setArchiving(true);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
       const { course } = await apiDelete<{ course: Course }>(
-        `${COURSE_BASE()}/${archiveTarget.id}`,
+        `${COURSE_BASE()}/${deleteTarget.id}`,
       );
-      setCourses(courses.map((item) => (item.id === course.id ? course : item)));
-      toast.success('课程已归档');
-      setArchiveTarget(null);
+      setCourses(courses.filter((item) => item.id !== course.id));
+      toast.success('课程已删除');
+      setDeleteTarget(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '归档失败');
+      toast.error(err instanceof Error ? err.message : '删除失败');
     } finally {
-      setArchiving(false);
+      setDeleting(false);
     }
   }
 
@@ -175,16 +175,14 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
                   <Pencil className="h-3.5 w-3.5" />
                   编辑
                 </button>
-                {row.status !== 'archived' && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost px-2 py-1 text-red-600"
-                    onClick={() => setArchiveTarget(row)}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    归档
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -253,9 +251,11 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value as CourseForm['status'] })}
             >
-              <option value="draft">draft 草稿</option>
-              <option value="published">published 已上架</option>
-              <option value="archived">archived 已归档</option>
+              {(['draft', 'published', 'archived'] as const).map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
             </select>
           </Field>
         </FieldRow>
@@ -276,14 +276,14 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
       </Drawer>
 
       <ConfirmDialog
-        open={Boolean(archiveTarget)}
-        title="归档课程？"
-        message={`「${archiveTarget?.name ?? ''}」归档后将从家长端下架，但不影响已有订单和班级。`}
-        confirmLabel="归档"
+        open={Boolean(deleteTarget)}
+        title="删除课程？"
+        message={`确认删除「${deleteTarget?.name ?? ''}」？如果课程已被班级、订单或课时包引用，系统会阻止删除。`}
+        confirmLabel="删除"
         danger
-        busy={archiving}
-        onConfirm={confirmArchive}
-        onCancel={() => setArchiveTarget(null)}
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </PageFrame>
   );
