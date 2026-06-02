@@ -163,7 +163,7 @@ jobs:
 
           # Keep the control connection alive and fail fast on a dead host so a
           # transient drop surfaces as exit 255 rather than hanging.
-          ssh_opts="-o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
+          ssh_opts="-o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
 
           # deploy.sh is idempotent (git reset --hard + image pull by digest +
           # migrate + health-check), so it is safe to re-run after a dropped SSH
@@ -171,7 +171,7 @@ jobs:
           # closed before/at handshake or mid-session). Any other code is the
           # remote script's own exit status and must surface immediately.
           attempt=1
-          max_attempts=3
+          max_attempts=8
           while true; do
             set +e
             ssh $ssh_opts "${DEPLOY_USER}@${DEPLOY_HOST}" "${remote_cmd}" < ./scripts/deploy/deploy.sh
@@ -189,7 +189,10 @@ jobs:
               echo "SSH transport failed (255) after ${attempt} attempts — giving up"
               exit 255
             fi
-            wait_s=$((attempt * 10))
+            wait_s=$((attempt * 20))
+            if [ "$wait_s" -gt 120 ]; then
+              wait_s=120
+            fi
             echo "SSH transport drop (255), attempt ${attempt}/${max_attempts} — retrying in ${wait_s}s"
             sleep "${wait_s}"
             attempt=$((attempt + 1))
