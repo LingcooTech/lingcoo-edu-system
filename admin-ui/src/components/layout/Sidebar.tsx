@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, LogOut } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, PanelLeft } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { logout, type AuthAccount } from '@/api/client';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { adminSections } from '@/lib/foundation';
 import { cn, getInitials } from '@/lib/utils';
 
@@ -82,19 +83,26 @@ export function Sidebar({
           )}
         </NavLink>
         {showCollapseToggle && (
-          <button
-            type="button"
-            className={cn(
-              'text-muted-foreground hover:bg-muted hover:text-foreground rounded-md',
-              collapsed
-                ? 'absolute inset-x-3 top-4 z-10 h-8 opacity-0 transition-opacity group-hover/brand:opacity-100'
-                : 'ml-auto h-7 w-7 shrink-0',
-            )}
-            onClick={onToggle}
-            aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
-          >
-            {collapsed ? <ChevronsRight className="mx-auto h-3.5 w-3.5" /> : <ChevronsLeft className="mx-auto h-3.5 w-3.5" />}
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'text-muted-foreground hover:bg-muted hover:text-foreground rounded-md',
+                  collapsed
+                    ? 'absolute inset-x-3 top-4 z-10 h-8 opacity-0 transition-opacity group-hover/brand:opacity-100 group-focus-within/brand:opacity-100'
+                    : 'ml-auto h-7 w-7 shrink-0',
+                )}
+                onClick={onToggle}
+                aria-label={collapsed ? '打开边栏' : '收起边栏'}
+              >
+                <PanelLeft className="mx-auto h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              {collapsed ? '打开边栏' : '收起边栏'}
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
 
@@ -103,35 +111,46 @@ export function Sidebar({
           const isExpanded = expanded[section.key] ?? false;
           const hasChildren = section.items.length > 0;
           const isActiveSection = activeSection.key === section.key;
+          const sectionLink = (
+            <NavLink
+              to={section.path}
+              className={({ isActive }) =>
+                cn(
+                  'relative flex min-w-0 flex-1 items-center rounded-md no-underline transition-colors',
+                  collapsed
+                    ? 'h-10 justify-center px-1'
+                    : 'h-9 gap-2.5 px-2.5 text-[13px] font-medium',
+                  isActive || isActiveSection
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
+                )
+              }
+              onClick={() => {
+                if (hasChildren && !collapsed) {
+                  setExpanded((current) => ({ ...current, [section.key]: true }));
+                }
+              }}
+            >
+              {isActiveSection && !collapsed ? (
+                <span className="bg-primary absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r" />
+              ) : null}
+              <section.icon className={cn('shrink-0', collapsed ? 'h-[18px] w-[18px]' : 'h-4 w-4')} />
+              {!collapsed && <span className="flex-1 truncate">{section.label}</span>}
+            </NavLink>
+          );
           return (
             <div key={section.key}>
               <div className="flex items-center gap-1">
-                <NavLink
-                  to={section.path}
-                  title={collapsed ? section.label : undefined}
-                  className={({ isActive }) =>
-                    cn(
-                      'relative flex min-w-0 flex-1 items-center rounded-md no-underline transition-colors',
-                      collapsed
-                        ? 'h-10 justify-center px-1'
-                        : 'h-9 gap-2.5 px-2.5 text-[13px] font-medium',
-                      isActive || isActiveSection
-                        ? 'bg-card text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
-                    )
-                  }
-                  onClick={() => {
-                    if (hasChildren && !collapsed) {
-                      setExpanded((current) => ({ ...current, [section.key]: true }));
-                    }
-                  }}
-                >
-                  {isActiveSection && !collapsed ? (
-                    <span className="bg-primary absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r" />
-                  ) : null}
-                  <section.icon className={cn('shrink-0', collapsed ? 'h-[18px] w-[18px]' : 'h-4 w-4')} />
-                  {!collapsed && <span className="flex-1 truncate">{section.label}</span>}
-                </NavLink>
+                {collapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>{sectionLink}</TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={8}>
+                      {section.label}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  sectionLink
+                )}
                 {hasChildren && !collapsed && (
                   <button
                     type="button"
