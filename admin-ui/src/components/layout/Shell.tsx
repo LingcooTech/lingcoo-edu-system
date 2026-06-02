@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
 import type { AuthAccount } from '@/api/client';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -19,7 +20,11 @@ export function Shell({ account }: { account: AuthAccount }) {
   const location = useLocation();
 
   useEffect(() => {
-    window.localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+    try {
+      window.localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
   }, [collapsed]);
 
   useEffect(() => {
@@ -41,26 +46,22 @@ export function Shell({ account }: { account: AuthAccount }) {
         />
       </div>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="关闭侧边栏"
-            className="absolute inset-0 bg-slate-900/40"
-            onClick={() => setMobileOpen(false)}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="left"
+          className="w-[240px] border-r-0 p-0 sm:max-w-[240px] lg:hidden"
+          aria-describedby={undefined}
+        >
+          <Sidebar
+            collapsed={false}
+            onToggle={() => setMobileOpen(false)}
+            account={account}
+            showCollapseToggle={false}
           />
-          <div className="absolute inset-y-0 left-0 w-[240px]">
-            <Sidebar
-              collapsed={false}
-              onToggle={() => setMobileOpen(false)}
-              account={account}
-              showCollapseToggle={false}
-            />
-          </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
 
-      <div className="bg-background flex min-h-screen min-w-0 flex-col overflow-hidden">
+      <div className="bg-background flex min-h-screen flex-col overflow-hidden">
         <Topbar account={account} onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-auto">
           <Outlet />

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, LogOut, PanelLeft } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { ChevronRight, LogOut, PanelLeft } from 'lucide-react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 
 import { logout, type AuthAccount } from '@/api/client';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { adminSections } from '@/lib/foundation';
 import { cn, getInitials } from '@/lib/utils';
@@ -75,46 +77,55 @@ export function Sidebar({
           collapsed ? 'space-y-0' : 'flex items-center gap-2.5',
         )}
       >
-        <NavLink
+        <Link
           to="/"
-          className={cn('flex items-center gap-2.5 no-underline', collapsed ? 'justify-center' : 'min-w-0 flex-1')}
+          className={cn(
+            'flex items-center gap-2.5 no-underline',
+            collapsed ? 'justify-center' : 'min-w-0 flex-1',
+          )}
           aria-label="返回经营看板"
         >
-          <div className="from-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br to-blue-500 text-[11px] font-semibold text-white">
-            {getInitials('FD Edu')}
+          <div className="shrink-0">
+            <div className="from-primary flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br to-blue-500 text-[11px] font-semibold text-white">
+              {getInitials('FD Edu')}
+            </div>
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold leading-tight">fd-edu-system</p>
+              <p className="text-foreground truncate text-[13px] font-semibold leading-tight tracking-tight">
+                fd-edu-system
+              </p>
               <p className="text-muted-foreground/80 mt-0.5 text-[10px]">Education Console</p>
             </div>
           )}
-        </NavLink>
-        {showCollapseToggle && (
+        </Link>
+        {showCollapseToggle ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 className={cn(
                   'text-muted-foreground hover:bg-muted hover:text-foreground rounded-md',
                   collapsed
-                    ? 'bg-background absolute inset-x-3 top-4 z-10 h-8 opacity-0 shadow-sm group-hover/brand:opacity-100'
+                    ? 'bg-background absolute inset-x-3 top-4 z-10 h-8 w-auto opacity-0 shadow-sm group-hover/brand:opacity-100'
                     : 'ml-auto h-7 w-7 shrink-0',
                 )}
                 onClick={onToggle}
                 aria-label={collapsed ? '打开边栏' : '收起边栏'}
               >
-                <PanelLeft className="mx-auto h-3.5 w-3.5" />
-              </button>
+                <PanelLeft className="h-3.5 w-3.5" />
+              </Button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={8}>
               {collapsed ? '打开边栏' : '收起边栏'}
             </TooltipContent>
           </Tooltip>
-        )}
+        ) : null}
       </div>
 
-      <nav className={cn('flex-1 overflow-auto px-2 pb-3', collapsed ? 'pt-2' : 'space-y-2')}>
+      <ScrollArea className={cn('flex-1 px-2', collapsed && 'pt-2')}>
         {adminSections.map((section) => {
           const isExpanded = expanded[section.key] ?? false;
           const hasChildren = section.items.length > 0;
@@ -124,54 +135,55 @@ export function Sidebar({
               to={section.path}
               className={({ isActive }) =>
                 cn(
-                  'relative flex min-w-0 flex-1 items-center rounded-md no-underline transition-colors',
+                  'relative flex items-center rounded-md no-underline transition-colors',
                   collapsed
-                    ? 'h-10 justify-center px-1'
-                    : 'h-9 gap-2.5 px-2.5 text-[13px] font-medium',
+                    ? 'mb-0 h-10 justify-center px-1'
+                    : 'mb-0.5 h-9 gap-2.5 px-2.5 text-[13px] font-medium',
                   isActive || isActiveSection
-                    ? 'bg-card text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
                     : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
                 )
               }
               onClick={() => {
                 if (hasChildren && !collapsed) {
-                  setExpanded((current) => ({ ...current, [section.key]: true }));
+                  setExpanded((current) => ({ ...current, [section.key]: !isExpanded }));
                 }
               }}
             >
               {isActiveSection && !collapsed ? (
                 <span className="bg-primary absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r" />
               ) : null}
-              <section.icon className={cn('shrink-0', collapsed ? 'h-[18px] w-[18px]' : 'h-4 w-4')} />
+              <section.icon
+                className={cn(
+                  'shrink-0',
+                  collapsed ? 'h-[18px] w-[18px]' : 'h-4 w-4',
+                  isActiveSection ? 'text-primary' : 'text-muted-foreground/70',
+                )}
+                strokeWidth={1.75}
+              />
               {!collapsed && <span className="flex-1 truncate">{section.label}</span>}
+              {!collapsed && hasChildren ? (
+                <ChevronRight
+                  className={cn(
+                    'text-muted-foreground/60 h-3.5 w-3.5 shrink-0 transition-transform',
+                    isExpanded ? 'rotate-90' : 'rotate-0',
+                  )}
+                />
+              ) : null}
             </NavLink>
           );
           return (
-            <div key={section.key} className={cn(collapsed && 'mb-2')}>
-              <div className="flex items-center gap-1">
-                {collapsed ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>{sectionLink}</TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={8}>
-                      {section.label}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  sectionLink
-                )}
-                {hasChildren && !collapsed && (
-                  <button
-                    type="button"
-                    className="hover:bg-card text-muted-foreground rounded-md p-2"
-                    aria-label={isExpanded ? '收起二级菜单' : '展开二级菜单'}
-                    onClick={() =>
-                      setExpanded((current) => ({ ...current, [section.key]: !isExpanded }))
-                    }
-                  >
-                    <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isExpanded && 'rotate-180')} />
-                  </button>
-                )}
-              </div>
+            <div key={section.key} className={cn(collapsed ? 'mb-2 space-y-2' : 'mb-3')}>
+              {collapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>{sectionLink}</TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={8}>
+                    {section.label}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                sectionLink
+              )}
               {hasChildren && !collapsed && isExpanded && (
                 <div className="border-border/60 ml-6 mt-0.5 space-y-0.5 border-l pl-3">
                   {section.items.map((item) => (
@@ -182,7 +194,7 @@ export function Sidebar({
                         cn(
                           'flex h-8 items-center rounded-md px-2 text-[12.5px] font-medium no-underline transition-colors',
                           isActive
-                            ? 'bg-card text-foreground shadow-sm'
+                            ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
                             : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
                         )
                       }
@@ -195,9 +207,9 @@ export function Sidebar({
             </div>
           );
         })}
-      </nav>
+      </ScrollArea>
 
-      <div className="shrink-0 border-t p-2">
+      <div className="border-border/70 shrink-0 border-t p-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
