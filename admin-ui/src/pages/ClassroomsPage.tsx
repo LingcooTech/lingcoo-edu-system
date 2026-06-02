@@ -229,7 +229,9 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
   );
 
   return embedded ? (
-    <div className="[&_.page-header]:hidden [&_.page-shell]:p-0">{page}</div>
+    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
+      {page}
+    </div>
   ) : (
     page
   );
