@@ -3,6 +3,15 @@ import { ChevronDown, ChevronRight, LogOut, PanelLeft } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { logout, type AuthAccount } from '@/api/client';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { adminSections } from '@/lib/foundation';
 import { cn, getInitials } from '@/lib/utils';
@@ -30,7 +39,6 @@ export function Sidebar({
   showCollapseToggle?: boolean;
 }) {
   const location = useLocation();
-  const [accountOpen, setAccountOpen] = useState(false);
   const activeSection = useMemo(
     () =>
       adminSections.find((section) => location.pathname.startsWith(sectionPrefix(section.path))) ??
@@ -90,7 +98,7 @@ export function Sidebar({
                 className={cn(
                   'text-muted-foreground hover:bg-muted hover:text-foreground rounded-md',
                   collapsed
-                    ? 'bg-muted/35 absolute inset-x-3 top-4 z-10 h-8 opacity-0 group-hover/brand:opacity-100 group-focus-within/brand:opacity-100'
+                    ? 'bg-background absolute inset-x-3 top-4 z-10 h-8 opacity-0 shadow-sm group-hover/brand:opacity-100'
                     : 'ml-auto h-7 w-7 shrink-0',
                 )}
                 onClick={onToggle}
@@ -106,7 +114,7 @@ export function Sidebar({
         )}
       </div>
 
-      <nav className={cn('flex-1 overflow-auto px-2 pb-3', collapsed ? 'space-y-2 pt-2' : 'space-y-2')}>
+      <nav className={cn('flex-1 overflow-auto px-2 pb-3', collapsed ? 'pt-2' : 'space-y-2')}>
         {adminSections.map((section) => {
           const isExpanded = expanded[section.key] ?? false;
           const hasChildren = section.items.length > 0;
@@ -139,7 +147,7 @@ export function Sidebar({
             </NavLink>
           );
           return (
-            <div key={section.key}>
+            <div key={section.key} className={cn(collapsed && 'mb-2')}>
               <div className="flex items-center gap-1">
                 {collapsed ? (
                   <Tooltip>
@@ -190,20 +198,54 @@ export function Sidebar({
       </nav>
 
       <div className="shrink-0 border-t p-2">
-        <div className="relative">
-          {accountOpen && (
-            <div
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
               className={cn(
-                'bg-card absolute bottom-full mb-2 w-[260px] rounded-lg border p-1 shadow-lg',
-                collapsed ? 'left-0' : 'right-0',
+                'hover:bg-card/80 w-full rounded-md text-left transition-colors',
+                collapsed
+                  ? 'flex items-center justify-center p-1.5'
+                  : 'flex items-center gap-2.5 px-2 py-1.5',
               )}
+              title={collapsed ? account.displayName : undefined}
             >
-              <div className="flex items-center gap-2.5 px-2 pb-2 pt-2">
-                <span className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs">
+              <Avatar className="h-7 w-7 shrink-0">
+                <AvatarFallback className="text-[10px]">
                   {getInitials(account.displayName)}
-                </span>
+                </AvatarFallback>
+              </Avatar>
+              {!collapsed && (
+                <>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block truncate text-[13px] font-medium">
+                      {account.displayName}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-[10px]">
+                      {account.email ?? ROLE_LABEL[account.role] ?? account.role}
+                    </span>
+                  </span>
+                  <ChevronRight className="text-muted-foreground/60 h-3.5 w-3.5 shrink-0" />
+                </>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align={collapsed ? 'start' : 'end'}
+            side="top"
+            className="bg-card w-[260px] rounded-lg border p-1 shadow-lg"
+          >
+            <DropdownMenuLabel className="px-2 pb-2 pt-2">
+              <div className="flex items-center gap-2.5">
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarFallback className="text-xs">
+                    {getInitials(account.displayName)}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold leading-tight">{account.displayName}</p>
+                  <p className="truncate text-sm font-semibold leading-tight">
+                    {account.displayName}
+                  </p>
                   <p className="text-muted-foreground mt-0.5 truncate text-xs">
                     {account.email ?? account.phone ?? ROLE_LABEL[account.role] ?? account.role}
                   </p>
@@ -212,42 +254,20 @@ export function Sidebar({
                   </p>
                 </div>
               </div>
-              <div className="my-1 border-t" />
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-4 w-4" />
-                退出登录
-              </button>
-            </div>
-          )}
-        <button
-          type="button"
-          className={cn(
-            'hover:bg-card/80 w-full rounded-md transition-colors',
-            collapsed ? 'flex justify-center p-1.5' : 'flex items-center gap-2.5 px-2 py-1.5',
-          )}
-          onClick={() => setAccountOpen((current) => !current)}
-          title={collapsed ? account.displayName : undefined}
-        >
-          <span className="bg-primary text-primary-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px]">
-            {getInitials(account.displayName)}
-          </span>
-          {!collapsed && (
-            <>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-[13px] font-medium">{account.displayName}</span>
-                <span className="text-muted-foreground block truncate text-[10px]">
-                  {account.email ?? ROLE_LABEL[account.role] ?? account.role}
-                </span>
-              </span>
-              <ChevronRight className="text-muted-foreground/60 h-3.5 w-3.5" />
-            </>
-          )}
-        </button>
-        </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="rounded-md px-2.5 py-2 text-[13px] text-rose-600 focus:bg-rose-50 focus:text-rose-600"
+              onSelect={(event) => {
+                event.preventDefault();
+                void handleLogout();
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              退出登录
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );

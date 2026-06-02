@@ -125,11 +125,11 @@ export function Topbar({
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="text-muted-foreground border-border/70 bg-background hover:bg-muted/70 hover:text-foreground inline-flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition-colors"
+            className="text-muted-foreground border-border/70 bg-background hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-10 items-center gap-2 rounded-lg border px-2.5 text-[12px] shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition-colors md:w-56 lg:w-64"
             title={`搜索 / 跳转（/ 或 ${shortcutLabel}）`}
           >
             <Search className="h-3.5 w-3.5" />
-            <span className="text-muted-foreground/80 hidden md:inline">搜索...</span>
+            <span className="text-muted-foreground/80 hidden flex-1 text-left md:inline">搜索...</span>
             <kbd className="border-border/70 bg-card text-muted-foreground/80 ml-1 hidden h-4 items-center rounded border px-1 font-mono text-[10px] md:inline-flex">
               {shortcutLabel}
             </kbd>
