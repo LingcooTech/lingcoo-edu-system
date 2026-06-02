@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 import { parentLogin, parentRegister } from '@/api/client';
+import { sendToAccountHome } from '@/lib/auth-redirect';
 
 export function AuthPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') ?? '/account';
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
@@ -24,17 +23,7 @@ export function AuthPage() {
     try {
       if (mode === 'login') {
         const { account } = await parentLogin(identifier.trim(), password);
-        if (account.mustChangePassword) {
-          navigate('/change-password');
-        } else if (account.role === 'admin') {
-          // Admins continue into the back office — /admin is a separate app
-          // under the same origin sharing the login cookie.
-          window.location.href = '/admin';
-        } else if (account.role === 'teacher') {
-          navigate(redirectTo === '/account' ? '/teacher' : redirectTo);
-        } else {
-          navigate(redirectTo);
-        }
+        sendToAccountHome(account, navigate);
       } else {
         await parentRegister({
           email: email.trim(),
@@ -42,7 +31,7 @@ export function AuthPage() {
           displayName: displayName.trim(),
           phone: phone.trim() || undefined,
         });
-        navigate(redirectTo);
+        navigate('/account');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败，请稍后再试');

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Modal } from './Modal';
 import { useSession } from '@/features/session';
 import type { AuthAccount } from '@/api/client';
+import { sendToAccountHome } from '@/lib/auth-redirect';
 
 /**
  * Login / register as a modal (replaces the standalone /login page). Lives at
@@ -34,14 +35,7 @@ export function AuthModal() {
 
   function afterAuth(account: AuthAccount) {
     setPassword('');
-    if (account.mustChangePassword) {
-      navigate('/change-password');
-    } else if (account.role === 'admin') {
-      // The back office is a separate app under the same origin / cookie.
-      window.location.href = '/admin';
-    }
-    // parent / teacher stay on the current page — the welcome toast + the avatar
-    // menu (个人中心) carry them onward.
+    sendToAccountHome(account, navigate);
   }
 
   async function submit(event: FormEvent) {

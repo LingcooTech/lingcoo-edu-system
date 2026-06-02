@@ -36,7 +36,7 @@ interface SessionContextValue {
   login: (identifier: string, password: string) => Promise<AuthAccount>;
   register: (input: RegisterInput) => Promise<AuthAccount>;
   logout: () => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<AuthAccount | null>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -63,7 +63,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const welcomeTimer = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
-    setAccount(await fetchParentProfile());
+    const next = await fetchParentProfile();
+    setAccount(next);
+    return next;
   }, []);
 
   useEffect(() => {

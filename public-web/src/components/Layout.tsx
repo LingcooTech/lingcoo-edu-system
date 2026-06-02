@@ -77,6 +77,8 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [accountOpen]);
 
   const organization = home?.organization;
+  const accountMenuPath = account?.role === 'teacher' ? '/teacher' : '/account';
+  const accountMenuLabel = account?.role === 'teacher' ? '老师工作台' : '个人中心';
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -141,9 +143,9 @@ export function Layout({ children }: { children: ReactNode }) {
                       <div className="text-ink font-semibold">{account.displayName}</div>
                       <div className="text-muted text-xs">{ROLE_LABEL[account.role] ?? '账号'}</div>
                     </div>
-                    <Link to="/account" role="menuitem" className="site-account-menu-item">
+                    <Link to={accountMenuPath} role="menuitem" className="site-account-menu-item">
                       <UserRound className="h-4 w-4" />
-                      个人中心
+                      {accountMenuLabel}
                     </Link>
                     {account.role === 'admin' ? (
                       <a href="/admin" role="menuitem" className="site-account-menu-item">
@@ -218,8 +220,8 @@ export function Layout({ children }: { children: ReactNode }) {
             </Link>
             {account ? (
               <div className="mt-3 grid gap-2">
-                <Link to="/account" className="pwbtn pwbtn-outline w-full">
-                  个人中心
+                <Link to={accountMenuPath} className="pwbtn pwbtn-outline w-full">
+                  {accountMenuLabel}
                 </Link>
                 <button
                   type="button"
