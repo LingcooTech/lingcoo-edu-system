@@ -90,7 +90,7 @@ export function Sidebar({
                 className={cn(
                   'text-muted-foreground hover:bg-muted hover:text-foreground rounded-md',
                   collapsed
-                    ? 'absolute inset-x-3 top-4 z-10 h-8 opacity-0 transition-opacity group-hover/brand:opacity-100 group-focus-within/brand:opacity-100'
+                    ? 'bg-muted/35 absolute inset-x-3 top-4 z-10 h-8 opacity-0 group-hover/brand:opacity-100 group-focus-within/brand:opacity-100'
                     : 'ml-auto h-7 w-7 shrink-0',
                 )}
                 onClick={onToggle}
@@ -99,14 +99,14 @@ export function Sidebar({
                 <PanelLeft className="mx-auto h-3.5 w-3.5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8}>
+            <TooltipContent side="right" sideOffset={8}>
               {collapsed ? '打开边栏' : '收起边栏'}
             </TooltipContent>
           </Tooltip>
         )}
       </div>
 
-      <nav className="flex-1 space-y-2 overflow-auto px-2 pb-3">
+      <nav className={cn('flex-1 overflow-auto px-2 pb-3', collapsed ? 'space-y-2 pt-2' : 'space-y-2')}>
         {adminSections.map((section) => {
           const isExpanded = expanded[section.key] ?? false;
           const hasChildren = section.items.length > 0;
