@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import QRCode from 'qrcode';
 
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as peopleRepo from '../../db/repositories/people.js';
+import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import type { AppModule } from '../types.js';
 
 const classSchema = z.object({
@@ -13,9 +15,7 @@ const classSchema = z.object({
   classroomId: z.string(),
   name: z.string().min(1),
   capacity: z.number().int().positive().default(8),
-  status: z
-    .enum(['recruiting', 'active', 'completed', 'paused', 'archived'])
-    .default('recruiting'),
+  status: z.enum(['recruiting', 'active', 'completed', 'paused', 'archived']).default('recruiting'),
 });
 
 const classUpdateSchema = classSchema.partial();
@@ -78,85 +78,69 @@ export const schedulingModule: AppModule = {
       return { class: classGroup };
     });
 
-    app.patch(
-      '/v1/classes/:classId',
-      { preHandler: app.requireAdmin },
-      async (request) => {
-        const { classId } = request.params as { classId: string };
-        const body = classUpdateSchema.parse(request.body);
-        const classGroup = await schedulingRepo.updateClass(app.db, classId, body);
-        if (!classGroup) throw notFound('Class not found');
-        return { class: classGroup };
-      },
-    );
+    app.patch('/v1/classes/:classId', { preHandler: app.requireAdmin }, async (request) => {
+      const { classId } = request.params as { classId: string };
+      const body = classUpdateSchema.parse(request.body);
+      const classGroup = await schedulingRepo.updateClass(app.db, classId, body);
+      if (!classGroup) throw notFound('Class not found');
+      return { class: classGroup };
+    });
 
-    app.delete(
-      '/v1/classes/:classId',
-      { preHandler: app.requireAdmin },
-      async (request) => {
-        const { classId } = request.params as { classId: string };
-        const classGroup = await schedulingRepo.deleteClass(app.db, classId);
-        if (!classGroup) throw notFound('Class not found');
-        return { class: classGroup };
-      },
-    );
+    app.delete('/v1/classes/:classId', { preHandler: app.requireAdmin }, async (request) => {
+      const { classId } = request.params as { classId: string };
+      const classGroup = await schedulingRepo.deleteClass(app.db, classId);
+      if (!classGroup) throw notFound('Class not found');
+      return { class: classGroup };
+    });
 
-    app.get(
-      '/v1/class-sessions',
-      { preHandler: app.requireAdmin },
-      async () => {
-        const [sessions, classes, teachers, classrooms] = await Promise.all([
-          schedulingRepo.listClassSessions(app.db),
-          schedulingRepo.listClasses(app.db),
-          teachingRepo.listTeachers(app.db),
-          teachingRepo.listClassrooms(app.db),
-        ]);
-        const classById = new Map(classes.map((item) => [item.id, item]));
-        const teacherById = new Map(teachers.map((item) => [item.id, item]));
-        const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+    app.get('/v1/class-sessions', { preHandler: app.requireAdmin }, async () => {
+      const [sessions, classes, teachers, classrooms] = await Promise.all([
+        schedulingRepo.listClassSessions(app.db),
+        schedulingRepo.listClasses(app.db),
+        teachingRepo.listTeachers(app.db),
+        teachingRepo.listClassrooms(app.db),
+      ]);
+      const classById = new Map(classes.map((item) => [item.id, item]));
+      const teacherById = new Map(teachers.map((item) => [item.id, item]));
+      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
 
-        return {
-          classSessions: sessions.map((session) => ({
-            ...session,
-            class: classById.get(session.classId),
-            teacher: teacherById.get(session.teacherId),
-            classroom: classroomById.get(session.classroomId),
-          })),
-        };
-      },
-    );
+      return {
+        classSessions: sessions.map((session) => ({
+          ...session,
+          class: classById.get(session.classId),
+          teacher: teacherById.get(session.teacherId),
+          classroom: classroomById.get(session.classroomId),
+        })),
+      };
+    });
 
-    app.post(
-      '/v1/class-sessions',
-      { preHandler: app.requireAdmin },
-      async (request) => {
-        const body = sessionCreateSchema.parse(request.body);
+    app.post('/v1/class-sessions', { preHandler: app.requireAdmin }, async (request) => {
+      const body = sessionCreateSchema.parse(request.body);
 
-        const startsAt = new Date(body.startsAt);
-        const endsAt = new Date(body.endsAt);
+      const startsAt = new Date(body.startsAt);
+      const endsAt = new Date(body.endsAt);
 
-        const conflict = await schedulingRepo.findScheduleConflict(app.db, {
-          startsAt,
-          endsAt,
-          classroomId: body.classroomId,
-          teacherId: body.teacherId,
-        });
-        if (conflict) {
-          throw Object.assign(new Error('Classroom or teacher time conflict'), { statusCode: 409 });
-        }
+      const conflict = await schedulingRepo.findScheduleConflict(app.db, {
+        startsAt,
+        endsAt,
+        classroomId: body.classroomId,
+        teacherId: body.teacherId,
+      });
+      if (conflict) {
+        throw Object.assign(new Error('Classroom or teacher time conflict'), { statusCode: 409 });
+      }
 
-        const classSession = await schedulingRepo.createClassSession(app.db, {
-          classId: body.classId,
-          teacherId: body.teacherId,
-          classroomId: body.classroomId,
-          topic: body.topic,
-          startsAt,
-          endsAt,
-          status: 'scheduled',
-        });
-        return { classSession };
-      },
-    );
+      const classSession = await schedulingRepo.createClassSession(app.db, {
+        classId: body.classId,
+        teacherId: body.teacherId,
+        classroomId: body.classroomId,
+        topic: body.topic,
+        startsAt,
+        endsAt,
+        status: 'scheduled',
+      });
+      return { classSession };
+    });
 
     app.patch(
       '/v1/class-sessions/:sessionId',
@@ -194,6 +178,19 @@ export const schedulingModule: AppModule = {
         });
         if (!classSession) throw notFound('Class session not found');
         return { classSession };
+      },
+    );
+
+    app.get(
+      '/v1/class-sessions/:sessionId/checkin-qrcode',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) throw notFound('Class session not found');
+        const landingUrl = `${resolvePublicWebBaseUrl(app.appEnv, request)}/check-in/${sessionId}`;
+        const qrCodeDataUrl = await QRCode.toDataURL(landingUrl, { margin: 1, width: 320 });
+        return { landingUrl, qrCodeDataUrl };
       },
     );
 
@@ -263,11 +260,7 @@ export const schedulingModule: AppModule = {
         };
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        const enrollment = await schedulingRepo.removeEnrollment(
-          app.db,
-          classId,
-          enrollmentId,
-        );
+        const enrollment = await schedulingRepo.removeEnrollment(app.db, classId, enrollmentId);
         if (!enrollment) throw notFound('Enrollment not found');
         return { enrollment };
       },

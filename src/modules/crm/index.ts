@@ -7,6 +7,7 @@ import type { Campaign } from '../../db/repositories/crm.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as trialRepo from '../../db/repositories/trial.js';
+import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
@@ -318,7 +319,7 @@ export const crmModule: AppModule = {
           const campaign = await crmRepo.requireCampaign(app.db, campaignId);
           const channel = await crmRepo.findChannel(app.db, campaign.channelId);
           const landingUrl = buildLandingUrl(
-            app.appEnv.PUBLIC_WEB_BASE_URL,
+            resolvePublicWebBaseUrl(app.appEnv, request),
             channel?.code ?? null,
             campaign,
           );

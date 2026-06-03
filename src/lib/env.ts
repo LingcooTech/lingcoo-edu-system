@@ -11,8 +11,10 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6381'),
   LOG_LEVEL: z.string().default('info'),
 
-  // Public base URL for notification CTA links and payment notify/return URLs.
+  // Public base URL for notification CTA links and QR landing URLs.
   PUBLIC_WEB_BASE_URL: z.string().default('http://localhost:5174'),
+  // Backwards-compatible alias used by older deployments.
+  PUBLIC_WEB_ORIGIN: z.string().optional(),
 
   // Settings encryption (AES-256-GCM key-derivation secret); falls back to JWT_SECRET.
   SETTINGS_ENCRYPTION_KEY: z.string().optional(),

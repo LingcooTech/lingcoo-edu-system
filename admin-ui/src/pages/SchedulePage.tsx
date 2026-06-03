@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Ban, Pencil, Plus } from 'lucide-react';
+import { Ban, Pencil, Plus, QrCode } from 'lucide-react';
 
-import { apiDelete, apiPatch, apiPost } from '@/api/client';
+import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { ClassGroup, ClassSession, Classroom, Teacher } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -33,7 +33,11 @@ function toDateTimeLocal(value: string | Date): string {
   )}:${pad(date.getMinutes())}`;
 }
 
-function defaultForm(classes: ClassGroup[], teachers: Teacher[], classrooms: Classroom[]): SessionForm {
+function defaultForm(
+  classes: ClassGroup[],
+  teachers: Teacher[],
+  classrooms: Classroom[],
+): SessionForm {
   const now = new Date();
   now.setMinutes(0, 0, 0);
   const end = new Date(now);
@@ -62,6 +66,9 @@ export function SchedulePage() {
   const [form, setForm] = useState<SessionForm>(defaultForm([], [], []));
   const [saving, setSaving] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<ClassSession | null>(null);
+  const [qrSession, setQrSession] = useState<ClassSession | null>(null);
+  const [qr, setQr] = useState<{ landingUrl: string; qrCodeDataUrl: string } | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
   function openCreate() {
     setEditing(null);
@@ -120,7 +127,9 @@ export function SchedulePage() {
           `${SESSIONS()}/${editing.id}`,
           payload,
         );
-        setData(data.map((item) => (item.id === classSession.id ? hydrateSession(classSession) : item)));
+        setData(
+          data.map((item) => (item.id === classSession.id ? hydrateSession(classSession) : item)),
+        );
       } else {
         const { classSession } = await apiPost<{ classSession: ClassSession }>(SESSIONS(), payload);
         setData([hydrateSession(classSession), ...data]);
@@ -140,11 +149,40 @@ export function SchedulePage() {
       const { classSession } = await apiDelete<{ classSession: ClassSession }>(
         `${SESSIONS()}/${cancelTarget.id}`,
       );
-      setData(data.map((item) => (item.id === classSession.id ? hydrateSession(classSession) : item)));
+      setData(
+        data.map((item) => (item.id === classSession.id ? hydrateSession(classSession) : item)),
+      );
       setCancelTarget(null);
       toast.success('课次已取消');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '取消失败');
+    }
+  }
+
+  async function openQr(session: ClassSession) {
+    setQrSession(session);
+    setQr(null);
+    setQrLoading(true);
+    try {
+      setQr(
+        await api<{ landingUrl: string; qrCodeDataUrl: string }>(
+          `${SESSIONS()}/${session.id}/checkin-qrcode`,
+        ),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '生成签到码失败');
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
+  async function copyLanding() {
+    if (!qr) return;
+    try {
+      await navigator.clipboard.writeText(qr.landingUrl);
+      toast.success('签到链接已复制');
+    } catch {
+      toast.error('复制失败，请手动选择');
     }
   }
 
@@ -194,6 +232,16 @@ export function SchedulePage() {
                 {row.status !== 'cancelled' && (
                   <button
                     type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    onClick={() => openQr(row)}
+                  >
+                    <QrCode className="h-3.5 w-3.5" />
+                    签到码
+                  </button>
+                )}
+                {row.status !== 'cancelled' && (
+                  <button
+                    type="button"
                     className="btn btn-ghost px-2 py-1 text-red-600"
                     onClick={() => setCancelTarget(row)}
                   >
@@ -224,7 +272,11 @@ export function SchedulePage() {
         }
       >
         <Field label="班级" required>
-          <select className="form-input" value={form.classId} onChange={(e) => selectClass(e.target.value)}>
+          <select
+            className="form-input"
+            value={form.classId}
+            onChange={(e) => selectClass(e.target.value)}
+          >
             <option value="">选择班级</option>
             {classes.map((classGroup) => (
               <option key={classGroup.id} value={classGroup.id}>
@@ -305,6 +357,38 @@ export function SchedulePage() {
             </select>
           </Field>
         )}
+      </Drawer>
+
+      <Drawer
+        open={Boolean(qrSession)}
+        onClose={() => setQrSession(null)}
+        title="课次签到码"
+        description={qrSession ? `${qrSession.class?.name ?? '班级'} · ${qrSession.topic}` : ''}
+      >
+        {qrLoading ? (
+          <p className="text-muted-foreground text-sm">生成中...</p>
+        ) : qr ? (
+          <div className="space-y-4">
+            <div className="flex justify-center rounded-xl border bg-white p-4">
+              <img src={qr.qrCodeDataUrl} alt="课次签到二维码" className="h-56 w-56" />
+            </div>
+            <Field label="签到链接">
+              <textarea className="form-input h-16" readOnly value={qr.landingUrl} />
+            </Field>
+            <div className="flex gap-2">
+              <button type="button" className="btn btn-secondary flex-1" onClick={copyLanding}>
+                复制链接
+              </button>
+              <a
+                className="btn btn-primary flex-1"
+                href={qr.qrCodeDataUrl}
+                download={`${qrSession?.id ?? 'class-session'}-checkin.png`}
+              >
+                下载二维码
+              </a>
+            </div>
+          </div>
+        ) : null}
       </Drawer>
 
       <ConfirmDialog

@@ -7,6 +7,7 @@ import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import type { AppModule } from '../types.js';
 
@@ -264,7 +265,7 @@ export const trialModule: AppModule = {
       async (request) => {
         const { trialSessionId } = request.params as { trialSessionId: string };
         await trialRepo.requireTrialSession(app.db, trialSessionId);
-        const landingUrl = `${app.appEnv.PUBLIC_WEB_BASE_URL.replace(/\/$/, '')}/trials/${trialSessionId}`;
+        const landingUrl = `${resolvePublicWebBaseUrl(app.appEnv, request)}/trials/${trialSessionId}`;
         const qrCodeDataUrl = await QRCode.toDataURL(landingUrl, { margin: 1, width: 320 });
         return { landingUrl, qrCodeDataUrl };
       },

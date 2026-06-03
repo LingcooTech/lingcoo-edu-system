@@ -5,6 +5,7 @@ import { AccountPage } from '@/pages/AccountPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { CampaignLandingPage } from '@/pages/CampaignLandingPage';
 import { ChangePasswordPage } from '@/pages/ChangePasswordPage';
+import { CheckInPage } from '@/pages/CheckInPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { CourseDetailPage } from '@/pages/CourseDetailPage';
 import { CourseListPage } from '@/pages/CourseListPage';
@@ -48,6 +49,7 @@ export function App() {
           <Route path="/trials" element={<TrialListPage />} />
           <Route path="/trials/:trialId" element={<TrialDetailPage />} />
           <Route path="/campaigns/:campaignCode" element={<CampaignLandingPage />} />
+          <Route path="/check-in/:sessionId" element={<CheckInPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/register/success" element={<RegisterSuccessPage />} />
           <Route path="/teachers" element={<TeachersPage />} />

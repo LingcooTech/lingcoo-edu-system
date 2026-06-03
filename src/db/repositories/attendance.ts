@@ -68,6 +68,7 @@ export async function recordAttendance(
     sessionId: string;
     courseId: string;
     records: Array<{ studentId: string; status: AttendanceStatus; note?: string }>;
+    completeSession?: boolean;
   },
 ) {
   return db.transaction(async (tx) => {
@@ -114,10 +115,12 @@ export async function recordAttendance(
       }
     }
 
-    await tx
-      .update(schema.classSessions)
-      .set({ status: 'completed', updatedAt: new Date() })
-      .where(eq(schema.classSessions.id, input.sessionId));
+    if (input.completeSession ?? true) {
+      await tx
+        .update(schema.classSessions)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .where(eq(schema.classSessions.id, input.sessionId));
+    }
 
     return created;
   });

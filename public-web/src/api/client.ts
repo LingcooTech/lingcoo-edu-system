@@ -201,11 +201,8 @@ export async function fetchChildren() {
 }
 
 export async function fetchParentLessonAccounts() {
-  return (
-    await publicApi<{ lessonAccounts: ParentLessonAccount[] }>(
-      '/public/me/lesson-accounts',
-    )
-  ).lessonAccounts;
+  return (await publicApi<{ lessonAccounts: ParentLessonAccount[] }>('/public/me/lesson-accounts'))
+    .lessonAccounts;
 }
 
 export async function fetchParentOrders() {
@@ -221,9 +218,8 @@ export interface CoursePackage {
 }
 
 export async function fetchCoursePackages() {
-  return (
-    await publicApi<{ coursePackages: CoursePackage[] }>('/public/course-packages')
-  ).coursePackages;
+  return (await publicApi<{ coursePackages: CoursePackage[] }>('/public/course-packages'))
+    .coursePackages;
 }
 
 // --- Acquisition funnel: course browsing + trial registration (no login) ---
@@ -253,9 +249,8 @@ export async function fetchCourse(slug: string) {
 }
 
 export async function fetchTrialSessions() {
-  return (
-    await publicApi<{ trialSessions: TrialSession[] }>('/public/trial-sessions')
-  ).trialSessions;
+  return (await publicApi<{ trialSessions: TrialSession[] }>('/public/trial-sessions'))
+    .trialSessions;
 }
 
 export interface TrialDetail {
@@ -372,23 +367,22 @@ export interface CreateOrderInput {
 
 export async function createOrder(input: CreateOrderInput) {
   return await publicApi<{ order: ParentOrder; checkout: CheckoutInfo }>('/public/orders', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function fetchPaymentProviders() {
-  return (
-    await publicApi<{ providers: PaymentProviderStatus[] }>('/public/payment-providers')
-  ).providers;
+  return (await publicApi<{ providers: PaymentProviderStatus[] }>('/public/payment-providers'))
+    .providers;
 }
 
 export async function createPaymentIntent(orderNo: string, provider: PaymentProvider) {
   return (
-    await publicApi<{ item: PaymentIntent }>(
-      `/public/orders/${orderNo}/payment-intent`,
-      { method: 'POST', body: JSON.stringify({ provider }) },
-    )
+    await publicApi<{ item: PaymentIntent }>(`/public/orders/${orderNo}/payment-intent`, {
+      method: 'POST',
+      body: JSON.stringify({ provider }),
+    })
   ).item;
 }
 
@@ -500,4 +494,39 @@ export interface ParentAttendanceRecord {
 export async function fetchParentAttendance() {
   return (await publicApi<{ attendance: ParentAttendanceRecord[] }>('/public/me/attendance'))
     .attendance;
+}
+
+// --- Public QR check-in (no login required) ---
+
+export interface PublicCheckInStudent {
+  id: string;
+  name: string;
+  grade: string;
+  checkedIn: boolean;
+  attendanceStatus: AttendanceStatus | null;
+}
+
+export interface PublicCheckInPayload {
+  session: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    topic: string;
+    status: string;
+  };
+  class: { id: string; name: string };
+  course: { id: string; name: string };
+  classroom: { id: string; name: string } | null;
+  roster: PublicCheckInStudent[];
+}
+
+export async function fetchPublicCheckIn(sessionId: string) {
+  return publicApi<PublicCheckInPayload>(`/public/class-sessions/${sessionId}/check-in`);
+}
+
+export async function submitPublicCheckIn(sessionId: string, studentId: string) {
+  return publicApi<{ attendanceRecord: SessionAttendanceRecord | null; message: string }>(
+    `/public/class-sessions/${sessionId}/check-in`,
+    { method: 'POST', body: JSON.stringify({ studentId }) },
+  );
 }

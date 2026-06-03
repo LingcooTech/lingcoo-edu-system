@@ -51,6 +51,7 @@ NODE_ENV=production
 API_HOST=0.0.0.0
 API_PORT=8090
 CORS_ORIGIN=https://edu.futuredecade.com
+PUBLIC_WEB_BASE_URL=https://edu.futuredecade.com
 CADDY_SITE_ADDRESS=:80
 FD_EDU_HTTP_PORT=18090
 FD_EDU_HTTPS_PORT=18446
