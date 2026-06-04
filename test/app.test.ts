@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
+import { and, eq } from 'drizzle-orm';
+
 import { buildApp } from '../src/app.js';
 import * as schema from '../src/db/schema.js';
 import type { AppEnv } from '../src/lib/env.js';
@@ -198,6 +200,91 @@ test('binds and reuses a WeChat Mini Program parent account', async () => {
     assert.equal(typeof secondLoginPayload.token, 'string');
   } finally {
     globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('creates and mock-pays a public package order', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+  const phone = `138${String(parseInt(suffix.replaceAll('-', '').slice(0, 8), 16))
+    .slice(-8)
+    .padStart(8, '0')}`;
+
+  try {
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        slug: `mini-checkout-${suffix}`,
+        name: 'Mini Checkout Course',
+        category: '美术',
+        ageRange: '7-9 岁',
+        durationMinutes: 60,
+        summary: 'Mini checkout course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [pkg] = await app.db
+      .insert(schema.coursePackages)
+      .values({
+        courseId: course.id,
+        name: '8 课时包',
+        description: '',
+        lessonCount: 8,
+        priceAmount: 88000,
+        status: 'active',
+      })
+      .returning();
+
+    const checkout = await app.inject({
+      method: 'POST',
+      url: '/public/orders',
+      payload: {
+        packageId: pkg.id,
+        guardianName: 'Mini Buyer',
+        guardianPhone: phone,
+        studentName: 'Checkout Student',
+        grade: '二年级',
+        source: 'mini_program',
+        medium: 'wechat_mini_program',
+      },
+    });
+    assert.equal(checkout.statusCode, 200);
+    const checkoutPayload = checkout.json();
+    assert.equal(checkoutPayload.order.status, 'pending');
+    assert.equal(checkoutPayload.order.amount, pkg.priceAmount);
+    assert.equal(checkoutPayload.checkout.defaultPassword, phone.slice(-6));
+
+    const intent = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${checkoutPayload.order.orderNo}/payment-intent`,
+      payload: { provider: 'mock' },
+    });
+    assert.equal(intent.statusCode, 200);
+    assert.equal(intent.json().item.nextAction, 'mock_pay');
+
+    const paid = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${checkoutPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(paid.statusCode, 200);
+    assert.equal(paid.json().item.status, 'paid');
+    assert.equal(paid.json().item.paidAmount, pkg.priceAmount);
+
+    const [lessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, checkoutPayload.order.studentId),
+          eq(schema.lessonAccounts.courseId, course.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(lessonAccount);
+    assert.equal(lessonAccount.balance, pkg.lessonCount);
+  } finally {
     await app.close();
   }
 });
