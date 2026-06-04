@@ -1,0 +1,56 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{notFound}}" class="empty-state">
+    <view class="section-title">活动不存在或已结束</view>
+    <navigator class="btn btn-outline empty-button" url="/pages/home/index" open-type="redirect">返回首页</navigator>
+  </view>
+
+  <block wx:else>
+    <view class="hero card">
+      <view class="eyebrow">{{payload.channel ? payload.channel.name : '招生活动'}}</view>
+      <view class="title hero-title">{{payload.campaign.name}}</view>
+      <view class="body-text hero-subtitle">
+        {{payload.course ? payload.course.name + ' · ' + payload.course.summary : payload.organization.publicProfile.bannerSubtitle}}
+      </view>
+      <image wx:if="{{payload.organization.publicProfile.bannerImageUrl}}" class="hero-image" src="{{payload.organization.publicProfile.bannerImageUrl}}" mode="aspectFill" />
+      <view class="chips">
+        <text wx:if="{{payload.course}}" class="chip">{{payload.course.category}}</text>
+        <text wx:if="{{payload.course}}" class="chip">{{payload.course.ageRange}}</text>
+        <text wx:if="{{!payload.course}}" wx:for="{{payload.organization.publicProfile.highlights}}" wx:key="*this" class="chip">{{item}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{contentBlocks.length}}" class="section card block-card">
+      <block-renderer blocks="{{contentBlocks}}" />
+    </view>
+
+    <view class="section card trial-card">
+      <view class="section-title">可预约试听</view>
+      <radio-group wx:if="{{trialSessions.length}}" class="trial-list" bindchange="onTrialChange">
+        <label wx:for="{{trialSessions}}" wx:key="id" class="trial-option">
+          <view>
+            <view class="trial-title">{{item.title}}</view>
+            <view class="muted trial-meta">{{item.startsAtLabel}} · {{item.bookedCount}}/{{item.capacity}}</view>
+          </view>
+          <radio value="{{item.id}}" checked="{{trialSessionId == item.id}}" color="#1f6f5b" />
+        </label>
+      </radio-group>
+      <view wx:else class="muted trial-empty">当前活动不绑定固定试听课，提交后老师会电话确认合适时间。</view>
+    </view>
+
+    <form class="section card form-card" bindsubmit="onSubmit">
+      <view class="section-title">提交报名</view>
+      <view class="muted form-hint">{{trialSessionId ? '提交后进入预约试听阶段。' : '提交后进入待联系阶段。'}}</view>
+      <view class="form-gap">
+        <input class="form-field" name="guardianName" placeholder="家长姓名" />
+        <input class="form-field" name="phone" type="number" placeholder="手机号" />
+        <input class="form-field" name="studentName" placeholder="孩子姓名" />
+        <input class="form-field" name="grade" placeholder="年级 / 年龄" />
+      </view>
+      <button class="btn btn-primary submit-button" form-type="submit" loading="{{submitting}}" disabled="{{submitting}}">
+        {{submitting ? '提交中...' : '立即预约'}}
+      </button>
+    </form>
+  </block>
+</view>

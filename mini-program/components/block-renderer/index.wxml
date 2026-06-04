@@ -1,0 +1,60 @@
+<view class="blocks" wx:if="{{blocks.length}}">
+  <block wx:for="{{blocks}}" wx:key="id" wx:for-item="item">
+    <view wx:if="{{item.type == 'heading' && item.text}}" class="block heading level-{{item.level}}">
+      {{item.text}}
+    </view>
+
+    <view wx:elif="{{item.type == 'paragraph' && item.text}}" class="block paragraph">
+      {{item.text}}
+    </view>
+
+    <view wx:elif="{{item.type == 'list' && item.items.length}}" class="block list">
+      <view wx:for="{{item.items}}" wx:key="*this" wx:for-item="listItem" class="list-row">
+        <text class="list-mark">{{item.ordered ? index + 1 + '.' : '•'}}</text>
+        <text class="list-text">{{listItem}}</text>
+      </view>
+    </view>
+
+    <view wx:elif="{{item.type == 'image' && item.url}}" class="block">
+      <image class="image" src="{{item.url}}" mode="widthFix" />
+      <view wx:if="{{item.caption}}" class="caption">{{item.caption}}</view>
+    </view>
+
+    <view wx:elif="{{item.type == 'imageText' && (item.url || item.title || item.text)}}" class="block image-text {{item.mediaSide == 'right' ? 'reverse' : ''}}">
+      <image wx:if="{{item.url}}" class="image-text-media" src="{{item.url}}" mode="aspectFill" />
+      <view class="image-text-body">
+        <view wx:if="{{item.title}}" class="image-text-title">{{item.title}}</view>
+        <view wx:if="{{item.text}}" class="paragraph">{{item.text}}</view>
+      </view>
+    </view>
+
+    <view wx:elif="{{item.type == 'stats' && item.items.length}}" class="block stats">
+      <view wx:for="{{item.items}}" wx:key="*this" wx:for-item="stat" class="stat-card">
+        {{stat}}
+      </view>
+    </view>
+
+    <view wx:elif="{{item.type == 'testimonials' && item.items.length}}" class="block testimonials">
+      <view wx:for="{{item.items}}" wx:key="*this" wx:for-item="quote" class="quote">
+        “{{quote}}”
+      </view>
+    </view>
+
+    <view wx:elif="{{item.type == 'cta' && item.text}}" class="block">
+      <button class="cta" data-link="{{item.link}}" bindtap="onCtaTap">{{item.text}}</button>
+    </view>
+
+    <view wx:elif="{{item.type == 'gallery' && item.urls.length}}" class="block gallery">
+      <image wx:for="{{item.urls}}" wx:key="*this" wx:for-item="url" class="gallery-image" src="{{url}}" mode="aspectFill" />
+    </view>
+
+    <view wx:elif="{{item.type == 'faq' && item.items.length}}" class="block faq">
+      <view wx:for="{{item.items}}" wx:key="q" wx:for-item="faq" class="faq-card">
+        <view wx:if="{{faq.q}}" class="faq-q">{{faq.q}}</view>
+        <view wx:if="{{faq.a}}" class="faq-a">{{faq.a}}</view>
+      </view>
+    </view>
+
+    <view wx:elif="{{item.type == 'divider'}}" class="divider"></view>
+  </block>
+</view>

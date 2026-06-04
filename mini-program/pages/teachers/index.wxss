@@ -1,0 +1,72 @@
+.page-title {
+  margin-top: 12rpx;
+}
+
+.intro {
+  margin-top: 12rpx;
+}
+
+.teacher-list {
+  display: grid;
+  gap: 20rpx;
+  margin-top: 30rpx;
+}
+
+.teacher-card {
+  padding: 28rpx;
+}
+
+.teacher-head {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.avatar {
+  width: 104rpx;
+  height: 104rpx;
+  flex: 0 0 104rpx;
+  border-radius: 28rpx;
+}
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9f4ef;
+  color: #1f6f5b;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.teacher-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-name {
+  color: #1f2b24;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.teacher-title {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}
+
+.specialties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.specialty-empty {
+  margin-top: 22rpx;
+  font-size: 26rpx;
+}
+
+.bio {
+  margin-top: 24rpx;
+}

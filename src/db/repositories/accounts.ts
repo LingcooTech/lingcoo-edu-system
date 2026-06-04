@@ -96,6 +96,61 @@ export async function deleteAccount(db: Database, accountId: string) {
   return account ?? null;
 }
 
+// --- WeChat Mini Program identities ---
+
+export async function findWechatIdentity(db: Database, appId: string, openid: string) {
+  const [identity] = await db
+    .select()
+    .from(schema.accountWechatIdentities)
+    .where(
+      and(
+        eq(schema.accountWechatIdentities.appId, appId),
+        eq(schema.accountWechatIdentities.openid, openid),
+      ),
+    )
+    .limit(1);
+  return identity ?? null;
+}
+
+export async function findAccountByWechatIdentity(db: Database, appId: string, openid: string) {
+  const [row] = await db
+    .select({ account: schema.accounts })
+    .from(schema.accountWechatIdentities)
+    .innerJoin(
+      schema.accounts,
+      eq(schema.accountWechatIdentities.accountId, schema.accounts.id),
+    )
+    .where(
+      and(
+        eq(schema.accountWechatIdentities.appId, appId),
+        eq(schema.accountWechatIdentities.openid, openid),
+      ),
+    )
+    .limit(1);
+  return row?.account ?? null;
+}
+
+export async function createWechatIdentity(
+  db: Database,
+  values: typeof schema.accountWechatIdentities.$inferInsert,
+) {
+  const [identity] = await db.insert(schema.accountWechatIdentities).values(values).returning();
+  return identity;
+}
+
+export async function updateWechatIdentity(
+  db: Database,
+  id: string,
+  patch: Partial<typeof schema.accountWechatIdentities.$inferInsert>,
+) {
+  const [identity] = await db
+    .update(schema.accountWechatIdentities)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(schema.accountWechatIdentities.id, id))
+    .returning();
+  return identity ?? null;
+}
+
 // --- Security codes (email verify / password reset) ---
 
 export async function findLatestSecurityCode(

@@ -1,0 +1,46 @@
+<view class="page">
+  <view class="card account-card">
+    <view class="eyebrow">Account</view>
+    <view class="title account-title">家长中心</view>
+    <block wx:if="{{account}}">
+      <view class="body-text account-desc">已登录：{{account.displayName}}</view>
+      <view wx:if="{{account.phone}}" class="muted account-phone">{{account.phone}}</view>
+      <view wx:if="{{defaultPassword}}" class="password-note">
+        初始密码：{{defaultPassword}}。后续 Web/小程序统一账号登录时可用于首次登录。
+      </view>
+    </block>
+    <block wx:else>
+      <view class="body-text account-desc">
+        使用微信登录后绑定手机号，后续可查看孩子、课时余额、订单和支付状态。
+      </view>
+      <button class="btn btn-primary login-button" loading="{{loading}}" disabled="{{loading}}" bindtap="onWechatLogin">
+        {{loading ? '登录中...' : '微信登录'}}
+      </button>
+    </block>
+  </view>
+
+  <form wx:if="{{bindToken && !account}}" class="section card bind-card" bindsubmit="onBindSubmit">
+    <view class="section-title">绑定手机号</view>
+    <view class="muted bind-hint">当前测试阶段支持手动填写手机号；正式上线建议接入微信手机号授权。</view>
+    <view class="form-gap">
+      <input class="form-field" name="phone" type="number" placeholder="手机号" />
+      <input class="form-field" name="displayName" placeholder="家长称呼（选填）" />
+    </view>
+    <button class="btn btn-primary bind-button" form-type="submit" loading="{{binding}}" disabled="{{binding}}">
+      {{binding ? '绑定中...' : '绑定并登录'}}
+    </button>
+  </form>
+
+  <view class="section card roadmap-card">
+    <view class="section-title">下一步接入</view>
+    <view class="roadmap-item">1. 我的孩子、课时余额、订单</view>
+    <view class="roadmap-item">2. 微信手机号授权替代测试手填手机号</view>
+    <view class="roadmap-item">3. wx.requestPayment 小程序支付</view>
+    <view class="roadmap-item">4. 订阅消息提醒</view>
+  </view>
+
+  <view class="section quick-nav">
+    <button class="btn btn-outline" bindtap="goCourses">看课程</button>
+    <button class="btn btn-outline" bindtap="goTeachers">看老师</button>
+  </view>
+</view>

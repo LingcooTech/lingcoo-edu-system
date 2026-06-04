@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/courses/index",
+    "pages/course-detail/index",
+    "pages/teachers/index",
+    "pages/campaign/index",
+    "pages/account/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "成长教室",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f3ed",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

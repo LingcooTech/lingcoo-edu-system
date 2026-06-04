@@ -1,0 +1,56 @@
+.account-card,
+.bind-card,
+.roadmap-card {
+  padding: 32rpx;
+}
+
+.account-title {
+  margin-top: 14rpx;
+}
+
+.account-desc {
+  margin-top: 18rpx;
+}
+
+.account-phone {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+}
+
+.password-note {
+  margin-top: 18rpx;
+  border-radius: 18rpx;
+  background: #fff7e6;
+  color: #7a4f00;
+  font-size: 24rpx;
+  line-height: 1.6;
+  padding: 18rpx;
+}
+
+.login-button {
+  margin-top: 28rpx;
+  width: 100%;
+}
+
+.bind-hint {
+  margin: 10rpx 0 22rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.bind-button {
+  margin-top: 22rpx;
+}
+
+.roadmap-item {
+  margin-top: 16rpx;
+  color: #4f5a53;
+  font-size: 27rpx;
+  line-height: 1.6;
+}
+
+.quick-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}

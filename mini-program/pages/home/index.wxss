@@ -1,0 +1,158 @@
+.hero {
+  overflow: hidden;
+  padding: 34rpx;
+}
+
+.hero-title {
+  margin-top: 18rpx;
+}
+
+.hero-subtitle {
+  margin-top: 18rpx;
+}
+
+.hero-image {
+  width: 100%;
+  height: 360rpx;
+  margin-top: 26rpx;
+  border-radius: 22rpx;
+}
+
+.hero-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18rpx;
+  margin-top: 26rpx;
+}
+
+.hero-btn {
+  width: 100%;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14rpx;
+}
+
+.stat-card {
+  border-radius: 18rpx;
+  background: #fff;
+  padding: 20rpx;
+  color: #1f2b24;
+  font-size: 24rpx;
+  font-weight: 800;
+  text-align: center;
+}
+
+.highlights {
+  display: grid;
+  gap: 18rpx;
+}
+
+.highlight-card {
+  display: flex;
+  gap: 18rpx;
+  padding: 24rpx;
+}
+
+.highlight-index {
+  display: flex;
+  width: 48rpx;
+  height: 48rpx;
+  flex: 0 0 48rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background: #e9f4ef;
+  color: #1f6f5b;
+  font-weight: 800;
+}
+
+.block-card,
+.contact-card {
+  padding: 28rpx;
+}
+
+.contact-title {
+  margin-top: 10rpx;
+}
+
+.contact-row {
+  margin-top: 14rpx;
+  color: #fff;
+  color: #4f5a53;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.section-head {
+  margin-bottom: 18rpx;
+}
+
+.text-button {
+  display: inline-flex;
+  width: auto;
+  height: 60rpx;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #1f6f5b;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 60rpx;
+  padding: 0;
+}
+
+.text-button::after {
+  border: 0;
+}
+
+.course-list,
+.trial-list,
+.testimonials {
+  display: grid;
+  gap: 18rpx;
+}
+
+.course-card,
+.trial-card,
+.quote-card {
+  padding: 26rpx;
+}
+
+.course-name {
+  color: #1f2b24;
+  font-size: 29rpx;
+  font-weight: 800;
+}
+
+.course-price {
+  flex-shrink: 0;
+  color: #1f2b24;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.course-meta,
+.trial-meta {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+}
+
+.course-summary {
+  margin-top: 12rpx;
+}
+
+.quote-card {
+  color: #4f5a53;
+  font-size: 26rpx;
+  line-height: 1.7;
+}
+
+.quick-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+  padding-bottom: 24rpx;
+}

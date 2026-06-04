@@ -1,4 +1,5 @@
 import { createHash, randomInt } from 'node:crypto';
+import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
@@ -7,6 +8,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import { httpError } from '../../lib/http-error.js';
 import { hashPassword, verifyPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import { SmtpSettingsService } from '../../lib/smtp-settings.js';
+import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
 import type { AppModule } from '../types.js';
 
 const AUTH_COOKIE = 'fd_edu_token';
@@ -36,6 +38,21 @@ const resetPasswordSchema = z.object({
   code: z.string().min(4),
   password: z.string().min(8),
 });
+
+const wechatMiniLoginSchema = z.object({
+  code: z.string().min(1),
+});
+
+const wechatMiniBindPhoneSchema = z
+  .object({
+    bindToken: z.string().min(1),
+    phoneCode: z.string().optional(),
+    phone: z.string().optional(),
+    displayName: z.string().optional(),
+  })
+  .refine((value) => Boolean(value.phoneCode || value.phone), {
+    message: 'phoneCode 或 phone 至少提供一个',
+  });
 
 const adminAccountCreateSchema = z.object({
   role: z.enum(['admin', 'teacher', 'parent']),
@@ -96,6 +113,23 @@ function publicAccount(account: accountsRepo.Account) {
   };
 }
 
+interface WechatMiniBindToken {
+  purpose: 'wechat_mini_bind';
+  appId: string;
+  openid: string;
+  unionid?: string | null;
+}
+
+function isWechatMiniBindToken(value: unknown): value is WechatMiniBindToken {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as Partial<WechatMiniBindToken>;
+  return (
+    payload.purpose === 'wechat_mini_bind' &&
+    typeof payload.appId === 'string' &&
+    typeof payload.openid === 'string'
+  );
+}
+
 function adminAccount(account: accountsRepo.Account) {
   return {
     ...publicAccount(account),
@@ -117,6 +151,15 @@ export const authModule: AppModule = {
         sameSite: 'lax' as const,
         secure: app.appEnv.NODE_ENV === 'production',
       };
+    }
+
+    async function signIn(reply: FastifyReply, account: accountsRepo.Account) {
+      const token = await reply.jwtSign(
+        { sub: account.id, role: account.role },
+        { expiresIn: TOKEN_TTL },
+      );
+      reply.setCookie(AUTH_COOKIE, token, cookieOptions());
+      return token;
     }
 
     // Issues an email verification / password reset code, throttled to one per
@@ -169,12 +212,113 @@ export const authModule: AppModule = {
         return reply.unauthorized('账号或密码不正确');
       }
 
-      const token = await reply.jwtSign(
-        { sub: account.id, role: account.role },
-        { expiresIn: TOKEN_TTL },
-      );
-      reply.setCookie(AUTH_COOKIE, token, cookieOptions());
+      const token = await signIn(reply, account);
       return { token, account: publicAccount(account) };
+    });
+
+    app.post('/auth/wechat-mini/login', async (request, reply) => {
+      const body = wechatMiniLoginSchema.parse(request.body);
+      const identity = await exchangeWechatMiniCode(app.appEnv, body.code);
+      const account = await accountsRepo.findAccountByWechatIdentity(
+        app.db,
+        identity.appId,
+        identity.openid,
+      );
+
+      if (account) {
+        if (account.status !== 'active') {
+          throw httpError(403, '账号已停用');
+        }
+        const token = await signIn(reply, account);
+        return { bound: true, token, account: publicAccount(account) };
+      }
+
+      const bindToken = await reply.jwtSign(
+        {
+          purpose: 'wechat_mini_bind',
+          appId: identity.appId,
+          openid: identity.openid,
+          unionid: identity.unionid,
+        },
+        { expiresIn: '10m' },
+      );
+      return { bound: false, bindToken };
+    });
+
+    app.post('/auth/wechat-mini/bind-phone', async (request, reply) => {
+      const body = wechatMiniBindPhoneSchema.parse(request.body);
+      let tokenPayload: unknown;
+      try {
+        tokenPayload = await app.jwt.verify(body.bindToken);
+      } catch {
+        throw httpError(401, '微信绑定凭证无效或已过期');
+      }
+      if (!isWechatMiniBindToken(tokenPayload)) {
+        throw httpError(401, '微信绑定凭证无效');
+      }
+
+      const rawPhone = body.phoneCode
+        ? await getWechatMiniPhoneNumber(app.appEnv, body.phoneCode)
+        : body.phone;
+      if (!body.phoneCode && app.appEnv.NODE_ENV === 'production') {
+        throw httpError(422, '生产环境必须使用微信手机号授权');
+      }
+      const phone = normalizeOptionalPhone(rawPhone);
+      if (!phone) {
+        throw httpError(422, '手机号不能为空');
+      }
+
+      const existingIdentity = await accountsRepo.findWechatIdentity(
+        app.db,
+        tokenPayload.appId,
+        tokenPayload.openid,
+      );
+      let account = await accountsRepo.findByPhone(app.db, phone);
+
+      if (account && account.role !== 'parent') {
+        throw httpError(409, '该手机号已绑定非家长账号');
+      }
+      if (account && account.status !== 'active') {
+        throw httpError(403, '账号已停用');
+      }
+
+      let accountCreated = false;
+      let defaultPassword: string | null = null;
+      if (!account) {
+        defaultPassword = generateDefaultPassword(phone);
+        account = await accountsRepo.createAccount(app.db, {
+          role: 'parent',
+          phone,
+          displayName: body.displayName?.trim() || `微信家长${phone.slice(-4)}`,
+          passwordHash: hashPassword(defaultPassword),
+          mustChangePassword: true,
+        });
+        accountCreated = true;
+      }
+
+      if (existingIdentity && existingIdentity.accountId !== account.id) {
+        throw httpError(409, '该微信已绑定其他账号');
+      }
+      if (existingIdentity) {
+        await accountsRepo.updateWechatIdentity(app.db, existingIdentity.id, {
+          unionid: tokenPayload.unionid ?? null,
+        });
+      } else {
+        await accountsRepo.createWechatIdentity(app.db, {
+          accountId: account.id,
+          appId: tokenPayload.appId,
+          openid: tokenPayload.openid,
+          unionid: tokenPayload.unionid ?? null,
+        });
+      }
+
+      const authToken = await signIn(reply, account);
+      return {
+        token: authToken,
+        account: publicAccount(account),
+        accountCreated,
+        defaultPassword,
+      };
     });
 
     app.post('/auth/logout', async (_request, reply) => {
@@ -362,11 +506,7 @@ export const authModule: AppModule = {
       });
 
       const codeResult = await sendCode(account, 'email_verify');
-      const token = await reply.jwtSign(
-        { sub: account.id, role: account.role },
-        { expiresIn: TOKEN_TTL },
-      );
-      reply.setCookie(AUTH_COOKIE, token, cookieOptions());
+      const token = await signIn(reply, account);
       return { token, account: publicAccount(account), verificationSent: codeResult.sent };
     });
 

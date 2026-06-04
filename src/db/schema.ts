@@ -628,6 +628,31 @@ export const accountSecurityCodes = pgTable(
   }),
 );
 
+export const accountWechatIdentities = pgTable(
+  'account_wechat_identities',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    appId: varchar('app_id', { length: 80 }).notNull(),
+    openid: varchar('openid', { length: 128 }).notNull(),
+    unionid: varchar('unionid', { length: 128 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    appOpenidUnique: uniqueIndex('account_wechat_identities_app_openid_idx').on(
+      table.appId,
+      table.openid,
+    ),
+    accountAppUnique: uniqueIndex('account_wechat_identities_account_app_idx').on(
+      table.accountId,
+      table.appId,
+    ),
+  }),
+);
+
 // --- Course packages (课时包) + payments ---
 
 export const coursePackageStatusEnum = pgEnum('course_package_status', ['active', 'archived']);

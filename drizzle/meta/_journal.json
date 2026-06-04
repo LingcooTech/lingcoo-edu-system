@@ -78,6 +78,13 @@
       "when": 1780567841297,
       "tag": "0010_lead_course_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780575117547,
+      "tag": "0011_wechat_mini_identities",
+      "breakpoints": true
     }
   ]
 }

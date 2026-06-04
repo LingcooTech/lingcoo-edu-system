@@ -1,0 +1,85 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <block wx:else>
+    <view class="hero card">
+      <view class="eyebrow">社区小班成长教室</view>
+      <view class="title hero-title">{{bannerTitle}}</view>
+      <view class="body-text hero-subtitle">{{bannerSubtitle}}</view>
+      <image wx:if="{{bannerImageUrl}}" class="hero-image" src="{{bannerImageUrl}}" mode="aspectFill" />
+      <view class="hero-actions">
+        <button class="btn btn-primary hero-btn" bindtap="onPrimaryCta">{{ctaText}}</button>
+        <button class="btn btn-outline hero-btn" bindtap="goCourses">浏览课程</button>
+      </view>
+    </view>
+
+    <view wx:if="{{stats.length}}" class="section stats">
+      <view wx:for="{{stats}}" wx:key="*this" class="stat-card">{{item}}</view>
+    </view>
+
+    <view wx:if="{{highlights.length}}" class="section highlights">
+      <view wx:for="{{highlights}}" wx:key="*this" class="card highlight-card">
+        <view class="highlight-index">{{index + 1}}</view>
+        <view class="body-text">{{item}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{bodyBlocks.length}}" class="section card block-card">
+      <block-renderer blocks="{{bodyBlocks}}" />
+    </view>
+
+    <view class="section card contact-card">
+      <view class="eyebrow">Visit</view>
+      <view class="section-title contact-title">到店前先预约，老师会确认适合的班型</view>
+      <view wx:if="{{address}}" class="contact-row">地址：{{address}}</view>
+      <view wx:if="{{phone}}" class="contact-row">电话：{{phone}}</view>
+      <view wx:if="{{businessHours}}" class="contact-row">{{businessHours}}</view>
+    </view>
+
+    <view class="section">
+      <view class="row-between section-head">
+        <view>
+          <view class="eyebrow">Courses</view>
+          <view class="section-title">推荐课程</view>
+        </view>
+        <button class="text-button" bindtap="goCourses">全部</button>
+      </view>
+
+      <view wx:if="{{courses.length}}" class="course-list">
+        <navigator wx:for="{{courses}}" wx:key="id" class="card course-card" url="/pages/course-detail/index?slug={{item.slug}}">
+          <view class="row-between">
+            <view class="course-name">{{item.name}}</view>
+            <view class="course-price">{{item.priceLabel}}</view>
+          </view>
+          <view class="muted course-meta">{{item.category}} · {{item.ageRange}}</view>
+          <view class="body-text course-summary">{{item.summary}}</view>
+        </navigator>
+      </view>
+      <view wx:else class="empty">课程即将上线</view>
+    </view>
+
+    <view class="section">
+      <view class="eyebrow">Trial</view>
+      <view class="section-title">本周公开课</view>
+      <view wx:if="{{trialSessions.length}}" class="trial-list">
+        <view wx:for="{{trialSessions}}" wx:key="id" class="card trial-card">
+          <view class="course-name">{{item.title}}</view>
+          <view class="muted trial-meta">{{item.startsAtLabel}} · 已报名 {{item.bookedCount}}/{{item.capacity}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty">近期暂无公开课，可直接预约心仪课程的试听。</view>
+    </view>
+
+    <view wx:if="{{testimonials.length}}" class="section testimonials">
+      <view class="eyebrow">Testimonials</view>
+      <view class="section-title">家长评价</view>
+      <view wx:for="{{testimonials}}" wx:key="*this" class="card quote-card">“{{item}}”</view>
+    </view>
+
+    <view class="section quick-nav">
+      <button class="btn btn-outline" bindtap="goCourses">课程</button>
+      <button class="btn btn-outline" bindtap="goTeachers">老师</button>
+      <button class="btn btn-outline" bindtap="goAccount">我的</button>
+    </view>
+  </block>
+</view>

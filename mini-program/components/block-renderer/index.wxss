@@ -1,0 +1,154 @@
+.blocks {
+  display: grid;
+  gap: 28rpx;
+}
+
+.block {
+  width: 100%;
+}
+
+.heading {
+  color: #1f2b24;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.level-2 {
+  font-size: 34rpx;
+}
+
+.level-3 {
+  font-size: 30rpx;
+}
+
+.paragraph {
+  color: #4f5a53;
+  font-size: 28rpx;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.list {
+  display: grid;
+  gap: 12rpx;
+}
+
+.list-row {
+  display: flex;
+  gap: 12rpx;
+  color: #4f5a53;
+  font-size: 28rpx;
+  line-height: 1.65;
+}
+
+.list-mark {
+  width: 36rpx;
+  flex: 0 0 36rpx;
+  color: #1f6f5b;
+  font-weight: 800;
+}
+
+.list-text {
+  flex: 1;
+}
+
+.image {
+  width: 100%;
+  border-radius: 20rpx;
+}
+
+.caption {
+  margin-top: 10rpx;
+  color: #6c766f;
+  font-size: 22rpx;
+  text-align: center;
+}
+
+.image-text {
+  display: grid;
+  gap: 18rpx;
+}
+
+.image-text-media {
+  width: 100%;
+  height: 300rpx;
+  border-radius: 20rpx;
+}
+
+.image-text-title {
+  margin-bottom: 10rpx;
+  color: #1f2b24;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.stats,
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+}
+
+.stat-card {
+  border-radius: 18rpx;
+  background: #f3efe7;
+  padding: 22rpx;
+  color: #1f2b24;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.testimonials {
+  display: grid;
+  gap: 16rpx;
+}
+
+.quote,
+.faq-card {
+  border: 1rpx solid rgba(31, 43, 36, 0.08);
+  border-radius: 18rpx;
+  background: #fff;
+  padding: 24rpx;
+  color: #4f5a53;
+  font-size: 26rpx;
+  line-height: 1.7;
+}
+
+.cta {
+  height: 88rpx;
+  border-radius: 999rpx;
+  background: #1f6f5b;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 88rpx;
+}
+
+.cta::after {
+  border: 0;
+}
+
+.gallery-image {
+  width: 100%;
+  height: 220rpx;
+  border-radius: 18rpx;
+}
+
+.faq-q {
+  color: #1f2b24;
+  font-size: 27rpx;
+  font-weight: 800;
+}
+
+.faq-a {
+  margin-top: 8rpx;
+  color: #4f5a53;
+  font-size: 26rpx;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.divider {
+  height: 1rpx;
+  background: rgba(31, 43, 36, 0.1);
+}

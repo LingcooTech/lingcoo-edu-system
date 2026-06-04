@@ -1,0 +1,140 @@
+page {
+  min-height: 100vh;
+  background: #f6f3ed;
+  color: #1f2b24;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-size: 28rpx;
+}
+
+view,
+text,
+button,
+input,
+textarea {
+  box-sizing: border-box;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 28rpx;
+}
+
+.section {
+  margin-top: 28rpx;
+}
+
+.card {
+  border: 1rpx solid rgba(31, 43, 36, 0.08);
+  border-radius: 20rpx;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 43, 36, 0.05);
+}
+
+.muted {
+  color: #6c766f;
+}
+
+.eyebrow {
+  color: #1f6f5b;
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.title {
+  color: #1f2b24;
+  font-size: 44rpx;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.section-title {
+  color: #1f2b24;
+  font-size: 34rpx;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.body-text {
+  color: #4f5a53;
+  font-size: 28rpx;
+  line-height: 1.75;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.grid {
+  display: grid;
+  gap: 20rpx;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border-radius: 999rpx;
+  background: #e9f4ef;
+  color: #1f6f5b;
+  padding: 8rpx 18rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.btn {
+  height: 88rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 88rpx;
+}
+
+.btn::after {
+  border: 0;
+}
+
+.btn-primary {
+  background: #1f6f5b;
+  color: #fff;
+}
+
+.btn-outline {
+  border: 1rpx solid rgba(31, 43, 36, 0.14);
+  background: #fff;
+  color: #1f2b24;
+}
+
+.loading,
+.empty {
+  padding: 60rpx 0;
+  color: #6c766f;
+  text-align: center;
+}
+
+.form-field {
+  width: 100%;
+  min-height: 88rpx;
+  border: 1rpx solid rgba(31, 43, 36, 0.12);
+  border-radius: 18rpx;
+  background: #fff;
+  padding: 20rpx 22rpx;
+  font-size: 28rpx;
+}
+
+.form-gap {
+  display: grid;
+  gap: 18rpx;
+}

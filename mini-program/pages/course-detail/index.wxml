@@ -1,0 +1,66 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{notFound}}" class="empty-state">
+    <view class="section-title">课程不存在或已下架</view>
+    <button class="btn btn-outline empty-button" bindtap="goCourses">查看全部课程</button>
+  </view>
+
+  <block wx:else>
+    <button class="back-button" bindtap="goCourses">‹ 全部课程</button>
+
+    <view class="header card">
+      <view class="chips">
+        <text class="chip">{{course.category}}</text>
+        <text class="chip">{{course.ageRange}}</text>
+      </view>
+      <view class="title course-title">{{course.name}}</view>
+      <view class="body-text summary">{{course.summary}}</view>
+      <view class="meta-row">
+        <text>{{course.durationMinutes}} 分钟/节</text>
+        <text>{{packages.length ? packages.length + ' 个课时包' : '暂未上架课时包'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{contentBlocks.length}}" class="section card block-card">
+      <block-renderer blocks="{{contentBlocks}}" />
+    </view>
+
+    <view class="section">
+      <view class="section-title">课时包</view>
+      <view wx:if="{{packages.length}}" class="package-list">
+        <view wx:for="{{packages}}" wx:key="id" class="card package-card">
+          <view class="row-between">
+            <view>
+              <view class="package-name">{{item.name}}</view>
+              <view class="muted package-meta">{{item.lessonCount}} 课时</view>
+            </view>
+            <view class="package-price">{{item.priceLabel}}</view>
+          </view>
+          <view wx:if="{{item.description}}" class="body-text package-desc">{{item.description}}</view>
+          <button class="btn btn-outline package-button" bindtap="onBuyTap">购买课时包</button>
+        </view>
+      </view>
+      <view wx:else class="empty">课时包暂未上架，可先预约试听。</view>
+    </view>
+
+    <form wx:if="{{showTrialForm}}" class="section card trial-form" bindsubmit="onTrialSubmit">
+      <view class="section-title">预约试听</view>
+      <view class="muted form-hint">提交后老师会电话确认上课时间。</view>
+      <view class="form-gap">
+        <input class="form-field" name="guardianName" placeholder="家长姓名" />
+        <input class="form-field" name="phone" type="number" placeholder="手机号" />
+        <input class="form-field" name="studentName" placeholder="孩子姓名" />
+        <input class="form-field" name="grade" placeholder="年级 / 年龄" />
+      </view>
+      <button class="btn btn-primary trial-submit" form-type="submit" loading="{{submittingTrial}}" disabled="{{submittingTrial}}">
+        {{submittingTrial ? '提交中...' : '提交预约'}}
+      </button>
+    </form>
+
+    <view class="sticky-cta">
+      <view class="sticky-note">免注册 · 老师电话确认时间</view>
+      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听 / 留资</button>
+    </view>
+  </block>
+</view>

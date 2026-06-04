@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="eyebrow">Teachers</view>
+  <view class="title page-title">教师团队</view>
+  <view class="body-text intro">提前了解授课老师的擅长方向和教学介绍。</view>
+
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:elif="{{teachers.length}}" class="teacher-list">
+    <view wx:for="{{teachers}}" wx:key="id" class="card teacher-card">
+      <view class="teacher-head">
+        <image wx:if="{{item.avatarUrl}}" class="avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar fallback">师</view>
+        <view class="teacher-main">
+          <view class="teacher-name">{{item.name}}</view>
+          <view wx:if="{{item.title}}" class="muted teacher-title">{{item.title}}</view>
+        </view>
+      </view>
+
+      <view wx:if="{{item.specialties.length}}" class="specialties">
+        <text wx:for="{{item.specialties}}" wx:key="*this" class="chip">{{item}}</text>
+      </view>
+      <view wx:else class="muted specialty-empty">待补充擅长方向</view>
+
+      <view wx:if="{{item.bioBlocks.length}}" class="bio">
+        <block-renderer blocks="{{item.bioBlocks}}" />
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty">教师信息待上线。</view>
+</view>

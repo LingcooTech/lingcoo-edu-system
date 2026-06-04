@@ -22,6 +22,10 @@ const envSchema = z.object({
   // Parent (家长) account self-signed token secret; falls back to JWT_SECRET.
   PARENT_TOKEN_SECRET: z.string().optional(),
 
+  // WeChat Mini Program login. Keep AppSecret in runtime env only.
+  WECHAT_MINI_PROGRAM_APP_ID: z.string().optional(),
+  WECHAT_MINI_PROGRAM_APP_SECRET: z.string().optional(),
+
   // SMTP (email verification / password reset).
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(465),

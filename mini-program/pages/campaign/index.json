@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "活动报名",
+  "usingComponents": {
+    "block-renderer": "../../components/block-renderer/index"
+  }
+}

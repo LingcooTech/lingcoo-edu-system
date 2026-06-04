@@ -1,0 +1,127 @@
+.back-button {
+  width: auto;
+  height: 58rpx;
+  border: 0;
+  background: transparent;
+  color: #6c766f;
+  font-size: 26rpx;
+  line-height: 58rpx;
+  padding: 0;
+  text-align: left;
+}
+
+.back-button::after {
+  border: 0;
+}
+
+.header {
+  margin-top: 8rpx;
+  padding: 30rpx;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.course-title {
+  margin-top: 18rpx;
+}
+
+.summary {
+  margin-top: 14rpx;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+  margin-top: 20rpx;
+  color: #6c766f;
+  font-size: 24rpx;
+}
+
+.block-card {
+  padding: 28rpx;
+}
+
+.package-list {
+  display: grid;
+  gap: 18rpx;
+  margin-top: 18rpx;
+}
+
+.package-card {
+  padding: 28rpx;
+}
+
+.package-name {
+  color: #1f2b24;
+  font-size: 29rpx;
+  font-weight: 800;
+}
+
+.package-meta {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}
+
+.package-price {
+  color: #1f2b24;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.package-desc {
+  margin-top: 14rpx;
+}
+
+.package-button {
+  margin-top: 18rpx;
+}
+
+.trial-form {
+  padding: 28rpx;
+}
+
+.form-hint {
+  margin: 10rpx 0 22rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.trial-submit {
+  margin-top: 22rpx;
+}
+
+.sticky-cta {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  align-items: center;
+  margin: 36rpx -28rpx -28rpx;
+  border-top: 1rpx solid rgba(31, 43, 36, 0.1);
+  background: rgba(246, 243, 237, 0.96);
+  padding: 18rpx 28rpx;
+}
+
+.sticky-note {
+  color: #6c766f;
+  font-size: 22rpx;
+}
+
+.sticky-button {
+  width: 100%;
+}
+
+.empty-state {
+  padding-top: 120rpx;
+  text-align: center;
+}
+
+.empty-button {
+  margin-top: 28rpx;
+}
