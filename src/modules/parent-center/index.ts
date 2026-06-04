@@ -2,7 +2,10 @@ import { desc, eq, inArray } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
+import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as notificationsRepo from '../../db/repositories/notifications.js';
+import * as peopleRepo from '../../db/repositories/people.js';
+import * as packagesRepo from '../../db/repositories/packages.js';
 import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
 import type { AppModule } from '../types.js';
@@ -38,26 +41,47 @@ export const parentCenterModule: AppModule = {
       if (studentIds.length === 0) {
         return { lessonAccounts: [] };
       }
-      const lessonAccounts = await app.db
-        .select()
-        .from(schema.lessonAccounts)
-        .where(inArray(schema.lessonAccounts.studentId, studentIds));
+      const [lessonAccounts, courses] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.lessonAccounts)
+          .where(inArray(schema.lessonAccounts.studentId, studentIds)),
+        catalogRepo.listCourses(app.db),
+      ]);
       const studentById = new Map(students.map((s) => [s.id, s]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
       return {
         lessonAccounts: lessonAccounts.map((row) => ({
           ...row,
           student: studentById.get(row.studentId),
+          course: courseById.get(row.courseId) ?? null,
         })),
       };
     });
 
     app.get('/public/me/orders', { preHandler: app.requireParent }, async (request) => {
-      const orders = await app.db
-        .select()
-        .from(schema.orders)
-        .where(eq(schema.orders.accountId, request.account!.id))
-        .orderBy(desc(schema.orders.createdAt));
-      return { orders };
+      const [orders, students, courses, packages] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.orders)
+          .where(eq(schema.orders.accountId, request.account!.id))
+          .orderBy(desc(schema.orders.createdAt)),
+        peopleRepo.listStudents(app.db),
+        catalogRepo.listCourses(app.db),
+        packagesRepo.listPackages(app.db),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const packageById = new Map(packages.map((pkg) => [pkg.id, pkg]));
+
+      return {
+        orders: orders.map((order) => ({
+          ...order,
+          student: order.studentId ? (studentById.get(order.studentId) ?? null) : null,
+          course: order.courseId ? (courseById.get(order.courseId) ?? null) : null,
+          package: order.packageId ? (packageById.get(order.packageId) ?? null) : null,
+        })),
+      };
     });
 
     app.get('/public/me/attendance', { preHandler: app.requireParent }, async (request) => {

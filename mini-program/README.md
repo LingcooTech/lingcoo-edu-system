@@ -9,7 +9,8 @@
 - 课程详情：读取 `/public/courses/:slug`，展示结构化课程内容和课时包。
 - 老师页：读取 `/public/teachers`，展示头像、头衔、擅长方向和结构化 bio。
 - 活动落地页：读取 `/public/campaigns/:code`，支持二维码 query/scene 进入并提交报名到 `/public/crm/campaigns/:code/participations`。
-- 我的页：支持 `wx.login`、微信 openid 登录、测试环境手机号绑定、家长 token 存储。
+- 我的页：支持 `wx.login`、微信 openid 登录、微信手机号授权绑定、测试环境手机号手填、家长 token 存储。
+- 家长中心：展示我的孩子、课时余额、订单、签到记录和站内通知，并支持通知已读。
 
 ## 本地开发
 
@@ -62,7 +63,6 @@ WECHAT_MINI_PROGRAM_APP_SECRET=你的 AppSecret
 
 以下能力需要微信 AppID/AppSecret/商户配置和线上 HTTPS 域名后再做完整闭环：
 
-- 将绑定手机号表单改成生产版 `getPhoneNumber` 授权，传 `phoneCode` 到 `POST /auth/wechat-mini/bind-phone`。
 - `POST /public/orders/:orderNo/wechat-mini-payment-intent`：返回 `wx.requestPayment` 参数。
 - 订阅消息接口：报名成功、课前提醒、课消通知。
 

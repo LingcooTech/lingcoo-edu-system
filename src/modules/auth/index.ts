@@ -268,6 +268,7 @@ export const authModule: AppModule = {
         throw httpError(422, '手机号不能为空');
       }
 
+      const guardian = await peopleRepo.findGuardianByPhone(app.db, phone);
       const existingIdentity = await accountsRepo.findWechatIdentity(
         app.db,
         tokenPayload.appId,
@@ -291,9 +292,15 @@ export const authModule: AppModule = {
           phone,
           displayName: body.displayName?.trim() || `微信家长${phone.slice(-4)}`,
           passwordHash: hashPassword(defaultPassword),
+          guardianId: guardian?.id ?? null,
           mustChangePassword: true,
         });
         accountCreated = true;
+      } else if (!account.guardianId && guardian) {
+        account =
+          (await accountsRepo.updateAccount(app.db, account.id, {
+            guardianId: guardian.id,
+          })) ?? account;
       }
 
       if (existingIdentity && existingIdentity.accountId !== account.id) {

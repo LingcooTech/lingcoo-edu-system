@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { buildApp } from '../src/app.js';
+import * as schema from '../src/db/schema.js';
 import type { AppEnv } from '../src/lib/env.js';
 
 const testEnv: AppEnv = {
@@ -55,7 +56,10 @@ test('binds and reuses a WeChat Mini Program parent account', async () => {
   const app = await buildApp(testEnv);
   const originalFetch = globalThis.fetch;
   const openid = `openid-${randomUUID()}`;
-  const phone = `139${String(Date.now()).slice(-8)}`;
+  const suffix = randomUUID();
+  const phone = `139${String(parseInt(suffix.replaceAll('-', '').slice(0, 8), 16))
+    .slice(-8)
+    .padStart(8, '0')}`;
 
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -75,6 +79,47 @@ test('binds and reuses a WeChat Mini Program parent account', async () => {
   }) as typeof fetch;
 
   try {
+    const [guardian] = await app.db
+      .insert(schema.guardians)
+      .values({ name: 'Mini Guardian', phone })
+      .returning();
+    const [student] = await app.db
+      .insert(schema.students)
+      .values({
+        guardianId: guardian.id,
+        name: 'Mini Student',
+        grade: '一年级',
+        status: 'active',
+      })
+      .returning();
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        slug: `mini-parent-${suffix}`,
+        name: 'Mini Parent Course',
+        category: '书法',
+        ageRange: '6-8 岁',
+        durationMinutes: 60,
+        summary: 'Parent center test course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [pkg] = await app.db
+      .insert(schema.coursePackages)
+      .values({
+        courseId: course.id,
+        name: '12 课时包',
+        description: '',
+        lessonCount: 12,
+        priceAmount: 129900,
+        status: 'active',
+      })
+      .returning();
+    await app.db
+      .insert(schema.lessonAccounts)
+      .values({ studentId: student.id, courseId: course.id, balance: 8 });
+
     const login = await app.inject({
       method: 'POST',
       url: '/auth/wechat-mini/login',
@@ -101,6 +146,45 @@ test('binds and reuses a WeChat Mini Program parent account', async () => {
     assert.equal(bindPayload.account.phone, phone);
     assert.equal(bindPayload.defaultPassword, phone.slice(-6));
     assert.equal(typeof bindPayload.token, 'string');
+
+    await app.db.insert(schema.orders).values({
+      accountId: bindPayload.account.id,
+      studentId: student.id,
+      courseId: course.id,
+      packageId: pkg.id,
+      orderNo: `TEST${Date.now()}${suffix.slice(0, 8)}`,
+      amount: pkg.priceAmount,
+      paidAmount: 0,
+      lessonCount: pkg.lessonCount,
+      status: 'pending',
+      source: 'test',
+    });
+
+    const children = await app.inject({
+      method: 'GET',
+      url: '/public/me/children',
+      headers: { authorization: `Bearer ${bindPayload.token}` },
+    });
+    assert.equal(children.statusCode, 200);
+    assert.equal(children.json().children[0].id, student.id);
+
+    const lessonAccounts = await app.inject({
+      method: 'GET',
+      url: '/public/me/lesson-accounts',
+      headers: { authorization: `Bearer ${bindPayload.token}` },
+    });
+    assert.equal(lessonAccounts.statusCode, 200);
+    assert.equal(lessonAccounts.json().lessonAccounts[0].course.name, course.name);
+    assert.equal(lessonAccounts.json().lessonAccounts[0].student.name, student.name);
+
+    const orders = await app.inject({
+      method: 'GET',
+      url: '/public/me/orders',
+      headers: { authorization: `Bearer ${bindPayload.token}` },
+    });
+    assert.equal(orders.statusCode, 200);
+    assert.equal(orders.json().orders[0].course.name, course.name);
+    assert.equal(orders.json().orders[0].package.name, pkg.name);
 
     const secondLogin = await app.inject({
       method: 'POST',

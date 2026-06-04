@@ -137,12 +137,89 @@ export interface AuthAccount {
   mustChangePassword: boolean;
 }
 
+export interface ParentChild {
+  id: string;
+  guardianId?: string | null;
+  name: string;
+  grade: string;
+  school?: string | null;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ParentLessonAccount {
+  id: string;
+  studentId: string;
+  courseId: string;
+  balance: number;
+  updatedAt: string;
+  student?: ParentChild | null;
+  course?: Course | null;
+}
+
+export interface ParentOrder {
+  id: string;
+  studentId?: string | null;
+  courseId?: string | null;
+  accountId?: string | null;
+  packageId?: string | null;
+  orderNo: string;
+  amount: number;
+  paidAmount: number;
+  lessonCount: number;
+  currency: string;
+  paymentProvider?: string | null;
+  providerOrderId?: string | null;
+  status: 'pending' | 'paid' | 'cancelled' | 'refunded' | string;
+  paidAt?: string | null;
+  source: string;
+  medium?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: ParentChild | null;
+  course?: Course | null;
+  package?: CoursePackage | null;
+}
+
+export interface ParentAttendance {
+  id: string;
+  studentId: string;
+  status: string;
+  lessonDelta: number;
+  note?: string | null;
+  createdAt: string;
+  sessionId: string;
+  startsAt: string;
+  topic: string;
+  className: string;
+  courseName: string;
+  student?: { id: string; name: string };
+}
+
+export interface ParentNotification {
+  id: string;
+  category: string;
+  level: 'info' | 'success' | 'warning' | 'error' | string;
+  title: string;
+  body: string;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+  status: 'unread' | 'read' | 'archived' | string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ApiErrorPayload {
   message?: string;
 }
 
-function token(): string {
+export function getToken(): string {
   return String(wx.getStorageSync(TOKEN_KEY) || '');
+}
+
+export function hasToken(): boolean {
+  return Boolean(getToken());
 }
 
 export function setToken(value: string): void {
@@ -157,7 +234,7 @@ export function request<T>(
   path: string,
   options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; data?: unknown } = {},
 ): Promise<T> {
-  const authToken = token();
+  const authToken = getToken();
   return new Promise((resolve, reject) => {
     wx.request<T | ApiErrorPayload>({
       url: `${API_BASE_URL}${path}`,
@@ -244,4 +321,43 @@ export function bindWechatMiniPhone(input: {
     method: 'POST',
     data: input,
   });
+}
+
+export function fetchMe(): Promise<{ account: AuthAccount | null }> {
+  return request('/auth/me');
+}
+
+export function logout(): Promise<{ ok: boolean }> {
+  return request('/auth/logout', { method: 'POST' });
+}
+
+export async function fetchParentChildren(): Promise<ParentChild[]> {
+  return (await request<{ children: ParentChild[] }>('/public/me/children')).children;
+}
+
+export async function fetchParentLessonAccounts(): Promise<ParentLessonAccount[]> {
+  return (await request<{ lessonAccounts: ParentLessonAccount[] }>('/public/me/lesson-accounts'))
+    .lessonAccounts;
+}
+
+export async function fetchParentOrders(): Promise<ParentOrder[]> {
+  return (await request<{ orders: ParentOrder[] }>('/public/me/orders')).orders;
+}
+
+export async function fetchParentAttendance(): Promise<ParentAttendance[]> {
+  return (await request<{ attendance: ParentAttendance[] }>('/public/me/attendance')).attendance;
+}
+
+export async function fetchParentNotifications(): Promise<ParentNotification[]> {
+  return (await request<{ notifications: ParentNotification[] }>('/public/me/notifications'))
+    .notifications;
+}
+
+export async function markParentNotificationRead(notificationId: string): Promise<ParentNotification> {
+  return (
+    await request<{ notification: ParentNotification }>(
+      `/public/me/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: 'POST' },
+    )
+  ).notification;
 }
