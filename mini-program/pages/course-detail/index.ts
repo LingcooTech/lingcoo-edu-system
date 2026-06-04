@@ -1,12 +1,16 @@
 import {
   createPaymentIntent,
   createPublicOrder,
+  createWechatMiniPaymentIntent,
   fetchCourse,
+  hasToken,
   mockPayOrder,
   submitTrialRegistration,
+  syncOrderPayment,
   type Course,
   type CoursePackage,
   type ParentOrder,
+  type PaymentIntent,
 } from '../../services/api';
 import { money } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
@@ -22,6 +26,35 @@ function orderStatusLabel(status: string): string {
     refunded: '已退款',
   };
   return labels[status] || status;
+}
+
+function payloadString(payload: Record<string, unknown>, key: string): string {
+  const value = payload[key];
+  return typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value);
+}
+
+function requestWechatPayment(intent: PaymentIntent): Promise<void> {
+  const timeStamp = payloadString(intent.payload, 'timeStamp');
+  const nonceStr = payloadString(intent.payload, 'nonceStr');
+  const packageValue = payloadString(intent.payload, 'package');
+  const signType = payloadString(intent.payload, 'signType') || 'HMAC-SHA256';
+  const paySign = payloadString(intent.payload, 'paySign');
+
+  if (!timeStamp || !nonceStr || !packageValue || !paySign) {
+    return Promise.reject(new Error('微信支付参数不完整'));
+  }
+
+  return new Promise((resolve, reject) => {
+    wx.requestPayment({
+      timeStamp,
+      nonceStr,
+      package: packageValue,
+      signType,
+      paySign,
+      success: () => resolve(),
+      fail: (error) => reject(new Error(error.errMsg || '微信支付失败')),
+    });
+  });
 }
 
 Page({
@@ -158,25 +191,31 @@ Page({
   async payCreatedOrder(orderNo: string) {
     this.setData({ payingOrder: true });
     try {
-      const intent = await createPaymentIntent(orderNo, 'mock');
-      if (!intent.configured || intent.nextAction !== 'mock_pay') {
-        wx.showModal({
-          title: '支付待配置',
-          content: '订单已创建，微信支付配置完成后可继续支付。',
-          showCancel: false,
-        });
-        return;
+      if (hasToken()) {
+        try {
+          const intent = await createWechatMiniPaymentIntent(orderNo);
+          if (intent.nextAction === 'none' && intent.status === 'paid') {
+            wx.showToast({ title: '订单已支付', icon: 'success' });
+            return;
+          }
+          if (intent.nextAction !== 'request_payment') {
+            throw new Error('微信支付参数未就绪');
+          }
+
+          await requestWechatPayment(intent);
+          const paidOrder = await syncOrderPayment(orderNo);
+          if (paidOrder.status !== 'paid') {
+            throw new Error('支付结果同步中，请稍后在家长中心查看订单状态');
+          }
+          await this.finishPaidOrder(paidOrder);
+          return;
+        } catch (error) {
+          await this.offerMockPayment(orderNo, error instanceof Error ? error.message : '');
+          return;
+        }
       }
 
-      wx.showModal({
-        title: '模拟支付',
-        content: '开发环境将使用 mock-pay 完成支付并给孩子增加课时。',
-        confirmText: '确认支付',
-        success: async (result) => {
-          if (!result.confirm) return;
-          await this.confirmMockPayment(orderNo);
-        },
-      });
+      await this.offerMockPayment(orderNo, '未登录家长中心，暂不能发起小程序微信支付。');
     } catch (error) {
       wx.showToast({
         title: error instanceof Error ? error.message : '支付初始化失败',
@@ -193,29 +232,64 @@ Page({
     this.payCreatedOrder(orderNo);
   },
 
+  async offerMockPayment(orderNo: string, reason?: string) {
+    try {
+      const intent = await createPaymentIntent(orderNo, 'mock');
+      if (!intent.configured || intent.nextAction !== 'mock_pay') {
+        wx.showModal({
+          title: '支付待配置',
+          content: reason || '订单已创建，微信支付配置完成后可继续支付。',
+          showCancel: false,
+        });
+        return;
+      }
+
+      wx.showModal({
+        title: '开发模拟支付',
+        content: reason
+          ? `${reason}\n\n当前可使用 mock-pay 完成开发环境验证。`
+          : '当前可使用 mock-pay 完成开发环境验证，并给孩子增加课时。',
+        confirmText: '模拟支付',
+        success: async (result) => {
+          if (!result.confirm) return;
+          await this.confirmMockPayment(orderNo);
+        },
+      });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '支付待配置',
+        icon: 'none',
+      });
+    }
+  },
+
+  async finishPaidOrder(paidOrder: ParentOrder) {
+    const order: CheckoutOrder = {
+      ...paidOrder,
+      amountLabel: money(paidOrder.amount),
+      statusLabel: orderStatusLabel(paidOrder.status),
+    };
+    this.setData({ checkoutOrder: order });
+    wx.showModal({
+      title: '支付成功',
+      content: this.data.checkoutDefaultPassword
+        ? `课时已到账。手机号账号初始密码：${this.data.checkoutDefaultPassword}`
+        : '课时已到账，可到家长中心查看。',
+      showCancel: true,
+      confirmText: '去查看',
+      success: (result) => {
+        if (result.confirm) {
+          wx.navigateTo({ url: '/pages/account/index' });
+        }
+      },
+    });
+  },
+
   async confirmMockPayment(orderNo: string) {
     this.setData({ payingOrder: true });
     try {
       const paidOrder = await mockPayOrder(orderNo);
-      const order: CheckoutOrder = {
-        ...paidOrder,
-        amountLabel: money(paidOrder.amount),
-        statusLabel: orderStatusLabel(paidOrder.status),
-      };
-      this.setData({ checkoutOrder: order });
-      wx.showModal({
-        title: '支付成功',
-        content: this.data.checkoutDefaultPassword
-          ? `课时已到账。手机号账号初始密码：${this.data.checkoutDefaultPassword}`
-          : '课时已到账，可到家长中心查看。',
-        showCancel: true,
-        confirmText: '去查看',
-        success: (result) => {
-          if (result.confirm) {
-            wx.navigateTo({ url: '/pages/account/index' });
-          }
-        },
-      });
+      await this.finishPaidOrder(paidOrder);
     } catch (error) {
       wx.showToast({
         title: error instanceof Error ? error.message : '支付失败',

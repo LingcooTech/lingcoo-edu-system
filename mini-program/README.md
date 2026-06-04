@@ -7,7 +7,7 @@
 - 首页：读取 `/public/home`，展示机构首屏、亮点、结构化内容块、推荐课程、公开课和家长评价。
 - 课程列表：读取 `/public/courses`。
 - 课程详情：读取 `/public/courses/:slug`，展示结构化课程内容和课时包，支持创建课时包订单。
-- 购买流程：调用 `/public/orders` 创建订单；开发环境使用 `/payment-intent` + `/mock-pay` 模拟支付并完成课时入账。
+- 购买流程：调用 `/public/orders` 创建订单；已接入小程序 JSAPI 支付参数，商户未配置时可使用 `/payment-intent` + `/mock-pay` 模拟支付并完成课时入账。
 - 老师页：读取 `/public/teachers`，展示头像、头衔、擅长方向和结构化 bio。
 - 活动落地页：读取 `/public/campaigns/:code`，支持二维码 query/scene 进入并提交报名到 `/public/crm/campaigns/:code/participations`。
 - 我的页：支持 `wx.login`、微信 openid 登录、微信手机号授权绑定、测试环境手机号手填、家长 token 存储。
@@ -58,13 +58,23 @@ WECHAT_MINI_PROGRAM_APP_ID=你的 AppID
 WECHAT_MINI_PROGRAM_APP_SECRET=你的 AppSecret
 ```
 
+真实小程序支付还需要在后台支付设置或运行环境里配置微信商户参数；其中微信支付 `appId` 应使用同一个小程序 AppID：
+
+```bash
+WECHAT_PAY_APP_ID=你的小程序 AppID
+WECHAT_PAY_APP_SECRET=你的小程序 AppSecret
+WECHAT_PAY_MCH_ID=微信支付商户号
+WECHAT_PAY_KEY=微信支付 API v2 密钥
+WECHAT_PAY_NOTIFY_URL=https://你的 API 域名/public/payment/wechat/notify
+```
+
 不要把 AppSecret 写进仓库。
 
 ## 下一步后端/小程序闭环
 
 以下能力需要微信 AppID/AppSecret/商户配置和线上 HTTPS 域名后再做完整闭环：
 
-- 将开发环境 mock 支付替换为小程序 JSAPI 支付，返回 `wx.requestPayment` 参数。
+- 真实微信支付回调联调：`wx.requestPayment` 成功后由微信回调确认支付并入账。
 - 订阅消息接口：报名成功、课前提醒、课消通知。
 
 ## 代码结构

@@ -13,12 +13,12 @@ export interface PaymentIntent {
   provider: PaymentProviderCode;
   amount: number;
   currency: string;
-  mode: 'native_qr' | 'page_redirect' | 'mock_mini_program';
+  mode: 'native_qr' | 'page_redirect' | 'mock_mini_program' | 'mini_program_jsapi';
   status: 'pending_payment' | 'paid';
   configured: boolean;
   integrationStatus: 'live' | 'mock' | 'not_configured';
   notifyUrl?: string;
-  nextAction: 'render_qr' | 'redirect' | 'mock_pay' | 'none';
+  nextAction: 'render_qr' | 'redirect' | 'mock_pay' | 'request_payment' | 'none';
   nextStep: string;
   payload: Record<string, unknown>;
 }
@@ -34,6 +34,10 @@ export type ProviderContext = {
   env: AppEnv;
   clientIp?: string;
   order: ProviderOrderContext;
+};
+
+export type MiniProgramPaymentContext = ProviderContext & {
+  openid: string;
 };
 
 export type ProviderNotificationContext = {
@@ -100,6 +104,7 @@ export interface PaymentProviderAdapter {
     notifyUrl?: string;
   };
   preparePayment(context: ProviderContext): Promise<PaymentIntent>;
+  prepareMiniProgramPayment?(context: MiniProgramPaymentContext): Promise<PaymentIntent>;
   parseNotification(context: ProviderNotificationContext): Promise<PaymentNotificationResult>;
   queryPayment(context: ProviderQueryContext): Promise<PaymentQueryResult>;
 }

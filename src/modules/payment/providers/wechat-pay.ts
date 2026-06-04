@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { httpError } from '../../../lib/http-error.js';
 import { normalizeObject, resolveCallbackUrl, resolvePublicBaseUrl, secretConfigured } from './shared.js';
 import type {
+  MiniProgramPaymentContext,
   PaymentNotificationResult,
   PaymentProviderAdapter,
   PaymentQueryResult,
@@ -206,13 +207,19 @@ export class WechatPayProvider implements PaymentProviderAdapter {
     return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+08:00`);
   }
 
-  async preparePayment(context: ProviderContext) {
+  private async createUnifiedOrder(
+    context: ProviderContext,
+    input: { tradeType: 'NATIVE' | 'JSAPI'; openid?: string },
+  ) {
     if (!this.isConfigured(context.env)) {
       throw httpError(422, 'WeChat Pay is not configured');
     }
 
     if (context.order.currency !== 'CNY') {
       throw httpError(422, 'WeChat Pay only supports CNY');
+    }
+    if (input.tradeType === 'JSAPI' && !input.openid?.trim()) {
+      throw httpError(422, 'Missing WeChat Mini Program openid');
     }
 
     const notifyUrl = this.getNotifyUrl(context.env);
@@ -227,9 +234,14 @@ export class WechatPayProvider implements PaymentProviderAdapter {
       fee_type: context.order.currency,
       spbill_create_ip: this.resolveClientIp(context),
       notify_url: notifyUrl,
-      trade_type: 'NATIVE',
-      product_id: context.order.orderNo
+      trade_type: input.tradeType
     };
+
+    if (input.tradeType === 'NATIVE') {
+      requestPayload.product_id = context.order.orderNo;
+    } else {
+      requestPayload.openid = input.openid!.trim();
+    }
 
     requestPayload.sign = this.createSignature(requestPayload, this.getApiKey(context.env), 'HMAC-SHA256');
 
@@ -258,11 +270,23 @@ export class WechatPayProvider implements PaymentProviderAdapter {
       throw httpError(502, `WeChat Pay create order failed: ${responsePayload.return_msg ?? 'unknown return error'}`);
     }
 
-    if (responsePayload.result_code !== 'SUCCESS' || !responsePayload.code_url) {
+    if (responsePayload.result_code !== 'SUCCESS') {
       throw httpError(
         502,
         `WeChat Pay create order failed: ${responsePayload.err_code_des ?? responsePayload.return_msg ?? 'empty response'}`
       );
+    }
+
+    return { notifyUrl, responsePayload };
+  }
+
+  async preparePayment(context: ProviderContext) {
+    const { notifyUrl, responsePayload } = await this.createUnifiedOrder(context, {
+      tradeType: 'NATIVE',
+    });
+
+    if (!responsePayload.code_url) {
+      throw httpError(502, 'WeChat Pay create order failed: missing code_url');
     }
 
     return {
@@ -282,6 +306,58 @@ export class WechatPayProvider implements PaymentProviderAdapter {
         qrCodeText: responsePayload.code_url,
         prepayId: responsePayload.prepay_id ?? ''
       }
+    } as const;
+  }
+
+  async prepareMiniProgramPayment(context: MiniProgramPaymentContext) {
+    const { notifyUrl, responsePayload } = await this.createUnifiedOrder(context, {
+      tradeType: 'JSAPI',
+      openid: context.openid,
+    });
+
+    if (!responsePayload.prepay_id) {
+      throw httpError(502, 'WeChat Pay create order failed: missing prepay_id');
+    }
+
+    const nonceStr = randomBytes(16).toString('hex');
+    const timeStamp = String(Math.floor(Date.now() / 1000));
+    const requestPaymentPackage = `prepay_id=${responsePayload.prepay_id}`;
+    const signType = 'HMAC-SHA256';
+    const appId = context.env.WECHAT_PAY_APP_ID!.trim();
+    const paySign = this.createSignature(
+      {
+        appId,
+        timeStamp,
+        nonceStr,
+        package: requestPaymentPackage,
+        signType,
+      },
+      this.getApiKey(context.env),
+      signType,
+    );
+
+    return {
+      orderNo: context.order.orderNo,
+      provider: this.code,
+      amount: context.order.amount,
+      currency: context.order.currency,
+      mode: 'mini_program_jsapi',
+      status: 'pending_payment',
+      configured: true,
+      integrationStatus: 'live',
+      notifyUrl,
+      nextAction: 'request_payment',
+      nextStep:
+        'Call wx.requestPayment with payload.timeStamp, payload.nonceStr, payload.package, payload.signType and payload.paySign.',
+      payload: {
+        appId,
+        timeStamp,
+        nonceStr,
+        package: requestPaymentPackage,
+        signType,
+        paySign,
+        prepayId: responsePayload.prepay_id,
+      },
     } as const;
   }
 

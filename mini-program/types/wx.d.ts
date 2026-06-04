@@ -24,6 +24,16 @@ declare const wx: {
   }): void;
   setClipboardData(options: { data: string; success?: () => void }): void;
   login(options: { success?: (result: { code: string }) => void; fail?: (error: { errMsg: string }) => void }): void;
+  requestPayment(options: {
+    timeStamp: string;
+    nonceStr: string;
+    package: string;
+    signType: string;
+    paySign: string;
+    success?: () => void;
+    fail?: (error: { errMsg: string }) => void;
+    complete?: () => void;
+  }): void;
 };
 
 declare function App(options: Record<string, unknown>): void;

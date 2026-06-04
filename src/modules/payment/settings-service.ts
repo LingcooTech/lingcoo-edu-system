@@ -308,7 +308,7 @@ export class PaymentSettingsService {
       label: wechatProvider.label,
       source: wechatSource,
       configured: wechatProvider.isConfigured(runtimeEnv),
-      supportedModes: ['native_qr'],
+      supportedModes: ['native_qr', 'mini_program_jsapi'],
       notifyUrl: wechatOverview.notifyUrl,
       values: {
         appId: wechat?.appId ?? '',

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import QRCode from 'qrcode';
 
+import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import type { Order } from '../../db/repositories/finance.js';
 import { httpError } from '../../lib/http-error.js';
@@ -103,6 +104,63 @@ export class PaymentService {
     await financeRepo.markPaymentPrepared(this.app.db, order.orderNo, provider);
 
     return { item: await attachQrCodeDataUrl(intent) };
+  }
+
+  async createWechatMiniProgramPaymentIntent(input: {
+    orderNo: string;
+    accountId: string;
+    clientIp?: string;
+  }) {
+    const order = await financeRepo.findOrderByOrderNo(this.app.db, input.orderNo);
+
+    if (!order) {
+      throw httpError(404, 'Order not found');
+    }
+    if (order.accountId !== input.accountId) {
+      throw httpError(403, '只能支付本人账号下的订单');
+    }
+    if (order.status === 'paid') {
+      return { item: this.buildPaidIntent(order, 'wechat_pay') };
+    }
+
+    const adapter = getPaymentProvider('wechat_pay');
+    const runtimeEnv = await new PaymentSettingsService(this.app).buildRuntimeEnv();
+    if (!adapter.isConfigured(runtimeEnv)) {
+      throw httpError(422, `${adapter.label} is not configured`);
+    }
+    if (!adapter.prepareMiniProgramPayment) {
+      throw httpError(422, `${adapter.label} does not support Mini Program payment`);
+    }
+
+    const appId = runtimeEnv.WECHAT_PAY_APP_ID?.trim();
+    if (!appId) {
+      throw httpError(422, 'WECHAT_PAY_APP_ID is not configured');
+    }
+
+    const identity = await accountsRepo.findWechatIdentityByAccount(
+      this.app.db,
+      input.accountId,
+      appId,
+    );
+    if (!identity) {
+      throw httpError(422, '当前账号未绑定该小程序微信身份，请先在小程序使用微信登录绑定手机号');
+    }
+
+    const intent = await adapter.prepareMiniProgramPayment({
+      env: runtimeEnv,
+      clientIp: input.clientIp,
+      openid: identity.openid,
+      order: {
+        orderNo: order.orderNo,
+        subject: buildOrderSubject(order),
+        amount: order.amount,
+        currency: order.currency,
+      },
+    });
+
+    await financeRepo.markPaymentPrepared(this.app.db, order.orderNo, 'wechat_pay');
+
+    return { item: intent };
   }
 
   private createMockIntent(order: Order) {

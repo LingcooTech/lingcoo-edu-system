@@ -130,6 +130,20 @@ export async function findAccountByWechatIdentity(db: Database, appId: string, o
   return row?.account ?? null;
 }
 
+export async function findWechatIdentityByAccount(db: Database, accountId: string, appId: string) {
+  const [identity] = await db
+    .select()
+    .from(schema.accountWechatIdentities)
+    .where(
+      and(
+        eq(schema.accountWechatIdentities.accountId, accountId),
+        eq(schema.accountWechatIdentities.appId, appId),
+      ),
+    )
+    .limit(1);
+  return identity ?? null;
+}
+
 export async function createWechatIdentity(
   db: Database,
   values: typeof schema.accountWechatIdentities.$inferInsert,

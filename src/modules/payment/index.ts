@@ -233,6 +233,19 @@ export const paymentModule: AppModule = {
       });
     });
 
+    app.post(
+      '/public/orders/:orderNo/wechat-mini-payment-intent',
+      { preHandler: app.requireParent },
+      async (request) => {
+        const { orderNo } = request.params as { orderNo: string };
+        return new PaymentService(app).createWechatMiniProgramPaymentIntent({
+          orderNo,
+          accountId: request.account!.id,
+          clientIp: request.ip,
+        });
+      },
+    );
+
     app.post('/public/orders/:orderNo/payment-sync', async (request) => {
       const { orderNo } = request.params as { orderNo: string };
       return new PaymentService(app).syncProviderPayment({

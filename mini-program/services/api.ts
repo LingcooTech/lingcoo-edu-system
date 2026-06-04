@@ -351,11 +351,33 @@ export async function createPaymentIntent(
   ).item;
 }
 
+export async function createWechatMiniPaymentIntent(orderNo: string): Promise<PaymentIntent> {
+  return (
+    await request<{ item: PaymentIntent }>(
+      `/public/orders/${encodeURIComponent(orderNo)}/wechat-mini-payment-intent`,
+      {
+        method: 'POST',
+      },
+    )
+  ).item;
+}
+
 export async function mockPayOrder(orderNo: string): Promise<ParentOrder> {
   return (
     await request<{ item: ParentOrder }>(`/public/orders/${encodeURIComponent(orderNo)}/mock-pay`, {
       method: 'POST',
     })
+  ).item;
+}
+
+export async function syncOrderPayment(orderNo: string): Promise<ParentOrder> {
+  return (
+    await request<{ item: ParentOrder }>(
+      `/public/orders/${encodeURIComponent(orderNo)}/payment-sync`,
+      {
+        method: 'POST',
+      },
+    )
   ).item;
 }
 

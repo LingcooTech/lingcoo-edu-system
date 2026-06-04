@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { buildApp } from '../src/app.js';
 import * as schema from '../src/db/schema.js';
 import type { AppEnv } from '../src/lib/env.js';
+import { hashPassword } from '../src/lib/password.js';
 
 const testEnv: AppEnv = {
   NODE_ENV: 'test',
@@ -285,6 +286,120 @@ test('creates and mock-pays a public package order', async () => {
     assert.ok(lessonAccount);
     assert.equal(lessonAccount.balance, pkg.lessonCount);
   } finally {
+    await app.close();
+  }
+});
+
+test('creates a WeChat Mini Program payment intent for a bound parent order', async () => {
+  const payEnv: AppEnv = {
+    ...testEnv,
+    PUBLIC_BASE_URL: 'https://api.example.com',
+    WECHAT_PAY_APP_ID: testEnv.WECHAT_MINI_PROGRAM_APP_ID,
+    WECHAT_PAY_APP_SECRET: 'wechat-pay-secret',
+    WECHAT_PAY_MCH_ID: '1234567890',
+    WECHAT_PAY_KEY: '12345678901234567890123456789012',
+  };
+  const app = await buildApp(payEnv);
+  const originalFetch = globalThis.fetch;
+  const suffix = randomUUID();
+  let requestXml = '';
+
+  globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    requestXml = String(init?.body ?? '');
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        '<xml><return_code><![CDATA[SUCCESS]]></return_code><result_code><![CDATA[SUCCESS]]></result_code><prepay_id><![CDATA[wx-prepay-id]]></prepay_id></xml>',
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const [guardian] = await app.db
+      .insert(schema.guardians)
+      .values({ name: 'JSAPI Guardian', phone: `137${suffix.replaceAll('-', '').slice(0, 8)}` })
+      .returning();
+    const [account] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'parent',
+        phone: guardian.phone,
+        passwordHash: hashPassword('test-password'),
+        displayName: guardian.name,
+        guardianId: guardian.id,
+      })
+      .returning();
+    await app.db.insert(schema.accountWechatIdentities).values({
+      accountId: account.id,
+      appId: payEnv.WECHAT_PAY_APP_ID!,
+      openid: 'openid-jsapi-test',
+    });
+    const [student] = await app.db
+      .insert(schema.students)
+      .values({
+        guardianId: guardian.id,
+        name: 'JSAPI Student',
+        grade: '三年级',
+        status: 'active',
+      })
+      .returning();
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        slug: `mini-jsapi-${suffix}`,
+        name: 'Mini JSAPI Course',
+        category: '编程',
+        ageRange: '8-10 岁',
+        durationMinutes: 60,
+        summary: 'Mini JSAPI course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [pkg] = await app.db
+      .insert(schema.coursePackages)
+      .values({
+        courseId: course.id,
+        name: '10 课时包',
+        description: '',
+        lessonCount: 10,
+        priceAmount: 108000,
+        status: 'active',
+      })
+      .returning();
+    const [order] = await app.db
+      .insert(schema.orders)
+      .values({
+        accountId: account.id,
+        studentId: student.id,
+        courseId: course.id,
+        packageId: pkg.id,
+        orderNo: `JSAPI${Date.now()}${suffix.slice(0, 8)}`,
+        amount: pkg.priceAmount,
+        paidAmount: 0,
+        lessonCount: pkg.lessonCount,
+        status: 'pending',
+        source: 'test',
+      })
+      .returning();
+    const token = await app.jwt.sign({ sub: account.id, role: 'parent' }, { expiresIn: '1h' });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${order.orderNo}/wechat-mini-payment-intent`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.statusCode, 200);
+    const intent = response.json().item;
+    assert.equal(intent.mode, 'mini_program_jsapi');
+    assert.equal(intent.nextAction, 'request_payment');
+    assert.equal(intent.payload.package, 'prepay_id=wx-prepay-id');
+    assert.equal(intent.payload.signType, 'HMAC-SHA256');
+    assert.equal(typeof intent.payload.paySign, 'string');
+    assert.match(requestXml, /<trade_type><!\[CDATA\[JSAPI\]\]><\/trade_type>/);
+    assert.match(requestXml, /<openid><!\[CDATA\[openid-jsapi-test\]\]><\/openid>/);
+  } finally {
+    globalThis.fetch = originalFetch;
     await app.close();
   }
 });
