@@ -71,6 +71,13 @@
       "when": 1780120400000,
       "tag": "0009_unified_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780567841297,
+      "tag": "0010_lead_course_delivery",
+      "breakpoints": true
     }
   ]
 }

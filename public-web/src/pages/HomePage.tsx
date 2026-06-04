@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarDays, MapPin, MessageCircle, Phone, Star } from 'lucide-react';
 
 import { loadHome, type Course, type HomePayload, type TrialSession } from '@/api/client';
+import { BlockRenderer } from '@/components/blocks/BlockRenderer';
+import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
 import { formatDateTime, money } from '@/lib/utils';
 
@@ -29,6 +31,7 @@ export function HomePage() {
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
   const testimonials = profile?.testimonials ?? [];
+  const bodyBlocks = useMemo(() => parseBlocks(profile?.bodyBlocks), [profile]);
 
   return (
     <Layout>
@@ -82,6 +85,12 @@ export function HomePage() {
               </article>
             ))}
           </div>
+        </section>
+      )}
+
+      {bodyBlocks.length > 0 && (
+        <section className="container-narrow py-8">
+          <BlockRenderer blocks={bodyBlocks} />
         </section>
       )}
 

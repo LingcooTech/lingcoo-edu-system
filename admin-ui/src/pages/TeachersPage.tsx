@@ -3,6 +3,8 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Teacher } from '@/api/types';
+import { BlockEditor } from '@/components/editor/BlockEditor';
+import { parseBlocks, serializeBlocks, TEACHER_ALLOWED, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -24,14 +26,20 @@ interface TeacherSaveResponse {
 interface TeacherForm {
   name: string;
   phone: string;
+  title: string;
+  avatarUrl: string;
   specialties: string;
+  bioBlocks: Block[];
   status: 'active' | 'archived';
 }
 
 const emptyTeacherForm: TeacherForm = {
   name: '',
   phone: '',
+  title: '',
+  avatarUrl: '',
   specialties: '',
+  bioBlocks: [],
   status: 'active',
 };
 
@@ -52,7 +60,10 @@ export function TeachersPage() {
         ? {
             name: teacher.name,
             phone: teacher.phone ?? '',
+            title: teacher.title ?? '',
+            avatarUrl: teacher.avatarUrl ?? '',
             specialties: teacher.specialties.join('、'),
+            bioBlocks: parseBlocks(teacher.bio),
             status: teacher.status as TeacherForm['status'],
           }
         : emptyTeacherForm,
@@ -70,10 +81,13 @@ export function TeachersPage() {
       const payload = {
         name: form.name.trim(),
         phone: form.phone.trim(),
+        title: form.title.trim(),
+        avatarUrl: form.avatarUrl.trim(),
         specialties: form.specialties
           .split(/[、,，]/)
           .map((item) => item.trim())
           .filter(Boolean),
+        bio: serializeBlocks(form.bioBlocks),
         status: form.status,
       };
       if (editing) {
@@ -197,11 +211,32 @@ export function TeachersPage() {
             onChange={(event) => setForm({ ...form, phone: event.target.value })}
           />
         </Field>
+        <Field label="职称 / 头衔" hint="如「教学主管」「资深书法老师」">
+          <input
+            className="form-input"
+            value={form.title}
+            onChange={(event) => setForm({ ...form, title: event.target.value })}
+          />
+        </Field>
+        <Field label="头像图片 URL" hint="可选，展示在家长端教师卡片">
+          <input
+            className="form-input"
+            value={form.avatarUrl}
+            onChange={(event) => setForm({ ...form, avatarUrl: event.target.value })}
+          />
+        </Field>
         <Field label="擅长" hint="用顿号或逗号分隔">
           <input
             className="form-input"
             value={form.specialties}
             onChange={(event) => setForm({ ...form, specialties: event.target.value })}
+          />
+        </Field>
+        <Field label="老师介绍" hint="用模块编排，展示在家长端教师页">
+          <BlockEditor
+            value={form.bioBlocks}
+            onChange={(bioBlocks) => setForm({ ...form, bioBlocks })}
+            allowed={TEACHER_ALLOWED}
           />
         </Field>
         <Field label="状态">

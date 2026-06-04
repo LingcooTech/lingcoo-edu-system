@@ -3,6 +3,8 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Course } from '@/api/types';
+import { BlockEditor } from '@/components/editor/BlockEditor';
+import { COURSE_ALLOWED, parseBlocks, serializeBlocks, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -21,7 +23,7 @@ interface CourseForm {
   ageRange: string;
   durationMinutes: string;
   summary: string;
-  content: string;
+  contentBlocks: Block[];
   status: 'draft' | 'published' | 'archived';
 }
 
@@ -32,7 +34,7 @@ const emptyCourseForm: CourseForm = {
   ageRange: '',
   durationMinutes: '60',
   summary: '',
-  content: '',
+  contentBlocks: [],
   status: 'draft',
 };
 
@@ -44,7 +46,7 @@ function courseToForm(course: Course): CourseForm {
     ageRange: course.ageRange,
     durationMinutes: String(course.durationMinutes),
     summary: course.summary ?? '',
-    content: course.content ?? '',
+    contentBlocks: parseBlocks(course.content),
     status: (course.status as CourseForm['status']) ?? 'draft',
   };
 }
@@ -57,7 +59,7 @@ function courseFormToPayload(form: CourseForm) {
     ageRange: form.ageRange.trim(),
     durationMinutes: Number(form.durationMinutes) || 60,
     summary: form.summary,
-    content: form.content,
+    content: serializeBlocks(form.contentBlocks),
     status: form.status,
   };
 }
@@ -266,11 +268,11 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
             onChange={(e) => setForm({ ...form, summary: e.target.value })}
           />
         </Field>
-        <Field label="详情正文" hint="展示在课程详情页">
-          <textarea
-            className="form-input h-32"
-            value={form.content}
-            onChange={(e) => setForm({ ...form, content: e.target.value })}
+        <Field label="详情正文" hint="展示在课程详情页，可用模块编排">
+          <BlockEditor
+            value={form.contentBlocks}
+            onChange={(contentBlocks) => setForm({ ...form, contentBlocks })}
+            allowed={COURSE_ALLOWED}
           />
         </Field>
       </Drawer>

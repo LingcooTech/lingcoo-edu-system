@@ -44,6 +44,7 @@ const campaignSchema = z.object({
   courseSlug: z.string().max(120).optional(),
   medium: z.string().max(40).default('qr_code'),
   status: z.enum(['active', 'paused', 'archived']).default('active'),
+  content: z.string().default(''),
 });
 
 const campaignUpdateSchema = campaignSchema.partial();

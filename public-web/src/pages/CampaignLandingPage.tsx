@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -7,6 +7,8 @@ import {
   submitCampaignParticipation,
   type CampaignLandingPayload,
 } from '@/api/client';
+import { BlockRenderer } from '@/components/blocks/BlockRenderer';
+import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
 import { formatDateTime } from '@/lib/utils';
 
@@ -64,6 +66,8 @@ export function CampaignLandingPage() {
 
   const inputClass = 'border-line w-full rounded-xl border bg-surface px-3.5 py-3 text-sm';
 
+  const contentBlocks = useMemo(() => parseBlocks(payload?.campaign.content), [payload]);
+
   if (loading) {
     return (
       <Layout>
@@ -113,6 +117,11 @@ export function CampaignLandingPage() {
 
       <section className="container-narrow grid gap-6 py-8 lg:grid-cols-[1fr_420px]">
         <div className="space-y-4">
+          {contentBlocks.length > 0 && (
+            <div className="pwcard p-5">
+              <BlockRenderer blocks={contentBlocks} />
+            </div>
+          )}
           <div className="pwcard p-5">
             <h2 className="text-ink text-lg font-semibold">可预约试听</h2>
             <div className="mt-3 grid gap-3">

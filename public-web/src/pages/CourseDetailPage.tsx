@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, Clock, Layers } from 'lucide-react';
 
 import { fetchCourse, type Course, type CoursePackage } from '@/api/client';
+import { BlockRenderer } from '@/components/blocks/BlockRenderer';
+import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
 import { money } from '@/lib/utils';
 
@@ -11,6 +13,8 @@ export function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [packages, setPackages] = useState<CoursePackage[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound'>('loading');
+
+  const contentBlocks = useMemo(() => parseBlocks(course?.content), [course]);
 
   useEffect(() => {
     setStatus('loading');
@@ -70,9 +74,9 @@ export function CourseDetailPage() {
           </span>
         </div>
 
-        {course.content && (
-          <div className="text-ink-soft mt-6 text-sm leading-7 whitespace-pre-line">
-            {course.content}
+        {contentBlocks.length > 0 && (
+          <div className="mt-6">
+            <BlockRenderer blocks={contentBlocks} />
           </div>
         )}
 

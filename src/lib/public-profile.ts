@@ -1,3 +1,5 @@
+import { normalizeBlocks, type Block } from './content-blocks.js';
+
 export interface PublicProfile {
   headline: string;
   introduction: string;
@@ -13,6 +15,7 @@ export interface PublicProfile {
   gallery: string[];
   faq: string[];
   businessHours: string;
+  bodyBlocks: Block[];
 }
 
 export const defaultPublicProfile: PublicProfile = {
@@ -39,6 +42,7 @@ export const defaultPublicProfile: PublicProfile = {
   gallery: [],
   faq: ['试听课需要提前预约，提交表单后老师会电话确认时间。'],
   businessHours: '周二至周日 10:00-20:00',
+  bodyBlocks: [],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -80,10 +84,15 @@ export function readPublicProfile(settings: unknown): PublicProfile {
     gallery: normalizeStringList(raw.gallery, defaultPublicProfile.gallery, 12),
     faq: normalizeStringList(raw.faq, defaultPublicProfile.faq, 8),
     businessHours: normalizeString(raw.businessHours) || defaultPublicProfile.businessHours,
+    bodyBlocks: normalizeBlocks(raw.bodyBlocks),
   };
 }
 
-export function normalizePublicProfile(input: Partial<PublicProfile>) {
+// Accepts bodyBlocks as untrusted `unknown` (the zod layer passes it through);
+// normalizeBlocks does the structural validation.
+type PublicProfileInput = Partial<Omit<PublicProfile, 'bodyBlocks'>> & { bodyBlocks?: unknown };
+
+export function normalizePublicProfile(input: PublicProfileInput) {
   return {
     headline: normalizeString(input.headline) || defaultPublicProfile.headline,
     introduction: normalizeString(input.introduction) || defaultPublicProfile.introduction,
@@ -99,6 +108,7 @@ export function normalizePublicProfile(input: Partial<PublicProfile>) {
     gallery: normalizeStringList(input.gallery, defaultPublicProfile.gallery, 12),
     faq: normalizeStringList(input.faq, defaultPublicProfile.faq, 8),
     businessHours: normalizeString(input.businessHours) || defaultPublicProfile.businessHours,
+    bodyBlocks: normalizeBlocks(input.bodyBlocks),
   };
 }
 

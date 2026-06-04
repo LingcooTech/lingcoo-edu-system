@@ -1,3 +1,5 @@
+import type { Block } from '@/components/blocks/blocks';
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8090');
 
@@ -47,6 +49,7 @@ export interface HomePayload {
       gallery: string[];
       faq: string[];
       businessHours: string;
+      bodyBlocks?: Block[];
     };
     branding: {
       fullLogoUrl?: string;
@@ -273,6 +276,7 @@ export interface CampaignLandingPayload {
     courseSlug?: string | null;
     medium: string;
     status: string;
+    content?: string;
   };
   channel: { id: string; code: string; name: string } | null;
   course: Course | null;
@@ -316,6 +320,9 @@ export interface PublicTeacher {
   id: string;
   name: string;
   phone?: string | null;
+  title?: string | null;
+  avatarUrl?: string | null;
+  bio?: string | null;
   specialties: string[];
   status: string;
 }

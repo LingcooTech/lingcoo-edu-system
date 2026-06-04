@@ -13,6 +13,9 @@ import type { AppModule } from '../types.js';
 const teacherSchema = z.object({
   name: z.string().min(1),
   phone: z.string().default(''),
+  title: z.string().max(120).optional(),
+  avatarUrl: z.string().max(500).optional(),
+  bio: z.string().default(''),
   specialties: z.array(z.string()).default([]),
   status: z.enum(['active', 'archived']).default('active'),
 });

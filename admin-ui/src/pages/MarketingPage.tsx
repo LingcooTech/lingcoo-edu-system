@@ -3,6 +3,13 @@ import { Plus, QrCode, Trash2 } from 'lucide-react';
 
 import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Campaign, CampaignFunnelRow, Channel, ChannelFunnelRow, Course } from '@/api/types';
+import { BlockEditor } from '@/components/editor/BlockEditor';
+import {
+  CAMPAIGN_ALLOWED,
+  parseBlocks,
+  serializeBlocks,
+  type Block,
+} from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -107,6 +114,7 @@ export function MarketingPage() {
     courseSlug: '',
     medium: 'qr_code',
     status: 'active',
+    contentBlocks: [] as Block[],
   });
   const [savingCampaign, setSavingCampaign] = useState(false);
   const [campaignDeleteTarget, setCampaignDeleteTarget] = useState<Campaign | null>(null);
@@ -122,6 +130,7 @@ export function MarketingPage() {
             courseSlug: campaign.courseSlug ?? '',
             medium: campaign.medium,
             status: campaign.status,
+            contentBlocks: parseBlocks(campaign.content),
           }
         : {
             channelId: channels[0]?.id ?? '',
@@ -130,6 +139,7 @@ export function MarketingPage() {
             courseSlug: '',
             medium: 'qr_code',
             status: 'active',
+            contentBlocks: [],
           },
     );
     setCampaignOpen(true);
@@ -142,7 +152,12 @@ export function MarketingPage() {
     }
     setSavingCampaign(true);
     try {
-      const payload = { ...campaignForm, courseSlug: campaignForm.courseSlug || undefined };
+      const { contentBlocks, ...rest } = campaignForm;
+      const payload = {
+        ...rest,
+        courseSlug: campaignForm.courseSlug || undefined,
+        content: serializeBlocks(contentBlocks),
+      };
       if (campaignEditing) {
         const { campaign } = await apiPatch<{ campaign: Campaign }>(
           `${CAMPAIGNS()}/${campaignEditing.id}`,
@@ -500,6 +515,13 @@ export function MarketingPage() {
             </select>
           </Field>
         </FieldRow>
+        <Field label="活动内容" hint="用模块编排，展示在活动落地页">
+          <BlockEditor
+            value={campaignForm.contentBlocks}
+            onChange={(contentBlocks) => setCampaignForm({ ...campaignForm, contentBlocks })}
+            allowed={CAMPAIGN_ALLOWED}
+          />
+        </Field>
       </Drawer>
 
       <Drawer

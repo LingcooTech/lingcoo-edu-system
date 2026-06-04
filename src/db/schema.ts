@@ -157,6 +157,7 @@ export const campaigns = pgTable(
     courseSlug: varchar('course_slug', { length: 120 }),
     medium: varchar('medium', { length: 40 }).notNull().default('qr_code'),
     status: campaignStatusEnum('status').notNull().default('active'),
+    content: text('content').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -297,6 +298,9 @@ export const teachers = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     name: varchar('name', { length: 120 }).notNull(),
     phone: varchar('phone', { length: 40 }),
+    title: varchar('title', { length: 120 }),
+    avatarUrl: varchar('avatar_url', { length: 500 }),
+    bio: text('bio').notNull().default(''),
     specialties: jsonb('specialties')
       .notNull()
       .default(sql`'[]'::jsonb`),

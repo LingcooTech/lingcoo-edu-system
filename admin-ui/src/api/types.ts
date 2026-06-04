@@ -1,3 +1,5 @@
+import type { Block } from '@/components/editor/blocks';
+
 export type LeadStatus =
   | 'new'
   | 'contacted'
@@ -41,6 +43,9 @@ export interface Teacher {
   id: string;
   name: string;
   phone?: string | null;
+  title?: string | null;
+  avatarUrl?: string | null;
+  bio?: string | null;
   specialties: string[];
   status: string;
 }
@@ -116,6 +121,7 @@ export interface Campaign {
   courseSlug?: string | null;
   medium: string;
   status: string;
+  content?: string;
 }
 
 export interface CampaignFunnelRow {
@@ -261,6 +267,7 @@ export interface PublicProfile {
   gallery: string[];
   faq: string[];
   businessHours: string;
+  bodyBlocks: Block[];
 }
 
 export interface OrganizationBranding {

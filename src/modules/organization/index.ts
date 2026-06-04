@@ -27,6 +27,7 @@ const publicProfileSchema = z.object({
   gallery: z.array(z.string().min(1).max(500)).max(12).optional(),
   faq: z.array(z.string().min(1).max(240)).max(8).optional(),
   businessHours: z.string().max(120).optional(),
+  bodyBlocks: z.array(z.unknown()).max(200).optional(),
 });
 
 const brandingSchema = z
