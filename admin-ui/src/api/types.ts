@@ -364,3 +364,9 @@ export interface QiniuUploadTokenResponse {
   publicUrl: string;
   expiresIn: number;
 }
+
+export interface QiniuUploadedImageResponse {
+  key: string;
+  url: string;
+  publicUrl: string;
+}

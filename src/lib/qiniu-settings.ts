@@ -37,6 +37,12 @@ export type QiniuImageItem = {
   uploadedAt: string | null;
 };
 
+export type QiniuUploadedImage = {
+  key: string;
+  url: string;
+  publicUrl: string;
+};
+
 function normalizeString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -61,6 +67,10 @@ function normalizeUrl(value: unknown, fallback = '') {
 
 function normalizePrefix(value: unknown) {
   return normalizeString(value).replace(/^\/+|\/+$/g, '');
+}
+
+function normalizeContentType(value: unknown) {
+  return normalizeString(value).split(';', 1)[0].toLowerCase() || 'application/octet-stream';
 }
 
 function normalizeLimit(value: unknown, fallback: number) {
@@ -391,6 +401,55 @@ export class QiniuSettingsService {
       uploadHost: settings.uploadHost,
       publicUrl: buildPublicUrl(settings.publicBaseUrl, objectKey),
       expiresIn,
+    };
+  }
+
+  async uploadImage(input: {
+    filename: string;
+    prefix?: string;
+    contentType?: string;
+    data: Buffer;
+  }): Promise<QiniuUploadedImage> {
+    if (!input.data.length) {
+      throw httpError(422, '请选择要上传的文件');
+    }
+
+    const token = await this.createUploadToken({
+      filename: input.filename,
+      prefix: input.prefix,
+    });
+    const formData = new FormData();
+    const blob = new Blob([Uint8Array.from(input.data)], {
+      type: normalizeContentType(input.contentType),
+    });
+    formData.set('token', token.uploadToken);
+    formData.set('key', token.key);
+    formData.set('file', blob, normalizeString(input.filename) || 'image');
+
+    let response: Response;
+    try {
+      response = await fetch(token.uploadHost, {
+        method: 'POST',
+        body: formData,
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      throw httpError(502, `七牛云上传请求失败: ${message}`);
+    }
+
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => '')).trim();
+      throw httpError(
+        502,
+        detail ? `七牛云上传失败: ${detail}` : `七牛云上传失败 (${response.status})`,
+      );
+    }
+
+    return {
+      key: token.key,
+      url: token.publicUrl,
+      publicUrl: token.publicUrl,
     };
   }
 }

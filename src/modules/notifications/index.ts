@@ -1,14 +1,19 @@
 import { z } from 'zod';
 
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
+import { httpError } from '../../lib/http-error.js';
 import { getWechatMiniSubscribeTemplates } from '../../lib/wechat-mini.js';
 import { NotificationsService } from './service.js';
 import type { AppModule } from '../types.js';
+
+const QINIU_UPLOAD_BODY_LIMIT = 15 * 1024 * 1024;
 
 const uploadTokenSchema = z.object({
   filename: z.string().min(1),
   prefix: z.string().optional(),
 });
+
+const uploadQuerySchema = uploadTokenSchema;
 
 const qiniuSettingsSchema = z.object({
   accessKey: z.string().optional(),
@@ -101,5 +106,24 @@ export const notificationsModule: AppModule = {
       const service = new QiniuSettingsService(app.db, app.appEnv);
       return service.createUploadToken(body);
     });
+
+    app.post(
+      '/v1/storage/qiniu/upload',
+      { preHandler: app.requireAdmin, bodyLimit: QINIU_UPLOAD_BODY_LIMIT },
+      async (request) => {
+        const query = uploadQuerySchema.parse(request.query);
+        if (!Buffer.isBuffer(request.body)) {
+          throw httpError(415, '请上传图片文件');
+        }
+
+        const service = new QiniuSettingsService(app.db, app.appEnv);
+        const contentTypeHeader = request.headers['content-type'];
+        return service.uploadImage({
+          ...query,
+          contentType: Array.isArray(contentTypeHeader) ? contentTypeHeader[0] : contentTypeHeader,
+          data: request.body,
+        });
+      },
+    );
   },
 };

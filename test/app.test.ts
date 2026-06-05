@@ -289,22 +289,36 @@ test('creates Qiniu upload tokens and lists images under the default prefix', as
   const originalFetch = globalThis.fetch;
   let listPrefix = '';
 
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    assert.equal(url.hostname, 'rsf.qiniuapi.com');
-    assert.equal(url.pathname, '/list');
-    assert.equal(url.searchParams.get('bucket'), 'fd-assets');
-    listPrefix = url.searchParams.get('prefix') ?? '';
-    return jsonResponse({
-      items: [
-        {
-          key: 'fd-edu/brand/logo/logo.png',
-          fsize: 1234,
-          mimeType: 'image/png',
-          putTime: 17_000_000_000_000_000,
-        },
-      ],
-    });
+    if (url.hostname === 'rsf.qiniuapi.com') {
+      assert.equal(url.pathname, '/list');
+      assert.equal(url.searchParams.get('bucket'), 'fd-assets');
+      listPrefix = url.searchParams.get('prefix') ?? '';
+      return jsonResponse({
+        items: [
+          {
+            key: 'fd-edu/brand/logo/logo.png',
+            fsize: 1234,
+            mimeType: 'image/png',
+            putTime: 17_000_000_000_000_000,
+          },
+        ],
+      });
+    }
+
+    assert.equal(url.hostname, 'upload.qiniup.com');
+    assert.equal(init?.method, 'POST');
+    assert.ok(init?.body instanceof FormData);
+    const formData = init.body;
+    const key = String(formData.get('key'));
+    assert.match(key, /^fd-edu\/brand\/logo\/\d{4}\/\d{2}\/\d{2}\/Logo-01-/);
+    assert.match(String(formData.get('token')), /^qiniu-access-key:/);
+    const file = formData.get('file');
+    assert.ok(file instanceof Blob);
+    assert.equal(file.type, 'image/png');
+    assert.equal(await file.text(), 'image-data');
+    return new Response(JSON.stringify({ key, hash: 'qiniu-hash' }), { status: 200 });
   }) as typeof fetch;
 
   try {
@@ -332,6 +346,21 @@ test('creates Qiniu upload tokens and lists images under the default prefix', as
     assert.equal(images.statusCode, 200, images.body);
     assert.equal(listPrefix, 'fd-edu/brand/logo');
     assert.equal(images.json().items[0].url, 'https://cdn.example.com/fd-edu/brand/logo/logo.png');
+
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/v1/storage/qiniu/upload?filename=Logo%2001.png&prefix=brand/logo',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'image/png',
+      },
+      payload: Buffer.from('image-data'),
+    });
+    assert.equal(upload.statusCode, 200, upload.body);
+    const uploadedPayload = upload.json();
+    assert.match(uploadedPayload.key, /^fd-edu\/brand\/logo\/\d{4}\/\d{2}\/\d{2}\/Logo-01-/);
+    assert.equal(uploadedPayload.publicUrl, `https://cdn.example.com/${uploadedPayload.key}`);
+    assert.equal(uploadedPayload.url, uploadedPayload.publicUrl);
   } finally {
     globalThis.fetch = originalFetch;
     await app.close();

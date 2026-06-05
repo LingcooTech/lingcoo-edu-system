@@ -20,6 +20,7 @@ import type { AppEnv } from './lib/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const IMAGE_UPLOAD_BODY_LIMIT = 15 * 1024 * 1024;
 
 function resolveRuntimePath(...segments: string[]): string {
   return path.resolve(__dirname, '..', ...segments);
@@ -86,6 +87,20 @@ export async function buildApp(env: AppEnv) {
   app.addContentTypeParser('application/xml', { parseAs: 'string' }, (_request, payload, done) => {
     done(null, payload);
   });
+  app.addContentTypeParser(
+    /^image\/[a-zA-Z0-9.+-]+$/,
+    { parseAs: 'buffer', bodyLimit: IMAGE_UPLOAD_BODY_LIMIT },
+    (_request, payload, done) => {
+      done(null, payload);
+    },
+  );
+  app.addContentTypeParser(
+    'application/octet-stream',
+    { parseAs: 'buffer', bodyLimit: IMAGE_UPLOAD_BODY_LIMIT },
+    (_request, payload, done) => {
+      done(null, payload);
+    },
+  );
 
   // Unified auth: the JWT (cookie `fd_edu_token` or Bearer) carries { sub, role }.
   // `authenticate` verifies the token and exposes request.account; `requireRole`

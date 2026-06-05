@@ -340,7 +340,6 @@ function QiniuImagePicker({
 
   useEffect(() => {
     void load(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefix, reloadKey]);
 
   return (

@@ -4,6 +4,7 @@ import type {
   PaymentProviderOverview,
   QiniuImageListResponse,
   QiniuSettingsInput,
+  QiniuUploadedImageResponse,
   QiniuUploadTokenResponse,
   SmtpSettingsInput,
   SystemSettingOverview,
@@ -187,25 +188,30 @@ export async function createQiniuUploadToken(input: { filename: string; prefix?:
 }
 
 export async function uploadQiniuImage(file: File, prefix?: string) {
-  const token = await createQiniuUploadToken({ filename: file.name, prefix });
-  const body = new FormData();
-  body.set('token', token.uploadToken);
-  body.set('key', token.key);
-  body.set('file', file);
+  const token = getToken();
+  const params = new URLSearchParams({ filename: file.name });
+  if (prefix) params.set('prefix', prefix);
+  const headers = new Headers();
+  headers.set('Content-Type', file.type || 'application/octet-stream');
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
-  const response = await fetch(token.uploadHost, {
+  const response = await fetch(`${API_BASE_URL}/v1/storage/qiniu/upload?${params}`, {
     method: 'POST',
-    body,
+    headers,
+    body: file,
+    credentials: 'include',
   });
 
   if (!response.ok) {
-    const detail = (await response.text().catch(() => '')).trim();
+    const payload = (await response
+      .clone()
+      .json()
+      .catch(() => null)) as { message?: string } | null;
+    const detail = payload?.message ?? (await response.text().catch(() => '')).trim();
     throw new Error(detail || `七牛云上传失败：${response.status}`);
   }
 
-  return {
-    key: token.key,
-    url: token.publicUrl,
-    publicUrl: token.publicUrl,
-  };
+  return (await response.json()) as QiniuUploadedImageResponse;
 }
