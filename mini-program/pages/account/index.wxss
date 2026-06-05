@@ -50,10 +50,23 @@
   padding: 18rpx;
 }
 
-.login-button,
-.refresh-button {
+.login-button {
   margin-top: 28rpx;
   width: 100%;
+}
+
+.account-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16rpx;
+  margin-top: 28rpx;
+}
+
+.account-actions .btn {
+  width: 100%;
+  min-width: 0;
+  padding: 0 18rpx;
+  font-size: 26rpx;
 }
 
 .bind-hint {
@@ -77,7 +90,7 @@
 
 .test-divider::before,
 .test-divider::after {
-  content: "";
+  content: '';
   flex: 1;
   height: 1rpx;
   background: rgba(31, 43, 36, 0.1);

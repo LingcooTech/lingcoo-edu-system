@@ -28,11 +28,7 @@ export class NotificationsService {
   constructor(private readonly db: Database) {}
 
   async create(input: CreateNotificationInput) {
-    const existing = await notificationsRepo.findByDedupeKey(this.db, input.dedupeKey);
-    if (existing) {
-      return existing;
-    }
-    return notificationsRepo.createNotification(this.db, {
+    const result = await notificationsRepo.createNotificationIfAbsent(this.db, {
       recipientType: input.recipientType,
       recipientId: input.recipientId,
       category: input.category,
@@ -45,6 +41,7 @@ export class NotificationsService {
       dedupeKey: input.dedupeKey,
       meta: input.meta ?? {},
     });
+    return result.notification;
   }
 
   listForRecipient(

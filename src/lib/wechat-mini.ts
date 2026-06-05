@@ -32,7 +32,8 @@ interface SubscribeMessagePayload extends WechatErrorPayload {
 export type WechatMiniSubscribeTemplateKey =
   | 'trial_registration'
   | 'payment_success'
-  | 'lesson_reminder';
+  | 'lesson_reminder'
+  | 'lesson_consumed';
 
 export interface WechatMiniSubscribeTemplate {
   key: WechatMiniSubscribeTemplateKey;
@@ -92,6 +93,11 @@ export function getWechatMiniSubscribeTemplates(env: AppEnv): WechatMiniSubscrib
       key: 'lesson_reminder',
       label: '课前提醒',
       templateId: env.WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID?.trim() ?? '',
+    },
+    {
+      key: 'lesson_consumed',
+      label: '课消通知',
+      templateId: env.WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID?.trim() ?? '',
     },
   ];
   return templates.filter((item) => Boolean(item.templateId));

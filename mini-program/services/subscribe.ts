@@ -18,10 +18,12 @@ async function loadTemplates() {
   return templateCache;
 }
 
-export async function requestSubscribe(keys: SubscribeTemplateKey[]) {
+export async function requestSubscribe(
+  keys: SubscribeTemplateKey[],
+): Promise<Record<string, string>> {
   const requestSubscribeMessage = wx.requestSubscribeMessage;
   if (!keys.length || !requestSubscribeMessage) {
-    return;
+    return {};
   }
 
   const templates = await loadTemplates();
@@ -31,14 +33,14 @@ export async function requestSubscribe(keys: SubscribeTemplateKey[]) {
     .map((template) => template.templateId);
 
   if (!tmplIds.length) {
-    return;
+    return {};
   }
 
-  await new Promise<void>((resolve) => {
+  return new Promise<Record<string, string>>((resolve) => {
     requestSubscribeMessage({
       tmplIds,
-      success: () => resolve(),
-      fail: () => resolve(),
+      success: (result) => resolve(result),
+      fail: () => resolve({}),
     });
   });
 }

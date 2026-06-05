@@ -19,6 +19,7 @@ import {
   type ParentNotification,
   type ParentOrder,
 } from '../../services/api';
+import { requestSubscribe } from '../../services/subscribe';
 import { formatDateTime, money } from '../../utils/format';
 
 type LessonAccountItem = ParentLessonAccount & {
@@ -88,6 +89,7 @@ Page({
     loading: false,
     refreshing: false,
     binding: false,
+    subscribingReminders: false,
     bindToken: '',
     account: null as AuthAccount | null,
     defaultPassword: '',
@@ -321,6 +323,20 @@ Page({
         title: error instanceof Error ? error.message : '操作失败',
         icon: 'none',
       });
+    }
+  },
+
+  async onSubscribeLessonNotifications() {
+    this.setData({ subscribingReminders: true });
+    try {
+      const result = await requestSubscribe(['lesson_reminder', 'lesson_consumed']);
+      const accepted = Object.values(result).some((value) => value === 'accept');
+      wx.showToast({
+        title: accepted ? '订阅成功' : '未授权',
+        icon: accepted ? 'success' : 'none',
+      });
+    } finally {
+      this.setData({ subscribingReminders: false });
     }
   },
 

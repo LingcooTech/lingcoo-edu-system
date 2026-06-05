@@ -128,7 +128,8 @@ export interface CreateOrderInput {
 export type SubscribeTemplateKey =
   | 'trial_registration'
   | 'payment_success'
-  | 'lesson_reminder';
+  | 'lesson_reminder'
+  | 'lesson_consumed';
 
 export interface WechatMiniSubscribeTemplate {
   key: SubscribeTemplateKey;

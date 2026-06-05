@@ -60,6 +60,7 @@ WECHAT_MINI_PROGRAM_STATE=developer|trial|formal
 WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID=预约试听模板 ID
 WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID=支付成功模板 ID
 WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID=课前提醒模板 ID
+WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID=课消通知模板 ID
 ```
 
 真实小程序支付还需要在后台支付设置或运行环境里配置微信商户参数；其中微信支付 `appId` 应使用同一个小程序 AppID：
@@ -76,19 +77,20 @@ WECHAT_PAY_NOTIFY_URL=https://你的 API 域名/public/payment/wechat/notify
 
 ## 订阅消息模板
 
-小程序会从 `/public/wechat-mini/subscribe-templates` 读取已配置模板，并在用户提交预约、购买课时包时调用 `wx.requestSubscribeMessage`。模板未配置时不会弹授权，也不会影响主流程。
+小程序会从 `/public/wechat-mini/subscribe-templates` 读取已配置模板，并在用户提交预约、购买课时包、家长中心点击订阅提醒时调用 `wx.requestSubscribeMessage`。模板未配置时不会弹授权，也不会影响主流程。
 
 当前后端发送时使用以下字段名，请在微信公众平台创建模板时保持关键词顺序/类型一致：
 
 - 预约试听：`thing1` 学员、`thing2` 课程/活动、`thing3` 状态、`time4` 提交时间。
 - 支付成功：`character_string1` 订单号、`amount2` 金额、`thing3` 到账说明、`time4` 支付时间。
+- 课前提醒：`thing1` 学员、`thing2` 课程/班级、`time3` 上课时间、`thing4` 上课地点。
+- 课消通知：`thing1` 学员、`thing2` 课程/班级、`thing3` 扣课说明、`time4` 上课时间。
 
 ## 下一步后端/小程序闭环
 
 以下能力需要微信 AppID/AppSecret/商户配置和线上 HTTPS 域名后再做完整闭环：
 
 - 真实微信支付回调联调：`wx.requestPayment` 成功后由微信回调确认支付并入账。
-- 课前提醒定时任务和课消通知订阅消息。
 
 ## 代码结构
 

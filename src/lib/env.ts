@@ -32,6 +32,7 @@ const envSchema = z.object({
   WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID: z.string().optional(),
   WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID: z.string().optional(),
   WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID: z.string().optional(),
+  WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID: z.string().optional(),
 
   // SMTP (email verification / password reset).
   SMTP_HOST: z.string().optional(),

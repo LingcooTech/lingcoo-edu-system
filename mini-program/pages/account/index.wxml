@@ -14,9 +14,14 @@
       <view wx:if="{{defaultPassword}}" class="password-note">
         初始密码：{{defaultPassword}}。手机号账号已同步创建。
       </view>
-      <button class="btn btn-outline refresh-button" loading="{{refreshing}}" disabled="{{refreshing}}" bindtap="loadParentCenter">
-        {{refreshing ? '同步中...' : '刷新数据'}}
-      </button>
+      <view class="account-actions">
+        <button class="btn btn-outline" loading="{{refreshing}}" disabled="{{refreshing}}" bindtap="loadParentCenter">
+          {{refreshing ? '同步中...' : '刷新数据'}}
+        </button>
+        <button class="btn btn-primary" loading="{{subscribingReminders}}" disabled="{{subscribingReminders}}" bindtap="onSubscribeLessonNotifications">
+          {{subscribingReminders ? '请求中...' : '订阅提醒'}}
+        </button>
+      </view>
     </block>
 
     <block wx:else>

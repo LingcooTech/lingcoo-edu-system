@@ -24,6 +24,27 @@ export async function createNotification(
   return row;
 }
 
+export async function createNotificationIfAbsent(
+  db: Database,
+  values: typeof schema.notifications.$inferInsert,
+) {
+  const [row] = await db
+    .insert(schema.notifications)
+    .values(values)
+    .onConflictDoNothing({ target: schema.notifications.dedupeKey })
+    .returning();
+
+  if (row) {
+    return { notification: row, created: true };
+  }
+
+  const existing = await findByDedupeKey(db, values.dedupeKey);
+  if (!existing) {
+    throw new Error(`Notification dedupe insert failed: ${values.dedupeKey}`);
+  }
+  return { notification: existing, created: false };
+}
+
 export async function listForRecipient(
   db: Database,
   input: {

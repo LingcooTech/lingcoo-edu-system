@@ -8,6 +8,7 @@ import { buildApp } from '../src/app.js';
 import * as schema from '../src/db/schema.js';
 import type { AppEnv } from '../src/lib/env.js';
 import { hashPassword } from '../src/lib/password.js';
+import { LessonNotificationService } from '../src/modules/notifications/lesson-notification-service.js';
 
 const testEnv: AppEnv = {
   NODE_ENV: 'test',
@@ -22,6 +23,166 @@ const testEnv: AppEnv = {
   WECHAT_MINI_PROGRAM_APP_ID: 'test-mini-app',
   WECHAT_MINI_PROGRAM_APP_SECRET: 'test-mini-secret',
 };
+
+type TestApp = Awaited<ReturnType<typeof buildApp>>;
+
+function phoneFromSuffix(suffix: string, prefix = '136') {
+  return `${prefix}${String(parseInt(suffix.replaceAll('-', '').slice(0, 8), 16))
+    .slice(-8)
+    .padStart(8, '0')}`;
+}
+
+function futureDateFromSuffix(suffix: string, year: number) {
+  const minuteOffset = parseInt(suffix.replaceAll('-', '').slice(0, 8), 16) % (365 * 24 * 60);
+  return new Date(Date.UTC(year, 0, 1, 0, 0, 0) + minuteOffset * 60_000);
+}
+
+function jsonResponse(payload: unknown) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => payload,
+  } as Response;
+}
+
+function installWechatSubscribeMock(env: AppEnv, sentPayloads: Array<Record<string, unknown>>) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    assert.equal(url.hostname, 'api.weixin.qq.com');
+
+    if (url.pathname === '/cgi-bin/token') {
+      assert.equal(url.searchParams.get('appid'), env.WECHAT_MINI_PROGRAM_APP_ID);
+      assert.equal(url.searchParams.get('secret'), env.WECHAT_MINI_PROGRAM_APP_SECRET);
+      return jsonResponse({
+        access_token: `token-${env.WECHAT_MINI_PROGRAM_APP_ID}`,
+        expires_in: 7200,
+      });
+    }
+
+    if (url.pathname === '/cgi-bin/message/subscribe/send') {
+      sentPayloads.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+      return jsonResponse({ errcode: 0, msgid: sentPayloads.length });
+    }
+
+    throw new Error(`Unexpected WeChat API call: ${url.pathname}`);
+  }) as typeof fetch;
+
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
+async function createLessonNotificationFixture(
+  app: TestApp,
+  suffix: string,
+  input: {
+    appId: string;
+    startsAt: Date;
+    balance?: number;
+  },
+) {
+  const phone = phoneFromSuffix(suffix);
+  const [guardian] = await app.db
+    .insert(schema.guardians)
+    .values({ name: `Lesson Guardian ${suffix.slice(0, 8)}`, phone })
+    .returning();
+  const [account] = await app.db
+    .insert(schema.accounts)
+    .values({
+      role: 'parent',
+      phone,
+      passwordHash: hashPassword('test-password'),
+      displayName: guardian.name,
+      guardianId: guardian.id,
+    })
+    .returning();
+  const openid = `openid-lesson-${suffix}`;
+  await app.db.insert(schema.accountWechatIdentities).values({
+    accountId: account.id,
+    appId: input.appId,
+    openid,
+  });
+  const [student] = await app.db
+    .insert(schema.students)
+    .values({
+      guardianId: guardian.id,
+      name: `Lesson Student ${suffix.slice(0, 8)}`,
+      grade: '三年级',
+      status: 'active',
+    })
+    .returning();
+  const [campus] = await app.db
+    .insert(schema.campuses)
+    .values({ name: `Lesson Campus ${suffix.slice(0, 8)}` })
+    .returning();
+  const [course] = await app.db
+    .insert(schema.courses)
+    .values({
+      campusId: campus.id,
+      slug: `lesson-notify-${suffix}`,
+      name: 'Lesson Notify Course',
+      category: '编程',
+      ageRange: '8-10 岁',
+      durationMinutes: 60,
+      summary: 'Lesson notification course',
+      content: '',
+      status: 'published',
+    })
+    .returning();
+  const [teacher] = await app.db
+    .insert(schema.teachers)
+    .values({ name: `Lesson Teacher ${suffix.slice(0, 8)}`, status: 'active' })
+    .returning();
+  const [classroom] = await app.db
+    .insert(schema.classrooms)
+    .values({ campusId: campus.id, name: `Room ${suffix.slice(0, 8)}`, status: 'active' })
+    .returning();
+  const [classGroup] = await app.db
+    .insert(schema.classes)
+    .values({
+      campusId: campus.id,
+      courseId: course.id,
+      teacherId: teacher.id,
+      classroomId: classroom.id,
+      name: `Lesson Class ${suffix.slice(0, 8)}`,
+      status: 'active',
+    })
+    .returning();
+  const [session] = await app.db
+    .insert(schema.classSessions)
+    .values({
+      classId: classGroup.id,
+      teacherId: teacher.id,
+      classroomId: classroom.id,
+      startsAt: input.startsAt,
+      endsAt: new Date(input.startsAt.getTime() + 60 * 60 * 1000),
+      topic: 'Lesson notification topic',
+      status: 'scheduled',
+    })
+    .returning();
+  await app.db
+    .insert(schema.classEnrollments)
+    .values({ classId: classGroup.id, studentId: student.id, active: true });
+  const [lessonAccount] = await app.db
+    .insert(schema.lessonAccounts)
+    .values({ studentId: student.id, courseId: course.id, balance: input.balance ?? 6 })
+    .returning();
+
+  return {
+    guardian,
+    account,
+    openid,
+    student,
+    campus,
+    course,
+    teacher,
+    classroom,
+    classGroup,
+    session,
+    lessonAccount,
+  };
+}
 
 test('serves health and readiness probes', async () => {
   const app = await buildApp(testEnv);
@@ -60,6 +221,8 @@ test('exposes configured WeChat Mini Program subscribe templates', async () => {
     ...testEnv,
     WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID: 'trial-template-id',
     WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID: 'payment-template-id',
+    WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID: 'reminder-template-id',
+    WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID: 'consumed-template-id',
   });
 
   try {
@@ -79,6 +242,16 @@ test('exposes configured WeChat Mini Program subscribe templates', async () => {
         key: 'payment_success',
         label: '支付成功通知',
         templateId: 'payment-template-id',
+      },
+      {
+        key: 'lesson_reminder',
+        label: '课前提醒',
+        templateId: 'reminder-template-id',
+      },
+      {
+        key: 'lesson_consumed',
+        label: '课消通知',
+        templateId: 'consumed-template-id',
       },
     ]);
   } finally {
@@ -444,9 +617,159 @@ test('creates a WeChat Mini Program payment intent for a bound parent order', as
     assert.equal(intent.payload.signType, 'HMAC-SHA256');
     assert.equal(typeof intent.payload.paySign, 'string');
     assert.match(requestXml, /<trade_type><!\[CDATA\[JSAPI\]\]><\/trade_type>/);
-    assert.match(requestXml, new RegExp(`<openid><!\\[CDATA\\[openid-jsapi-${suffix}\\]\\]></openid>`));
+    assert.match(
+      requestXml,
+      new RegExp(`<openid><!\\[CDATA\\[openid-jsapi-${suffix}\\]\\]></openid>`),
+    );
   } finally {
     globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('sends upcoming lesson reminders idempotently', async () => {
+  const suffix = randomUUID();
+  const reminderEnv: AppEnv = {
+    ...testEnv,
+    WECHAT_MINI_PROGRAM_APP_ID: `lesson-reminder-app-${suffix}`,
+    WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID: 'reminder-template-id',
+  };
+  const app = await buildApp(reminderEnv);
+  const sentPayloads: Array<Record<string, unknown>> = [];
+  const restoreFetch = installWechatSubscribeMock(reminderEnv, sentPayloads);
+  const startsAt = futureDateFromSuffix(suffix, 2040);
+
+  try {
+    const fixture = await createLessonNotificationFixture(app, suffix, {
+      appId: reminderEnv.WECHAT_MINI_PROGRAM_APP_ID!,
+      startsAt,
+    });
+    const service = new LessonNotificationService({
+      db: app.db,
+      env: reminderEnv,
+      log: app.log,
+    });
+    const now = new Date(startsAt.getTime() - 30_000);
+
+    const firstRun = await service.runUpcomingLessonReminders({
+      now,
+      windowHours: 1 / 60,
+    });
+    assert.equal(firstRun.scannedTargets, 1);
+    assert.equal(firstRun.notificationsCreated, 1);
+    assert.equal(firstRun.wechatSent, 1);
+    assert.equal(sentPayloads.length, 1);
+
+    const secondRun = await service.runUpcomingLessonReminders({
+      now,
+      windowHours: 1 / 60,
+    });
+    assert.equal(secondRun.notificationsCreated, 0);
+    assert.equal(secondRun.wechatSent, 0);
+    assert.equal(sentPayloads.length, 1);
+
+    const sentPayload = sentPayloads[0] as {
+      touser: string;
+      template_id: string;
+      data: Record<string, { value: string }>;
+    };
+    assert.equal(sentPayload.touser, fixture.openid);
+    assert.equal(sentPayload.template_id, 'reminder-template-id');
+    assert.equal(sentPayload.data.thing1.value, fixture.student.name.slice(0, 20));
+
+    const [notification] = await app.db
+      .select()
+      .from(schema.notifications)
+      .where(
+        eq(
+          schema.notifications.dedupeKey,
+          `lesson.reminder:${fixture.account.id}:${fixture.session.id}:${fixture.student.id}`,
+        ),
+      )
+      .limit(1);
+    assert.ok(notification);
+    assert.equal(notification.title, '课前提醒');
+  } finally {
+    restoreFetch();
+    await app.close();
+  }
+});
+
+test('creates lesson consumption notifications after admin attendance once', async () => {
+  const suffix = randomUUID();
+  const consumedEnv: AppEnv = {
+    ...testEnv,
+    WECHAT_MINI_PROGRAM_APP_ID: `lesson-consumed-app-${suffix}`,
+    WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID: 'consumed-template-id',
+  };
+  const app = await buildApp(consumedEnv);
+  const sentPayloads: Array<Record<string, unknown>> = [];
+  const restoreFetch = installWechatSubscribeMock(consumedEnv, sentPayloads);
+
+  try {
+    const fixture = await createLessonNotificationFixture(app, suffix, {
+      appId: consumedEnv.WECHAT_MINI_PROGRAM_APP_ID!,
+      startsAt: futureDateFromSuffix(suffix, 2041),
+      balance: 5,
+    });
+    const adminToken = await app.jwt.sign(
+      { sub: randomUUID(), role: 'admin' },
+      { expiresIn: '1h' },
+    );
+
+    const firstResponse = await app.inject({
+      method: 'POST',
+      url: `/v1/class-sessions/${fixture.session.id}/attendance`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        records: [{ studentId: fixture.student.id, status: 'present' }],
+      },
+    });
+    assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+    assert.equal(sentPayloads.length, 1);
+
+    const [lessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(eq(schema.lessonAccounts.id, fixture.lessonAccount.id))
+      .limit(1);
+    assert.equal(lessonAccount.balance, 4);
+
+    const dedupeKey = `lesson.consumed:${fixture.account.id}:${fixture.session.id}:${fixture.student.id}`;
+    const [notification] = await app.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.dedupeKey, dedupeKey))
+      .limit(1);
+    assert.ok(notification);
+    assert.equal(notification.title, '课时已扣减');
+    assert.match(notification.body, /剩余 4 课时/);
+
+    const sentPayload = sentPayloads[0] as {
+      template_id: string;
+      data: Record<string, { value: string }>;
+    };
+    assert.equal(sentPayload.template_id, 'consumed-template-id');
+    assert.equal(sentPayload.data.thing3.value, '扣减 1 课时，剩余 4 课时');
+
+    const secondResponse = await app.inject({
+      method: 'POST',
+      url: `/v1/class-sessions/${fixture.session.id}/attendance`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        records: [{ studentId: fixture.student.id, status: 'present' }],
+      },
+    });
+    assert.equal(secondResponse.statusCode, 200, secondResponse.body);
+
+    const notifications = await app.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.dedupeKey, dedupeKey));
+    assert.equal(notifications.length, 1);
+    assert.equal(sentPayloads.length, 1);
+  } finally {
+    restoreFetch();
     await app.close();
   }
 });

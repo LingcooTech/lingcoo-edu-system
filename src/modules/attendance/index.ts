@@ -5,6 +5,7 @@ import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
 
 const attendanceSchema = z.object({
@@ -32,6 +33,12 @@ function unprocessable(message: string): Error {
 export const attendanceModule: AppModule = {
   name: 'attendance',
   async register(app) {
+    const lessonNotifications = new LessonNotificationService({
+      db: app.db,
+      env: app.appEnv,
+      log: app.log,
+    });
+
     async function loadPublicCheckInContext(sessionId: string) {
       const session = await schedulingRepo.findSession(app.db, sessionId);
       if (!session) {
@@ -128,11 +135,18 @@ export const attendanceModule: AppModule = {
       const alreadyCheckedIn = context.attendanceRecords.some(
         (record) => record.studentId === body.studentId,
       );
+      const existingStudentIds = new Set(
+        context.attendanceRecords.map((record) => record.studentId),
+      );
       const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
         sessionId,
         courseId: context.classGroup.courseId,
         records: [{ studentId: body.studentId, status: 'present', note: '家长扫码签到' }],
         completeSession: false,
+      });
+      await lessonNotifications.notifyLessonConsumedForAttendance({
+        sessionId,
+        records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
       });
 
       const latestAttendanceRecords = alreadyCheckedIn
@@ -188,10 +202,16 @@ export const attendanceModule: AppModule = {
         }
 
         const body = attendanceSchema.parse(request.body);
+        const existingRecords = await attendanceRepo.listAttendanceForSession(app.db, sessionId);
+        const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
           courseId: classGroup.courseId,
           records: body.records,
+        });
+        await lessonNotifications.notifyLessonConsumedForAttendance({
+          sessionId,
+          records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
 
         return { attendanceRecords };

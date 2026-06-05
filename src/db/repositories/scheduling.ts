@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lte, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -45,6 +45,76 @@ export async function countActiveEnrollments(db: Database, classId: string) {
 
 export async function listClassSessions(db: Database) {
   return db.select().from(schema.classSessions).orderBy(asc(schema.classSessions.startsAt));
+}
+
+function lessonNotificationTargetSelect() {
+  return {
+    sessionId: schema.classSessions.id,
+    startsAt: schema.classSessions.startsAt,
+    endsAt: schema.classSessions.endsAt,
+    topic: schema.classSessions.topic,
+    classId: schema.classes.id,
+    className: schema.classes.name,
+    courseId: schema.courses.id,
+    courseName: schema.courses.name,
+    classroomId: schema.classrooms.id,
+    classroomName: schema.classrooms.name,
+    teacherId: schema.teachers.id,
+    teacherName: schema.teachers.name,
+    studentId: schema.students.id,
+    studentName: schema.students.name,
+  };
+}
+
+export async function listUpcomingLessonNotificationTargets(
+  db: Database,
+  input: { from: Date; until: Date },
+) {
+  return db
+    .select(lessonNotificationTargetSelect())
+    .from(schema.classSessions)
+    .innerJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
+    .innerJoin(schema.courses, eq(schema.classes.courseId, schema.courses.id))
+    .innerJoin(schema.classrooms, eq(schema.classSessions.classroomId, schema.classrooms.id))
+    .innerJoin(schema.teachers, eq(schema.classSessions.teacherId, schema.teachers.id))
+    .innerJoin(
+      schema.classEnrollments,
+      and(
+        eq(schema.classEnrollments.classId, schema.classes.id),
+        eq(schema.classEnrollments.active, true),
+      ),
+    )
+    .innerJoin(schema.students, eq(schema.classEnrollments.studentId, schema.students.id))
+    .where(
+      and(
+        eq(schema.classSessions.status, 'scheduled'),
+        eq(schema.students.status, 'active'),
+        gt(schema.classSessions.startsAt, input.from),
+        lte(schema.classSessions.startsAt, input.until),
+      ),
+    )
+    .orderBy(asc(schema.classSessions.startsAt));
+}
+
+export async function listLessonNotificationTargetsForSessionStudents(
+  db: Database,
+  sessionId: string,
+  studentIds: string[],
+) {
+  if (studentIds.length === 0) {
+    return [];
+  }
+
+  return db
+    .select(lessonNotificationTargetSelect())
+    .from(schema.classSessions)
+    .innerJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
+    .innerJoin(schema.courses, eq(schema.classes.courseId, schema.courses.id))
+    .innerJoin(schema.classrooms, eq(schema.classSessions.classroomId, schema.classrooms.id))
+    .innerJoin(schema.teachers, eq(schema.classSessions.teacherId, schema.teachers.id))
+    .innerJoin(schema.students, inArray(schema.students.id, studentIds))
+    .where(eq(schema.classSessions.id, sessionId))
+    .orderBy(asc(schema.students.name));
 }
 
 export async function createClassSession(
@@ -133,10 +203,7 @@ export async function listEnrollments(db: Database, classId: string) {
     .select()
     .from(schema.classEnrollments)
     .where(
-      and(
-        eq(schema.classEnrollments.classId, classId),
-        eq(schema.classEnrollments.active, true),
-      ),
+      and(eq(schema.classEnrollments.classId, classId), eq(schema.classEnrollments.active, true)),
     )
     .orderBy(asc(schema.classEnrollments.createdAt));
 }

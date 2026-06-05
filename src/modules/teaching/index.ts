@@ -8,6 +8,7 @@ import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
 import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
+import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
 
 const teacherSchema = z.object({
@@ -48,6 +49,12 @@ function notFound(message: string): Error {
 export const teachingModule: AppModule = {
   name: 'teaching',
   async register(app) {
+    const lessonNotifications = new LessonNotificationService({
+      db: app.db,
+      env: app.appEnv,
+      log: app.log,
+    });
+
     app.get('/public/teacher/dashboard', { preHandler: app.requireRole('teacher') }, async (request) => {
       const account = await accountsRepo.findById(app.db, request.account!.id);
       if (!account?.teacherId) {
@@ -162,10 +169,16 @@ export const teachingModule: AppModule = {
         if (invalidRecord) {
           throw Object.assign(new Error('只能为本班学员点名'), { statusCode: 400 });
         }
+        const existingRecords = await attendanceRepo.listAttendanceForSession(app.db, sessionId);
+        const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
           courseId: classGroup.courseId,
           records: body.records,
+        });
+        await lessonNotifications.notifyLessonConsumedForAttendance({
+          sessionId,
+          records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
         return { attendanceRecords };
       },
