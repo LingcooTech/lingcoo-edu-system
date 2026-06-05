@@ -19,6 +19,7 @@ import {
 } from '@/api/client';
 import type { PaymentProviderItem, SystemSettingOverview } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { QiniuImageField, QiniuMediaLibrary } from '@/components/shared/QiniuImageField';
 
 const SOURCE_LABEL: Record<string, string> = {
   database: '后台配置',
@@ -529,49 +530,44 @@ export function SettingsPage() {
                     onChange={(e) => setOrg({ ...org, address: e.target.value })}
                   />
                 </label>
-                <label className="block">
-                  <span className="text-sm font-medium">完整 Logo URL</span>
-                  <input
-                    className={inputClass}
-                    placeholder="横版完整 logo，适合页眉/官网使用"
-                    value={org.fullLogoUrl}
-                    onChange={(e) => setOrg({ ...org, fullLogoUrl: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">方形 Logo URL</span>
-                  <input
-                    className={inputClass}
-                    placeholder="方形图标，适合头像/小程序/应用图标"
-                    value={org.squareLogoUrl}
-                    onChange={(e) => setOrg({ ...org, squareLogoUrl: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">暗色 Logo URL</span>
-                  <input
-                    className={inputClass}
-                    value={org.darkLogoUrl}
-                    onChange={(e) => setOrg({ ...org, darkLogoUrl: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">兼容 Logo URL</span>
-                  <input
-                    className={inputClass}
-                    placeholder="历史字段；为空时保存完整 Logo"
-                    value={org.logoUrl}
-                    onChange={(e) => setOrg({ ...org, logoUrl: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">Favicon URL</span>
-                  <input
-                    className={inputClass}
-                    value={org.faviconUrl}
-                    onChange={(e) => setOrg({ ...org, faviconUrl: e.target.value })}
-                  />
-                </label>
+                <QiniuImageField
+                  label="完整 Logo URL"
+                  hint="横版完整 logo，适合页眉/官网使用"
+                  value={org.fullLogoUrl}
+                  onChange={(fullLogoUrl) => setOrg({ ...org, fullLogoUrl })}
+                  prefix="brand/logo"
+                  previewAlt="完整 Logo"
+                />
+                <QiniuImageField
+                  label="方形 Logo URL"
+                  hint="方形图标，适合头像/小程序/应用图标"
+                  value={org.squareLogoUrl}
+                  onChange={(squareLogoUrl) => setOrg({ ...org, squareLogoUrl })}
+                  prefix="brand/logo"
+                  previewAlt="方形 Logo"
+                />
+                <QiniuImageField
+                  label="暗色 Logo URL"
+                  value={org.darkLogoUrl}
+                  onChange={(darkLogoUrl) => setOrg({ ...org, darkLogoUrl })}
+                  prefix="brand/logo"
+                  previewAlt="暗色 Logo"
+                />
+                <QiniuImageField
+                  label="兼容 Logo URL"
+                  hint="历史字段；为空时保存完整 Logo"
+                  value={org.logoUrl}
+                  onChange={(logoUrl) => setOrg({ ...org, logoUrl })}
+                  prefix="brand/logo"
+                  previewAlt="兼容 Logo"
+                />
+                <QiniuImageField
+                  label="Favicon URL"
+                  value={org.faviconUrl}
+                  onChange={(faviconUrl) => setOrg({ ...org, faviconUrl })}
+                  prefix="brand/favicon"
+                  previewAlt="Favicon"
+                />
                 <label className="block">
                   <span className="text-sm font-medium">主色</span>
                   <input
@@ -899,92 +895,96 @@ export function SettingsPage() {
           )}
 
           {activeTab === 'qiniu' && (
-            <form className="resource-card mt-4 p-5" onSubmit={submitQiniu}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">七牛云存储</span>
-                  <StatusBadge configured={Boolean(qiniuOverview?.configured)} />
+            <div className="mt-4 grid gap-4">
+              <form className="resource-card p-5" onSubmit={submitQiniu}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">七牛云存储</span>
+                    <StatusBadge configured={Boolean(qiniuOverview?.configured)} />
+                  </div>
+                  <SourceLabel source={qiniuOverview?.source} />
                 </div>
-                <SourceLabel source={qiniuOverview?.source} />
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-medium">Access Key</span>
-                  <input
-                    className={inputClass}
-                    value={qiniu.accessKey}
-                    onChange={(e) => setQiniu({ ...qiniu, accessKey: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">Secret Key</span>
-                  <input
-                    className={inputClass}
-                    type="password"
-                    placeholder={
-                      qiniuOverview?.secrets.secretKey?.configured ? '已配置（留空不变）' : ''
-                    }
-                    value={qiniu.secretKey}
-                    onChange={(e) => setQiniu({ ...qiniu, secretKey: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">Bucket</span>
-                  <input
-                    className={inputClass}
-                    value={qiniu.bucketName}
-                    onChange={(e) => setQiniu({ ...qiniu, bucketName: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">默认目录</span>
-                  <input
-                    className={inputClass}
-                    value={qiniu.defaultPrefix}
-                    onChange={(e) => setQiniu({ ...qiniu, defaultPrefix: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">公共域名</span>
-                  <input
-                    className={inputClass}
-                    placeholder="https://cdn.example.com"
-                    value={qiniu.publicBaseUrl}
-                    onChange={(e) => setQiniu({ ...qiniu, publicBaseUrl: e.target.value })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">上传 Host</span>
-                  <input
-                    className={inputClass}
-                    placeholder="https://upload.qiniup.com"
-                    value={qiniu.uploadHost}
-                    onChange={(e) => setQiniu({ ...qiniu, uploadHost: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button className={buttonClass} disabled={saving === 'qiniu'}>
-                  {saving === 'qiniu' ? '保存中...' : '保存七牛云'}
-                </button>
-                <button
-                  type="button"
-                  className={outlineButtonClass}
-                  disabled={saving === 'qiniu-test'}
-                  onClick={testQiniu}
-                >
-                  测试连接
-                </button>
-                <button
-                  type="button"
-                  className={outlineButtonClass}
-                  disabled={saving === 'qiniu-clear'}
-                  onClick={clearQiniu}
-                >
-                  清除配置
-                </button>
-              </div>
-            </form>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium">Access Key</span>
+                    <input
+                      className={inputClass}
+                      value={qiniu.accessKey}
+                      onChange={(e) => setQiniu({ ...qiniu, accessKey: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">Secret Key</span>
+                    <input
+                      className={inputClass}
+                      type="password"
+                      placeholder={
+                        qiniuOverview?.secrets.secretKey?.configured ? '已配置（留空不变）' : ''
+                      }
+                      value={qiniu.secretKey}
+                      onChange={(e) => setQiniu({ ...qiniu, secretKey: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">Bucket</span>
+                    <input
+                      className={inputClass}
+                      value={qiniu.bucketName}
+                      onChange={(e) => setQiniu({ ...qiniu, bucketName: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">默认目录</span>
+                    <input
+                      className={inputClass}
+                      value={qiniu.defaultPrefix}
+                      onChange={(e) => setQiniu({ ...qiniu, defaultPrefix: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">公共域名</span>
+                    <input
+                      className={inputClass}
+                      placeholder="https://cdn.example.com"
+                      value={qiniu.publicBaseUrl}
+                      onChange={(e) => setQiniu({ ...qiniu, publicBaseUrl: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">上传 Host</span>
+                    <input
+                      className={inputClass}
+                      placeholder="https://upload.qiniup.com"
+                      value={qiniu.uploadHost}
+                      onChange={(e) => setQiniu({ ...qiniu, uploadHost: e.target.value })}
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button className={buttonClass} disabled={saving === 'qiniu'}>
+                    {saving === 'qiniu' ? '保存中...' : '保存七牛云'}
+                  </button>
+                  <button
+                    type="button"
+                    className={outlineButtonClass}
+                    disabled={saving === 'qiniu-test'}
+                    onClick={testQiniu}
+                  >
+                    测试连接
+                  </button>
+                  <button
+                    type="button"
+                    className={outlineButtonClass}
+                    disabled={saving === 'qiniu-clear'}
+                    onClick={clearQiniu}
+                  >
+                    清除配置
+                  </button>
+                </div>
+              </form>
+
+              <QiniuMediaLibrary />
+            </div>
           )}
         </>
       )}

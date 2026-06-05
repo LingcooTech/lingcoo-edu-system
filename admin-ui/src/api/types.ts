@@ -340,3 +340,27 @@ export interface QiniuSettingsInput {
   uploadHost?: string;
   defaultPrefix?: string;
 }
+
+export interface QiniuImageItem {
+  key: string;
+  url: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: string | null;
+}
+
+export interface QiniuImageListResponse {
+  items: QiniuImageItem[];
+  marker: string | null;
+  hasMore: boolean;
+  prefix: string;
+  limit: number;
+}
+
+export interface QiniuUploadTokenResponse {
+  uploadToken: string;
+  key: string;
+  uploadHost: string;
+  publicUrl: string;
+  expiresIn: number;
+}

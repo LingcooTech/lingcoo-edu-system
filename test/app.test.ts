@@ -275,6 +275,69 @@ test('does not expose unconfigured WeChat Mini Program subscribe templates', asy
   }
 });
 
+test('creates Qiniu upload tokens and lists images under the default prefix', async () => {
+  const qiniuEnv: AppEnv = {
+    ...testEnv,
+    QINIU_ACCESS_KEY: 'qiniu-access-key',
+    QINIU_SECRET_KEY: 'qiniu-secret-key',
+    QINIU_BUCKET_NAME: 'fd-assets',
+    QINIU_PUBLIC_BASE_URL: 'https://cdn.example.com',
+    QINIU_UPLOAD_HOST: 'https://upload.qiniup.com',
+    QINIU_DEFAULT_PREFIX: 'fd-edu',
+  };
+  const app = await buildApp(qiniuEnv);
+  const originalFetch = globalThis.fetch;
+  let listPrefix = '';
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    assert.equal(url.hostname, 'rsf.qiniuapi.com');
+    assert.equal(url.pathname, '/list');
+    assert.equal(url.searchParams.get('bucket'), 'fd-assets');
+    listPrefix = url.searchParams.get('prefix') ?? '';
+    return jsonResponse({
+      items: [
+        {
+          key: 'fd-edu/brand/logo/logo.png',
+          fsize: 1234,
+          mimeType: 'image/png',
+          putTime: 17_000_000_000_000_000,
+        },
+      ],
+    });
+  }) as typeof fetch;
+
+  try {
+    const token = await app.jwt.sign({ sub: randomUUID(), role: 'admin' }, { expiresIn: '1h' });
+    const uploadToken = await app.inject({
+      method: 'POST',
+      url: '/v1/storage/qiniu/upload-token',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { filename: 'Logo 01.png', prefix: 'brand/logo' },
+    });
+    assert.equal(uploadToken.statusCode, 200, uploadToken.body);
+    const uploadPayload = uploadToken.json();
+    assert.match(uploadPayload.key, /^fd-edu\/brand\/logo\/\d{4}\/\d{2}\/\d{2}\/Logo-01-/);
+    assert.match(uploadPayload.key, /\.png$/);
+    assert.equal(uploadPayload.uploadHost, 'https://upload.qiniup.com');
+    assert.equal(uploadPayload.publicUrl, `https://cdn.example.com/${uploadPayload.key}`);
+    assert.match(uploadPayload.uploadToken, /^qiniu-access-key:/);
+    assert.doesNotMatch(uploadPayload.uploadToken, /qiniu-secret-key/);
+
+    const images = await app.inject({
+      method: 'GET',
+      url: '/v1/storage/qiniu/images?prefix=brand/logo',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(images.statusCode, 200, images.body);
+    assert.equal(listPrefix, 'fd-edu/brand/logo');
+    assert.equal(images.json().items[0].url, 'https://cdn.example.com/fd-edu/brand/logo/logo.png');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
 test('binds and reuses a WeChat Mini Program parent account', async () => {
   const app = await buildApp(testEnv);
   const originalFetch = globalThis.fetch;

@@ -102,11 +102,7 @@ function buildPublicUrl(baseUrl: string, key: string) {
 
 function normalizeUploadedAt(value: unknown) {
   const parsed =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number.parseInt(value, 10)
-        : 0;
+    typeof value === 'number' ? value : typeof value === 'string' ? Number.parseInt(value, 10) : 0;
   return Number.isFinite(parsed) && parsed > 0
     ? new Date(Math.floor(parsed / 10_000)).toISOString()
     : null;
@@ -172,7 +168,8 @@ export class QiniuSettingsService {
     const secretKey = normalizeString(this.env.QINIU_SECRET_KEY);
     const bucketName = normalizeString(this.env.QINIU_BUCKET_NAME);
     const publicBaseUrl = normalizeUrl(this.env.QINIU_PUBLIC_BASE_URL);
-    const uploadHost = normalizeUrl(this.env.QINIU_UPLOAD_HOST, DEFAULT_UPLOAD_HOST) || DEFAULT_UPLOAD_HOST;
+    const uploadHost =
+      normalizeUrl(this.env.QINIU_UPLOAD_HOST, DEFAULT_UPLOAD_HOST) || DEFAULT_UPLOAD_HOST;
     const defaultPrefix = normalizePrefix(this.env.QINIU_DEFAULT_PREFIX);
 
     if (!accessKey && !secretKey && !bucketName && !publicBaseUrl && !defaultPrefix) {
@@ -208,9 +205,9 @@ export class QiniuSettingsService {
     return {
       configured: Boolean(
         effective?.accessKey &&
-          effective.secretKey &&
-          effective.bucketName &&
-          effective.publicBaseUrl,
+        effective.secretKey &&
+        effective.bucketName &&
+        effective.publicBaseUrl,
       ),
       source,
       values: {
@@ -245,7 +242,9 @@ export class QiniuSettingsService {
     input?: QiniuSettingsInput,
     options: { requirePublicBaseUrl?: boolean } = {},
   ) {
-    const settings = input ? await this.resolveDraftSettings(input) : await this.getRuntimeSettings();
+    const settings = input
+      ? await this.resolveDraftSettings(input)
+      : await this.getRuntimeSettings();
 
     if (!settings?.accessKey || !settings.secretKey || !settings.bucketName) {
       throw httpError(422, '七牛云配置不完整，请先填写 Access Key、Secret Key 和 Bucket');
@@ -288,7 +287,10 @@ export class QiniuSettingsService {
 
     if (!response.ok) {
       const detail = (await response.text()).trim();
-      throw httpError(502, detail ? `七牛云请求失败: ${detail}` : `七牛云请求失败 (${response.status})`);
+      throw httpError(
+        502,
+        detail ? `七牛云请求失败: ${detail}` : `七牛云请求失败 (${response.status})`,
+      );
     }
 
     const payload = (await response.json()) as {
@@ -334,8 +336,11 @@ export class QiniuSettingsService {
 
   async listImages(input: { prefix?: string; marker?: string; limit?: number }) {
     const settings = await this.resolveRequiredSettings(undefined, { requirePublicBaseUrl: true });
+    const prefix = [settings.defaultPrefix, normalizePrefix(input.prefix)]
+      .filter(Boolean)
+      .join('/');
     const result = await this.listBucketObjects(settings, {
-      prefix: input.prefix,
+      prefix,
       marker: input.marker,
       limit: input.limit,
       imagesOnly: true,
@@ -363,7 +368,9 @@ export class QiniuSettingsService {
       String(date.getUTCMonth() + 1).padStart(2, '0'),
       String(date.getUTCDate()).padStart(2, '0'),
     ].join('/');
-    const prefix = [settings.defaultPrefix, normalizePrefix(input.prefix)].filter(Boolean).join('/');
+    const prefix = [settings.defaultPrefix, normalizePrefix(input.prefix)]
+      .filter(Boolean)
+      .join('/');
     const objectKey = [
       prefix,
       datePrefix,

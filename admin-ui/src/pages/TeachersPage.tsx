@@ -4,12 +4,18 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Teacher } from '@/api/types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
-import { parseBlocks, serializeBlocks, TEACHER_ALLOWED, type Block } from '@/components/editor/blocks';
+import {
+  parseBlocks,
+  serializeBlocks,
+  TEACHER_ALLOWED,
+  type Block,
+} from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
+import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
@@ -92,7 +98,9 @@ export function TeachersPage() {
       };
       if (editing) {
         const result = await apiPatch<TeacherSaveResponse>(`${TEACHERS()}/${editing.id}`, payload);
-        setTeachers(teachers.map((item) => (item.id === result.teacher.id ? result.teacher : item)));
+        setTeachers(
+          teachers.map((item) => (item.id === result.teacher.id ? result.teacher : item)),
+        );
         surfaceSave(result);
       } else {
         const result = await apiPost<TeacherSaveResponse>(TEACHERS(), payload);
@@ -218,13 +226,14 @@ export function TeachersPage() {
             onChange={(event) => setForm({ ...form, title: event.target.value })}
           />
         </Field>
-        <Field label="头像图片 URL" hint="可选，展示在家长端教师卡片">
-          <input
-            className="form-input"
-            value={form.avatarUrl}
-            onChange={(event) => setForm({ ...form, avatarUrl: event.target.value })}
-          />
-        </Field>
+        <QiniuImageField
+          label="头像图片 URL"
+          hint="可选，展示在家长端教师卡片"
+          value={form.avatarUrl}
+          onChange={(avatarUrl) => setForm({ ...form, avatarUrl })}
+          prefix="teachers/avatar"
+          previewAlt="老师头像"
+        />
         <Field label="擅长" hint="用顿号或逗号分隔">
           <input
             className="form-input"

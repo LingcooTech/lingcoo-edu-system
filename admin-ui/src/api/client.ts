@@ -2,7 +2,9 @@ import type {
   AlipayPaymentSettingsInput,
   OrganizationSettings,
   PaymentProviderOverview,
+  QiniuImageListResponse,
   QiniuSettingsInput,
+  QiniuUploadTokenResponse,
   SmtpSettingsInput,
   SystemSettingOverview,
   WechatPaymentSettingsInput,
@@ -160,4 +162,50 @@ export async function testQiniuSettings(input: QiniuSettingsInput) {
 
 export async function clearQiniuSettings() {
   return api<{ ok: boolean }>('/v1/system-settings/qiniu', { method: 'DELETE' });
+}
+
+export async function fetchQiniuImages(
+  input: {
+    prefix?: string;
+    marker?: string | null;
+    limit?: number;
+  } = {},
+) {
+  const params = new URLSearchParams();
+  if (input.prefix) params.set('prefix', input.prefix);
+  if (input.marker) params.set('marker', input.marker);
+  if (input.limit) params.set('limit', String(input.limit));
+  const query = params.toString();
+  return api<QiniuImageListResponse>(`/v1/storage/qiniu/images${query ? `?${query}` : ''}`);
+}
+
+export async function createQiniuUploadToken(input: { filename: string; prefix?: string }) {
+  return api<QiniuUploadTokenResponse>('/v1/storage/qiniu/upload-token', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function uploadQiniuImage(file: File, prefix?: string) {
+  const token = await createQiniuUploadToken({ filename: file.name, prefix });
+  const body = new FormData();
+  body.set('token', token.uploadToken);
+  body.set('key', token.key);
+  body.set('file', file);
+
+  const response = await fetch(token.uploadHost, {
+    method: 'POST',
+    body,
+  });
+
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).trim();
+    throw new Error(detail || `七牛云上传失败：${response.status}`);
+  }
+
+  return {
+    key: token.key,
+    url: token.publicUrl,
+    publicUrl: token.publicUrl,
+  };
 }

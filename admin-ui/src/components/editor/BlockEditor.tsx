@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 
 import { Field } from '@/components/shared/FormField';
+import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
 import {
   ALL_BLOCK_TYPES,
   BLOCK_LABELS,
@@ -15,6 +16,13 @@ interface BlockEditorProps {
   onChange: (blocks: Block[]) => void;
   /** Which module types appear in the "add module" palette. Defaults to all. */
   allowed?: BlockType[];
+}
+
+function imageLines(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -195,13 +203,12 @@ function BlockFields({ block, patch }: { block: Block; patch: (partial: Partial<
     case 'image':
       return (
         <>
-          <Field label="图片地址 URL">
-            <input
-              className="form-input"
-              value={block.url}
-              onChange={(event) => patch({ url: event.target.value })}
-            />
-          </Field>
+          <QiniuImageField
+            label="图片地址 URL"
+            value={block.url}
+            onChange={(url) => patch({ url })}
+            prefix="content/images"
+          />
           <Field label="图注" hint="可选">
             <input
               className="form-input"
@@ -221,14 +228,13 @@ function BlockFields({ block, patch }: { block: Block; patch: (partial: Partial<
     case 'imageText':
       return (
         <>
-          <div className="grid grid-cols-[1fr_auto] gap-3">
-            <Field label="图片地址 URL">
-              <input
-                className="form-input"
-                value={block.url}
-                onChange={(event) => patch({ url: event.target.value })}
-              />
-            </Field>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <QiniuImageField
+              label="图片地址 URL"
+              value={block.url}
+              onChange={(url) => patch({ url })}
+              prefix="content/images"
+            />
             <Field label="图片位置">
               <select
                 className="form-input"
@@ -297,11 +303,12 @@ function BlockFields({ block, patch }: { block: Block; patch: (partial: Partial<
       );
     case 'gallery':
       return (
-        <LinesField
+        <QiniuGalleryField
           label="图片地址"
           hint="每行一个图片 URL"
-          items={block.urls}
-          onChange={(urls) => patch({ urls })}
+          value={block.urls.join('\n')}
+          onChange={(value) => patch({ urls: imageLines(value) })}
+          prefix="content/gallery"
         />
       );
     case 'faq':

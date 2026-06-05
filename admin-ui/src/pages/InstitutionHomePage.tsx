@@ -7,6 +7,7 @@ import { BlockRenderer } from '@/components/editor/BlockRenderer';
 import { HOME_ALLOWED, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
+import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
 
 // The structured publicProfile fields are edited here as module cards; list-like
@@ -140,13 +141,13 @@ export function InstitutionHomePage() {
                   onChange={(e) => update('bannerSubtitle', e.target.value)}
                 />
               </Field>
-              <Field label="Banner 背景图 URL">
-                <input
-                  className="form-input"
-                  value={form.bannerImageUrl}
-                  onChange={(e) => update('bannerImageUrl', e.target.value)}
-                />
-              </Field>
+              <QiniuImageField
+                label="Banner 背景图 URL"
+                value={form.bannerImageUrl}
+                onChange={(value) => update('bannerImageUrl', value)}
+                prefix="homepage/banner"
+                previewAlt="机构 Banner"
+              />
               <Field label="一句话定位 headline" hint="副标题为空时展示">
                 <input
                   className="form-input"
@@ -198,13 +199,13 @@ export function InstitutionHomePage() {
             </EditorCard>
 
             <EditorCard title="图库与常见问题">
-              <Field label="图库 gallery" hint="每行一个图片 URL">
-                <textarea
-                  className="form-input h-20"
-                  value={form.galleryText}
-                  onChange={(e) => update('galleryText', e.target.value)}
-                />
-              </Field>
+              <QiniuGalleryField
+                label="图库 gallery"
+                hint="每行一个图片 URL"
+                value={form.galleryText}
+                onChange={(value) => update('galleryText', value)}
+                prefix="homepage/gallery"
+              />
               <Field label="常见问题 faq" hint="每行一条">
                 <textarea
                   className="form-input h-20"
@@ -240,7 +241,10 @@ export function InstitutionHomePage() {
               </Field>
             </EditorCard>
 
-            <EditorCard title="自由内容模块" description="像搭积木一样追加自定义模块，展示在主页正文区">
+            <EditorCard
+              title="自由内容模块"
+              description="像搭积木一样追加自定义模块，展示在主页正文区"
+            >
               <BlockEditor
                 value={form.bodyBlocks}
                 onChange={(bodyBlocks) => update('bodyBlocks', bodyBlocks)}
