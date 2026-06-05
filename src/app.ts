@@ -21,6 +21,14 @@ import type { AppEnv } from './lib/env.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const IMAGE_UPLOAD_BODY_LIMIT = 15 * 1024 * 1024;
+const CSP_DIRECTIVES = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-inline'"],
+  styleSrc: ["'self'", "'unsafe-inline'"],
+  imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+  fontSrc: ["'self'", 'data:', 'https:'],
+  connectSrc: ["'self'", 'https:'],
+};
 
 function resolveRuntimePath(...segments: string[]): string {
   return path.resolve(__dirname, '..', ...segments);
@@ -46,7 +54,11 @@ export async function buildApp(env: AppEnv) {
     origin: parseCorsOrigin(env.CORS_ORIGIN),
     credentials: true,
   });
-  await app.register(helmet);
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: CSP_DIRECTIVES,
+    },
+  });
   await app.register(cookie);
   await app.register(jwt, {
     secret: env.JWT_SECRET,

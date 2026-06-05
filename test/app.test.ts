@@ -191,6 +191,10 @@ test('serves health and readiness probes', async () => {
     const health = await app.inject({ method: 'GET', url: '/health' });
     assert.equal(health.statusCode, 200);
     assert.deepEqual(health.json(), { ok: true });
+    assert.match(
+      health.headers['content-security-policy'] as string,
+      /img-src 'self' data: blob: https:/,
+    );
 
     const ready = await app.inject({ method: 'GET', url: '/ready' });
     assert.equal(ready.statusCode, 200);
