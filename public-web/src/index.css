@@ -45,7 +45,7 @@ body {
 
   /* Primary CTA = ink (near-black), the Apple-neutral default. */
   .pwbtn-primary {
-    @apply bg-ink text-white hover:bg-ink/90;
+    @apply bg-ink hover:bg-ink/90 text-white;
   }
 
   .pwbtn-outline {
@@ -109,7 +109,7 @@ body {
   }
 
   .site-phone {
-    @apply border-line bg-surface text-ink hidden items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium no-underline transition-colors hover:bg-brand-soft sm:inline-flex;
+    @apply border-line bg-surface text-ink hover:bg-brand-soft hidden items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium no-underline transition-colors sm:inline-flex;
   }
 
   .site-account-trigger {
@@ -149,7 +149,7 @@ body {
   }
 
   .site-drawer-link {
-    @apply text-ink rounded-2xl px-4 py-3 text-base font-semibold no-underline hover:bg-surface;
+    @apply text-ink hover:bg-surface rounded-2xl px-4 py-3 text-base font-semibold no-underline;
   }
 
   .site-drawer-link.is-active {
@@ -160,19 +160,23 @@ body {
     @apply border-line bg-surface mt-12 border-t;
   }
 
-  .site-footer-grid {
-    @apply mx-auto grid w-full max-w-6xl gap-8 px-5 py-10 sm:px-6 md:grid-cols-[1.4fr_0.8fr_1fr] lg:px-8;
+  .site-footer-simple {
+    @apply mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-8 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8;
   }
 
-  .site-footer-heading {
-    @apply text-ink text-sm font-semibold;
+  .site-footer-brandline {
+    @apply flex min-w-0 flex-col gap-3;
   }
 
-  .site-footer-list {
-    @apply text-ink-soft mt-4 grid gap-2 text-sm;
+  .site-footer-note {
+    @apply text-ink-soft max-w-2xl text-sm leading-6;
   }
 
-  .site-footer-list a {
+  .site-footer-contact {
+    @apply text-ink-soft flex flex-wrap gap-x-4 gap-y-2 text-sm lg:justify-end;
+  }
+
+  .site-footer-contact a {
     @apply text-ink-soft hover:text-ink no-underline;
   }
 
@@ -189,6 +193,6 @@ body {
   }
 
   .hero-media {
-    @apply border-line aspect-[4/3] overflow-hidden rounded-[2rem] border bg-surface shadow-sm;
+    @apply border-line bg-surface aspect-[4/3] overflow-hidden rounded-[2rem] border shadow-sm;
   }
 }

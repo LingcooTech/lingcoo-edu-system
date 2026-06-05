@@ -33,9 +33,11 @@ function Brand({ organization }: { organization?: HomePayload['organization'] })
       {logoUrl ? (
         <img src={logoUrl} alt={brandName} className="h-8 max-w-36 object-contain" />
       ) : (
-        <span className="app-brand-mark">FD</span>
+        <>
+          <span className="app-brand-mark">FD</span>
+          <span className="app-brand-name">{brandName}</span>
+        </>
       )}
-      <span className="app-brand-name">{brandName}</span>
     </Link>
   );
 }
@@ -250,34 +252,27 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="site-main">{children}</main>
 
       <footer className="site-footer">
-        <div className="site-footer-grid">
-          <div>
+        <div className="site-footer-simple">
+          <div className="site-footer-brandline">
             <Brand organization={organization} />
-            <p className="text-ink-soft mt-4 text-sm leading-6">
+            <p className="site-footer-note">
               {organization?.publicProfile.bannerSubtitle ??
                 '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
             </p>
           </div>
-          <div>
-            <h3 className="site-footer-heading">导航</h3>
-            <div className="site-footer-list">
-              {navItems.map((item) => (
-                <Link key={item.to} to={item.to}>
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h3 className="site-footer-heading">联系</h3>
-            <div className="site-footer-list">
-              <span>{organization?.address ?? '请在后台配置校区地址'}</span>
-              <span>{organization?.phone ?? '请在后台配置联系电话'}</span>
-              <span>{organization?.publicProfile.businessHours}</span>
-            </div>
+          <div className="site-footer-contact">
+            {organization?.address ? <span>{organization.address}</span> : null}
+            {organization?.phone ? (
+              <a href={`tel:${organization.phone}`}>{organization.phone}</a>
+            ) : null}
+            {organization?.publicProfile.businessHours ? (
+              <span>{organization.publicProfile.businessHours}</span>
+            ) : null}
           </div>
         </div>
-        <div className="site-footer-bottom">© {new Date().getFullYear()} {organization?.brandName ?? '成长教室'}</div>
+        <div className="site-footer-bottom">
+          © {new Date().getFullYear()} {organization?.brandName ?? '成长教室'}
+        </div>
       </footer>
     </div>
   );

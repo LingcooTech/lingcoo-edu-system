@@ -3,6 +3,7 @@ import { ChevronRight, LogOut, PanelLeft } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
 import { logout, type AuthAccount } from '@/api/client';
+import type { OrganizationSettings } from '@/api/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,14 +34,20 @@ export function Sidebar({
   collapsed,
   onToggle,
   account,
+  organization,
   showCollapseToggle = true,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   account: AuthAccount;
+  organization?: OrganizationSettings | null;
   showCollapseToggle?: boolean;
 }) {
   const location = useLocation();
+  const brandName = organization?.brandName || organization?.name || 'fd-edu-system';
+  const fullLogoUrl = organization?.branding.fullLogoUrl || organization?.branding.logoUrl || '';
+  const squareLogoUrl =
+    organization?.branding.squareLogoUrl || organization?.branding.logoUrl || fullLogoUrl;
   const activeSection = useMemo(
     () =>
       adminSections.find((section) => location.pathname.startsWith(sectionPrefix(section.path))) ??
@@ -73,7 +80,7 @@ export function Sidebar({
     >
       <div
         className={cn(
-          'group/brand relative shrink-0 px-3 pb-3 pt-4',
+          'group/brand relative shrink-0 px-3 pt-4 pb-3',
           collapsed ? 'space-y-0' : 'flex items-center gap-2.5',
         )}
       >
@@ -85,18 +92,20 @@ export function Sidebar({
           )}
           aria-label="返回经营看板"
         >
-          <div className="shrink-0">
-            <div className="from-primary flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br to-blue-500 text-[11px] font-semibold text-white">
-              {getInitials('FD Edu')}
-            </div>
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-foreground truncate text-[13px] font-semibold leading-tight tracking-tight">
-                fd-edu-system
-              </p>
-              <p className="text-muted-foreground/80 mt-0.5 text-[10px]">Education Console</p>
-            </div>
+          {collapsed ? (
+            <BrandIcon logoUrl={squareLogoUrl} brandName={brandName} />
+          ) : fullLogoUrl ? (
+            <img src={fullLogoUrl} alt={brandName} className="h-9 max-w-[172px] object-contain" />
+          ) : (
+            <>
+              <BrandIcon logoUrl={squareLogoUrl} brandName={brandName} />
+              <div className="min-w-0">
+                <p className="text-foreground truncate text-[13px] leading-tight font-semibold tracking-tight">
+                  {brandName}
+                </p>
+                <p className="text-muted-foreground/80 mt-0.5 text-[10px]">Education Console</p>
+              </div>
+            </>
           )}
         </Link>
         {showCollapseToggle ? (
@@ -151,7 +160,7 @@ export function Sidebar({
               }}
             >
               {isActiveSection && !collapsed ? (
-                <span className="bg-primary absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r" />
+                <span className="bg-primary absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r" />
               ) : null}
               <section.icon
                 className={cn(
@@ -185,7 +194,7 @@ export function Sidebar({
                 sectionLink
               )}
               {hasChildren && !collapsed && isExpanded && (
-                <div className="border-border/60 ml-6 mt-0.5 space-y-0.5 border-l pl-3">
+                <div className="border-border/60 mt-0.5 ml-6 space-y-0.5 border-l pl-3">
                   {section.items.map((item) => (
                     <NavLink
                       key={item.key}
@@ -247,7 +256,7 @@ export function Sidebar({
             side="top"
             className="bg-card w-[260px] rounded-lg border p-1 shadow-lg"
           >
-            <DropdownMenuLabel className="px-2 pb-2 pt-2">
+            <DropdownMenuLabel className="px-2 pt-2 pb-2">
               <div className="flex items-center gap-2.5">
                 <Avatar className="h-9 w-9 shrink-0">
                   <AvatarFallback className="text-xs">
@@ -255,13 +264,13 @@ export function Sidebar({
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold leading-tight">
+                  <p className="truncate text-sm leading-tight font-semibold">
                     {account.displayName}
                   </p>
                   <p className="text-muted-foreground mt-0.5 truncate text-xs">
                     {account.email ?? account.phone ?? ROLE_LABEL[account.role] ?? account.role}
                   </p>
-                  <p className="text-muted-foreground/70 mt-0.5 truncate text-[10px] font-medium uppercase tracking-wider">
+                  <p className="text-muted-foreground/70 mt-0.5 truncate text-[10px] font-medium tracking-wider uppercase">
                     {ROLE_LABEL[account.role] ?? account.role}
                   </p>
                 </div>
@@ -282,5 +291,21 @@ export function Sidebar({
         </DropdownMenu>
       </div>
     </aside>
+  );
+}
+
+function BrandIcon({ logoUrl, brandName }: { logoUrl?: string; brandName: string }) {
+  if (logoUrl) {
+    return (
+      <span className="bg-card flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+        <img src={logoUrl} alt={brandName} className="h-full w-full object-contain" />
+      </span>
+    );
+  }
+
+  return (
+    <span className="from-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br to-blue-500 text-[11px] font-semibold text-white">
+      {getInitials(brandName)}
+    </span>
   );
 }

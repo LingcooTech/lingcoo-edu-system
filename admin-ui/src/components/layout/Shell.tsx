@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
-import type { AuthAccount } from '@/api/client';
+import { fetchOrganization, type AuthAccount } from '@/api/client';
+import type { OrganizationSettings } from '@/api/types';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
@@ -17,7 +18,14 @@ function readCollapsed(): boolean {
 export function Shell({ account }: { account: AuthAccount }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [organization, setOrganization] = useState<OrganizationSettings | null>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    fetchOrganization()
+      .then(setOrganization)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     try {
@@ -43,6 +51,7 @@ export function Shell({ account }: { account: AuthAccount }) {
           collapsed={collapsed}
           onToggle={() => setCollapsed((current) => !current)}
           account={account}
+          organization={organization}
         />
       </div>
 
@@ -56,6 +65,7 @@ export function Shell({ account }: { account: AuthAccount }) {
             collapsed={false}
             onToggle={() => setMobileOpen(false)}
             account={account}
+            organization={organization}
             showCollapseToggle={false}
           />
         </SheetContent>
