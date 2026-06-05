@@ -9,6 +9,7 @@ import * as packagesRepo from '../../db/repositories/packages.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
+import { readPublicSite } from '../../lib/public-site.js';
 import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
 import type { AppModule } from '../types.js';
 
@@ -96,6 +97,7 @@ export const trialModule: AppModule = {
           phone: organization.phone,
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
+          publicSite: readPublicSite(organization.settings),
           branding: readSettings(organization.settings).branding ?? {},
         },
         featuredCourses,
@@ -135,6 +137,7 @@ export const trialModule: AppModule = {
           phone: organization.phone,
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
+          publicSite: readPublicSite(organization.settings),
           branding: readSettings(organization.settings).branding ?? {},
         },
       };
@@ -192,7 +195,9 @@ export const trialModule: AppModule = {
         await trialRepo.incrementBookedCount(app.db, body.trialSessionId);
       }
 
-      const course = lead.courseId ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null) : null;
+      const course = lead.courseId
+        ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null)
+        : null;
       await sendTrialRegistrationSubscribe({
         app,
         phone: body.phone,

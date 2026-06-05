@@ -6,7 +6,7 @@ import { ChevronDown, LogOut, Menu, Phone, Shield, UserRound, X } from 'lucide-r
 import { loadHome, type HomePayload } from '@/api/client';
 import { useSession } from '@/features/session';
 
-const navItems = [
+const defaultNavItems = [
   { to: '/', label: '首页', end: true },
   { to: '/courses', label: '课程', end: false },
   { to: '/trials', label: '试听', end: false },
@@ -20,6 +20,25 @@ const ROLE_LABEL: Record<string, string> = {
   teacher: '老师',
   parent: '家长',
 };
+
+function navItemsFor(organization?: HomePayload['organization']) {
+  const configured = organization?.publicSite?.navigation;
+  if (!configured) {
+    return defaultNavItems;
+  }
+
+  return configured
+    .filter((item) => item.visible)
+    .map((item) => ({
+      to: item.path,
+      label: item.label,
+      end: item.path === '/',
+    }));
+}
+
+function isExternalUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
 
 function Brand({ organization }: { organization?: HomePayload['organization'] }) {
   const logoUrl =
@@ -79,6 +98,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [accountOpen]);
 
   const organization = home?.organization;
+  const navItems = navItemsFor(organization);
   const accountMenuPath = account?.role === 'teacher' ? '/teacher' : '/account';
   const accountMenuLabel = account?.role === 'teacher' ? '老师工作台' : '个人中心';
 
@@ -104,16 +124,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
           <nav className="site-nav" aria-label="主导航">
             {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  isActive ? 'site-nav-link is-active' : 'site-nav-link'
-                }
-              >
-                {item.label}
-              </NavLink>
+              <HeaderNavItem key={`${item.to}-${item.label}`} item={item} />
             ))}
           </nav>
 
@@ -205,16 +216,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
             <nav className="mt-8 grid gap-2">
               {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    isActive ? 'site-drawer-link is-active' : 'site-drawer-link'
-                  }
-                >
-                  {item.label}
-                </NavLink>
+                <DrawerNavItem key={`${item.to}-${item.label}`} item={item} />
               ))}
             </nav>
             <Link to="/register" className="pwbtn pwbtn-primary mt-8 w-full">
@@ -255,25 +257,99 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="site-footer-simple">
           <div className="site-footer-brandline">
             <Brand organization={organization} />
-            <p className="site-footer-note">
-              {organization?.publicProfile.bannerSubtitle ??
-                '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
-            </p>
-          </div>
-          <div className="site-footer-contact">
-            {organization?.address ? <span>{organization.address}</span> : null}
-            {organization?.phone ? (
-              <a href={`tel:${organization.phone}`}>{organization.phone}</a>
-            ) : null}
-            {organization?.publicProfile.businessHours ? (
-              <span>{organization.publicProfile.businessHours}</span>
-            ) : null}
+            <div className="site-footer-copy">
+              <div className="site-footer-contact">
+                {organization?.address ? <span>{organization.address}</span> : null}
+                {organization?.phone ? (
+                  <a href={`tel:${organization.phone}`}>{organization.phone}</a>
+                ) : null}
+                {organization?.publicProfile.businessHours ? (
+                  <span>{organization.publicProfile.businessHours}</span>
+                ) : null}
+              </div>
+              <p className="site-footer-note">
+                {organization?.publicProfile.bannerSubtitle ??
+                  '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
+              </p>
+            </div>
           </div>
         </div>
         <div className="site-footer-bottom">
-          © {new Date().getFullYear()} {organization?.brandName ?? '成长教室'}
+          <span>
+            © {new Date().getFullYear()} {organization?.brandName ?? '成长教室'}
+          </span>
+          {organization?.publicSite?.icpNumber ? (
+            organization.publicSite.icpUrl ? (
+              <a
+                className="site-footer-icp"
+                href={organization.publicSite.icpUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {organization.publicSite.icpNumber}
+              </a>
+            ) : (
+              <span className="site-footer-icp">{organization.publicSite.icpNumber}</span>
+            )
+          ) : null}
         </div>
       </footer>
     </div>
+  );
+}
+
+function HeaderNavItem({
+  item,
+}: {
+  item: {
+    to: string;
+    label: string;
+    end: boolean;
+  };
+}) {
+  if (isExternalUrl(item.to)) {
+    return (
+      <a href={item.to} className="site-nav-link" target="_blank" rel="noreferrer">
+        {item.label}
+      </a>
+    );
+  }
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) => (isActive ? 'site-nav-link is-active' : 'site-nav-link')}
+    >
+      {item.label}
+    </NavLink>
+  );
+}
+
+function DrawerNavItem({
+  item,
+}: {
+  item: {
+    to: string;
+    label: string;
+    end: boolean;
+  };
+}) {
+  if (isExternalUrl(item.to)) {
+    return (
+      <a href={item.to} className="site-drawer-link" target="_blank" rel="noreferrer">
+        {item.label}
+      </a>
+    );
+  }
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) => (isActive ? 'site-drawer-link is-active' : 'site-drawer-link')}
+    >
+      {item.label}
+    </NavLink>
   );
 }

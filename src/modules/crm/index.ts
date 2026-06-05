@@ -9,6 +9,7 @@ import * as peopleRepo from '../../db/repositories/people.js';
 import * as trialRepo from '../../db/repositories/trial.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
+import { readPublicSite } from '../../lib/public-site.js';
 import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
 import type { AppModule } from '../types.js';
 
@@ -520,7 +521,9 @@ export const crmModule: AppModule = {
       const body = leadRegistrationSchema.omit({ campaign: true }).parse(request.body);
       const campaign = await crmRepo.requireActiveCampaignByCode(app.db, campaignCode);
       const lead = await createLeadFromRegistration(app, body, campaign);
-      const course = lead.courseId ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null) : null;
+      const course = lead.courseId
+        ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null)
+        : null;
       await sendTrialRegistrationSubscribe({
         app,
         phone: body.phone,
@@ -555,6 +558,7 @@ export const crmModule: AppModule = {
           phone: organization.phone,
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
+          publicSite: readPublicSite(organization.settings),
           branding: readSettings(organization.settings).branding ?? {},
         },
       };

@@ -51,6 +51,23 @@ export interface HomePayload {
       businessHours: string;
       bodyBlocks?: Block[];
     };
+    publicSite: {
+      navigation: Array<{
+        label: string;
+        path: string;
+        visible: boolean;
+      }>;
+      aboutPage: {
+        title: string;
+        subtitle: string;
+        heroImageUrl: string;
+        operatorIntro: string;
+        brandCooperation: string;
+        bodyBlocks?: Block[];
+      };
+      icpNumber: string;
+      icpUrl: string;
+    };
     branding: {
       fullLogoUrl?: string;
       squareLogoUrl?: string;

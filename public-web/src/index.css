@@ -161,27 +161,35 @@ body {
   }
 
   .site-footer-simple {
-    @apply mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-8 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8;
+    @apply mx-auto w-full max-w-6xl px-5 py-8 sm:px-6 lg:px-8;
   }
 
   .site-footer-brandline {
-    @apply flex min-w-0 flex-col gap-3;
+    @apply flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start;
+  }
+
+  .site-footer-copy {
+    @apply min-w-0 flex-1;
   }
 
   .site-footer-note {
-    @apply text-ink-soft max-w-2xl text-sm leading-6;
+    @apply text-ink-soft mt-2 max-w-3xl text-sm leading-6;
   }
 
   .site-footer-contact {
-    @apply text-ink-soft flex flex-wrap gap-x-4 gap-y-2 text-sm lg:justify-end;
+    @apply text-ink flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium;
   }
 
   .site-footer-contact a {
-    @apply text-ink-soft hover:text-ink no-underline;
+    @apply text-ink hover:text-brand no-underline;
   }
 
   .site-footer-bottom {
-    @apply border-line text-muted mx-auto w-full max-w-6xl border-t px-5 py-4 text-xs sm:px-6 lg:px-8;
+    @apply border-line text-muted mx-auto flex w-full max-w-6xl justify-center border-t px-5 py-4 text-center text-xs sm:justify-between sm:px-6 sm:text-left lg:px-8;
+  }
+
+  .site-footer-icp {
+    @apply text-muted hover:text-ink hidden no-underline sm:inline;
   }
 
   .section-title {

@@ -286,6 +286,28 @@ export interface OrganizationBranding {
   radius?: string;
 }
 
+export interface PublicNavItem {
+  label: string;
+  path: string;
+  visible: boolean;
+}
+
+export interface AboutPageSettings {
+  title: string;
+  subtitle: string;
+  heroImageUrl: string;
+  operatorIntro: string;
+  brandCooperation: string;
+  bodyBlocks: Block[];
+}
+
+export interface PublicSiteSettings {
+  navigation: PublicNavItem[];
+  aboutPage: AboutPageSettings;
+  icpNumber: string;
+  icpUrl: string;
+}
+
 export interface OrganizationSettings {
   id: string;
   name: string;
@@ -293,6 +315,7 @@ export interface OrganizationSettings {
   phone: string | null;
   address: string | null;
   publicProfile: PublicProfile;
+  publicSite: PublicSiteSettings;
   branding: OrganizationBranding;
 }
 

@@ -9,6 +9,7 @@ import {
   normalizePublicProfile,
   readPublicProfile,
 } from '../../lib/public-profile.js';
+import { mergePublicSite, normalizePublicSite, readPublicSite } from '../../lib/public-site.js';
 import { z } from 'zod';
 import type { AppModule } from '../types.js';
 
@@ -48,6 +49,33 @@ const brandingSchema = z
   })
   .optional();
 
+const publicSiteSchema = z
+  .object({
+    navigation: z
+      .array(
+        z.object({
+          label: z.string().min(1).max(24),
+          path: z.string().min(1).max(160),
+          visible: z.boolean().optional(),
+        }),
+      )
+      .max(12)
+      .optional(),
+    aboutPage: z
+      .object({
+        title: z.string().max(120).optional(),
+        subtitle: z.string().max(240).optional(),
+        heroImageUrl: z.string().max(500).optional(),
+        operatorIntro: z.string().max(5000).optional(),
+        brandCooperation: z.string().max(5000).optional(),
+        bodyBlocks: z.array(z.unknown()).max(200).optional(),
+      })
+      .optional(),
+    icpNumber: z.string().max(80).optional(),
+    icpUrl: z.string().max(160).optional(),
+  })
+  .optional();
+
 const organizationSchema = z.object({
   name: z.string().min(1).max(160).optional(),
   brandName: z.string().min(1).max(160).optional(),
@@ -55,6 +83,7 @@ const organizationSchema = z.object({
   address: z.string().max(255).nullable().optional(),
   publicProfile: publicProfileSchema.optional(),
   branding: brandingSchema,
+  publicSite: publicSiteSchema,
 });
 
 const campusSchema = z.object({
@@ -81,6 +110,7 @@ export const organizationModule: AppModule = {
         organization: {
           ...organization,
           publicProfile: readPublicProfile(settings),
+          publicSite: readPublicSite(settings),
           branding: settings.branding ?? {},
         },
       };
@@ -98,6 +128,9 @@ export const organizationModule: AppModule = {
       if (body.branding !== undefined) {
         settings = { ...settings, branding: body.branding ?? {} };
       }
+      if (body.publicSite !== undefined) {
+        settings = mergePublicSite(settings, normalizePublicSite(body.publicSite));
+      }
 
       const updated = await organizationRepo.updateOrganization(app.db, {
         name: body.name,
@@ -111,6 +144,7 @@ export const organizationModule: AppModule = {
         organization: {
           ...updated,
           publicProfile: readPublicProfile(updated.settings),
+          publicSite: readPublicSite(updated.settings),
           branding: readSettings(updated.settings).branding ?? {},
         },
       };

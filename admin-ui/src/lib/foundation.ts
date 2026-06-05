@@ -35,7 +35,10 @@ export const adminSections = [
     label: '机构主页',
     path: '/institution',
     icon: Home,
-    items: [],
+    items: [
+      { key: 'institutionHome', label: '首页内容', path: '/institution', icon: Home },
+      { key: 'institutionAbout', label: '关于我们', path: '/institution/about', icon: Building2 },
+    ],
   },
   {
     key: 'resources',
@@ -114,6 +117,11 @@ export const pageMeta: Record<string, { title: string; description: string; eyeb
     eyebrow: 'Institution',
     title: '机构主页',
     description: '维护对外展示的机构主体、介绍内容、亮点承诺和品牌基础信息。',
+  },
+  institutionAbout: {
+    eyebrow: 'Public Site',
+    title: '关于我们与导航',
+    description: '维护前台 Header 菜单、关于我们页面内容和页脚备案信息。',
   },
   marketing: {
     eyebrow: 'Admissions',
