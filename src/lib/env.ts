@@ -25,6 +25,13 @@ const envSchema = z.object({
   // WeChat Mini Program login. Keep AppSecret in runtime env only.
   WECHAT_MINI_PROGRAM_APP_ID: z.string().optional(),
   WECHAT_MINI_PROGRAM_APP_SECRET: z.string().optional(),
+  WECHAT_MINI_PROGRAM_STATE: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.enum(['developer', 'trial', 'formal']).optional(),
+  ),
+  WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID: z.string().optional(),
+  WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID: z.string().optional(),
+  WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID: z.string().optional(),
 
   // SMTP (email verification / password reset).
   SMTP_HOST: z.string().optional(),

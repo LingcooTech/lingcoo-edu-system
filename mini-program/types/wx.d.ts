@@ -34,6 +34,12 @@ declare const wx: {
     fail?: (error: { errMsg: string }) => void;
     complete?: () => void;
   }): void;
+  requestSubscribeMessage?: (options: {
+    tmplIds: string[];
+    success?: (result: Record<string, string>) => void;
+    fail?: (error: { errMsg: string }) => void;
+    complete?: () => void;
+  }) => void;
 };
 
 declare function App(options: Record<string, unknown>): void;

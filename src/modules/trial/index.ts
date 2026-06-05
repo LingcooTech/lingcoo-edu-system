@@ -9,6 +9,7 @@ import * as packagesRepo from '../../db/repositories/packages.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
+import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
 import type { AppModule } from '../types.js';
 
 const trialSessionSchema = z.object({
@@ -190,6 +191,14 @@ export const trialModule: AppModule = {
       if (body.trialSessionId) {
         await trialRepo.incrementBookedCount(app.db, body.trialSessionId);
       }
+
+      const course = lead.courseId ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null) : null;
+      await sendTrialRegistrationSubscribe({
+        app,
+        phone: body.phone,
+        studentName: body.studentName,
+        courseName: course?.name ?? null,
+      });
 
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
     });

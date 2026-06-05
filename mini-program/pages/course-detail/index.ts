@@ -14,6 +14,7 @@ import {
 } from '../../services/api';
 import { money } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
+import { requestSubscribe } from '../../services/subscribe';
 
 type PackageItem = CoursePackage & { priceLabel: string };
 type CheckoutOrder = ParentOrder & { amountLabel: string; statusLabel: string };
@@ -159,6 +160,9 @@ Page({
 
     this.setData({ submittingOrder: true });
     try {
+      if (hasToken()) {
+        await requestSubscribe(['payment_success']);
+      }
       const payload = await createPublicOrder({
         packageId: selectedPackage.id,
         guardianName: guardianName || undefined,
@@ -325,6 +329,7 @@ Page({
 
     this.setData({ submittingTrial: true });
     try {
+      await requestSubscribe(['trial_registration']);
       await submitTrialRegistration({
         guardianName,
         phone,

@@ -9,6 +9,7 @@ import * as peopleRepo from '../../db/repositories/people.js';
 import * as trialRepo from '../../db/repositories/trial.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
+import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
 import type { AppModule } from '../types.js';
 
 const leadStatuses = [
@@ -519,6 +520,13 @@ export const crmModule: AppModule = {
       const body = leadRegistrationSchema.omit({ campaign: true }).parse(request.body);
       const campaign = await crmRepo.requireActiveCampaignByCode(app.db, campaignCode);
       const lead = await createLeadFromRegistration(app, body, campaign);
+      const course = lead.courseId ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null) : null;
+      await sendTrialRegistrationSubscribe({
+        app,
+        phone: body.phone,
+        studentName: body.studentName,
+        courseName: course?.name ?? campaign.name,
+      });
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
     });
 

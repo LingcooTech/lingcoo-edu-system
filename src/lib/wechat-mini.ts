@@ -25,6 +25,37 @@ interface PhoneNumberPayload extends WechatErrorPayload {
   };
 }
 
+interface SubscribeMessagePayload extends WechatErrorPayload {
+  msgid?: number;
+}
+
+export type WechatMiniSubscribeTemplateKey =
+  | 'trial_registration'
+  | 'payment_success'
+  | 'lesson_reminder';
+
+export interface WechatMiniSubscribeTemplate {
+  key: WechatMiniSubscribeTemplateKey;
+  label: string;
+  templateId: string;
+}
+
+export interface WechatMiniSubscribeMessageInput {
+  toUser: string;
+  templateId: string;
+  page?: string;
+  data: Record<string, { value: string }>;
+}
+
+export interface WechatMiniSubscribeMessageResult {
+  sent: boolean;
+  msgid?: number;
+  errcode?: number;
+  errmsg?: string;
+}
+
+const accessTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
 function requireWechatMiniConfig(env: AppEnv) {
   if (!env.WECHAT_MINI_PROGRAM_APP_ID || !env.WECHAT_MINI_PROGRAM_APP_SECRET) {
     throw httpError(501, '微信小程序 AppID/AppSecret 未配置');
@@ -39,6 +70,38 @@ function assertWechatSuccess(payload: WechatErrorPayload, fallbackMessage: strin
   if (payload.errcode && payload.errcode !== 0) {
     throw httpError(502, payload.errmsg || fallbackMessage);
   }
+}
+
+function miniprogramState(env: AppEnv) {
+  return env.WECHAT_MINI_PROGRAM_STATE ?? (env.NODE_ENV === 'production' ? 'formal' : 'developer');
+}
+
+export function getWechatMiniSubscribeTemplates(env: AppEnv): WechatMiniSubscribeTemplate[] {
+  const templates: WechatMiniSubscribeTemplate[] = [
+    {
+      key: 'trial_registration',
+      label: '预约试听通知',
+      templateId: env.WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID?.trim() ?? '',
+    },
+    {
+      key: 'payment_success',
+      label: '支付成功通知',
+      templateId: env.WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID?.trim() ?? '',
+    },
+    {
+      key: 'lesson_reminder',
+      label: '课前提醒',
+      templateId: env.WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID?.trim() ?? '',
+    },
+  ];
+  return templates.filter((item) => Boolean(item.templateId));
+}
+
+export function getWechatMiniSubscribeTemplateId(
+  env: AppEnv,
+  key: WechatMiniSubscribeTemplateKey,
+) {
+  return getWechatMiniSubscribeTemplates(env).find((item) => item.key === key)?.templateId ?? '';
 }
 
 async function fetchWechatJson<T>(url: URL, init?: RequestInit): Promise<T> {
@@ -72,6 +135,11 @@ export async function exchangeWechatMiniCode(env: AppEnv, code: string) {
 
 async function getWechatAccessToken(env: AppEnv) {
   const config = requireWechatMiniConfig(env);
+  const cached = accessTokenCache.get(config.appId);
+  if (cached && cached.expiresAt > Date.now() + 60_000) {
+    return cached.token;
+  }
+
   const url = new URL('https://api.weixin.qq.com/cgi-bin/token');
   url.searchParams.set('grant_type', 'client_credential');
   url.searchParams.set('appid', config.appId);
@@ -82,6 +150,10 @@ async function getWechatAccessToken(env: AppEnv) {
   if (!payload.access_token) {
     throw httpError(502, '微信 access_token 返回为空');
   }
+  accessTokenCache.set(config.appId, {
+    token: payload.access_token,
+    expiresAt: Date.now() + Math.max((payload.expires_in ?? 7200) - 300, 60) * 1000,
+  });
   return payload.access_token;
 }
 
@@ -102,4 +174,42 @@ export async function getWechatMiniPhoneNumber(env: AppEnv, phoneCode: string) {
     throw httpError(502, '微信手机号返回为空');
   }
   return phone;
+}
+
+export async function sendWechatMiniSubscribeMessage(
+  env: AppEnv,
+  input: WechatMiniSubscribeMessageInput,
+): Promise<WechatMiniSubscribeMessageResult> {
+  if (!input.templateId.trim() || !input.toUser.trim()) {
+    return { sent: false, errmsg: 'missing templateId or touser' };
+  }
+
+  const accessToken = await getWechatAccessToken(env);
+  const url = new URL('https://api.weixin.qq.com/cgi-bin/message/subscribe/send');
+  url.searchParams.set('access_token', accessToken);
+
+  const payload = await fetchWechatJson<SubscribeMessagePayload>(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      touser: input.toUser,
+      template_id: input.templateId,
+      page: input.page,
+      miniprogram_state: miniprogramState(env),
+      lang: 'zh_CN',
+      data: input.data,
+    }),
+  });
+
+  if (!payload.errcode || payload.errcode === 0) {
+    return { sent: true, msgid: payload.msgid };
+  }
+
+  // 43101 = user refused or did not grant the one-time subscription. This is an
+  // expected runtime outcome and should not break the business transaction.
+  if (payload.errcode === 43101) {
+    return { sent: false, errcode: payload.errcode, errmsg: payload.errmsg };
+  }
+
+  throw httpError(502, payload.errmsg || '发送微信订阅消息失败');
 }

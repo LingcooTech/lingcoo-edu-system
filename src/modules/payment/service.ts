@@ -5,6 +5,10 @@ import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import type { Order } from '../../db/repositories/finance.js';
 import { httpError } from '../../lib/http-error.js';
+import {
+  getWechatMiniSubscribeTemplateId,
+  sendWechatMiniSubscribeMessage,
+} from '../../lib/wechat-mini.js';
 import { NotificationsService } from '../notifications/service.js';
 import { getPaymentProvider } from './providers/index.js';
 import type {
@@ -21,6 +25,14 @@ function isLiveProvider(provider: string): provider is LivePaymentProviderCode {
 
 function buildOrderSubject(order: Order) {
   return `课时包订单 ${order.orderNo}（${order.lessonCount} 课时）`;
+}
+
+function formatAmount(amount: number) {
+  return `￥${(amount / 100).toFixed(2)}`;
+}
+
+function formatMessageTime(date = new Date()) {
+  return date.toISOString().replace('T', ' ').slice(0, 16);
 }
 
 async function attachQrCodeDataUrl(intent: PaymentIntent): Promise<PaymentIntent> {
@@ -318,6 +330,42 @@ export class PaymentService {
       sourceEventName: 'payment.paid',
       dedupeKey: `payment.paid:${order.orderNo}:${provider}:${providerOrderId}`
     });
+    await this.sendWechatMiniPaymentSubscribe(order);
+  }
+
+  private async sendWechatMiniPaymentSubscribe(order: Order) {
+    const templateId = getWechatMiniSubscribeTemplateId(this.app.appEnv, 'payment_success');
+    const appId = this.app.appEnv.WECHAT_MINI_PROGRAM_APP_ID?.trim();
+    if (!templateId || !appId || !order.accountId) {
+      return;
+    }
+
+    const identity = await accountsRepo.findWechatIdentityByAccount(this.app.db, order.accountId, appId);
+    if (!identity) {
+      return;
+    }
+
+    try {
+      const result = await sendWechatMiniSubscribeMessage(this.app.appEnv, {
+        toUser: identity.openid,
+        templateId,
+        page: '/pages/account/index',
+        data: {
+          character_string1: { value: order.orderNo },
+          amount2: { value: formatAmount(order.amount) },
+          thing3: { value: `${order.lessonCount} 课时已到账` },
+          time4: { value: formatMessageTime(order.paidAt ?? new Date()) },
+        },
+      });
+      if (!result.sent) {
+        this.app.log.info(
+          { orderNo: order.orderNo, errcode: result.errcode, errmsg: result.errmsg },
+          'wechat mini payment subscribe skipped',
+        );
+      }
+    } catch (error) {
+      this.app.log.warn({ err: error, orderNo: order.orderNo }, 'wechat mini payment subscribe failed');
+    }
   }
 
   private buildPaidIntent(order: Order, requestedProvider: PaymentProviderCode): PaymentIntent {

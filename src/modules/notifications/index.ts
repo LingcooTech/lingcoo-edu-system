@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
+import { getWechatMiniSubscribeTemplates } from '../../lib/wechat-mini.js';
 import { NotificationsService } from './service.js';
 import type { AppModule } from '../types.js';
 
@@ -21,6 +22,10 @@ const qiniuSettingsSchema = z.object({
 export const notificationsModule: AppModule = {
   name: 'notifications',
   async register(app) {
+    app.get('/public/wechat-mini/subscribe-templates', async () => {
+      return { templates: getWechatMiniSubscribeTemplates(app.appEnv) };
+    });
+
     // --- Staff notifications ---
     app.get('/v1/notifications', { preHandler: app.requireAdmin }, async (request) => {
       const recipientId = request.account!.id;

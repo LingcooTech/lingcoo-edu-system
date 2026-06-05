@@ -125,6 +125,17 @@ export interface CreateOrderInput {
   medium?: string;
 }
 
+export type SubscribeTemplateKey =
+  | 'trial_registration'
+  | 'payment_success'
+  | 'lesson_reminder';
+
+export interface WechatMiniSubscribeTemplate {
+  key: SubscribeTemplateKey;
+  label: string;
+  templateId: string;
+}
+
 export interface PublicTeacher {
   id: string;
   name: string;
@@ -327,6 +338,11 @@ export function submitTrialRegistration(input: TrialRegistrationInput): Promise<
     method: 'POST',
     data: input,
   });
+}
+
+export async function fetchWechatMiniSubscribeTemplates(): Promise<WechatMiniSubscribeTemplate[]> {
+  return (await request<{ templates: WechatMiniSubscribeTemplate[] }>('/public/wechat-mini/subscribe-templates'))
+    .templates;
 }
 
 export function createPublicOrder(input: CreateOrderInput): Promise<CheckoutPayload> {

@@ -4,6 +4,7 @@ import {
   type CampaignLandingPayload,
   type TrialSession,
 } from '../../services/api';
+import { requestSubscribe } from '../../services/subscribe';
 import { formatDateTime } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
 
@@ -103,6 +104,7 @@ Page({
     this.setData({ submitting: true });
     try {
       const payload = this.data.payload;
+      await requestSubscribe(['trial_registration']);
       await submitCampaignParticipation(payload.campaign.code, {
         guardianName,
         phone,

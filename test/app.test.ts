@@ -55,6 +55,53 @@ test('exposes the public organization home payload', async () => {
   }
 });
 
+test('exposes configured WeChat Mini Program subscribe templates', async () => {
+  const app = await buildApp({
+    ...testEnv,
+    WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID: 'trial-template-id',
+    WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID: 'payment-template-id',
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/public/wechat-mini/subscribe-templates',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json().templates, [
+      {
+        key: 'trial_registration',
+        label: '预约试听通知',
+        templateId: 'trial-template-id',
+      },
+      {
+        key: 'payment_success',
+        label: '支付成功通知',
+        templateId: 'payment-template-id',
+      },
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
+test('does not expose unconfigured WeChat Mini Program subscribe templates', async () => {
+  const app = await buildApp(testEnv);
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/public/wechat-mini/subscribe-templates',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), { templates: [] });
+  } finally {
+    await app.close();
+  }
+});
+
 test('binds and reuses a WeChat Mini Program parent account', async () => {
   const app = await buildApp(testEnv);
   const originalFetch = globalThis.fetch;
@@ -332,7 +379,7 @@ test('creates a WeChat Mini Program payment intent for a bound parent order', as
     await app.db.insert(schema.accountWechatIdentities).values({
       accountId: account.id,
       appId: payEnv.WECHAT_PAY_APP_ID!,
-      openid: 'openid-jsapi-test',
+      openid: `openid-jsapi-${suffix}`,
     });
     const [student] = await app.db
       .insert(schema.students)
@@ -397,7 +444,7 @@ test('creates a WeChat Mini Program payment intent for a bound parent order', as
     assert.equal(intent.payload.signType, 'HMAC-SHA256');
     assert.equal(typeof intent.payload.paySign, 'string');
     assert.match(requestXml, /<trade_type><!\[CDATA\[JSAPI\]\]><\/trade_type>/);
-    assert.match(requestXml, /<openid><!\[CDATA\[openid-jsapi-test\]\]><\/openid>/);
+    assert.match(requestXml, new RegExp(`<openid><!\\[CDATA\\[openid-jsapi-${suffix}\\]\\]></openid>`));
   } finally {
     globalThis.fetch = originalFetch;
     await app.close();
