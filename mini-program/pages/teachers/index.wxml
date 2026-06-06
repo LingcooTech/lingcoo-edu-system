@@ -5,11 +5,6 @@
 
   <scroll-view wx:if="{{tabs.length}}" class="tabs" scroll-x enable-flex>
     <view
-      class="tab {{activeTab === 'all' ? 'tab-active' : ''}}"
-      data-id="all"
-      bindtap="onTabTap"
-    >全部</view>
-    <view
       wx:for="{{tabs}}"
       wx:key="id"
       class="tab {{activeTab === item.id ? 'tab-active' : ''}}"
@@ -36,7 +31,10 @@
         <view class="teacher-main">
           <view class="teacher-name">{{item.name}}</view>
           <view wx:if="{{item.title}}" class="muted teacher-title">{{item.title}}</view>
-          <view wx:if="{{item.institutionName || item.institutionLogoUrl}}" class="institution-mark">
+          <view
+            wx:if="{{item.institutionName || item.institutionLogoUrl}}"
+            class="{{item.institutionLogoUrl ? 'institution-logo-wrap' : 'institution-mark'}}"
+          >
             <image
               wx:if="{{item.institutionLogoUrl}}"
               class="institution-logo"

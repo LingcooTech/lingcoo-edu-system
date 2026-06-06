@@ -19,6 +19,10 @@ const teacherSchema = z.object({
   institutionId: z.string().uuid().nullable().optional(),
   tagline: z.string().max(200).optional(),
   wechatQrUrl: z.string().max(500).optional(),
+  education: z.string().default(''),
+  teachingExperience: z.string().default(''),
+  teachingStyle: z.string().default(''),
+  achievements: z.string().default(''),
   bio: z.string().default(''),
   specialties: z.array(z.string()).default([]),
   status: z.enum(['active', 'archived']).default('active'),
@@ -68,59 +72,63 @@ export const teachingModule: AppModule = {
       log: app.log,
     });
 
-    app.get('/public/teacher/dashboard', { preHandler: app.requireRole('teacher') }, async (request) => {
-      const account = await accountsRepo.findById(app.db, request.account!.id);
-      if (!account?.teacherId) {
-        throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
-      }
+    app.get(
+      '/public/teacher/dashboard',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const account = await accountsRepo.findById(app.db, request.account!.id);
+        if (!account?.teacherId) {
+          throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
+        }
 
-      const [sessions, classes, courses, classrooms, students] = await Promise.all([
-        schedulingRepo.listClassSessions(app.db),
-        schedulingRepo.listClasses(app.db),
-        catalogRepo.listCourses(app.db),
-        teachingRepo.listClassrooms(app.db),
-        peopleRepo.listStudents(app.db),
-      ]);
-      const classById = new Map(classes.map((item) => [item.id, item]));
-      const courseById = new Map(courses.map((item) => [item.id, item]));
-      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
-      const studentById = new Map(students.map((item) => [item.id, item]));
-      const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
+        const [sessions, classes, courses, classrooms, students] = await Promise.all([
+          schedulingRepo.listClassSessions(app.db),
+          schedulingRepo.listClasses(app.db),
+          catalogRepo.listCourses(app.db),
+          teachingRepo.listClassrooms(app.db),
+          peopleRepo.listStudents(app.db),
+        ]);
+        const classById = new Map(classes.map((item) => [item.id, item]));
+        const courseById = new Map(courses.map((item) => [item.id, item]));
+        const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+        const studentById = new Map(students.map((item) => [item.id, item]));
+        const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
 
-      const classCards = await Promise.all(
-        myClasses.map(async (classGroup) => {
-          const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
-          return {
-            ...classGroup,
-            course: courseById.get(classGroup.courseId),
-            classroom: classroomById.get(classGroup.classroomId),
-            students: enrollments
-              .map((enrollment) => studentById.get(enrollment.studentId))
-              .filter(Boolean)
-              .map((student) => ({
-                id: student!.id,
-                name: student!.name,
-                grade: student!.grade,
-              })),
-          };
-        }),
-      );
-
-      return {
-        sessions: sessions
-          .filter((session) => session.teacherId === account.teacherId)
-          .map((session) => {
-            const classGroup = classById.get(session.classId);
+        const classCards = await Promise.all(
+          myClasses.map(async (classGroup) => {
+            const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
             return {
-              ...session,
-              class: classGroup ? { name: classGroup.name } : undefined,
-              course: classGroup ? courseById.get(classGroup.courseId) : undefined,
-              classroom: classroomById.get(session.classroomId),
+              ...classGroup,
+              course: courseById.get(classGroup.courseId),
+              classroom: classroomById.get(classGroup.classroomId),
+              students: enrollments
+                .map((enrollment) => studentById.get(enrollment.studentId))
+                .filter(Boolean)
+                .map((student) => ({
+                  id: student!.id,
+                  name: student!.name,
+                  grade: student!.grade,
+                })),
             };
           }),
-        classes: classCards,
-      };
-    });
+        );
+
+        return {
+          sessions: sessions
+            .filter((session) => session.teacherId === account.teacherId)
+            .map((session) => {
+              const classGroup = classById.get(session.classId);
+              return {
+                ...session,
+                class: classGroup ? { name: classGroup.name } : undefined,
+                course: classGroup ? courseById.get(classGroup.courseId) : undefined,
+                classroom: classroomById.get(session.classroomId),
+              };
+            }),
+          classes: classCards,
+        };
+      },
+    );
 
     // Resolves the authenticated teacher's session and asserts they own it, so a
     // teacher can only read/record attendance for their own class sessions.
@@ -178,7 +186,9 @@ export const teachingModule: AppModule = {
         const body = teacherAttendanceSchema.parse(request.body);
         const enrollments = await schedulingRepo.listEnrollments(app.db, session.classId);
         const rosterStudentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
-        const invalidRecord = body.records.find((record) => !rosterStudentIds.has(record.studentId));
+        const invalidRecord = body.records.find(
+          (record) => !rosterStudentIds.has(record.studentId),
+        );
         if (invalidRecord) {
           throw Object.assign(new Error('只能为本班学员点名'), { statusCode: 400 });
         }
@@ -235,8 +245,14 @@ export const teachingModule: AppModule = {
         });
         return { accountCreated: true, defaultPassword: password };
       } catch (error) {
-        app.log.error({ err: error, teacherId: teacher.id }, 'failed to auto-create teacher account');
-        return { accountCreated: false, accountWarning: '自动创建老师账号失败，请在账号管理中手动创建' };
+        app.log.error(
+          { err: error, teacherId: teacher.id },
+          'failed to auto-create teacher account',
+        );
+        return {
+          accountCreated: false,
+          accountWarning: '自动创建老师账号失败，请在账号管理中手动创建',
+        };
       }
     }
 
@@ -306,27 +322,19 @@ export const teachingModule: AppModule = {
       return { classroom };
     });
 
-    app.patch(
-      '/v1/classrooms/:classroomId',
-      { preHandler: app.requireAdmin },
-      async (request) => {
-        const { classroomId } = request.params as { classroomId: string };
-        const body = classroomUpdateSchema.parse(request.body);
-        const classroom = await teachingRepo.updateClassroom(app.db, classroomId, body);
-        if (!classroom) throw notFound('Classroom not found');
-        return { classroom };
-      },
-    );
+    app.patch('/v1/classrooms/:classroomId', { preHandler: app.requireAdmin }, async (request) => {
+      const { classroomId } = request.params as { classroomId: string };
+      const body = classroomUpdateSchema.parse(request.body);
+      const classroom = await teachingRepo.updateClassroom(app.db, classroomId, body);
+      if (!classroom) throw notFound('Classroom not found');
+      return { classroom };
+    });
 
-    app.delete(
-      '/v1/classrooms/:classroomId',
-      { preHandler: app.requireAdmin },
-      async (request) => {
-        const { classroomId } = request.params as { classroomId: string };
-        const classroom = await teachingRepo.deleteClassroom(app.db, classroomId);
-        if (!classroom) throw notFound('Classroom not found');
-        return { classroom };
-      },
-    );
+    app.delete('/v1/classrooms/:classroomId', { preHandler: app.requireAdmin }, async (request) => {
+      const { classroomId } = request.params as { classroomId: string };
+      const classroom = await teachingRepo.deleteClassroom(app.db, classroomId);
+      if (!classroom) throw notFound('Classroom not found');
+      return { classroom };
+    });
   },
 };

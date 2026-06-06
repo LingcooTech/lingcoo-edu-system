@@ -43,11 +43,7 @@ async function seedDemo(): Promise<void> {
   );
   const classroom = required(
     await findOne(
-      db
-        .select()
-        .from(schema.classrooms)
-        .where(eq(schema.classrooms.name, '成长教室 A'))
-        .limit(1),
+      db.select().from(schema.classrooms).where(eq(schema.classrooms.name, '成长教室 A')).limit(1),
     ),
     '缺少教室，请先 npm run db:seed',
   );
@@ -101,11 +97,7 @@ async function seedDemo(): Promise<void> {
   );
   const summerBridge = required(
     await findOne(
-      db
-        .select()
-        .from(schema.campaigns)
-        .where(eq(schema.campaigns.code, 'summer_bridge'))
-        .limit(1),
+      db.select().from(schema.campaigns).where(eq(schema.campaigns.code, 'summer_bridge')).limit(1),
     ),
     '缺少活动 summer_bridge，请先 npm run db:seed',
   );
@@ -117,11 +109,7 @@ async function seedDemo(): Promise<void> {
   );
   const weekendTrial = required(
     await findOne(
-      db
-        .select()
-        .from(schema.campaigns)
-        .where(eq(schema.campaigns.code, 'weekend_trial'))
-        .limit(1),
+      db.select().from(schema.campaigns).where(eq(schema.campaigns.code, 'weekend_trial')).limit(1),
     ),
     '缺少活动 weekend_trial，请先 npm run db:seed',
   );
@@ -137,12 +125,7 @@ async function seedDemo(): Promise<void> {
     );
   }
 
-  async function ensureStudent(
-    guardianId: string,
-    name: string,
-    grade: string,
-    school: string,
-  ) {
+  async function ensureStudent(guardianId: string, name: string, grade: string, school: string) {
     const existing = await findOne(
       db.select().from(schema.students).where(eq(schema.students.name, name)).limit(1),
     );
@@ -533,6 +516,13 @@ async function seedDemo(): Promise<void> {
     .set({
       institutionId: futureAcademy.id,
       tagline: '十年硬笔书法教学，擅长帮孩子稳定坐姿与笔画基础。',
+      education: '本科毕业于师范类院校艺术教育方向，长期研习硬笔书写与儿童书写习惯训练。',
+      teachingExperience:
+        '10 年少儿书法教学经验，长期带 6-12 岁孩子做控笔、结构、章法训练；熟悉零基础启蒙和进阶班教学。',
+      teachingStyle:
+        '课堂节奏稳定，重视坐姿、握笔、观察和临摹方法，让孩子先把笔画写稳，再逐步形成自己的书写节奏。',
+      achievements:
+        '指导多名学员完成校内书法展示\n参与社区儿童书写公益课堂\n长期担任硬笔书法启蒙课程主讲老师',
       updatedAt: new Date(),
     })
     .where(eq(schema.teachers.id, teacher.id));
@@ -547,6 +537,13 @@ async function seedDemo(): Promise<void> {
       title: '创意美术老师',
       institutionId: artStudio.id,
       tagline: '带孩子从涂鸦到创作，让每一幅画都有自己的故事。',
+      education: '毕业于美术教育相关专业，系统学习儿童创意美术、色彩启蒙与综合材料表达。',
+      teachingExperience:
+        '多年少儿美术小班教学经验，覆盖绘画启蒙、手工创作、色彩训练和主题作品课。',
+      teachingStyle:
+        '鼓励孩子先观察再表达，用故事和材料打开想象力，在作品完成过程中建立审美、自信和专注力。',
+      achievements:
+        '策划多期儿童作品展示\n参与社区美育主题活动\n擅长带领孩子完成节日、自然、人物等主题创作',
       specialties: ['创意美术', '儿童手工', '色彩启蒙'],
       status: 'active',
     });

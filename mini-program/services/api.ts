@@ -163,6 +163,10 @@ export interface PublicTeacher {
   institutionId?: string | null;
   tagline?: string | null;
   wechatQrUrl?: string | null;
+  education?: string | null;
+  teachingExperience?: string | null;
+  teachingStyle?: string | null;
+  achievements?: string | null;
   bio?: string | null;
   specialties: string[];
   status: string;
@@ -358,7 +362,8 @@ export async function fetchPublicTeachers(): Promise<PublicTeacher[]> {
 }
 
 export async function fetchPublicInstitutions(): Promise<PublicInstitution[]> {
-  return (await request<{ institutions: PublicInstitution[] }>('/public/institutions')).institutions;
+  return (await request<{ institutions: PublicInstitution[] }>('/public/institutions'))
+    .institutions;
 }
 
 export function fetchPublicTeacher(teacherId: string): Promise<PublicTeacherDetail> {
@@ -369,13 +374,18 @@ export function submitCampaignParticipation(
   code: string,
   input: TrialRegistrationInput,
 ): Promise<{ message: string }> {
-  return request<{ message: string }>(`/public/crm/campaigns/${encodeURIComponent(code)}/participations`, {
-    method: 'POST',
-    data: input,
-  });
+  return request<{ message: string }>(
+    `/public/crm/campaigns/${encodeURIComponent(code)}/participations`,
+    {
+      method: 'POST',
+      data: input,
+    },
+  );
 }
 
-export function submitTrialRegistration(input: TrialRegistrationInput): Promise<{ message: string }> {
+export function submitTrialRegistration(
+  input: TrialRegistrationInput,
+): Promise<{ message: string }> {
   return request<{ message: string }>('/public/trial-registrations', {
     method: 'POST',
     data: input,
@@ -383,8 +393,11 @@ export function submitTrialRegistration(input: TrialRegistrationInput): Promise<
 }
 
 export async function fetchWechatMiniSubscribeTemplates(): Promise<WechatMiniSubscribeTemplate[]> {
-  return (await request<{ templates: WechatMiniSubscribeTemplate[] }>('/public/wechat-mini/subscribe-templates'))
-    .templates;
+  return (
+    await request<{ templates: WechatMiniSubscribeTemplate[] }>(
+      '/public/wechat-mini/subscribe-templates',
+    )
+  ).templates;
 }
 
 export function createPublicOrder(input: CreateOrderInput): Promise<CheckoutPayload> {
@@ -439,9 +452,10 @@ export async function syncOrderPayment(orderNo: string): Promise<ParentOrder> {
   ).item;
 }
 
-export function wechatMiniLogin(code: string): Promise<
-  | { bound: true; token: string; account: AuthAccount }
-  | { bound: false; bindToken: string }
+export function wechatMiniLogin(
+  code: string,
+): Promise<
+  { bound: true; token: string; account: AuthAccount } | { bound: false; bindToken: string }
 > {
   return request('/auth/wechat-mini/login', {
     method: 'POST',
@@ -496,7 +510,9 @@ export async function fetchParentNotifications(): Promise<ParentNotification[]> 
     .notifications;
 }
 
-export async function markParentNotificationRead(notificationId: string): Promise<ParentNotification> {
+export async function markParentNotificationRead(
+  notificationId: string,
+): Promise<ParentNotification> {
   return (
     await request<{ notification: ParentNotification }>(
       `/public/me/notifications/${encodeURIComponent(notificationId)}/read`,

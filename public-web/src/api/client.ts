@@ -342,6 +342,10 @@ export interface PublicTeacher {
   institutionId?: string | null;
   tagline?: string | null;
   wechatQrUrl?: string | null;
+  education?: string | null;
+  teachingExperience?: string | null;
+  teachingStyle?: string | null;
+  achievements?: string | null;
   bio?: string | null;
   specialties: string[];
   status: string;

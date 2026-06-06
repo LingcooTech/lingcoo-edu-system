@@ -10,21 +10,31 @@
     <button class="back-button" bindtap="goTeachers">‹ 教师团队</button>
 
     <view class="header card">
-      <view class="teacher-head">
-        <image wx:if="{{teacher.avatarUrl}}" class="avatar" src="{{teacher.avatarUrl}}" mode="aspectFill" />
-        <view wx:else class="avatar fallback">师</view>
-        <view class="teacher-main">
-          <view class="teacher-name">{{teacher.name}}</view>
-          <view wx:if="{{teacher.title}}" class="muted teacher-title">{{teacher.title}}</view>
-          <view wx:if="{{institution}}" class="institution">
-            <image
-              wx:if="{{institution.logoUrl}}"
-              class="institution-logo"
-              src="{{institution.logoUrl}}"
-              mode="aspectFit"
-            />
-            <text wx:else>{{institution.name}}</text>
+      <view class="header-main">
+        <view class="teacher-head">
+          <image wx:if="{{teacher.avatarUrl}}" class="avatar" src="{{teacher.avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="avatar fallback">师</view>
+          <view class="teacher-main">
+            <view class="teacher-name">{{teacher.name}}</view>
+            <view wx:if="{{teacher.title}}" class="muted teacher-title">{{teacher.title}}</view>
+            <view
+              wx:if="{{institution}}"
+              class="{{institution.logoUrl ? 'institution-logo-only' : 'institution'}}"
+            >
+              <image
+                wx:if="{{institution.logoUrl}}"
+                class="institution-logo"
+                src="{{institution.logoUrl}}"
+                mode="aspectFit"
+              />
+              <text wx:else>{{institution.name}}</text>
+            </view>
           </view>
+        </view>
+
+        <view wx:if="{{teacher.wechatQrUrl}}" class="qr-top">
+          <view class="qr-title">加老师微信</view>
+          <image class="qr-top-image" src="{{teacher.wechatQrUrl}}" mode="aspectFit" bindtap="previewQr" />
         </view>
       </view>
 
@@ -35,25 +45,23 @@
       </view>
     </view>
 
-    <view wx:if="{{resumeHighlights.length}}" class="highlight-section">
-      <view class="section-title">履历重点</view>
-      <view class="highlight-list">
-        <view wx:for="{{resumeHighlights}}" wx:key="label" class="highlight-card">
-          <view class="highlight-label">{{item.label}}</view>
-          <view class="highlight-text">{{item.text}}</view>
+    <view class="card profile-card">
+      <view class="section-title">老师介绍</view>
+      <view wx:if="{{profileSections.length}}" class="profile-list">
+        <view wx:for="{{profileSections}}" wx:key="key" class="profile-section">
+          <view class="profile-label">{{item.label}}</view>
+          <view wx:if="{{item.tone === 'list' && item.lines.length > 1}}" class="profile-lines">
+            <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="profile-line">
+              <text class="profile-dot"></text>
+              <text class="profile-line-text">{{line}}</text>
+            </view>
+          </view>
+          <view wx:else class="profile-text {{item.tone === 'quote' ? 'profile-quote' : ''}}">
+            {{item.text}}
+          </view>
         </view>
       </view>
-    </view>
-
-    <view wx:if="{{bioBlocks.length}}" class="card bio">
-      <view class="section-title bio-title">教师简历</view>
-      <block-renderer blocks="{{bioBlocks}}" />
-    </view>
-
-    <view wx:if="{{teacher.wechatQrUrl}}" class="card qr-card">
-      <view class="qr-title">加老师微信</view>
-      <view class="muted qr-hint">微信扫一扫，添加老师了解更多课程信息。</view>
-      <image class="qr-image" src="{{teacher.wechatQrUrl}}" mode="aspectFit" bindtap="previewQr" />
+      <view wx:else class="muted profile-empty">老师介绍待补充。</view>
     </view>
   </block>
 </view>

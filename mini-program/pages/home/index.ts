@@ -9,6 +9,7 @@ interface HomeState {
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImageUrl: string;
+  bannerImages: string[];
   ctaText: string;
   ctaLink: string;
   stats: string[];
@@ -29,6 +30,7 @@ const initialState: HomeState = {
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImageUrl: '',
+  bannerImages: [],
   ctaText: '预约试听',
   ctaLink: '/courses',
   stats: [],
@@ -44,6 +46,9 @@ const initialState: HomeState = {
 
 function toState(home: HomePayload): HomeState {
   const profile = home.organization.publicProfile;
+  const bannerImages = Array.from(
+    new Set([profile.bannerImageUrl, ...(profile.gallery ?? [])].filter(Boolean)),
+  );
   return {
     loading: false,
     organizationName: home.organization.name,
@@ -51,6 +56,7 @@ function toState(home: HomePayload): HomeState {
     bannerTitle: profile.bannerTitle || profile.headline || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle || profile.introduction,
     bannerImageUrl: profile.bannerImageUrl,
+    bannerImages,
     ctaText: profile.ctaText || '预约试听',
     ctaLink: profile.ctaLink || '/courses',
     stats: profile.stats ?? [],
@@ -59,7 +65,10 @@ function toState(home: HomePayload): HomeState {
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,
-    courses: home.featuredCourses.map((course) => ({ ...course, priceLabel: coursePriceLabel(course) })),
+    courses: home.featuredCourses.map((course) => ({
+      ...course,
+      priceLabel: coursePriceLabel(course),
+    })),
     trialSessions: home.trialSessions.map((session) => ({
       ...session,
       startsAtLabel: formatDateTime(session.startsAt),

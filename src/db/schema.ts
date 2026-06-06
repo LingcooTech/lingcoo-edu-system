@@ -327,6 +327,10 @@ export const teachers = pgTable(
     }),
     tagline: varchar('tagline', { length: 200 }),
     wechatQrUrl: varchar('wechat_qr_url', { length: 500 }),
+    education: text('education').notNull().default(''),
+    teachingExperience: text('teaching_experience').notNull().default(''),
+    teachingStyle: text('teaching_style').notNull().default(''),
+    achievements: text('achievements').notNull().default(''),
     bio: text('bio').notNull().default(''),
     specialties: jsonb('specialties')
       .notNull()

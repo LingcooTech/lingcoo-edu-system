@@ -3,13 +3,6 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Institution, Teacher } from '@/api/types';
-import { BlockEditor } from '@/components/editor/BlockEditor';
-import {
-  parseBlocks,
-  serializeBlocks,
-  TEACHER_ALLOWED,
-  type Block,
-} from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -37,8 +30,11 @@ interface TeacherForm {
   institutionId: string;
   tagline: string;
   wechatQrUrl: string;
+  education: string;
+  teachingExperience: string;
+  teachingStyle: string;
+  achievements: string;
   specialties: string;
-  bioBlocks: Block[];
   status: 'active' | 'archived';
 }
 
@@ -50,8 +46,11 @@ const emptyTeacherForm: TeacherForm = {
   institutionId: '',
   tagline: '',
   wechatQrUrl: '',
+  education: '',
+  teachingExperience: '',
+  teachingStyle: '',
+  achievements: '',
   specialties: '',
-  bioBlocks: [],
   status: 'active',
 };
 
@@ -79,8 +78,11 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
             institutionId: teacher.institutionId ?? '',
             tagline: teacher.tagline ?? '',
             wechatQrUrl: teacher.wechatQrUrl ?? '',
+            education: teacher.education ?? '',
+            teachingExperience: teacher.teachingExperience ?? '',
+            teachingStyle: teacher.teachingStyle ?? '',
+            achievements: teacher.achievements ?? '',
             specialties: teacher.specialties.join('、'),
-            bioBlocks: parseBlocks(teacher.bio),
             status: teacher.status as TeacherForm['status'],
           }
         : emptyTeacherForm,
@@ -103,11 +105,14 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
         institutionId: form.institutionId || null,
         tagline: form.tagline.trim(),
         wechatQrUrl: form.wechatQrUrl.trim(),
+        education: form.education.trim(),
+        teachingExperience: form.teachingExperience.trim(),
+        teachingStyle: form.teachingStyle.trim(),
+        achievements: form.achievements.trim(),
         specialties: form.specialties
           .split(/[、,，]/)
           .map((item) => item.trim())
           .filter(Boolean),
-        bio: serializeBlocks(form.bioBlocks),
         status: form.status,
       };
       if (editing) {
@@ -290,11 +295,36 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
             onChange={(event) => setForm({ ...form, specialties: event.target.value })}
           />
         </Field>
-        <Field label="老师介绍" hint="用模块编排，展示在家长端教师页">
-          <BlockEditor
-            value={form.bioBlocks}
-            onChange={(bioBlocks) => setForm({ ...form, bioBlocks })}
-            allowed={TEACHER_ALLOWED}
+        <Field label="毕业院校 / 专业背景" hint="如毕业院校、专业、师承背景等">
+          <textarea
+            className="form-input min-h-24"
+            rows={3}
+            value={form.education}
+            onChange={(event) => setForm({ ...form, education: event.target.value })}
+          />
+        </Field>
+        <Field label="教学经验" hint="如从教年限、授课对象、课程研发经历等">
+          <textarea
+            className="form-input min-h-28"
+            rows={4}
+            value={form.teachingExperience}
+            onChange={(event) => setForm({ ...form, teachingExperience: event.target.value })}
+          />
+        </Field>
+        <Field label="教学风格" hint="如课堂节奏、沟通方式、对孩子的引导特点">
+          <textarea
+            className="form-input min-h-28"
+            rows={4}
+            value={form.teachingStyle}
+            onChange={(event) => setForm({ ...form, teachingStyle: event.target.value })}
+          />
+        </Field>
+        <Field label="荣誉奖项 / 代表经历" hint="一行一条，前台会自动排成重点列表">
+          <textarea
+            className="form-input min-h-32"
+            rows={5}
+            value={form.achievements}
+            onChange={(event) => setForm({ ...form, achievements: event.target.value })}
           />
         </Field>
         <Field label="状态">
@@ -324,7 +354,7 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
   );
 
   return embedded ? (
-    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
+    <div className="[&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-header>div]:hidden [&_.page-shell]:p-0">
       {page}
     </div>
   ) : (

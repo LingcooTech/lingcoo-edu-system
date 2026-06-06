@@ -10,12 +10,10 @@ import {
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
 
-const ALL_TAB = 'all';
-
 export function TeachersPage() {
   const [teachers, setTeachers] = useState<PublicTeacher[]>([]);
   const [institutions, setInstitutions] = useState<PublicInstitution[]>([]);
-  const [activeTab, setActiveTab] = useState<string>(ALL_TAB);
+  const [activeTab, setActiveTab] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,12 +29,21 @@ export function TeachersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Only show tabs for institutions that actually have at least one teacher;
-  // teachers without an institution stay visible under「全部」.
+  // Keep the institution order from the backend list; only omit empty groups.
   const tabs = useMemo(
     () => institutions.filter((inst) => teachers.some((t) => t.institutionId === inst.id)),
     [institutions, teachers],
   );
+
+  useEffect(() => {
+    if (tabs.length === 0) {
+      if (activeTab) setActiveTab('');
+      return;
+    }
+    if (!tabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [activeTab, tabs]);
 
   const institutionById = useMemo(
     () => new Map(institutions.map((institution) => [institution.id, institution])),
@@ -45,10 +52,10 @@ export function TeachersPage() {
 
   const visibleTeachers = useMemo(
     () =>
-      activeTab === ALL_TAB
+      tabs.length === 0
         ? teachers
-        : teachers.filter((teacher) => teacher.institutionId === activeTab),
-    [teachers, activeTab],
+        : teachers.filter((teacher) => teacher.institutionId === (activeTab || tabs[0]?.id)),
+    [teachers, activeTab, tabs],
   );
 
   function tabClassName(active: boolean) {
@@ -65,19 +72,9 @@ export function TeachersPage() {
       <section className="container-narrow py-10">
         <div className="eyebrow">Teachers</div>
         <h1 className="section-title mt-2">教师团队</h1>
-        <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          从教师背景、教学风格到擅长方向，帮助家长更快判断课程匹配。
-        </p>
 
         {tabs.length > 0 && (
           <div className="mt-6 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={tabClassName(activeTab === ALL_TAB)}
-              onClick={() => setActiveTab(ALL_TAB)}
-            >
-              全部
-            </button>
             {tabs.map((inst) => (
               <button
                 key={inst.id}
@@ -121,7 +118,7 @@ function InstitutionMark({ institution }: { institution: PublicInstitution }) {
         <img
           src={institution.logoUrl}
           alt={institution.name}
-          className="max-h-7 max-w-28 object-contain"
+          className="max-h-6 max-w-24 object-contain"
         />
         <span className="sr-only">{institution.name}</span>
       </>
@@ -161,9 +158,15 @@ function TeacherCard({
 
         <div className="min-w-0 flex-1">
           {institution ? (
-            <div className="mb-2 inline-flex max-w-full items-center rounded-full border border-[#d8c39a]/70 bg-[#fbf7ec] px-2.5 py-1 text-xs text-[#17324d]">
-              <InstitutionMark institution={institution} />
-            </div>
+            institution.logoUrl ? (
+              <div className="mb-2 flex h-6 max-w-28 items-center">
+                <InstitutionMark institution={institution} />
+              </div>
+            ) : (
+              <div className="mb-2 inline-flex max-w-full items-center rounded-full bg-[#fbf7ec] px-2.5 py-1 text-xs text-[#17324d]">
+                <InstitutionMark institution={institution} />
+              </div>
+            )
           ) : null}
           <h2 className="text-ink truncate text-xl font-semibold">{teacher.name}</h2>
           {teacher.title ? (

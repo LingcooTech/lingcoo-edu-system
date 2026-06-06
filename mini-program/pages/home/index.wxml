@@ -6,7 +6,19 @@
       <view class="eyebrow">社区小班成长教室</view>
       <view class="title hero-title">{{bannerTitle}}</view>
       <view class="body-text hero-subtitle">{{bannerSubtitle}}</view>
-      <image wx:if="{{bannerImageUrl}}" class="hero-image" src="{{bannerImageUrl}}" mode="aspectFill" />
+      <swiper
+        wx:if="{{bannerImages.length}}"
+        class="hero-swiper"
+        autoplay="{{bannerImages.length > 1}}"
+        circular="{{bannerImages.length > 1}}"
+        indicator-dots="{{bannerImages.length > 1}}"
+        indicator-color="rgba(255,255,255,0.55)"
+        indicator-active-color="#ffffff"
+      >
+        <swiper-item wx:for="{{bannerImages}}" wx:key="*this">
+          <image class="hero-image" src="{{item}}" mode="aspectFill" />
+        </swiper-item>
+      </swiper>
       <view class="hero-actions">
         <button class="btn btn-primary hero-btn" bindtap="onPrimaryCta">{{ctaText}}</button>
         <button class="btn btn-outline hero-btn" bindtap="goCourses">浏览课程</button>

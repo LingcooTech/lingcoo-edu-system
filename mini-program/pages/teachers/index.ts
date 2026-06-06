@@ -5,8 +5,6 @@ import {
   type PublicTeacher,
 } from '../../services/api';
 
-const ALL_TAB = 'all';
-
 type TeacherCard = PublicTeacher & {
   institutionName?: string;
   institutionLogoUrl?: string | null;
@@ -17,7 +15,7 @@ Page({
     loading: true,
     teachers: [] as TeacherCard[],
     tabs: [] as PublicInstitution[],
-    activeTab: ALL_TAB,
+    activeTab: '',
     visibleTeachers: [] as TeacherCard[],
   },
 
@@ -37,8 +35,7 @@ Page({
         fetchPublicTeachers(),
         fetchPublicInstitutions(),
       ]);
-      // Only keep tabs for institutions that actually have teachers; unbound
-      // teachers stay visible under「全部」.
+      // Keep backend institution order and only omit empty groups.
       const tabs = institutions.filter((inst) =>
         teachers.some((teacher) => teacher.institutionId === inst.id),
       );
@@ -56,7 +53,7 @@ Page({
         };
       });
       this.setData({ loading: false, teachers: teacherCards, tabs });
-      this.applyTab(ALL_TAB);
+      this.applyTab(tabs[0]?.id || '');
     } catch (error) {
       this.setData({ loading: false, teachers: [], tabs: [], visibleTeachers: [] });
       wx.showToast({
@@ -67,15 +64,14 @@ Page({
   },
 
   onTabTap(event: { currentTarget: { dataset: { id?: string } } }) {
-    this.applyTab(event.currentTarget.dataset.id || ALL_TAB);
+    this.applyTab(event.currentTarget.dataset.id || '');
   },
 
   applyTab(activeTab: string) {
     const teachers = this.data.teachers as TeacherCard[];
-    const visibleTeachers =
-      activeTab === ALL_TAB
-        ? teachers
-        : teachers.filter((teacher) => teacher.institutionId === activeTab);
+    const visibleTeachers = !activeTab
+      ? teachers
+      : teachers.filter((teacher) => teacher.institutionId === activeTab);
     this.setData({ activeTab, visibleTeachers });
   },
 
