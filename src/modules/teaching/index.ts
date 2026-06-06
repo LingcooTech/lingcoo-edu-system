@@ -35,10 +35,15 @@ const institutionSchema = z.object({
   logoUrl: z.string().max(500).optional(),
   intro: z.string().default(''),
   contact: z.string().max(200).optional(),
+  sortOrder: z.number().int().min(0).optional(),
   status: z.enum(['active', 'archived']).default('active'),
 });
 
 const institutionUpdateSchema = institutionSchema.partial();
+
+const institutionOrderSchema = z.object({
+  ids: z.array(z.string().uuid()).default([]),
+});
 
 const classroomSchema = z.object({
   campusId: z.string(),
@@ -285,8 +290,18 @@ export const teachingModule: AppModule = {
 
     app.post('/v1/institutions', { preHandler: app.requireAdmin }, async (request) => {
       const body = institutionSchema.parse(request.body);
-      const institution = await teachingRepo.createInstitution(app.db, body);
+      const existing = await teachingRepo.listInstitutions(app.db);
+      const institution = await teachingRepo.createInstitution(app.db, {
+        ...body,
+        sortOrder: body.sortOrder ?? existing.length * 10,
+      });
       return { institution };
+    });
+
+    app.patch('/v1/institutions/order', { preHandler: app.requireAdmin }, async (request) => {
+      const body = institutionOrderSchema.parse(request.body);
+      const institutions = await teachingRepo.reorderInstitutions(app.db, body.ids);
+      return { institutions };
     });
 
     app.patch(

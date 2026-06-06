@@ -63,6 +63,7 @@ export interface Institution {
   logoUrl?: string | null;
   intro?: string | null;
   contact?: string | null;
+  sortOrder: number;
   status: string;
 }
 

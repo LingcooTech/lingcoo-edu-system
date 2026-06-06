@@ -178,6 +178,7 @@ export interface PublicInstitution {
   logoUrl?: string | null;
   intro?: string | null;
   contact?: string | null;
+  sortOrder?: number;
 }
 
 export interface PublicTeacherDetail {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Institution } from '@/api/types';
@@ -46,6 +46,7 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
   const [editing, setEditing] = useState<Institution | null>(null);
   const [form, setForm] = useState<InstitutionForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Institution | null>(null);
 
   function openCreate() {
@@ -86,7 +87,7 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
           '/v1/institutions',
           payload,
         );
-        setData([institution, ...data]);
+        setData([...data, institution]);
         toast.success('机构已创建');
       }
       setOpen(false);
@@ -94,6 +95,31 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
       toast.error(err instanceof Error ? err.message : '保存失败');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function moveInstitution(institution: Institution, direction: -1 | 1) {
+    const index = data.findIndex((item) => item.id === institution.id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= data.length) return;
+
+    const next = [...data];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+
+    setSavingOrder(true);
+    setData(next);
+    try {
+      const result = await apiPatch<{ institutions: Institution[] }>('/v1/institutions/order', {
+        ids: next.map((item) => item.id),
+      });
+      setData(result.institutions);
+      toast.success('机构排序已保存');
+    } catch (err) {
+      setData(data);
+      toast.error(err instanceof Error ? err.message : '排序保存失败');
+    } finally {
+      setSavingOrder(false);
     }
   }
 
@@ -140,6 +166,37 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
             ),
           },
           { key: 'contact', header: '联系方式', cell: (row) => row.contact || '-' },
+          {
+            key: 'order',
+            header: '排序',
+            cell: (row) => {
+              const index = data.findIndex((item) => item.id === row.id);
+              return (
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    disabled={savingOrder || index <= 0}
+                    title="上移"
+                    onClick={() => moveInstitution(row, -1)}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    <span className="sr-only">上移</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    disabled={savingOrder || index < 0 || index >= data.length - 1}
+                    title="下移"
+                    onClick={() => moveInstitution(row, 1)}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                    <span className="sr-only">下移</span>
+                  </button>
+                </div>
+              );
+            },
+          },
           {
             key: 'status',
             header: '状态',
@@ -243,7 +300,7 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
   );
 
   return embedded ? (
-    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
+    <div className="[&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-header>div]:hidden [&_.page-shell]:p-0">
       {page}
     </div>
   ) : (

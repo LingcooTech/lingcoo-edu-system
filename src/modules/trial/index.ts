@@ -159,6 +159,7 @@ export const trialModule: AppModule = {
             logoUrl: institution.logoUrl,
             intro: institution.intro,
             contact: institution.contact,
+            sortOrder: institution.sortOrder,
           })),
       };
     });

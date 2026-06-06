@@ -484,7 +484,12 @@ async function seedDemo(): Promise<void> {
   });
 
   // --- 机构（教师所属机构）+ 教师档案补充 ---
-  async function ensureInstitution(values: { name: string; intro: string; contact: string }) {
+  async function ensureInstitution(values: {
+    name: string;
+    intro: string;
+    contact: string;
+    sortOrder: number;
+  }) {
     const existing = await findOne(
       db
         .select()
@@ -492,7 +497,14 @@ async function seedDemo(): Promise<void> {
         .where(eq(schema.institutions.name, values.name))
         .limit(1),
     );
-    if (existing) return existing;
+    if (existing) {
+      const [updated] = await db
+        .update(schema.institutions)
+        .set({ sortOrder: values.sortOrder, updatedAt: new Date() })
+        .where(eq(schema.institutions.id, existing.id))
+        .returning();
+      return updated ?? existing;
+    }
     return required(
       await findOne(db.insert(schema.institutions).values(values).returning()),
       'institution insert failed',
@@ -503,11 +515,13 @@ async function seedDemo(): Promise<void> {
     name: '未来书院',
     intro: '专注 6-12 岁中文书写与表达训练，小班教学、固定老师跟进。',
     contact: '微信 future-academy · 电话 0571-8888 0001',
+    sortOrder: 10,
   });
   const artStudio = await ensureInstitution({
     name: '童心美育',
     intro: '以创意美术启发孩子观察力与想象力的社区美育机构。',
     contact: '微信 tongxin-art · 电话 0571-8888 0002',
+    sortOrder: 20,
   });
 
   // 把基础种子里的王老师绑定到机构，并补充一句话简介。

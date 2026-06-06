@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -46,7 +46,10 @@ export async function deleteTeacher(db: Database, teacherId: string) {
 }
 
 export async function listInstitutions(db: Database) {
-  return db.select().from(schema.institutions).orderBy(desc(schema.institutions.createdAt));
+  return db
+    .select()
+    .from(schema.institutions)
+    .orderBy(asc(schema.institutions.sortOrder), desc(schema.institutions.createdAt));
 }
 
 export async function findInstitution(db: Database, institutionId: string | null) {
@@ -80,6 +83,19 @@ export async function updateInstitution(
     .where(eq(schema.institutions.id, institutionId))
     .returning();
   return institution ?? null;
+}
+
+export async function reorderInstitutions(db: Database, institutionIds: string[]) {
+  const now = new Date();
+  await Promise.all(
+    institutionIds.map((institutionId, index) =>
+      db
+        .update(schema.institutions)
+        .set({ sortOrder: index * 10, updatedAt: now })
+        .where(eq(schema.institutions.id, institutionId)),
+    ),
+  );
+  return listInstitutions(db);
 }
 
 export async function deleteInstitution(db: Database, institutionId: string) {

@@ -303,12 +303,14 @@ export const institutions = pgTable(
     logoUrl: varchar('logo_url', { length: 500 }),
     intro: text('intro').notNull().default(''),
     contact: varchar('contact', { length: 200 }),
+    sortOrder: integer('sort_order').notNull().default(0),
     status: teachingResourceStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     statusIdx: index('institutions_status_idx').on(table.status),
+    sortIdx: index('institutions_sort_idx').on(table.sortOrder),
   }),
 );
 
