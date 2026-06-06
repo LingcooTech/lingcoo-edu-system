@@ -1,4 +1,4 @@
-import { fetchPublicTeacher, type PublicTeacher } from '../../services/api';
+import { fetchPublicTeacher, type Course, type PublicTeacher } from '../../services/api';
 
 type InstitutionSummary = { id: string; name: string; logoUrl?: string | null };
 type ProfileSection = {
@@ -8,6 +8,7 @@ type ProfileSection = {
   tone: 'plain' | 'quote' | 'list';
   lines: string[];
 };
+type StatItem = { label: string; value: string };
 
 function splitLines(text: string): string[] {
   return text
@@ -47,12 +48,22 @@ function buildProfileSections(teacher: PublicTeacher): ProfileSection[] {
     .map((section) => ({ ...section, lines: splitLines(section.text) }));
 }
 
+function buildStats(teacher: PublicTeacher): StatItem[] {
+  return [
+    { label: '教学经验', value: teacher.teachingYears ?? '' },
+    { label: '累计学员', value: teacher.studentCount ?? '' },
+    { label: '续班率', value: teacher.retentionRate ?? '' },
+  ].filter((item) => item.value.trim().length > 0);
+}
+
 Page({
   data: {
     loading: true,
     notFound: false,
     teacher: null as PublicTeacher | null,
     institution: null as InstitutionSummary | null,
+    courses: [] as Course[],
+    statItems: [] as StatItem[],
     profileSections: [] as ProfileSection[],
   },
 
@@ -73,6 +84,8 @@ Page({
         loading: false,
         teacher: detail.teacher,
         institution: detail.institution,
+        courses: detail.courses,
+        statItems: buildStats(detail.teacher),
         profileSections: buildProfileSections(detail.teacher),
       });
     } catch {
@@ -94,5 +107,16 @@ Page({
     if (teacher?.wechatQrUrl) {
       wx.previewImage({ urls: [teacher.wechatQrUrl] });
     }
+  },
+
+  goCourses() {
+    const courses = this.data.courses as Course[];
+    if (courses[0]?.slug) {
+      wx.navigateTo({
+        url: `/pages/course-detail/index?slug=${encodeURIComponent(courses[0].slug)}`,
+      });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/courses/index' });
   },
 });

@@ -333,6 +333,22 @@ export const teachers = pgTable(
     teachingExperience: text('teaching_experience').notNull().default(''),
     teachingStyle: text('teaching_style').notNull().default(''),
     achievements: text('achievements').notNull().default(''),
+    teachingYears: varchar('teaching_years', { length: 40 }),
+    studentCount: varchar('student_count', { length: 40 }),
+    retentionRate: varchar('retention_rate', { length: 40 }),
+    teachingPhilosophy: text('teaching_philosophy').notNull().default(''),
+    classPhotoUrls: jsonb('class_photo_urls')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    studentWorkUrls: jsonb('student_work_urls')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    parentTestimonials: jsonb('parent_testimonials')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     bio: text('bio').notNull().default(''),
     specialties: jsonb('specialties')
       .notNull()

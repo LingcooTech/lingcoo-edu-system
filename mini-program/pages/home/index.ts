@@ -8,7 +8,6 @@ interface HomeState {
   brandName: string;
   bannerTitle: string;
   bannerSubtitle: string;
-  bannerImageUrl: string;
   bannerImages: string[];
   ctaText: string;
   ctaLink: string;
@@ -29,7 +28,6 @@ const initialState: HomeState = {
   brandName: '',
   bannerTitle: '',
   bannerSubtitle: '',
-  bannerImageUrl: '',
   bannerImages: [],
   ctaText: '预约试听',
   ctaLink: '/courses',
@@ -47,7 +45,11 @@ const initialState: HomeState = {
 function toState(home: HomePayload): HomeState {
   const profile = home.organization.publicProfile;
   const bannerImages = Array.from(
-    new Set([profile.bannerImageUrl, ...(profile.gallery ?? [])].filter(Boolean)),
+    new Set(
+      (profile.bannerImages?.length ? profile.bannerImages : [profile.bannerImageUrl]).filter(
+        Boolean,
+      ),
+    ),
   );
   return {
     loading: false,
@@ -55,7 +57,6 @@ function toState(home: HomePayload): HomeState {
     brandName: home.organization.brandName,
     bannerTitle: profile.bannerTitle || profile.headline || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle || profile.introduction,
-    bannerImageUrl: profile.bannerImageUrl,
     bannerImages,
     ctaText: profile.ctaText || '预约试听',
     ctaLink: profile.ctaLink || '/courses',

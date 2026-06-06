@@ -7,6 +7,7 @@ import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
@@ -171,11 +172,27 @@ export const trialModule: AppModule = {
         throw notFound('Teacher not found');
       }
       const institution = await teachingRepo.findInstitution(app.db, teacher.institutionId);
+      const [classes, courses] = await Promise.all([
+        schedulingRepo.listClasses(app.db),
+        catalogRepo.listPublishedCourses(app.db),
+      ]);
+      const taughtCourseIds = new Set(
+        classes
+          .filter(
+            (classGroup) => classGroup.teacherId === teacher.id && classGroup.status !== 'archived',
+          )
+          .map((classGroup) => classGroup.courseId),
+      );
+      const teacherCourses = await attachPackageSummary(
+        app,
+        courses.filter((course) => taughtCourseIds.has(course.id)),
+      );
       return {
         teacher,
         institution: institution
           ? { id: institution.id, name: institution.name, logoUrl: institution.logoUrl }
           : null,
+        courses: teacherCourses,
       };
     });
 

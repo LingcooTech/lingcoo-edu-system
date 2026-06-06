@@ -44,6 +44,7 @@ export interface Organization {
     introduction: string;
     highlights: string[];
     promises: string[];
+    bannerImages: string[];
     bannerImageUrl: string;
     bannerTitle: string;
     bannerSubtitle: string;
@@ -167,6 +168,13 @@ export interface PublicTeacher {
   teachingExperience?: string | null;
   teachingStyle?: string | null;
   achievements?: string | null;
+  teachingYears?: string | null;
+  studentCount?: string | null;
+  retentionRate?: string | null;
+  teachingPhilosophy?: string | null;
+  classPhotoUrls: string[];
+  studentWorkUrls: string[];
+  parentTestimonials: string[];
   bio?: string | null;
   specialties: string[];
   status: string;
@@ -184,6 +192,7 @@ export interface PublicInstitution {
 export interface PublicTeacherDetail {
   teacher: PublicTeacher;
   institution: { id: string; name: string; logoUrl?: string | null } | null;
+  courses: Course[];
 }
 
 export interface AuthAccount {

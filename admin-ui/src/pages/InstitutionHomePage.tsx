@@ -7,7 +7,7 @@ import { BlockRenderer } from '@/components/editor/BlockRenderer';
 import { HOME_ALLOWED, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
-import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
+import { QiniuGalleryField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
 
 // The structured publicProfile fields are edited here as module cards; list-like
@@ -18,7 +18,7 @@ import { useToast } from '@/components/shared/Toast';
 interface HomeForm {
   bannerTitle: string;
   bannerSubtitle: string;
-  bannerImageUrl: string;
+  bannerImagesText: string;
   headline: string;
   introduction: string;
   highlightsText: string;
@@ -44,7 +44,12 @@ function profileToForm(profile: PublicProfile): HomeForm {
   return {
     bannerTitle: profile.bannerTitle,
     bannerSubtitle: profile.bannerSubtitle,
-    bannerImageUrl: profile.bannerImageUrl,
+    bannerImagesText: (profile.bannerImages?.length
+      ? profile.bannerImages
+      : [profile.bannerImageUrl]
+    )
+      .filter(Boolean)
+      .join('\n'),
     headline: profile.headline,
     introduction: profile.introduction,
     highlightsText: profile.highlights.join('\n'),
@@ -87,7 +92,8 @@ export function InstitutionHomePage() {
         publicProfile: {
           headline: form.headline,
           introduction: form.introduction,
-          bannerImageUrl: form.bannerImageUrl,
+          bannerImages: linesToList(form.bannerImagesText),
+          bannerImageUrl: linesToList(form.bannerImagesText)[0] ?? '',
           bannerTitle: form.bannerTitle,
           bannerSubtitle: form.bannerSubtitle,
           ctaText: form.ctaText,
@@ -141,12 +147,12 @@ export function InstitutionHomePage() {
                   onChange={(e) => update('bannerSubtitle', e.target.value)}
                 />
               </Field>
-              <QiniuImageField
-                label="Banner 背景图 URL"
-                value={form.bannerImageUrl}
-                onChange={(value) => update('bannerImageUrl', value)}
+              <QiniuGalleryField
+                label="Banner 轮播图"
+                hint="可上传或从素材库勾选多张图片；首页首屏只使用这里的图片轮播"
+                value={form.bannerImagesText}
+                onChange={(value) => update('bannerImagesText', value)}
                 prefix="homepage/banner"
-                previewAlt="机构 Banner"
               />
               <Field label="一句话定位 headline" hint="副标题为空时展示">
                 <input
@@ -198,10 +204,10 @@ export function InstitutionHomePage() {
               </Field>
             </EditorCard>
 
-            <EditorCard title="图库与常见问题">
+            <EditorCard title="公开图库与常见问题">
               <QiniuGalleryField
-                label="图库 gallery"
-                hint="每行一个图片 URL"
+                label="公开图库 gallery"
+                hint="用于学生故事等图库页面，不参与首页 Banner 轮播"
                 value={form.galleryText}
                 onChange={(value) => update('galleryText', value)}
                 prefix="homepage/gallery"
@@ -295,6 +301,7 @@ function HomePreview({
   const squareLogoUrl = branding?.squareLogoUrl || fullLogoUrl;
   const stats = linesToList(form.statsText);
   const testimonials = linesToList(form.testimonialsText);
+  const bannerImages = linesToList(form.bannerImagesText);
 
   return (
     <section
@@ -304,9 +311,9 @@ function HomePreview({
         color: branding?.textColor || undefined,
       }}
     >
-      {form.bannerImageUrl ? (
+      {bannerImages.length > 0 ? (
         <div className="h-44 overflow-hidden border-b">
-          <img src={form.bannerImageUrl} alt="机构 Banner" className="h-full w-full object-cover" />
+          <img src={bannerImages[0]} alt="机构 Banner" className="h-full w-full object-cover" />
         </div>
       ) : null}
       <div className="space-y-6 p-6">

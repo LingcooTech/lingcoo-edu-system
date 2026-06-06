@@ -537,6 +537,23 @@ async function seedDemo(): Promise<void> {
         '课堂节奏稳定，重视坐姿、握笔、观察和临摹方法，让孩子先把笔画写稳，再逐步形成自己的书写节奏。',
       achievements:
         '指导多名学员完成校内书法展示\n参与社区儿童书写公益课堂\n长期担任硬笔书法启蒙课程主讲老师',
+      teachingYears: '10年',
+      studentCount: '500+',
+      retentionRate: '90%+',
+      teachingPhilosophy:
+        '先培养习惯，再提升书写。重视坐姿、握笔、控笔和书写兴趣培养，让孩子建立长期受益的书写习惯。',
+      classPhotoUrls: [
+        'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=900&q=80',
+      ],
+      studentWorkUrls: [
+        'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=80',
+      ],
+      parentTestimonials: [
+        '孩子之前握笔很乱，两个月后坐姿和笔画稳定很多。',
+        '老师反馈很细，孩子每周都愿意来上课。',
+      ],
       updatedAt: new Date(),
     })
     .where(eq(schema.teachers.id, teacher.id));
@@ -545,22 +562,40 @@ async function seedDemo(): Promise<void> {
   const existingLi = await findOne(
     db.select().from(schema.teachers).where(eq(schema.teachers.name, '李老师')).limit(1),
   );
-  if (!existingLi) {
-    await db.insert(schema.teachers).values({
-      name: '李老师',
-      title: '创意美术老师',
-      institutionId: artStudio.id,
-      tagline: '带孩子从涂鸦到创作，让每一幅画都有自己的故事。',
-      education: '毕业于美术教育相关专业，系统学习儿童创意美术、色彩启蒙与综合材料表达。',
-      teachingExperience:
-        '多年少儿美术小班教学经验，覆盖绘画启蒙、手工创作、色彩训练和主题作品课。',
-      teachingStyle:
-        '鼓励孩子先观察再表达，用故事和材料打开想象力，在作品完成过程中建立审美、自信和专注力。',
-      achievements:
-        '策划多期儿童作品展示\n参与社区美育主题活动\n擅长带领孩子完成节日、自然、人物等主题创作',
-      specialties: ['创意美术', '儿童手工', '色彩启蒙'],
-      status: 'active',
-    });
+  const liPatch = {
+    title: '创意美术老师',
+    institutionId: artStudio.id,
+    tagline: '带孩子从涂鸦到创作，让每一幅画都有自己的故事。',
+    education: '毕业于美术教育相关专业，系统学习儿童创意美术、色彩启蒙与综合材料表达。',
+    teachingExperience: '多年少儿美术小班教学经验，覆盖绘画启蒙、手工创作、色彩训练和主题作品课。',
+    teachingStyle:
+      '鼓励孩子先观察再表达，用故事和材料打开想象力，在作品完成过程中建立审美、自信和专注力。',
+    achievements:
+      '策划多期儿童作品展示\n参与社区美育主题活动\n擅长带领孩子完成节日、自然、人物等主题创作',
+    teachingYears: '6年',
+    studentCount: '300+',
+    retentionRate: '88%+',
+    teachingPhilosophy: '用材料和故事启发观察力，让孩子在完成作品的过程中学习表达、审美和专注。',
+    classPhotoUrls: [
+      'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1604881991720-f91add269bed?auto=format&fit=crop&w=900&q=80',
+    ],
+    studentWorkUrls: [
+      'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=900&q=80',
+    ],
+    parentTestimonials: [
+      '孩子从不敢画到能讲出自己的画面故事，变化很明显。',
+      '课堂材料丰富，老师很会引导孩子观察。',
+    ],
+    specialties: ['创意美术', '儿童手工', '色彩启蒙'],
+    status: 'active' as const,
+    updatedAt: new Date(),
+  };
+  if (existingLi) {
+    await db.update(schema.teachers).set(liPatch).where(eq(schema.teachers.id, existingLi.id));
+  } else {
+    await db.insert(schema.teachers).values({ name: '李老师', ...liPatch });
   }
 
   console.log(JSON.stringify({ msg: 'demo enrichment completed', classId }));

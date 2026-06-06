@@ -40,13 +40,67 @@
 
       <view wx:if="{{teacher.tagline}}" class="tagline">{{teacher.tagline}}</view>
 
+      <view wx:if="{{statItems.length}}" class="stats">
+        <view wx:for="{{statItems}}" wx:key="label" class="stat-card">
+          <view class="stat-value">{{item.value}}</view>
+          <view class="stat-label">{{item.label}}</view>
+        </view>
+      </view>
+
       <view wx:if="{{teacher.specialties.length}}" class="specialties">
         <text wx:for="{{teacher.specialties}}" wx:for-item="spec" wx:key="*this" class="chip">{{spec}}</text>
+      </view>
+
+      <view class="action-row">
+        <button class="btn btn-primary action-btn" bindtap="goCourses">预约试听</button>
+        <button wx:if="{{teacher.wechatQrUrl}}" class="btn btn-outline action-btn" bindtap="previewQr">微信咨询</button>
+      </view>
+    </view>
+
+    <view wx:if="{{teacher.teachingPhilosophy}}" class="card profile-card">
+      <view class="section-title">教学理念</view>
+      <view class="profile-text profile-quote">{{teacher.teachingPhilosophy}}</view>
+    </view>
+
+    <view wx:if="{{courses.length}}" class="card profile-card">
+      <view class="section-title">主讲课程</view>
+      <view class="course-list">
+        <navigator
+          wx:for="{{courses}}"
+          wx:key="id"
+          class="course-card"
+          url="/pages/course-detail/index?slug={{item.slug}}"
+        >
+          <view class="course-name">{{item.name}}</view>
+          <view class="muted course-meta">{{item.category}} · {{item.ageRange}} · {{item.durationMinutes}}分钟</view>
+          <view class="course-summary">{{item.summary}}</view>
+        </navigator>
+      </view>
+    </view>
+
+    <view wx:if="{{teacher.classPhotoUrls.length}}" class="card profile-card">
+      <view class="section-title">课堂实拍</view>
+      <view class="photo-grid">
+        <image wx:for="{{teacher.classPhotoUrls}}" wx:key="*this" class="photo" src="{{item}}" mode="aspectFill" />
+      </view>
+    </view>
+
+    <view wx:if="{{teacher.studentWorkUrls.length}}" class="card profile-card">
+      <view class="section-title">学员作品</view>
+      <view class="photo-grid">
+        <image wx:for="{{teacher.studentWorkUrls}}" wx:key="*this" class="photo" src="{{item}}" mode="aspectFill" />
+      </view>
+    </view>
+
+    <view wx:if="{{teacher.parentTestimonials.length}}" class="card profile-card">
+      <view class="section-title">家长评价</view>
+      <view class="quote-list">
+        <view wx:for="{{teacher.parentTestimonials}}" wx:key="*this" class="quote-card">“{{item}}”</view>
       </view>
     </view>
 
     <view class="card profile-card">
-      <view class="section-title">老师介绍</view>
+      <view class="section-title">教学经历与资质</view>
       <view wx:if="{{profileSections.length}}" class="profile-list">
         <view wx:for="{{profileSections}}" wx:key="key" class="profile-section">
           <view class="profile-label">{{item.label}}</view>

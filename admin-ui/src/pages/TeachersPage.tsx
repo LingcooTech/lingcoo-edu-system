@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
-import { QiniuImageField } from '@/components/shared/QiniuImageField';
+import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
@@ -34,8 +34,26 @@ interface TeacherForm {
   teachingExperience: string;
   teachingStyle: string;
   achievements: string;
+  teachingYears: string;
+  studentCount: string;
+  retentionRate: string;
+  teachingPhilosophy: string;
+  classPhotoUrlsText: string;
+  studentWorkUrlsText: string;
+  parentTestimonialsText: string;
   specialties: string;
   status: 'active' | 'archived';
+}
+
+function linesToList(value: string): string[] {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function listToLines(value?: string[] | null): string {
+  return (value ?? []).join('\n');
 }
 
 const emptyTeacherForm: TeacherForm = {
@@ -50,6 +68,13 @@ const emptyTeacherForm: TeacherForm = {
   teachingExperience: '',
   teachingStyle: '',
   achievements: '',
+  teachingYears: '',
+  studentCount: '',
+  retentionRate: '',
+  teachingPhilosophy: '',
+  classPhotoUrlsText: '',
+  studentWorkUrlsText: '',
+  parentTestimonialsText: '',
   specialties: '',
   status: 'active',
 };
@@ -82,6 +107,13 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
             teachingExperience: teacher.teachingExperience ?? '',
             teachingStyle: teacher.teachingStyle ?? '',
             achievements: teacher.achievements ?? '',
+            teachingYears: teacher.teachingYears ?? '',
+            studentCount: teacher.studentCount ?? '',
+            retentionRate: teacher.retentionRate ?? '',
+            teachingPhilosophy: teacher.teachingPhilosophy ?? '',
+            classPhotoUrlsText: listToLines(teacher.classPhotoUrls),
+            studentWorkUrlsText: listToLines(teacher.studentWorkUrls),
+            parentTestimonialsText: listToLines(teacher.parentTestimonials),
             specialties: teacher.specialties.join('、'),
             status: teacher.status as TeacherForm['status'],
           }
@@ -109,6 +141,13 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
         teachingExperience: form.teachingExperience.trim(),
         teachingStyle: form.teachingStyle.trim(),
         achievements: form.achievements.trim(),
+        teachingYears: form.teachingYears.trim(),
+        studentCount: form.studentCount.trim(),
+        retentionRate: form.retentionRate.trim(),
+        teachingPhilosophy: form.teachingPhilosophy.trim(),
+        classPhotoUrls: linesToList(form.classPhotoUrlsText),
+        studentWorkUrls: linesToList(form.studentWorkUrlsText),
+        parentTestimonials: linesToList(form.parentTestimonialsText),
         specialties: form.specialties
           .split(/[、,，]/)
           .map((item) => item.trim())
@@ -293,6 +332,62 @@ export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) 
             className="form-input"
             value={form.specialties}
             onChange={(event) => setForm({ ...form, specialties: event.target.value })}
+          />
+        </Field>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="教学年限">
+            <input
+              className="form-input"
+              placeholder="如 8年"
+              value={form.teachingYears}
+              onChange={(event) => setForm({ ...form, teachingYears: event.target.value })}
+            />
+          </Field>
+          <Field label="累计学员">
+            <input
+              className="form-input"
+              placeholder="如 500+"
+              value={form.studentCount}
+              onChange={(event) => setForm({ ...form, studentCount: event.target.value })}
+            />
+          </Field>
+          <Field label="续班率">
+            <input
+              className="form-input"
+              placeholder="如 95%"
+              value={form.retentionRate}
+              onChange={(event) => setForm({ ...form, retentionRate: event.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="教学理念" hint="展示在教师详情页靠前位置">
+          <textarea
+            className="form-input min-h-28"
+            rows={4}
+            value={form.teachingPhilosophy}
+            onChange={(event) => setForm({ ...form, teachingPhilosophy: event.target.value })}
+          />
+        </Field>
+        <QiniuGalleryField
+          label="课堂照片"
+          hint="用于教师详情页课堂实拍模块，可批量上传或从素材库勾选多张"
+          value={form.classPhotoUrlsText}
+          onChange={(classPhotoUrlsText) => setForm({ ...form, classPhotoUrlsText })}
+          prefix="teachers/class-photos"
+        />
+        <QiniuGalleryField
+          label="学员作品"
+          hint="用于教师详情页学员作品模块，可放前后对比图"
+          value={form.studentWorkUrlsText}
+          onChange={(studentWorkUrlsText) => setForm({ ...form, studentWorkUrlsText })}
+          prefix="teachers/student-works"
+        />
+        <Field label="家长评价" hint="每行一条，建议 3-5 条">
+          <textarea
+            className="form-input min-h-28"
+            rows={4}
+            value={form.parentTestimonialsText}
+            onChange={(event) => setForm({ ...form, parentTestimonialsText: event.target.value })}
           />
         </Field>
         <Field label="毕业院校 / 专业背景" hint="如毕业院校、专业、师承背景等">

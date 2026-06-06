@@ -20,6 +20,10 @@ function appendUrl(value: string, url: string) {
   return lines.join('\n');
 }
 
+function appendUrls(value: string, urls: string[]) {
+  return urls.reduce((current, url) => appendUrl(current, url), value);
+}
+
 function bytesLabel(value: number) {
   if (!Number.isFinite(value) || value <= 0) return '';
   if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
@@ -226,7 +230,11 @@ export function QiniuGalleryField({
           </div>
         ) : null}
         {pickerOpen ? (
-          <QiniuImagePicker prefix={prefix} onSelect={(url) => onChange(appendUrl(value, url))} />
+          <QiniuImagePicker
+            prefix={prefix}
+            onSelect={(url) => onChange(appendUrl(value, url))}
+            onSelectMany={(urls) => onChange(appendUrls(value, urls))}
+          />
         ) : null}
       </div>
     </FieldShell>
@@ -309,16 +317,19 @@ export function QiniuMediaLibrary({ prefix = '' }: { prefix?: string }) {
 function QiniuImagePicker({
   prefix,
   onSelect,
+  onSelectMany,
   reloadKey = 0,
 }: {
   prefix?: string;
   onSelect?: (url: string) => void;
+  onSelectMany?: (urls: string[]) => void;
   reloadKey?: number;
 }) {
   const toast = useToast();
   const [items, setItems] = useState<QiniuImageItem[]>([]);
   const [marker, setMarker] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
 
   async function load(nextMarker?: string | null) {
     setLoading(true);
@@ -342,8 +353,21 @@ function QiniuImagePicker({
   }
 
   useEffect(() => {
+    setSelectedUrls([]);
     void load(null);
   }, [prefix, reloadKey]);
+
+  function toggleSelected(url: string) {
+    setSelectedUrls((current) =>
+      current.includes(url) ? current.filter((item) => item !== url) : [...current, url],
+    );
+  }
+
+  function selectMany() {
+    if (selectedUrls.length === 0) return;
+    onSelectMany?.(selectedUrls);
+    setSelectedUrls([]);
+  }
 
   return (
     <div className="rounded-lg border bg-slate-50/70 p-3">
@@ -355,9 +379,22 @@ function QiniuImagePicker({
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => {
+            const selected = selectedUrls.includes(item.url);
             const content = (
               <>
-                <div className="flex h-28 items-center justify-center overflow-hidden rounded-md border bg-white p-1">
+                <div className="relative flex h-28 items-center justify-center overflow-hidden rounded-md border bg-white p-1">
+                  {onSelectMany ? (
+                    <span
+                      className={[
+                        'absolute top-2 left-2 flex h-5 w-5 items-center justify-center rounded border text-[11px] font-semibold',
+                        selected
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-300 bg-white',
+                      ].join(' ')}
+                    >
+                      {selected ? '✓' : ''}
+                    </span>
+                  ) : null}
                   <img
                     src={item.url}
                     alt={item.key}
@@ -372,6 +409,21 @@ function QiniuImagePicker({
                 </div>
               </>
             );
+            if (onSelectMany) {
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={[
+                    'rounded-md p-1 text-left hover:bg-white',
+                    selected ? 'bg-blue-50 ring-1 ring-blue-300' : '',
+                  ].join(' ')}
+                  onClick={() => toggleSelected(item.url)}
+                >
+                  {content}
+                </button>
+              );
+            }
             return onSelect ? (
               <button
                 key={item.key}
@@ -390,7 +442,11 @@ function QiniuImagePicker({
         </div>
       )}
       <div className="mt-3 flex justify-center">
-        {marker ? (
+        {onSelectMany && selectedUrls.length > 0 ? (
+          <button type="button" className="btn btn-primary" onClick={selectMany}>
+            添加选中 {selectedUrls.length} 张
+          </button>
+        ) : marker ? (
           <button
             type="button"
             className="btn btn-secondary"

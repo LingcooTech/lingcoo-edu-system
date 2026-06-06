@@ -50,8 +50,8 @@ export function HomePage() {
     () =>
       Array.from(
         new Set(
-          [profile?.bannerImageUrl, ...(profile?.gallery ?? [])].filter((url): url is string =>
-            Boolean(url),
+          (profile?.bannerImages?.length ? profile.bannerImages : [profile?.bannerImageUrl]).filter(
+            (url): url is string => Boolean(url),
           ),
         ),
       ),

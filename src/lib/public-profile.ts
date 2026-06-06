@@ -5,6 +5,7 @@ export interface PublicProfile {
   introduction: string;
   highlights: string[];
   promises: string[];
+  bannerImages: string[];
   bannerImageUrl: string;
   bannerTitle: string;
   bannerSubtitle: string;
@@ -28,6 +29,9 @@ export const defaultPublicProfile: PublicProfile = {
     '课后反馈清晰，家长能持续看到进步',
   ],
   promises: ['真实课堂体验', '固定老师跟进', '安全社区空间'],
+  bannerImages: [
+    'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1600&q=80',
+  ],
   bannerImageUrl:
     'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1600&q=80',
   bannerTitle: '在社区里，给孩子一个稳定成长的课堂',
@@ -68,13 +72,21 @@ function normalizeStringList(value: unknown, fallback: string[], limit: number) 
 
 export function readPublicProfile(settings: unknown): PublicProfile {
   const raw = isRecord(settings) && isRecord(settings.publicProfile) ? settings.publicProfile : {};
+  const bannerImages = normalizeStringList(
+    raw.bannerImages,
+    normalizeString(raw.bannerImageUrl)
+      ? [normalizeString(raw.bannerImageUrl)]
+      : defaultPublicProfile.bannerImages,
+    12,
+  );
 
   return {
     headline: normalizeString(raw.headline) || defaultPublicProfile.headline,
     introduction: normalizeString(raw.introduction) || defaultPublicProfile.introduction,
     highlights: normalizeStringList(raw.highlights, defaultPublicProfile.highlights, 6),
     promises: normalizeStringList(raw.promises, defaultPublicProfile.promises, 6),
-    bannerImageUrl: normalizeString(raw.bannerImageUrl) || defaultPublicProfile.bannerImageUrl,
+    bannerImages,
+    bannerImageUrl: bannerImages[0] || defaultPublicProfile.bannerImageUrl,
     bannerTitle: normalizeString(raw.bannerTitle) || defaultPublicProfile.bannerTitle,
     bannerSubtitle: normalizeString(raw.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
     ctaText: normalizeString(raw.ctaText) || defaultPublicProfile.ctaText,
@@ -93,12 +105,21 @@ export function readPublicProfile(settings: unknown): PublicProfile {
 type PublicProfileInput = Partial<Omit<PublicProfile, 'bodyBlocks'>> & { bodyBlocks?: unknown };
 
 export function normalizePublicProfile(input: PublicProfileInput) {
+  const bannerImages = normalizeStringList(
+    input.bannerImages,
+    normalizeString(input.bannerImageUrl)
+      ? [normalizeString(input.bannerImageUrl)]
+      : defaultPublicProfile.bannerImages,
+    12,
+  );
+
   return {
     headline: normalizeString(input.headline) || defaultPublicProfile.headline,
     introduction: normalizeString(input.introduction) || defaultPublicProfile.introduction,
     highlights: normalizeStringList(input.highlights, defaultPublicProfile.highlights, 6),
     promises: normalizeStringList(input.promises, defaultPublicProfile.promises, 6),
-    bannerImageUrl: normalizeString(input.bannerImageUrl) || defaultPublicProfile.bannerImageUrl,
+    bannerImages,
+    bannerImageUrl: bannerImages[0] || defaultPublicProfile.bannerImageUrl,
     bannerTitle: normalizeString(input.bannerTitle) || defaultPublicProfile.bannerTitle,
     bannerSubtitle: normalizeString(input.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
     ctaText: normalizeString(input.ctaText) || defaultPublicProfile.ctaText,

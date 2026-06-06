@@ -18,6 +18,7 @@ const publicProfileSchema = z.object({
   introduction: z.string().max(1000).optional(),
   highlights: z.array(z.string().min(1).max(120)).max(6).optional(),
   promises: z.array(z.string().min(1).max(120)).max(6).optional(),
+  bannerImages: z.array(z.string().min(1).max(500)).max(12).optional(),
   bannerImageUrl: z.string().max(500).optional(),
   bannerTitle: z.string().max(120).optional(),
   bannerSubtitle: z.string().max(240).optional(),
