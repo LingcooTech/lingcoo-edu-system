@@ -19,7 +19,6 @@ export function PageFrame({
         <div>
           <div className="eyebrow">{meta.eyebrow}</div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{meta.title}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">{meta.description}</p>
         </div>
         {actions}
       </div>

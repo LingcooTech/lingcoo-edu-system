@@ -161,11 +161,11 @@ body {
   }
 
   .site-footer-simple {
-    @apply mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8;
+    @apply mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-7 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8;
   }
 
   .site-footer-brandline {
-    @apply min-w-0 flex-1;
+    @apply flex min-w-0 flex-1 flex-col items-center text-center lg:items-start lg:text-left;
   }
 
   .site-footer-note {
@@ -173,15 +173,15 @@ body {
   }
 
   .site-footer-org {
-    @apply text-ink min-w-0 text-sm font-medium lg:min-w-[280px] lg:text-right;
+    @apply border-line text-ink min-w-0 border-t pt-4 text-center text-sm font-medium lg:min-w-[360px] lg:border-t-0 lg:pt-0 lg:text-right;
   }
 
   .site-footer-org-name {
-    @apply truncate;
+    @apply leading-6 lg:truncate;
   }
 
   .site-footer-org-meta {
-    @apply text-ink-soft mt-2 flex flex-wrap gap-x-4 gap-y-1 lg:justify-end;
+    @apply text-ink-soft mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 lg:justify-end;
   }
 
   .site-footer-org-meta a {

@@ -1,8 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
-import type { OrganizationSettings, PublicNavItem, PublicSiteSettings } from '@/api/types';
+import type { OrganizationSettings, PublicSiteSettings } from '@/api/types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
 import { BlockRenderer } from '@/components/editor/BlockRenderer';
 import { HOME_ALLOWED } from '@/components/editor/blocks';
@@ -11,28 +10,36 @@ import { Field } from '@/components/shared/FormField';
 import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
 
-const DEFAULT_NAVIGATION: PublicNavItem[] = [
-  { label: '首页', path: '/', visible: true },
-  { label: '课程', path: '/courses', visible: true },
-  { label: '试听', path: '/trials', visible: true },
-  { label: '老师', path: '/teachers', visible: true },
-  { label: '学员', path: '/students', visible: true },
-  { label: '关于', path: '/about', visible: true },
-];
+const DEFAULT_SITE: PublicSiteSettings = {
+  navigation: [
+    { label: '首页', path: '/', visible: true },
+    { label: '课程', path: '/courses', visible: true },
+    { label: '试听', path: '/trials', visible: true },
+    { label: '老师', path: '/teachers', visible: true },
+    { label: '学员', path: '/students', visible: true },
+    { label: '关于', path: '/about', visible: true },
+  ],
+  aboutPage: {
+    title: '关于我们',
+    subtitle: '',
+    heroImageUrl: '',
+    operatorIntro: '',
+    brandCooperation: '',
+    bodyBlocks: [],
+  },
+  icpNumber: '',
+  icpUrl: '',
+};
 
 function normalizeSite(value?: PublicSiteSettings): PublicSiteSettings {
   return {
-    navigation: value?.navigation?.length ? value.navigation : DEFAULT_NAVIGATION,
+    navigation: value?.navigation?.length ? value.navigation : DEFAULT_SITE.navigation,
     aboutPage: {
-      title: value?.aboutPage?.title ?? '关于我们',
-      subtitle: value?.aboutPage?.subtitle ?? '',
-      heroImageUrl: value?.aboutPage?.heroImageUrl ?? '',
-      operatorIntro: value?.aboutPage?.operatorIntro ?? '',
-      brandCooperation: value?.aboutPage?.brandCooperation ?? '',
-      bodyBlocks: value?.aboutPage?.bodyBlocks ?? [],
+      ...DEFAULT_SITE.aboutPage,
+      ...value?.aboutPage,
     },
-    icpNumber: value?.icpNumber ?? '',
-    icpUrl: value?.icpUrl ?? '',
+    icpNumber: value?.icpNumber ?? DEFAULT_SITE.icpNumber,
+    icpUrl: value?.icpUrl ?? DEFAULT_SITE.icpUrl,
   };
 }
 
@@ -51,10 +58,6 @@ export function InstitutionAboutPage() {
       .catch((err) => toast.error(err instanceof Error ? err.message : '加载失败'));
   }, [toast]);
 
-  function updateSite(patch: Partial<PublicSiteSettings>) {
-    setForm((current) => (current ? { ...current, ...patch } : current));
-  }
-
   function updateAbout(patch: Partial<PublicSiteSettings['aboutPage']>) {
     setForm((current) =>
       current ? { ...current, aboutPage: { ...current.aboutPage, ...patch } } : current,
@@ -65,10 +68,15 @@ export function InstitutionAboutPage() {
     if (!form) return;
     setSaving(true);
     try {
-      const updated = await saveOrganization({ publicSite: form });
+      const current = await fetchOrganization();
+      const publicSite = {
+        ...normalizeSite(current.publicSite),
+        aboutPage: form.aboutPage,
+      };
+      const updated = await saveOrganization({ publicSite });
       setOrganization(updated);
       setForm(normalizeSite(updated.publicSite));
-      toast.success('公开页面已保存');
+      toast.success('关于页已保存');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -81,7 +89,7 @@ export function InstitutionAboutPage() {
       section="institutionAbout"
       actions={
         <button type="button" className="btn btn-primary" onClick={save} disabled={!form || saving}>
-          {saving ? '保存中...' : '保存公开页面'}
+          {saving ? '保存中...' : '保存关于页'}
         </button>
       }
     >
@@ -90,13 +98,6 @@ export function InstitutionAboutPage() {
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-5">
-            <EditorCard title="前台 Header 菜单">
-              <NavEditor
-                value={form.navigation}
-                onChange={(navigation) => updateSite({ navigation })}
-              />
-            </EditorCard>
-
             <EditorCard title="关于我们页面">
               <Field label="页面标题">
                 <input
@@ -145,27 +146,6 @@ export function InstitutionAboutPage() {
                 allowed={HOME_ALLOWED}
               />
             </EditorCard>
-
-            <EditorCard title="页脚备案信息">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="备案号">
-                  <input
-                    className="form-input"
-                    placeholder="例如：沪ICP备00000000号-1"
-                    value={form.icpNumber}
-                    onChange={(event) => updateSite({ icpNumber: event.target.value })}
-                  />
-                </Field>
-                <Field label="备案链接">
-                  <input
-                    className="form-input"
-                    placeholder="https://beian.miit.gov.cn"
-                    value={form.icpUrl}
-                    onChange={(event) => updateSite({ icpUrl: event.target.value })}
-                  />
-                </Field>
-              </div>
-            </EditorCard>
           </div>
 
           <div className="xl:sticky xl:top-4 xl:self-start">
@@ -175,98 +155,6 @@ export function InstitutionAboutPage() {
         </div>
       )}
     </PageFrame>
-  );
-}
-
-function NavEditor({
-  value,
-  onChange,
-}: {
-  value: PublicNavItem[];
-  onChange: (value: PublicNavItem[]) => void;
-}) {
-  function patch(index: number, partial: Partial<PublicNavItem>) {
-    onChange(
-      value.map((item, itemIndex) => (itemIndex === index ? { ...item, ...partial } : item)),
-    );
-  }
-
-  function move(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= value.length) return;
-    const next = value.slice();
-    [next[index], next[target]] = [next[target], next[index]];
-    onChange(next);
-  }
-
-  return (
-    <div className="space-y-3">
-      {value.map((item, index) => (
-        <div key={index} className="rounded-lg border p-3">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] md:items-end">
-            <Field label="菜单名称">
-              <input
-                className="form-input"
-                value={item.label}
-                onChange={(event) => patch(index, { label: event.target.value })}
-              />
-            </Field>
-            <Field label="链接">
-              <input
-                className="form-input"
-                value={item.path}
-                onChange={(event) => patch(index, { path: event.target.value })}
-              />
-            </Field>
-            <div className="mb-3.5 flex items-center gap-1">
-              <button
-                type="button"
-                className="btn btn-ghost px-2"
-                onClick={() => move(index, -1)}
-                disabled={index === 0}
-                aria-label="上移菜单"
-              >
-                <ChevronUp className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost px-2"
-                onClick={() => move(index, 1)}
-                disabled={index === value.length - 1}
-                aria-label="下移菜单"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost px-2 text-red-600"
-                onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
-                aria-label="删除菜单"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <label className="text-muted-foreground flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={item.visible}
-              onChange={(event) => patch(index, { visible: event.target.checked })}
-            />
-            在前台 Header 显示
-          </label>
-        </div>
-      ))}
-
-      <button
-        type="button"
-        className="btn btn-secondary w-full"
-        onClick={() => onChange([...value, { label: '新菜单', path: '/', visible: true }])}
-      >
-        <Plus className="h-4 w-4" />
-        添加菜单项
-      </button>
-    </div>
   );
 }
 

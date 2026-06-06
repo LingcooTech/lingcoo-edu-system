@@ -97,115 +97,101 @@ export const adminSections = [
   },
 ] as const;
 
-export const pageMeta: Record<string, { title: string; description: string; eyebrow: string }> = {
+export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   dashboard: {
     eyebrow: 'Overview',
     title: '经营看板',
-    description: '查看招生、试听、收入、课时和今日课程。',
   },
   reports: {
     eyebrow: 'Reports',
     title: '数据报表',
-    description: '招生漏斗、收入与课消报表，按渠道 / 活动复盘 ROI。',
   },
   todos: {
     eyebrow: 'Todo',
     title: '待办事项',
-    description: '集中处理待联系线索、待跟进事项和今日试听课。',
   },
   institutionHome: {
     eyebrow: 'Institution',
     title: '机构主页',
-    description: '维护对外展示的机构主体、介绍内容、亮点承诺和品牌基础信息。',
   },
   institutionAbout: {
-    eyebrow: 'Public Site',
-    title: '关于我们与导航',
-    description: '维护前台 Header 菜单、关于我们页面内容和页脚备案信息。',
+    eyebrow: 'Institution',
+    title: '关于我们',
   },
   marketing: {
     eyebrow: 'Admissions',
     title: '营销活动',
-    description: '管理渠道、活动和活动二维码，持续获取可追踪的线索。',
   },
   leads: {
     eyebrow: 'Admissions',
     title: '线索跟进',
-    description: '跟进来自渠道和活动的线索，记录每个阶段的沟通与转化反馈。',
   },
   trials: {
     eyebrow: 'Admissions',
     title: '试听转化',
-    description: '管理试听课、试听报名、签到核销与转化效果。',
   },
   courses: {
     eyebrow: 'Resource',
     title: '课程资源',
-    description: '维护课程产品、适龄、简介和公开端展示状态。',
   },
   packages: {
     eyebrow: 'Resource',
     title: '课时包',
-    description: '维护对外售卖的课时包：课时数、价格与关联课程。',
   },
   students: {
     eyebrow: 'Academic',
     title: '学员档案',
-    description: '管理孩子档案、家长信息和课时余额。',
   },
   guardians: {
     eyebrow: 'Operations',
     title: '家长用户',
-    description: '维护家长联系人档案、名下孩子与家长账号。',
   },
   classes: {
     eyebrow: 'Academic',
     title: '班级排课',
-    description: '维护正式教学班、老师、教室和班级容量。',
   },
   schedule: {
     eyebrow: 'Academic',
     title: '排课总览',
-    description: '查看课次、老师教室占用和签到入口。',
   },
   attendance: {
     eyebrow: 'Academic',
     title: '签到消课总览',
-    description: '后台总览老师/家长签到结果，并支持管理员手动补签、核销和课时流水校正。',
   },
   lessons: {
     eyebrow: 'Operations',
     title: '课时账户',
-    description: '查看课时余额与课时流水，确保消课可追溯。',
   },
   teachers: {
     eyebrow: 'Resource',
     title: '教师资源',
-    description: '维护授课老师档案，用于排课与考勤。',
   },
   classrooms: {
     eyebrow: 'Resource',
     title: '教室资源',
-    description: '维护各校区教室与容量，用于排课占用与冲突检测。',
   },
   campuses: {
     eyebrow: 'Resource',
     title: '场地资源',
-    description: '维护校区、地址和教学场地基础信息。',
   },
   orders: {
     eyebrow: 'Operations',
     title: '订单收款',
-    description: '手动登记收款、购买课时并生成课时入账。',
   },
   settings: {
     eyebrow: 'System',
     title: '系统设置',
-    description: '机构品牌、支付、SMTP、短信验证码、七牛云等系统配置入口。',
+  },
+  brandSettings: {
+    eyebrow: 'System',
+    title: '品牌设置',
+  },
+  integrations: {
+    eyebrow: 'System',
+    title: '接口配置',
   },
   accounts: {
     eyebrow: 'Operations',
     title: '用户账号',
-    description: '管理管理员、老师和学员家长账号与角色。',
   },
 };
