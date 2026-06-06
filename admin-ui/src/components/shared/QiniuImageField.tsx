@@ -161,11 +161,11 @@ export function QiniuGalleryField({
   const [pickerOpen, setPickerOpen] = useState(false);
   const urls = imageLines(value);
 
-  async function upload(files: FileList) {
+  async function upload(files: File[]) {
     setUploading(true);
     try {
       let next = value;
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const result = await uploadQiniuImage(file, prefix);
         next = appendUrl(next, result.publicUrl);
       }
@@ -212,9 +212,9 @@ export function QiniuGalleryField({
           multiple
           className="hidden"
           onChange={(event) => {
-            const files = event.target.files;
+            const files = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = '';
-            if (files?.length) void upload(files);
+            if (files.length) void upload(files);
           }}
         />
         {urls.length > 0 ? (
@@ -248,10 +248,10 @@ export function QiniuMediaLibrary({ prefix = '' }: { prefix?: string }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [uploading, setUploading] = useState(false);
 
-  async function upload(files: FileList) {
+  async function upload(files: File[]) {
     setUploading(true);
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         await uploadQiniuImage(file, currentPrefix || undefined);
       }
       setReloadKey((key) => key + 1);
@@ -302,9 +302,9 @@ export function QiniuMediaLibrary({ prefix = '' }: { prefix?: string }) {
         multiple
         className="hidden"
         onChange={(event) => {
-          const files = event.target.files;
+          const files = Array.from(event.currentTarget.files ?? []);
           event.currentTarget.value = '';
-          if (files?.length) void upload(files);
+          if (files.length) void upload(files);
         }}
       />
       <div className="mt-4">
