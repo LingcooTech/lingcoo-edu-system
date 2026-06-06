@@ -120,8 +120,8 @@ export function QiniuImageField({
           }}
         />
         {value ? (
-          <div className="h-32 overflow-hidden rounded-lg border bg-slate-50">
-            <img src={value} alt={previewAlt} className="h-full w-full object-cover" />
+          <div className="flex h-24 items-center justify-center overflow-hidden rounded-lg border bg-white p-2">
+            <img src={value} alt={previewAlt} className="max-h-full max-w-full object-contain" />
           </div>
         ) : null}
         {pickerOpen ? (
@@ -216,8 +216,11 @@ export function QiniuGalleryField({
         {urls.length > 0 ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {urls.slice(0, 8).map((url) => (
-              <div key={url} className="aspect-video overflow-hidden rounded-md border bg-slate-50">
-                <img src={url} alt="图库预览" className="h-full w-full object-cover" />
+              <div
+                key={url}
+                className="flex h-24 items-center justify-center overflow-hidden rounded-md border bg-white p-1"
+              >
+                <img src={url} alt="图库预览" className="max-h-full max-w-full object-contain" />
               </div>
             ))}
           </div>
@@ -354,8 +357,12 @@ function QiniuImagePicker({
           {items.map((item) => {
             const content = (
               <>
-                <div className="aspect-video overflow-hidden rounded-md border bg-white">
-                  <img src={item.url} alt={item.key} className="h-full w-full object-cover" />
+                <div className="flex h-28 items-center justify-center overflow-hidden rounded-md border bg-white p-1">
+                  <img
+                    src={item.url}
+                    alt={item.key}
+                    className="max-h-full max-w-full object-contain"
+                  />
                 </div>
                 <div className="mt-1 min-w-0">
                   <div className="truncate text-xs font-medium">{item.key}</div>

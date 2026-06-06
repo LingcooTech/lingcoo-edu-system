@@ -257,20 +257,22 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="site-footer-simple">
           <div className="site-footer-brandline">
             <Brand organization={organization} />
-            <div className="site-footer-copy">
-              <div className="site-footer-contact">
-                {organization?.address ? <span>{organization.address}</span> : null}
-                {organization?.phone ? (
-                  <a href={`tel:${organization.phone}`}>{organization.phone}</a>
-                ) : null}
-                {organization?.publicProfile.businessHours ? (
-                  <span>{organization.publicProfile.businessHours}</span>
-                ) : null}
-              </div>
-              <p className="site-footer-note">
-                {organization?.publicProfile.bannerSubtitle ??
-                  '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
-              </p>
+            <p className="site-footer-note">
+              {organization?.publicProfile.bannerSubtitle ??
+                '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
+            </p>
+          </div>
+          <div className="site-footer-org">
+            <div className="site-footer-org-name">
+              {organization?.address ?? organization?.brandName ?? '成长教室'}
+            </div>
+            <div className="site-footer-org-meta">
+              {organization?.phone ? (
+                <a href={`tel:${organization.phone}`}>{organization.phone}</a>
+              ) : null}
+              {organization?.publicProfile.businessHours ? (
+                <span>{organization.publicProfile.businessHours}</span>
+              ) : null}
             </div>
           </div>
         </div>

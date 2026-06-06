@@ -161,26 +161,30 @@ body {
   }
 
   .site-footer-simple {
-    @apply mx-auto w-full max-w-6xl px-5 py-8 sm:px-6 lg:px-8;
+    @apply mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-8 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8;
   }
 
   .site-footer-brandline {
-    @apply flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start;
-  }
-
-  .site-footer-copy {
     @apply min-w-0 flex-1;
   }
 
   .site-footer-note {
-    @apply text-ink-soft mt-2 max-w-3xl text-sm leading-6;
+    @apply text-ink-soft mt-3 max-w-2xl text-sm leading-6;
   }
 
-  .site-footer-contact {
-    @apply text-ink flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium;
+  .site-footer-org {
+    @apply text-ink min-w-0 text-sm font-medium lg:min-w-[280px] lg:text-right;
   }
 
-  .site-footer-contact a {
+  .site-footer-org-name {
+    @apply truncate;
+  }
+
+  .site-footer-org-meta {
+    @apply text-ink-soft mt-2 flex flex-wrap gap-x-4 gap-y-1 lg:justify-end;
+  }
+
+  .site-footer-org-meta a {
     @apply text-ink hover:text-brand no-underline;
   }
 

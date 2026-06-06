@@ -95,7 +95,7 @@ export function Sidebar({
           {collapsed ? (
             <BrandIcon logoUrl={squareLogoUrl} brandName={brandName} />
           ) : fullLogoUrl ? (
-            <img src={fullLogoUrl} alt={brandName} className="h-9 max-w-[172px] object-contain" />
+            <img src={fullLogoUrl} alt={brandName} className="h-7 max-w-[140px] object-contain" />
           ) : (
             <>
               <BrandIcon logoUrl={squareLogoUrl} brandName={brandName} />
