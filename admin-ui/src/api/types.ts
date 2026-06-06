@@ -45,8 +45,20 @@ export interface Teacher {
   phone?: string | null;
   title?: string | null;
   avatarUrl?: string | null;
+  institutionId?: string | null;
+  tagline?: string | null;
+  wechatQrUrl?: string | null;
   bio?: string | null;
   specialties: string[];
+  status: string;
+}
+
+export interface Institution {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  intro?: string | null;
+  contact?: string | null;
   status: string;
 }
 

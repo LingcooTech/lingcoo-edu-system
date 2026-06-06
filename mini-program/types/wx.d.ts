@@ -11,9 +11,14 @@ declare const wx: {
   setStorageSync(key: string, value: unknown): void;
   removeStorageSync(key: string): void;
   navigateTo(options: { url: string; fail?: (error: { errMsg: string }) => void }): void;
+  navigateBack(options?: {
+    delta?: number;
+    fail?: (error: { errMsg: string }) => void;
+  }): void;
   redirectTo(options: { url: string; fail?: (error: { errMsg: string }) => void }): void;
   switchTab(options: { url: string; fail?: (error: { errMsg: string }) => void }): void;
   setNavigationBarTitle(options: { title: string }): void;
+  previewImage(options: { urls: string[]; current?: string; fail?: (error: { errMsg: string }) => void }): void;
   showToast(options: { title: string; icon?: 'success' | 'error' | 'loading' | 'none'; duration?: number }): void;
   showModal(options: {
     title: string;
@@ -40,6 +45,7 @@ declare const wx: {
     fail?: (error: { errMsg: string }) => void;
     complete?: () => void;
   }) => void;
+  stopPullDownRefresh(options?: { complete?: () => void }): void;
 };
 
 declare function App(options: Record<string, unknown>): void;

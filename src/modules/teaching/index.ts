@@ -16,12 +16,25 @@ const teacherSchema = z.object({
   phone: z.string().default(''),
   title: z.string().max(120).optional(),
   avatarUrl: z.string().max(500).optional(),
+  institutionId: z.string().uuid().nullable().optional(),
+  tagline: z.string().max(200).optional(),
+  wechatQrUrl: z.string().max(500).optional(),
   bio: z.string().default(''),
   specialties: z.array(z.string()).default([]),
   status: z.enum(['active', 'archived']).default('active'),
 });
 
 const teacherUpdateSchema = teacherSchema.partial();
+
+const institutionSchema = z.object({
+  name: z.string().min(1).max(160),
+  logoUrl: z.string().max(500).optional(),
+  intro: z.string().default(''),
+  contact: z.string().max(200).optional(),
+  status: z.enum(['active', 'archived']).default('active'),
+});
+
+const institutionUpdateSchema = institutionSchema.partial();
 
 const classroomSchema = z.object({
   campusId: z.string(),
@@ -249,6 +262,39 @@ export const teachingModule: AppModule = {
       if (!teacher) throw notFound('Teacher not found');
       return { teacher };
     });
+
+    app.get('/v1/institutions', { preHandler: app.requireAdmin }, async () => {
+      return { institutions: await teachingRepo.listInstitutions(app.db) };
+    });
+
+    app.post('/v1/institutions', { preHandler: app.requireAdmin }, async (request) => {
+      const body = institutionSchema.parse(request.body);
+      const institution = await teachingRepo.createInstitution(app.db, body);
+      return { institution };
+    });
+
+    app.patch(
+      '/v1/institutions/:institutionId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { institutionId } = request.params as { institutionId: string };
+        const body = institutionUpdateSchema.parse(request.body);
+        const institution = await teachingRepo.updateInstitution(app.db, institutionId, body);
+        if (!institution) throw notFound('Institution not found');
+        return { institution };
+      },
+    );
+
+    app.delete(
+      '/v1/institutions/:institutionId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { institutionId } = request.params as { institutionId: string };
+        const institution = await teachingRepo.deleteInstitution(app.db, institutionId);
+        if (!institution) throw notFound('Institution not found');
+        return { institution };
+      },
+    );
 
     app.get('/v1/classrooms', { preHandler: app.requireAdmin }, async () => {
       return { classrooms: await teachingRepo.listClassrooms(app.db) };

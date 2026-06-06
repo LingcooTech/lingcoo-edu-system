@@ -500,6 +500,58 @@ async function seedDemo(): Promise<void> {
     status: 'pending',
   });
 
+  // --- 机构（教师所属机构）+ 教师档案补充 ---
+  async function ensureInstitution(values: { name: string; intro: string; contact: string }) {
+    const existing = await findOne(
+      db
+        .select()
+        .from(schema.institutions)
+        .where(eq(schema.institutions.name, values.name))
+        .limit(1),
+    );
+    if (existing) return existing;
+    return required(
+      await findOne(db.insert(schema.institutions).values(values).returning()),
+      'institution insert failed',
+    );
+  }
+
+  const futureAcademy = await ensureInstitution({
+    name: '未来书院',
+    intro: '专注 6-12 岁中文书写与表达训练，小班教学、固定老师跟进。',
+    contact: '微信 future-academy · 电话 0571-8888 0001',
+  });
+  const artStudio = await ensureInstitution({
+    name: '童心美育',
+    intro: '以创意美术启发孩子观察力与想象力的社区美育机构。',
+    contact: '微信 tongxin-art · 电话 0571-8888 0002',
+  });
+
+  // 把基础种子里的王老师绑定到机构，并补充一句话简介。
+  await db
+    .update(schema.teachers)
+    .set({
+      institutionId: futureAcademy.id,
+      tagline: '十年硬笔书法教学，擅长帮孩子稳定坐姿与笔画基础。',
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.teachers.id, teacher.id));
+
+  // 再加一位隶属另一机构的老师，让前台机构 Tab 有对比。
+  const existingLi = await findOne(
+    db.select().from(schema.teachers).where(eq(schema.teachers.name, '李老师')).limit(1),
+  );
+  if (!existingLi) {
+    await db.insert(schema.teachers).values({
+      name: '李老师',
+      title: '创意美术老师',
+      institutionId: artStudio.id,
+      tagline: '带孩子从涂鸦到创作，让每一幅画都有自己的故事。',
+      specialties: ['创意美术', '儿童手工', '色彩启蒙'],
+      status: 'active',
+    });
+  }
+
   console.log(JSON.stringify({ msg: 'demo enrichment completed', classId }));
 }
 

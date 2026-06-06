@@ -32,7 +32,7 @@ export const adminSections = [
   },
   {
     key: 'institution',
-    label: '机构主页',
+    label: '前台页面',
     path: '/institution',
     icon: Home,
     items: [
@@ -165,6 +165,10 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   teachers: {
     eyebrow: 'Resource',
     title: '教师资源',
+  },
+  institutions: {
+    eyebrow: 'Resource',
+    title: '机构',
   },
   classrooms: {
     eyebrow: 'Resource',

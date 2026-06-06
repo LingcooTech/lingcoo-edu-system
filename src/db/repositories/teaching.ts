@@ -45,6 +45,51 @@ export async function deleteTeacher(db: Database, teacherId: string) {
   return teacher ?? null;
 }
 
+export async function listInstitutions(db: Database) {
+  return db.select().from(schema.institutions).orderBy(desc(schema.institutions.createdAt));
+}
+
+export async function findInstitution(db: Database, institutionId: string | null) {
+  if (!institutionId) {
+    return null;
+  }
+  const [institution] = await db
+    .select()
+    .from(schema.institutions)
+    .where(eq(schema.institutions.id, institutionId))
+    .limit(1);
+  return institution ?? null;
+}
+
+export async function createInstitution(
+  db: Database,
+  values: typeof schema.institutions.$inferInsert,
+) {
+  const [institution] = await db.insert(schema.institutions).values(values).returning();
+  return institution;
+}
+
+export async function updateInstitution(
+  db: Database,
+  institutionId: string,
+  patch: Partial<typeof schema.institutions.$inferInsert>,
+) {
+  const [institution] = await db
+    .update(schema.institutions)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(schema.institutions.id, institutionId))
+    .returning();
+  return institution ?? null;
+}
+
+export async function deleteInstitution(db: Database, institutionId: string) {
+  const [institution] = await db
+    .delete(schema.institutions)
+    .where(eq(schema.institutions.id, institutionId))
+    .returning();
+  return institution ?? null;
+}
+
 export async function listClassrooms(db: Database) {
   return db.select().from(schema.classrooms).orderBy(desc(schema.classrooms.createdAt));
 }

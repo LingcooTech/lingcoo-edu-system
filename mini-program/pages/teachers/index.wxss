@@ -6,6 +6,35 @@
   margin-top: 12rpx;
 }
 
+.tabs {
+  margin-top: 28rpx;
+  white-space: nowrap;
+}
+
+.tab {
+  display: inline-block;
+  margin-right: 16rpx;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  border: 1px solid #e3ddd1;
+  color: #6b6357;
+  font-size: 26rpx;
+}
+
+.tab-active {
+  border-color: #1f6f5b;
+  background: #e9f4ef;
+  color: #1f6f5b;
+  font-weight: 700;
+}
+
+.tagline {
+  margin-top: 18rpx;
+  color: #4a5550;
+  font-size: 27rpx;
+  line-height: 1.6;
+}
+
 .teacher-list {
   display: grid;
   gap: 20rpx;

@@ -339,13 +339,38 @@ export interface PublicTeacher {
   phone?: string | null;
   title?: string | null;
   avatarUrl?: string | null;
+  institutionId?: string | null;
+  tagline?: string | null;
+  wechatQrUrl?: string | null;
   bio?: string | null;
   specialties: string[];
   status: string;
 }
 
+export interface PublicInstitution {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  intro?: string | null;
+  contact?: string | null;
+}
+
+export interface PublicTeacherDetail {
+  teacher: PublicTeacher;
+  institution: { id: string; name: string; logoUrl?: string | null } | null;
+}
+
 export async function fetchPublicTeachers() {
   return (await publicApi<{ teachers: PublicTeacher[] }>('/public/teachers')).teachers;
+}
+
+export async function fetchPublicInstitutions() {
+  return (await publicApi<{ institutions: PublicInstitution[] }>('/public/institutions'))
+    .institutions;
+}
+
+export async function fetchPublicTeacher(teacherId: string) {
+  return publicApi<PublicTeacherDetail>(`/public/teachers/${teacherId}`);
 }
 
 // --- Checkout / payment ---

@@ -148,6 +148,36 @@ export const trialModule: AppModule = {
       return { teachers: teachers.filter((teacher) => teacher.status !== 'archived') };
     });
 
+    app.get('/public/institutions', async () => {
+      const institutions = await teachingRepo.listInstitutions(app.db);
+      return {
+        institutions: institutions
+          .filter((institution) => institution.status !== 'archived')
+          .map((institution) => ({
+            id: institution.id,
+            name: institution.name,
+            logoUrl: institution.logoUrl,
+            intro: institution.intro,
+            contact: institution.contact,
+          })),
+      };
+    });
+
+    app.get('/public/teachers/:teacherId', async (request) => {
+      const { teacherId } = request.params as { teacherId: string };
+      const teacher = await teachingRepo.findTeacher(app.db, teacherId);
+      if (!teacher || teacher.status === 'archived') {
+        throw notFound('Teacher not found');
+      }
+      const institution = await teachingRepo.findInstitution(app.db, teacher.institutionId);
+      return {
+        teacher,
+        institution: institution
+          ? { id: institution.id, name: institution.name, logoUrl: institution.logoUrl }
+          : null,
+      };
+    });
+
     app.post('/public/trial-registrations', async (request) => {
       const body = registrationSchema.parse(request.body);
       const campusId = await trialRepo.firstCampusId(app.db);

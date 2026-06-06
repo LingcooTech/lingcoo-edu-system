@@ -160,9 +160,25 @@ export interface PublicTeacher {
   phone?: string | null;
   title?: string | null;
   avatarUrl?: string | null;
+  institutionId?: string | null;
+  tagline?: string | null;
+  wechatQrUrl?: string | null;
   bio?: string | null;
   specialties: string[];
   status: string;
+}
+
+export interface PublicInstitution {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  intro?: string | null;
+  contact?: string | null;
+}
+
+export interface PublicTeacherDetail {
+  teacher: PublicTeacher;
+  institution: { id: string; name: string; logoUrl?: string | null } | null;
 }
 
 export interface AuthAccount {
@@ -339,6 +355,14 @@ export function fetchCampaignLanding(code: string): Promise<CampaignLandingPaylo
 
 export async function fetchPublicTeachers(): Promise<PublicTeacher[]> {
   return (await request<{ teachers: PublicTeacher[] }>('/public/teachers')).teachers;
+}
+
+export async function fetchPublicInstitutions(): Promise<PublicInstitution[]> {
+  return (await request<{ institutions: PublicInstitution[] }>('/public/institutions')).institutions;
+}
+
+export function fetchPublicTeacher(teacherId: string): Promise<PublicTeacherDetail> {
+  return request<PublicTeacherDetail>(`/public/teachers/${encodeURIComponent(teacherId)}`);
 }
 
 export function submitCampaignParticipation(

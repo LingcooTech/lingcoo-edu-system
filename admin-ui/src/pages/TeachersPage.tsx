@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Teacher } from '@/api/types';
+import type { Institution, Teacher } from '@/api/types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
 import {
   parseBlocks,
@@ -34,6 +34,9 @@ interface TeacherForm {
   phone: string;
   title: string;
   avatarUrl: string;
+  institutionId: string;
+  tagline: string;
+  wechatQrUrl: string;
   specialties: string;
   bioBlocks: Block[];
   status: 'active' | 'archived';
@@ -44,14 +47,19 @@ const emptyTeacherForm: TeacherForm = {
   phone: '',
   title: '',
   avatarUrl: '',
+  institutionId: '',
+  tagline: '',
+  wechatQrUrl: '',
   specialties: '',
   bioBlocks: [],
   status: 'active',
 };
 
-export function TeachersPage() {
+export function TeachersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useToast();
   const { data: teachers, setData: setTeachers } = useApiResource<Teacher>(TEACHERS(), 'teachers');
+  const { data: institutions } = useApiResource<Institution>('/v1/institutions', 'institutions');
+  const institutionNameById = new Map(institutions.map((item) => [item.id, item.name]));
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Teacher | null>(null);
@@ -68,6 +76,9 @@ export function TeachersPage() {
             phone: teacher.phone ?? '',
             title: teacher.title ?? '',
             avatarUrl: teacher.avatarUrl ?? '',
+            institutionId: teacher.institutionId ?? '',
+            tagline: teacher.tagline ?? '',
+            wechatQrUrl: teacher.wechatQrUrl ?? '',
             specialties: teacher.specialties.join('、'),
             bioBlocks: parseBlocks(teacher.bio),
             status: teacher.status as TeacherForm['status'],
@@ -89,6 +100,9 @@ export function TeachersPage() {
         phone: form.phone.trim(),
         title: form.title.trim(),
         avatarUrl: form.avatarUrl.trim(),
+        institutionId: form.institutionId || null,
+        tagline: form.tagline.trim(),
+        wechatQrUrl: form.wechatQrUrl.trim(),
         specialties: form.specialties
           .split(/[、,，]/)
           .map((item) => item.trim())
@@ -142,7 +156,7 @@ export function TeachersPage() {
     }
   }
 
-  return (
+  const page = (
     <PageFrame
       section="teachers"
       actions={
@@ -156,6 +170,12 @@ export function TeachersPage() {
         columns={[
           { key: 'name', header: '老师', cell: (row) => row.name },
           { key: 'phone', header: '电话', cell: (row) => row.phone ?? '-' },
+          {
+            key: 'institution',
+            header: '机构',
+            cell: (row) =>
+              row.institutionId ? (institutionNameById.get(row.institutionId) ?? '-') : '-',
+          },
           { key: 'spec', header: '擅长', cell: (row) => row.specialties.join('、') || '-' },
           {
             key: 'status',
@@ -226,6 +246,27 @@ export function TeachersPage() {
             onChange={(event) => setForm({ ...form, title: event.target.value })}
           />
         </Field>
+        <Field label="一句话简介" hint="展示在家长端教师卡片与详情页顶部">
+          <input
+            className="form-input"
+            value={form.tagline}
+            onChange={(event) => setForm({ ...form, tagline: event.target.value })}
+          />
+        </Field>
+        <Field label="所属机构" hint="可选，前台按机构分组展示">
+          <select
+            className="form-input"
+            value={form.institutionId}
+            onChange={(event) => setForm({ ...form, institutionId: event.target.value })}
+          >
+            <option value="">未绑定</option>
+            {institutions.map((institution) => (
+              <option key={institution.id} value={institution.id}>
+                {institution.name}
+              </option>
+            ))}
+          </select>
+        </Field>
         <QiniuImageField
           label="头像图片 URL"
           hint="可选，展示在家长端教师卡片"
@@ -233,6 +274,14 @@ export function TeachersPage() {
           onChange={(avatarUrl) => setForm({ ...form, avatarUrl })}
           prefix="teachers/avatar"
           previewAlt="老师头像"
+        />
+        <QiniuImageField
+          label="个人微信二维码"
+          hint="可选，展示在教师详情页，家长可扫码加微信"
+          value={form.wechatQrUrl}
+          onChange={(wechatQrUrl) => setForm({ ...form, wechatQrUrl })}
+          prefix="teachers/wechat-qr"
+          previewAlt="老师微信二维码"
         />
         <Field label="擅长" hint="用顿号或逗号分隔">
           <input
@@ -272,5 +321,13 @@ export function TeachersPage() {
         onCancel={() => setDeleteTarget(null)}
       />
     </PageFrame>
+  );
+
+  return embedded ? (
+    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
+      {page}
+    </div>
+  ) : (
+    page
   );
 }

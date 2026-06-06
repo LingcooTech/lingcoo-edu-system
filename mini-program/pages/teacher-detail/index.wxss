@@ -1,0 +1,129 @@
+.back-button {
+  display: inline-block;
+  margin-bottom: 20rpx;
+  padding: 0;
+  background: transparent;
+  color: #1f6f5b;
+  font-size: 28rpx;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.back-button::after {
+  border: 0;
+}
+
+.empty-state {
+  padding: 80rpx 0;
+  text-align: center;
+  display: grid;
+  gap: 28rpx;
+  justify-items: center;
+}
+
+.empty-button {
+  width: 320rpx;
+}
+
+.header {
+  padding: 32rpx;
+}
+
+.teacher-head {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+
+.avatar {
+  width: 128rpx;
+  height: 128rpx;
+  flex: 0 0 128rpx;
+  border-radius: 32rpx;
+}
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9f4ef;
+  color: #1f6f5b;
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.teacher-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-name {
+  color: #1f2b24;
+  font-size: 38rpx;
+  font-weight: 800;
+}
+
+.teacher-title {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+}
+
+.institution {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 12rpx;
+  color: #4f5a53;
+  font-size: 26rpx;
+}
+
+.institution-logo {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 8rpx;
+  background: #fff;
+}
+
+.tagline {
+  margin-top: 24rpx;
+  color: #34403a;
+  font-size: 30rpx;
+  line-height: 1.7;
+}
+
+.specialties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 24rpx;
+}
+
+.bio {
+  margin-top: 24rpx;
+  padding: 32rpx;
+}
+
+.qr-card {
+  margin-top: 24rpx;
+  padding: 32rpx;
+}
+
+.qr-title {
+  color: #1f2b24;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.qr-hint {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+}
+
+.qr-image {
+  width: 360rpx;
+  height: 360rpx;
+  margin-top: 24rpx;
+  border: 1rpx solid rgba(31, 43, 36, 0.08);
+  border-radius: 24rpx;
+  background: #fff;
+}

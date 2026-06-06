@@ -85,6 +85,13 @@
       "when": 1780575117547,
       "tag": "0011_wechat_mini_identities",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780731286532,
+      "tag": "0012_skinny_spirit",
+      "breakpoints": true
     }
   ]
 }

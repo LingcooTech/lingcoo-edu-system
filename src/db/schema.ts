@@ -292,6 +292,26 @@ export const followUpRecords = pgTable(
   }),
 );
 
+// Teaching institutions a teacher can be affiliated with. Distinct from the
+// `organization` singleton (the site owner / brand): this is a list teachers
+// are grouped by on the public site (tabs) and in the back office.
+export const institutions = pgTable(
+  'institutions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: varchar('name', { length: 160 }).notNull(),
+    logoUrl: varchar('logo_url', { length: 500 }),
+    intro: text('intro').notNull().default(''),
+    contact: varchar('contact', { length: 200 }),
+    status: teachingResourceStatusEnum('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    statusIdx: index('institutions_status_idx').on(table.status),
+  }),
+);
+
 export const teachers = pgTable(
   'teachers',
   {
@@ -300,6 +320,13 @@ export const teachers = pgTable(
     phone: varchar('phone', { length: 40 }),
     title: varchar('title', { length: 120 }),
     avatarUrl: varchar('avatar_url', { length: 500 }),
+    // Affiliated institution (nullable); detaches to null if the institution is
+    // deleted so the teacher record survives.
+    institutionId: uuid('institution_id').references(() => institutions.id, {
+      onDelete: 'set null',
+    }),
+    tagline: varchar('tagline', { length: 200 }),
+    wechatQrUrl: varchar('wechat_qr_url', { length: 500 }),
     bio: text('bio').notNull().default(''),
     specialties: jsonb('specialties')
       .notNull()
@@ -310,6 +337,7 @@ export const teachers = pgTable(
   },
   (table) => ({
     statusIdx: index('teachers_status_idx').on(table.status),
+    institutionIdx: index('teachers_institution_idx').on(table.institutionId),
   }),
 );
 

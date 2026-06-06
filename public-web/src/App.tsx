@@ -14,6 +14,7 @@ import { HomePage } from '@/pages/HomePage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { RegisterSuccessPage } from '@/pages/RegisterSuccessPage';
 import { StudentStoriesPage } from '@/pages/StudentStoriesPage';
+import { TeacherDetailPage } from '@/pages/TeacherDetailPage';
 import { TeacherPage } from '@/pages/TeacherPage';
 import { TeachersPage } from '@/pages/TeachersPage';
 import { TrialDetailPage } from '@/pages/TrialDetailPage';
@@ -53,6 +54,7 @@ export function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/register/success" element={<RegisterSuccessPage />} />
           <Route path="/teachers" element={<TeachersPage />} />
+          <Route path="/teachers/:teacherId" element={<TeacherDetailPage />} />
           <Route path="/students" element={<StudentStoriesPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/login" element={<LoginRoute />} />

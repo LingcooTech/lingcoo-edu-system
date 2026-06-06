@@ -4,6 +4,7 @@
     "pages/courses/index",
     "pages/course-detail/index",
     "pages/teachers/index",
+    "pages/teacher-detail/index",
     "pages/campaign/index",
     "pages/account/index"
   ],

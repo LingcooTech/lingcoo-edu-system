@@ -1,0 +1,48 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{notFound}}" class="empty-state">
+    <view class="section-title">老师不存在或已下线</view>
+    <button class="btn btn-outline empty-button" bindtap="goTeachers">返回教师团队</button>
+  </view>
+
+  <block wx:else>
+    <button class="back-button" bindtap="goTeachers">‹ 教师团队</button>
+
+    <view class="header card">
+      <view class="teacher-head">
+        <image wx:if="{{teacher.avatarUrl}}" class="avatar" src="{{teacher.avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar fallback">师</view>
+        <view class="teacher-main">
+          <view class="teacher-name">{{teacher.name}}</view>
+          <view wx:if="{{teacher.title}}" class="muted teacher-title">{{teacher.title}}</view>
+          <view wx:if="{{institution}}" class="institution">
+            <image
+              wx:if="{{institution.logoUrl}}"
+              class="institution-logo"
+              src="{{institution.logoUrl}}"
+              mode="aspectFit"
+            />
+            <text>{{institution.name}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{teacher.tagline}}" class="tagline">{{teacher.tagline}}</view>
+
+      <view wx:if="{{teacher.specialties.length}}" class="specialties">
+        <text wx:for="{{teacher.specialties}}" wx:for-item="spec" wx:key="*this" class="chip">{{spec}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{bioBlocks.length}}" class="card bio">
+      <block-renderer blocks="{{bioBlocks}}" />
+    </view>
+
+    <view wx:if="{{teacher.wechatQrUrl}}" class="card qr-card">
+      <view class="qr-title">加老师微信</view>
+      <view class="muted qr-hint">微信扫一扫，添加老师了解更多课程信息。</view>
+      <image class="qr-image" src="{{teacher.wechatQrUrl}}" mode="aspectFit" bindtap="previewQr" />
+    </view>
+  </block>
+</view>

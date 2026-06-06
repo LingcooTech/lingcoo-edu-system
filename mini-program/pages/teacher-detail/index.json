@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "老师详情",
+  "usingComponents": {
+    "block-renderer": "../../components/block-renderer/index"
+  }
+}

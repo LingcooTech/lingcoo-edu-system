@@ -24,6 +24,7 @@ import { ReportsPage } from '@/pages/ReportsPage';
 import { SchedulePage } from '@/pages/SchedulePage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { StudentsPage } from '@/pages/StudentsPage';
+import { TeacherResourcesPage } from '@/pages/TeacherResourcesPage';
 import { TeachersPage } from '@/pages/TeachersPage';
 import { TodoPage } from '@/pages/TodoPage';
 import { TrialsPage } from '@/pages/TrialsPage';
@@ -89,7 +90,7 @@ const router = createBrowserRouter(
         // 教学资源
         { path: 'resources/venues', element: <VenueResourcesPage /> },
         { path: 'resources/classrooms', element: <ClassroomsPage /> },
-        { path: 'resources/teachers', element: <TeachersPage /> },
+        { path: 'resources/teachers', element: <TeacherResourcesPage /> },
         { path: 'resources/courses', element: <CourseResourcesPage /> },
         { path: 'resources/packages', element: <PackagesPage /> },
         // 招生转化
