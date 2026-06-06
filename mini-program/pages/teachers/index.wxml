@@ -15,7 +15,10 @@
       class="tab {{activeTab === item.id ? 'tab-active' : ''}}"
       data-id="{{item.id}}"
       bindtap="onTabTap"
-    >{{item.name}}</view>
+    >
+      <image wx:if="{{item.logoUrl}}" class="tab-logo" src="{{item.logoUrl}}" mode="aspectFit" />
+      <text wx:else>{{item.name}}</text>
+    </view>
   </scroll-view>
 
   <view wx:if="{{loading}}" class="loading">加载中...</view>
@@ -33,6 +36,15 @@
         <view class="teacher-main">
           <view class="teacher-name">{{item.name}}</view>
           <view wx:if="{{item.title}}" class="muted teacher-title">{{item.title}}</view>
+          <view wx:if="{{item.institutionName || item.institutionLogoUrl}}" class="institution-mark">
+            <image
+              wx:if="{{item.institutionLogoUrl}}"
+              class="institution-logo"
+              src="{{item.institutionLogoUrl}}"
+              mode="aspectFit"
+            />
+            <text wx:else>{{item.institutionName}}</text>
+          </view>
         </view>
       </view>
 

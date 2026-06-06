@@ -23,7 +23,7 @@
               src="{{institution.logoUrl}}"
               mode="aspectFit"
             />
-            <text>{{institution.name}}</text>
+            <text wx:else>{{institution.name}}</text>
           </view>
         </view>
       </view>
@@ -35,7 +35,18 @@
       </view>
     </view>
 
+    <view wx:if="{{resumeHighlights.length}}" class="highlight-section">
+      <view class="section-title">履历重点</view>
+      <view class="highlight-list">
+        <view wx:for="{{resumeHighlights}}" wx:key="label" class="highlight-card">
+          <view class="highlight-label">{{item.label}}</view>
+          <view class="highlight-text">{{item.text}}</view>
+        </view>
+      </view>
+    </view>
+
     <view wx:if="{{bioBlocks.length}}" class="card bio">
+      <view class="section-title bio-title">教师简历</view>
       <block-renderer blocks="{{bioBlocks}}" />
     </view>
 

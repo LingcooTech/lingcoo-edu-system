@@ -7,13 +7,18 @@ import {
 
 const ALL_TAB = 'all';
 
+type TeacherCard = PublicTeacher & {
+  institutionName?: string;
+  institutionLogoUrl?: string | null;
+};
+
 Page({
   data: {
     loading: true,
-    teachers: [] as PublicTeacher[],
+    teachers: [] as TeacherCard[],
     tabs: [] as PublicInstitution[],
     activeTab: ALL_TAB,
-    visibleTeachers: [] as PublicTeacher[],
+    visibleTeachers: [] as TeacherCard[],
   },
 
   onLoad() {
@@ -37,7 +42,20 @@ Page({
       const tabs = institutions.filter((inst) =>
         teachers.some((teacher) => teacher.institutionId === inst.id),
       );
-      this.setData({ loading: false, teachers, tabs });
+      const institutionById = new Map(
+        institutions.map((institution) => [institution.id, institution]),
+      );
+      const teacherCards = teachers.map((teacher) => {
+        const institution = teacher.institutionId
+          ? institutionById.get(teacher.institutionId)
+          : undefined;
+        return {
+          ...teacher,
+          institutionName: institution?.name,
+          institutionLogoUrl: institution?.logoUrl,
+        };
+      });
+      this.setData({ loading: false, teachers: teacherCards, tabs });
       this.applyTab(ALL_TAB);
     } catch (error) {
       this.setData({ loading: false, teachers: [], tabs: [], visibleTeachers: [] });
@@ -53,7 +71,7 @@ Page({
   },
 
   applyTab(activeTab: string) {
-    const teachers = this.data.teachers as PublicTeacher[];
+    const teachers = this.data.teachers as TeacherCard[];
     const visibleTeachers =
       activeTab === ALL_TAB
         ? teachers
