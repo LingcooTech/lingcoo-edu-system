@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as organizationRepo from '../../db/repositories/organization.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
+import { readBusinessModel } from '../../lib/business-model.js';
 import type { AppModule } from '../types.js';
 
 const courseSchema = z.object({
@@ -11,6 +14,15 @@ const courseSchema = z.object({
   category: z.string().min(1),
   ageRange: z.string().min(1),
   durationMinutes: z.number().int().positive(),
+  providerInstitutionId: z.string().uuid().nullable().optional(),
+  defaultTeacherId: z.string().uuid().nullable().optional(),
+  teachingLocationLabel: z.string().max(200).nullable().optional(),
+  paymentReceiverType: z.enum(['platform', 'provider', 'other']).default('platform'),
+  paymentReceiverInstitutionId: z.string().uuid().nullable().optional(),
+  paymentReceiverName: z.string().max(160).nullable().optional(),
+  trialDescription: z.string().default(''),
+  reservationNotice: z.string().default(''),
+  onlineSalesEnabled: z.boolean().default(true),
   summary: z.string().default(''),
   content: z.string().default(''),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
@@ -112,8 +124,28 @@ export const catalogModule: AppModule = {
       if (!course) {
         throw Object.assign(new Error('Course not found'), { statusCode: 404 });
       }
-      const coursePackages = await packagesRepo.listActivePackagesForCourse(app.db, course.id);
-      return { course, coursePackages };
+      const [
+        coursePackages,
+        organization,
+        providerInstitution,
+        defaultTeacher,
+        paymentReceiverInstitution,
+      ] = await Promise.all([
+        packagesRepo.listActivePackagesForCourse(app.db, course.id),
+        organizationRepo.requireOrganization(app.db),
+        teachingRepo.findInstitution(app.db, course.providerInstitutionId),
+        teachingRepo.findTeacher(app.db, course.defaultTeacherId),
+        teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),
+      ]);
+      const businessModel = readBusinessModel(organization.settings);
+      return {
+        course,
+        coursePackages: businessModel.packagePriceDisplayEnabled ? coursePackages : [],
+        providerInstitution,
+        defaultTeacher,
+        paymentReceiverInstitution,
+        businessModel,
+      };
     });
   },
 };

@@ -7,6 +7,7 @@ import {
   CheckSquare,
   ClipboardCheck,
   DoorOpen,
+  FileText,
   GraduationCap,
   Home,
   LayoutDashboard,
@@ -81,6 +82,7 @@ export const adminSections = [
     icon: BarChart3,
     items: [
       { key: 'orders', label: '订单收款', path: '/operations/orders', icon: ReceiptText },
+      { key: 'contracts', label: '正式课程档案', path: '/operations/contracts', icon: FileText },
       { key: 'lessons', label: '课时账户', path: '/operations/lessons', icon: BarChart3 },
       { key: 'accounts', label: '用户账号', path: '/operations/accounts', icon: ShieldCheck },
     ],
@@ -168,7 +170,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   institutions: {
     eyebrow: 'Resource',
-    title: '机构',
+    title: '合作方',
   },
   classrooms: {
     eyebrow: 'Resource',
@@ -181,6 +183,10 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   orders: {
     eyebrow: 'Operations',
     title: '订单收款',
+  },
+  contracts: {
+    eyebrow: 'Operations',
+    title: '正式课程档案',
   },
   settings: {
     eyebrow: 'System',

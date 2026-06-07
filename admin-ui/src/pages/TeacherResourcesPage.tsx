@@ -22,7 +22,7 @@ export function TeacherResourcesPage() {
           className={tab === 'institutions' ? 'btn btn-primary' : 'btn btn-secondary'}
           onClick={() => setTab('institutions')}
         >
-          机构
+          合作方
         </button>
       </div>
       {tab === 'teachers' ? <TeachersPage embedded /> : <InstitutionsPage embedded />}

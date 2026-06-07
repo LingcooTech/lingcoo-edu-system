@@ -24,6 +24,9 @@ function isLiveProvider(provider: string): provider is LivePaymentProviderCode {
 }
 
 function buildOrderSubject(order: Order) {
+  if (order.orderType === 'seat_reservation') {
+    return `试听席位保留费 ${order.orderNo}`;
+  }
   return `课时包订单 ${order.orderNo}（${order.lessonCount} 课时）`;
 }
 
@@ -317,6 +320,7 @@ export class PaymentService {
     if (!order.accountId) {
       return;
     }
+    const isSeatReservation = order.orderType === 'seat_reservation';
 
     await new NotificationsService(this.app.db).create({
       recipientType: 'parent',
@@ -324,7 +328,9 @@ export class PaymentService {
       category: 'payment',
       level: 'success',
       title: '支付成功',
-      body: `订单 ${order.orderNo} 已支付，${order.lessonCount} 课时已到账。`,
+      body: isSeatReservation
+        ? `订单 ${order.orderNo} 已支付，试听席位已保留。`
+        : `订单 ${order.orderNo} 已支付，${order.lessonCount} 课时已到账。`,
       ctaLabel: '查看订单',
       ctaUrl: '/account',
       sourceEventName: 'payment.paid',
@@ -353,7 +359,12 @@ export class PaymentService {
         data: {
           character_string1: { value: order.orderNo },
           amount2: { value: formatAmount(order.amount) },
-          thing3: { value: `${order.lessonCount} 课时已到账` },
+          thing3: {
+            value:
+              order.orderType === 'seat_reservation'
+                ? '试听席位已保留'
+                : `${order.lessonCount} 课时已到账`,
+          },
           time4: { value: formatMessageTime(order.paidAt ?? new Date()) },
         },
       });

@@ -146,6 +146,13 @@
   font-size: 24rpx;
 }
 
+.trial-fee {
+  margin-top: 10rpx;
+  color: #a15c12;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
 .course-summary {
   margin-top: 12rpx;
 }

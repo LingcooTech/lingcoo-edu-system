@@ -113,6 +113,41 @@
       "when": 1780747685394,
       "tag": "0015_freezing_outlaw_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1780800000000,
+      "tag": "0016_business_model_switch",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1780800100000,
+      "tag": "0017_seat_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1780800200000,
+      "tag": "0018_seat_reservation_reschedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1780800300000,
+      "tag": "0019_settlement_batches",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1780800400000,
+      "tag": "0020_course_contracts",
+      "breakpoints": true
     }
   ]
 }

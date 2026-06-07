@@ -189,7 +189,7 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? '编辑课时包' : '新增课时包'}
-        description="课时包是家长端购买的产品。课程只通过课时包售卖，价格与课时数仅在此定义。"
+        description="课时包可用于线上售卖，也可用于线下收款后手动添加课时；公开端是否购买由业务模式控制。"
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>

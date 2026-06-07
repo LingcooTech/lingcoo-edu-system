@@ -10,7 +10,7 @@ import {
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, money } from '@/lib/utils';
 
 const initialForm = {
   guardianName: '',
@@ -46,6 +46,23 @@ export function CampaignLandingPage() {
     setSubmitting(true);
     setError('');
     try {
+      const selectedSession = payload.trialSessions.find(
+        (session) => session.id === form.trialSessionId,
+      );
+      if (selectedSession && selectedSession.reservationFeeAmount > 0) {
+        navigate(`/trials/${selectedSession.id}`, {
+          state: {
+            trialRegistration: {
+              guardianName: form.guardianName,
+              phone: form.phone,
+              studentName: form.studentName,
+              grade: form.grade,
+            },
+          },
+        });
+        return;
+      }
+
       await submitCampaignParticipation(payload.campaign.code, {
         guardianName: form.guardianName,
         phone: form.phone,
@@ -71,7 +88,7 @@ export function CampaignLandingPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="container-narrow py-12 text-sm text-muted">加载中…</div>
+        <div className="container-narrow text-muted py-12 text-sm">加载中…</div>
       </Layout>
     );
   }
@@ -81,13 +98,21 @@ export function CampaignLandingPage() {
       <Layout>
         <div className="container-narrow py-12 text-center">
           <p className="text-ink-soft text-sm">活动不存在或已结束。</p>
-          <Link to="/" className="pwbtn pwbtn-outline mt-4">返回首页</Link>
+          <Link to="/" className="pwbtn pwbtn-outline mt-4">
+            返回首页
+          </Link>
         </div>
       </Layout>
     );
   }
 
   const profile = payload.organization.publicProfile;
+  const selectedSession = payload.trialSessions.find(
+    (session) => session.id === form.trialSessionId,
+  );
+  const selectedRequiresReservationFee = Boolean(
+    selectedSession?.reservationFeeAmount && selectedSession.reservationFeeAmount > 0,
+  );
 
   return (
     <Layout>
@@ -104,13 +129,22 @@ export function CampaignLandingPage() {
                 : profile.bannerSubtitle}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
-              {(payload.course ? [payload.course.category, payload.course.ageRange] : profile.highlights).map((item) => (
-                <span key={item} className="chip">{item}</span>
+              {(payload.course
+                ? [payload.course.category, payload.course.ageRange]
+                : profile.highlights
+              ).map((item) => (
+                <span key={item} className="chip">
+                  {item}
+                </span>
               ))}
             </div>
           </div>
           <div className="hero-media">
-            <img src={profile.bannerImageUrl} alt={payload.campaign.name} className="h-full w-full object-cover" />
+            <img
+              src={profile.bannerImageUrl}
+              alt={payload.campaign.name}
+              className="h-full w-full object-cover"
+            />
           </div>
         </div>
       </section>
@@ -127,10 +161,19 @@ export function CampaignLandingPage() {
             <div className="mt-3 grid gap-3">
               {payload.trialSessions.length ? (
                 payload.trialSessions.map((session) => (
-                  <label key={session.id} className="flex cursor-pointer items-center justify-between rounded-2xl border border-line p-4">
+                  <label
+                    key={session.id}
+                    className="border-line flex cursor-pointer items-center justify-between rounded-2xl border p-4"
+                  >
                     <span>
-                      <span className="block text-sm font-semibold text-ink">{session.title}</span>
-                      <span className="mt-1 block text-xs text-muted">{formatDateTime(session.startsAt)} · {session.bookedCount}/{session.capacity}</span>
+                      <span className="text-ink block text-sm font-semibold">{session.title}</span>
+                      <span className="text-muted mt-1 block text-xs">
+                        {formatDateTime(session.startsAt)} · {session.bookedCount}/
+                        {session.capacity}
+                        {session.reservationFeeAmount > 0
+                          ? ` · ${money(session.reservationFeeAmount)}席位保留费`
+                          : ''}
+                      </span>
                     </span>
                     <input
                       type="radio"
@@ -142,7 +185,9 @@ export function CampaignLandingPage() {
                   </label>
                 ))
               ) : (
-                <p className="text-muted text-sm">当前活动不绑定固定试听课，提交后老师会电话确认合适时间。</p>
+                <p className="text-muted text-sm">
+                  当前活动不绑定固定试听课，提交后老师会电话确认合适时间。
+                </p>
               )}
             </div>
           </div>
@@ -152,16 +197,45 @@ export function CampaignLandingPage() {
           <div>
             <h2 className="text-ink text-lg font-semibold">提交报名</h2>
             <p className="text-muted mt-1 text-xs">
-              {form.trialSessionId ? '提交后进入预约试听阶段。' : '提交后进入待联系阶段。'}
+              {selectedRequiresReservationFee
+                ? '提交后进入席位保留费支付页。'
+                : form.trialSessionId
+                  ? '提交后进入预约试听阶段。'
+                  : '提交后进入待联系阶段。'}
             </p>
           </div>
-          <input className={inputClass} placeholder="家长姓名" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} required />
-          <input className={inputClass} placeholder="手机号" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
-          <input className={inputClass} placeholder="孩子姓名" value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })} required />
-          <input className={inputClass} placeholder="年级 / 年龄" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} required />
+          <input
+            className={inputClass}
+            placeholder="家长姓名"
+            value={form.guardianName}
+            onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
+            required
+          />
+          <input
+            className={inputClass}
+            placeholder="手机号"
+            inputMode="tel"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            required
+          />
+          <input
+            className={inputClass}
+            placeholder="孩子姓名"
+            value={form.studentName}
+            onChange={(e) => setForm({ ...form, studentName: e.target.value })}
+            required
+          />
+          <input
+            className={inputClass}
+            placeholder="年级 / 年龄"
+            value={form.grade}
+            onChange={(e) => setForm({ ...form, grade: e.target.value })}
+            required
+          />
           {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
           <button type="submit" className="pwbtn pwbtn-primary w-full" disabled={submitting}>
-            {submitting ? '提交中...' : '立即预约'}
+            {submitting ? '提交中...' : selectedRequiresReservationFee ? '去保留名额' : '立即预约'}
           </button>
         </form>
       </section>

@@ -9,6 +9,15 @@ export interface Course {
   category: string;
   ageRange: string;
   durationMinutes: number;
+  providerInstitutionId?: string | null;
+  defaultTeacherId?: string | null;
+  teachingLocationLabel?: string | null;
+  paymentReceiverType?: 'platform' | 'provider' | 'other';
+  paymentReceiverInstitutionId?: string | null;
+  paymentReceiverName?: string | null;
+  trialDescription?: string;
+  reservationNotice?: string;
+  onlineSalesEnabled?: boolean;
   packageCount?: number;
   startingPriceAmount?: number | null;
   summary: string;
@@ -31,6 +40,18 @@ export interface TrialSession {
   endsAt: string;
   capacity: number;
   bookedCount: number;
+  reservationFeeAmount: number;
+  reservationNotice: string;
+}
+
+export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+
+export interface BusinessModelSettings {
+  mode: BusinessMode;
+  onlinePackageSalesEnabled: boolean;
+  manualPackageGrantEnabled: boolean;
+  packagePriceDisplayEnabled: boolean;
+  seatReservationFeeEnabled: boolean;
 }
 
 export interface Organization {
@@ -57,6 +78,7 @@ export interface Organization {
     businessHours: string;
     bodyBlocks?: Block[];
   };
+  businessModel: BusinessModelSettings;
   publicSite?: {
     navigation: Array<{
       label: string;
@@ -100,6 +122,10 @@ export interface HomePayload {
 export interface CourseDetail {
   course: Course;
   coursePackages: CoursePackage[];
+  providerInstitution?: PublicInstitution | null;
+  defaultTeacher?: PublicTeacher | null;
+  paymentReceiverInstitution?: PublicInstitution | null;
+  businessModel: BusinessModelSettings;
 }
 
 export interface CampaignLandingPayload {
@@ -119,6 +145,13 @@ export interface CampaignLandingPayload {
   organization: Organization;
 }
 
+export interface TrialDetail {
+  trialSession: TrialSession;
+  course: Course;
+  campus: { id: string; name: string; address: string | null } | null;
+  organization: Organization;
+}
+
 export interface TrialRegistrationInput {
   guardianName: string;
   phone: string;
@@ -130,6 +163,34 @@ export interface TrialRegistrationInput {
   campaign?: string;
   course?: string;
   medium?: string;
+}
+
+export interface SeatReservation {
+  id: string;
+  orderNo: string;
+  courseId?: string | null;
+  trialSessionId?: string | null;
+  originalTrialSessionId?: string | null;
+  guardianName: string;
+  phone: string;
+  studentName: string;
+  grade: string;
+  reservationFeeAmount: number;
+  reservationStatus: string;
+  paymentStatus: string;
+  checkInStatus: string;
+  rescheduleCount: number;
+  cancelBefore?: string | null;
+  rescheduledAt?: string | null;
+  createdAt: string;
+}
+
+export interface ParentSeatReservation extends SeatReservation {
+  course?: Course | null;
+  trialSession?: TrialSession | null;
+  campus?: { id: string; name: string; address?: string | null } | null;
+  canReschedule: boolean;
+  rescheduleOptions: TrialSession[];
 }
 
 export interface CreateOrderInput {
@@ -232,6 +293,7 @@ export interface ParentOrder {
   courseId?: string | null;
   accountId?: string | null;
   packageId?: string | null;
+  orderType?: 'package_purchase' | 'seat_reservation' | 'manual_package_grant' | string;
   orderNo: string;
   amount: number;
   paidAmount: number;
@@ -367,6 +429,10 @@ export function fetchCampaignLanding(code: string): Promise<CampaignLandingPaylo
   return request<CampaignLandingPayload>(`/public/campaigns/${encodeURIComponent(code)}`);
 }
 
+export function fetchTrialSession(id: string): Promise<TrialDetail> {
+  return request<TrialDetail>(`/public/trial-sessions/${encodeURIComponent(id)}`);
+}
+
 export async function fetchPublicTeachers(): Promise<PublicTeacher[]> {
   return (await request<{ teachers: PublicTeacher[] }>('/public/teachers')).teachers;
 }
@@ -400,6 +466,38 @@ export function submitTrialRegistration(
     method: 'POST',
     data: input,
   });
+}
+
+export function createSeatReservation(
+  input: Omit<TrialRegistrationInput, 'courseId'> & { trialSessionId: string },
+): Promise<{ seatReservation: SeatReservation; order: ParentOrder; message: string }> {
+  return request('/public/seat-reservations', {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export async function fetchParentSeatReservations(): Promise<ParentSeatReservation[]> {
+  return (
+    await request<{ seatReservations: ParentSeatReservation[] }>('/public/me/seat-reservations')
+  ).seatReservations;
+}
+
+export function rescheduleParentSeatReservation(
+  seatReservationId: string,
+  trialSessionId: string,
+): Promise<{
+  seatReservation: SeatReservation;
+  previousTrialSession?: TrialSession | null;
+  trialSession: TrialSession;
+}> {
+  return request(
+    `/public/me/seat-reservations/${encodeURIComponent(seatReservationId)}/reschedule`,
+    {
+      method: 'POST',
+      data: { trialSessionId },
+    },
+  );
 }
 
 export async function fetchWechatMiniSubscribeTemplates(): Promise<WechatMiniSubscribeTemplate[]> {

@@ -46,6 +46,22 @@
   padding: 28rpx;
 }
 
+.info-card {
+  display: grid;
+  gap: 14rpx;
+  padding: 28rpx;
+}
+
+.info-row {
+  color: #4f5a53;
+  font-size: 25rpx;
+  line-height: 1.5;
+}
+
+.notice-block {
+  margin-top: 10rpx;
+}
+
 .package-list {
   display: grid;
   gap: 18rpx;

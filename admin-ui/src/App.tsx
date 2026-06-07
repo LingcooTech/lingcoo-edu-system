@@ -8,6 +8,7 @@ import { AttendancePage } from '@/pages/AttendancePage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
+import { CourseContractsPage } from '@/pages/CourseContractsPage';
 import { CourseResourcesPage } from '@/pages/CourseResourcesPage';
 import { CoursesPage } from '@/pages/CoursesPage';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -104,6 +105,7 @@ const router = createBrowserRouter(
         { path: 'academic/attendance', element: <AttendancePage /> },
         // 运营管理
         { path: 'operations/orders', element: <OrdersPage /> },
+        { path: 'operations/contracts', element: <CourseContractsPage /> },
         { path: 'operations/lessons', element: <LessonsPage /> },
         { path: 'operations/accounts', element: <AccountsPage /> },
         { path: 'operations/guardians', element: <GuardiansPage /> },
@@ -126,6 +128,7 @@ const router = createBrowserRouter(
         { path: 'classrooms', element: <ClassroomsPage /> },
         { path: 'campuses', element: <CampusesPage /> },
         { path: 'orders', element: <OrdersPage /> },
+        { path: 'contracts', element: <CourseContractsPage /> },
         { path: 'settings', element: <SettingsPage /> },
         { path: 'accounts', element: <AccountsPage /> },
       ],

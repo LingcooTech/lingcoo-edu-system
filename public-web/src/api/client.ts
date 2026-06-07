@@ -11,6 +11,15 @@ export interface Course {
   category: string;
   ageRange: string;
   durationMinutes: number;
+  providerInstitutionId?: string | null;
+  defaultTeacherId?: string | null;
+  teachingLocationLabel?: string | null;
+  paymentReceiverType?: 'platform' | 'provider' | 'other';
+  paymentReceiverInstitutionId?: string | null;
+  paymentReceiverName?: string | null;
+  trialDescription?: string;
+  reservationNotice?: string;
+  onlineSalesEnabled?: boolean;
   packageCount?: number;
   startingPriceAmount?: number | null;
   summary: string;
@@ -25,6 +34,18 @@ export interface TrialSession {
   endsAt: string;
   capacity: number;
   bookedCount: number;
+  reservationFeeAmount: number;
+  reservationNotice: string;
+}
+
+export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+
+export interface BusinessModelSettings {
+  mode: BusinessMode;
+  onlinePackageSalesEnabled: boolean;
+  manualPackageGrantEnabled: boolean;
+  packagePriceDisplayEnabled: boolean;
+  seatReservationFeeEnabled: boolean;
 }
 
 export interface HomePayload {
@@ -69,6 +90,7 @@ export interface HomePayload {
       icpNumber: string;
       icpUrl: string;
     };
+    businessModel: BusinessModelSettings;
     branding: {
       fullLogoUrl?: string;
       squareLogoUrl?: string;
@@ -204,10 +226,14 @@ export interface ParentLessonAccount {
 export interface ParentOrder {
   id: string;
   orderNo: string;
+  orderType?: string;
   amount: number;
+  paidAmount?: number;
   status: string;
   lessonCount: number;
   createdAt: string;
+  course?: Course | null;
+  package?: CoursePackage | null;
 }
 
 export interface CheckoutInfo {
@@ -263,6 +289,10 @@ export async function fetchCourses() {
 export interface CourseDetail {
   course: Course;
   coursePackages: CoursePackage[];
+  providerInstitution?: PublicInstitution | null;
+  defaultTeacher?: PublicTeacher | null;
+  paymentReceiverInstitution?: PublicInstitution | null;
+  businessModel: BusinessModelSettings;
 }
 
 export async function fetchCourse(slug: string) {
@@ -324,6 +354,69 @@ export async function submitTrialRegistration(input: TrialRegistrationInput) {
   return publicApi<{ message: string }>('/public/trial-registrations', {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export interface SeatReservation {
+  id: string;
+  orderNo: string;
+  courseId?: string | null;
+  trialSessionId?: string | null;
+  originalTrialSessionId?: string | null;
+  guardianName: string;
+  phone: string;
+  studentName: string;
+  grade: string;
+  reservationFeeAmount: number;
+  reservationStatus: string;
+  paymentStatus: string;
+  checkInStatus: string;
+  rescheduleCount: number;
+  cancelBefore?: string | null;
+  rescheduledAt?: string | null;
+  createdAt: string;
+}
+
+export interface ParentSeatReservation extends SeatReservation {
+  course?: Course | null;
+  trialSession?: TrialSession | null;
+  campus?: { id: string; name: string; address?: string | null } | null;
+  canReschedule: boolean;
+  rescheduleOptions: TrialSession[];
+}
+
+export async function createSeatReservation(
+  input: Omit<TrialRegistrationInput, 'courseId'> & {
+    trialSessionId: string;
+  },
+) {
+  return publicApi<{
+    seatReservation: SeatReservation;
+    order: ParentOrder;
+    message: string;
+  }>('/public/seat-reservations', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchParentSeatReservations() {
+  return (
+    await publicApi<{ seatReservations: ParentSeatReservation[] }>('/public/me/seat-reservations')
+  ).seatReservations;
+}
+
+export async function rescheduleParentSeatReservation(
+  seatReservationId: string,
+  trialSessionId: string,
+) {
+  return publicApi<{
+    seatReservation: SeatReservation;
+    previousTrialSession?: TrialSession | null;
+    trialSession: TrialSession;
+  }>(`/public/me/seat-reservations/${seatReservationId}/reschedule`, {
+    method: 'POST',
+    body: JSON.stringify({ trialSessionId }),
   });
 }
 

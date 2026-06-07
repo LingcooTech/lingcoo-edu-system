@@ -33,6 +33,9 @@ const statusLabels: Record<string, string> = {
   recruiting: '招生中',
   paused: '已暂停',
   pending: '待处理',
+  pending_payment: '待支付',
+  reserved: '已保留',
+  unpaid: '未支付',
   paid: '已支付',
   refunded: '已退款',
   new: '待联系',
@@ -47,6 +50,11 @@ const statusLabels: Record<string, string> = {
   absent: '缺勤',
   makeup: '补课',
   trial: '试听',
+  checked_in: '已签到',
+  no_show: '未到课',
+  settled: '已结算',
+  unsettled: '未结算',
+  voided: '已作废',
 };
 
 export function statusLabel(status: string): string {
@@ -78,14 +86,37 @@ export function StatusPill({
 
 export function statusToTone(status: string): Tone {
   if (
-    ['active', 'paid', 'course_delivery', 'published', 'completed', 'open', 'present'].includes(
-      status,
-    )
+    [
+      'active',
+      'paid',
+      'course_delivery',
+      'published',
+      'completed',
+      'open',
+      'present',
+      'settled',
+    ].includes(status) ||
+    ['reserved', 'checked_in'].includes(status)
   )
     return 'ok';
-  if (['new', 'trial_booked', 'follow_up', 'scheduled', 'pending', 'recruiting'].includes(status))
+  if (
+    [
+      'new',
+      'trial_booked',
+      'follow_up',
+      'scheduled',
+      'pending',
+      'pending_payment',
+      'unpaid',
+      'recruiting',
+      'unsettled',
+    ].includes(status)
+  )
     return 'warn';
-  if (['invalid', 'cancelled', 'archived', 'absent', 'refunded'].includes(status)) return 'danger';
+  if (
+    ['invalid', 'cancelled', 'archived', 'absent', 'refunded', 'no_show', 'voided'].includes(status)
+  )
+    return 'danger';
   if (['contacted', 'trial_attended'].includes(status)) return 'info';
   return 'neutral';
 }

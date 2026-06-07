@@ -32,6 +32,22 @@ export const trialSessionStatusEnum = pgEnum('trial_session_status', [
   'closed',
   'cancelled',
 ]);
+export const seatReservationStatusEnum = pgEnum('seat_reservation_status', [
+  'pending_payment',
+  'reserved',
+  'cancelled',
+  'expired',
+]);
+export const seatReservationPaymentStatusEnum = pgEnum('seat_reservation_payment_status', [
+  'unpaid',
+  'paid',
+  'refunded',
+]);
+export const seatReservationCheckInStatusEnum = pgEnum('seat_reservation_check_in_status', [
+  'pending',
+  'checked_in',
+  'no_show',
+]);
 export const studentStatusEnum = pgEnum('student_status', ['active', 'inactive']);
 export const classStatusEnum = pgEnum('class_status', [
   'recruiting',
@@ -62,7 +78,23 @@ export const lessonTransactionTypeEnum = pgEnum('lesson_transaction_type', [
   'refund',
   'adjustment',
 ]);
+export const paymentReceiverTypeEnum = pgEnum('payment_receiver_type', [
+  'platform',
+  'provider',
+  'other',
+]);
+export const orderTypeEnum = pgEnum('order_type', [
+  'package_purchase',
+  'seat_reservation',
+  'manual_package_grant',
+]);
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'refunded', 'cancelled']);
+export const settlementBatchStatusEnum = pgEnum('settlement_batch_status', ['settled', 'voided']);
+export const courseContractStatusEnum = pgEnum('course_contract_status', [
+  'active',
+  'completed',
+  'cancelled',
+]);
 export const auditOutcomeEnum = pgEnum('audit_outcome', ['succeeded', 'failed']);
 
 // Unified identity: a single account table + role. One login endpoint, the JWT
@@ -177,6 +209,24 @@ export const courses = pgTable(
     category: varchar('category', { length: 80 }).notNull(),
     ageRange: varchar('age_range', { length: 120 }).notNull(),
     durationMinutes: integer('duration_minutes').notNull().default(60),
+    providerInstitutionId: uuid('provider_institution_id').references(() => institutions.id, {
+      onDelete: 'set null',
+    }),
+    defaultTeacherId: uuid('default_teacher_id').references(() => teachers.id, {
+      onDelete: 'set null',
+    }),
+    teachingLocationLabel: varchar('teaching_location_label', { length: 200 }),
+    paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
+      .notNull()
+      .default('platform'),
+    paymentReceiverInstitutionId: uuid('payment_receiver_institution_id').references(
+      () => institutions.id,
+      { onDelete: 'set null' },
+    ),
+    paymentReceiverName: varchar('payment_receiver_name', { length: 160 }),
+    trialDescription: text('trial_description').notNull().default(''),
+    reservationNotice: text('reservation_notice').notNull().default(''),
+    onlineSalesEnabled: boolean('online_sales_enabled').notNull().default(true),
     summary: text('summary').notNull().default(''),
     content: text('content').notNull().default(''),
     status: courseStatusEnum('status').notNull().default('draft'),
@@ -204,6 +254,8 @@ export const trialSessions = pgTable(
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
     capacity: integer('capacity').notNull().default(8),
     bookedCount: integer('booked_count').notNull().default(0),
+    reservationFeeAmount: integer('reservation_fee_amount').notNull().default(0),
+    reservationNotice: text('reservation_notice').notNull().default(''),
     status: trialSessionStatusEnum('status').notNull().default('open'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -537,12 +589,23 @@ export const orders = pgTable(
     accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
     packageId: uuid('package_id').references(() => coursePackages.id, { onDelete: 'set null' }),
     orderNo: varchar('order_no', { length: 64 }).notNull().unique(),
+    orderType: orderTypeEnum('order_type').notNull().default('package_purchase'),
     amount: integer('amount').notNull(),
     paidAmount: integer('paid_amount').notNull().default(0),
     lessonCount: integer('lesson_count').notNull().default(0),
     currency: varchar('currency', { length: 8 }).notNull().default('CNY'),
     paymentProvider: varchar('payment_provider', { length: 40 }),
     providerOrderId: varchar('provider_order_id', { length: 120 }),
+    paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
+      .notNull()
+      .default('platform'),
+    paymentReceiverInstitutionId: uuid('payment_receiver_institution_id').references(
+      () => institutions.id,
+      { onDelete: 'set null' },
+    ),
+    paymentReceiverName: varchar('payment_receiver_name', { length: 160 }),
+    paymentMethod: varchar('payment_method', { length: 40 }),
+    offlinePaymentNote: text('offline_payment_note'),
     status: orderStatusEnum('status').notNull().default('pending'),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     source: varchar('source', { length: 80 }).notNull().default('unknown'),
@@ -557,6 +620,174 @@ export const orders = pgTable(
     accountIdx: index('orders_account_idx').on(table.accountId),
     channelIdx: index('orders_channel_idx').on(table.channelId),
     campaignIdx: index('orders_campaign_idx').on(table.campaignId),
+  }),
+);
+
+export const courseContracts = pgTable(
+  'course_contracts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'restrict' }),
+    courseId: uuid('course_id')
+      .notNull()
+      .references(() => courses.id, { onDelete: 'restrict' }),
+    classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+    packageId: uuid('package_id').references(() => coursePackages.id, { onDelete: 'set null' }),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+    contractNo: varchar('contract_no', { length: 64 }).notNull(),
+    title: varchar('title', { length: 200 }).notNull(),
+    lessonCount: integer('lesson_count').notNull(),
+    paidAmount: integer('paid_amount').notNull().default(0),
+    paymentMethod: varchar('payment_method', { length: 40 }),
+    paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
+      .notNull()
+      .default('platform'),
+    paymentReceiverInstitutionId: uuid('payment_receiver_institution_id').references(
+      () => institutions.id,
+      { onDelete: 'set null' },
+    ),
+    paymentReceiverName: varchar('payment_receiver_name', { length: 160 }),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    status: courseContractStatusEnum('status').notNull().default('active'),
+    note: text('note'),
+    createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    contractNoUnique: uniqueIndex('course_contracts_contract_no_idx').on(table.contractNo),
+    studentIdx: index('course_contracts_student_idx').on(table.studentId),
+    courseIdx: index('course_contracts_course_idx').on(table.courseId),
+    classIdx: index('course_contracts_class_idx').on(table.classId),
+    orderIdx: index('course_contracts_order_idx').on(table.orderId),
+    statusIdx: index('course_contracts_status_idx').on(table.status),
+  }),
+);
+
+export const courseContractPaymentRecords = pgTable(
+  'course_contract_payment_records',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    courseContractId: uuid('course_contract_id')
+      .notNull()
+      .references(() => courseContracts.id, { onDelete: 'cascade' }),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+    paidAmount: integer('paid_amount').notNull(),
+    paymentMethod: varchar('payment_method', { length: 40 }),
+    paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),
+    note: text('note'),
+    createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    contractIdx: index('course_contract_payment_records_contract_idx').on(table.courseContractId),
+    orderIdx: index('course_contract_payment_records_order_idx').on(table.orderId),
+  }),
+);
+
+export const seatReservations = pgTable(
+  'seat_reservations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+    orderNo: varchar('order_no', { length: 64 }).notNull(),
+    leadId: uuid('lead_id').references(() => leads.id, { onDelete: 'set null' }),
+    campusId: uuid('campus_id').references(() => campuses.id, { onDelete: 'set null' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    trialSessionId: uuid('trial_session_id').references(() => trialSessions.id, {
+      onDelete: 'set null',
+    }),
+    originalTrialSessionId: uuid('original_trial_session_id').references(() => trialSessions.id, {
+      onDelete: 'set null',
+    }),
+    guardianName: varchar('guardian_name', { length: 120 }).notNull(),
+    phone: varchar('phone', { length: 40 }).notNull(),
+    studentName: varchar('student_name', { length: 120 }).notNull(),
+    grade: varchar('grade', { length: 80 }).notNull(),
+    reservationFeeAmount: integer('reservation_fee_amount').notNull().default(0),
+    reservationStatus: seatReservationStatusEnum('reservation_status')
+      .notNull()
+      .default('pending_payment'),
+    paymentStatus: seatReservationPaymentStatusEnum('payment_status').notNull().default('unpaid'),
+    checkInStatus: seatReservationCheckInStatusEnum('check_in_status').notNull().default('pending'),
+    rescheduleCount: integer('reschedule_count').notNull().default(0),
+    cancelBefore: timestamp('cancel_before', { withTimezone: true }),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+    rescheduledAt: timestamp('rescheduled_at', { withTimezone: true }),
+    source: varchar('source', { length: 80 }).notNull().default('unknown'),
+    channelId: uuid('channel_id').references(() => channels.id, { onDelete: 'set null' }),
+    campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
+    medium: varchar('medium', { length: 40 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orderNoIdx: index('seat_reservations_order_no_idx').on(table.orderNo),
+    trialSessionIdx: index('seat_reservations_trial_session_idx').on(table.trialSessionId),
+    phoneIdx: index('seat_reservations_phone_idx').on(table.phone),
+  }),
+);
+
+export const settlementBatches = pgTable(
+  'settlement_batches',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
+      .notNull()
+      .default('platform'),
+    paymentReceiverInstitutionId: uuid('payment_receiver_institution_id').references(
+      () => institutions.id,
+      { onDelete: 'set null' },
+    ),
+    paymentReceiverName: varchar('payment_receiver_name', { length: 160 }).notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    orderCount: integer('order_count').notNull().default(0),
+    totalAmount: integer('total_amount').notNull().default(0),
+    status: settlementBatchStatusEnum('status').notNull().default('settled'),
+    note: text('note'),
+    createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    settledAt: timestamp('settled_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    receiverIdx: index('settlement_batches_receiver_idx').on(
+      table.paymentReceiverType,
+      table.paymentReceiverInstitutionId,
+      table.paymentReceiverName,
+    ),
+    statusIdx: index('settlement_batches_status_idx').on(table.status),
+    settledAtIdx: index('settlement_batches_settled_at_idx').on(table.settledAt),
+  }),
+);
+
+export const settlementBatchOrders = pgTable(
+  'settlement_batch_orders',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    settlementBatchId: uuid('settlement_batch_id')
+      .notNull()
+      .references(() => settlementBatches.id, { onDelete: 'cascade' }),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'restrict' }),
+    amount: integer('amount').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    batchIdx: index('settlement_batch_orders_batch_idx').on(table.settlementBatchId),
+    orderIdx: index('settlement_batch_orders_order_idx').on(table.orderId),
   }),
 );
 

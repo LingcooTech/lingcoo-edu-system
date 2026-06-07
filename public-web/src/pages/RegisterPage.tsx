@@ -11,7 +11,7 @@ import {
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { getAttribution } from '@/lib/attribution';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, money } from '@/lib/utils';
 
 const initialForm = {
   guardianName: '',
@@ -52,6 +52,21 @@ export function RegisterPage() {
     setSubmitting(true);
     setError('');
     try {
+      const selectedSession = sessions.find((session) => session.id === form.trialSessionId);
+      if (selectedSession && selectedSession.reservationFeeAmount > 0) {
+        navigate(`/trials/${selectedSession.id}`, {
+          state: {
+            trialRegistration: {
+              guardianName: form.guardianName,
+              phone: form.phone,
+              studentName: form.studentName,
+              grade: form.grade,
+            },
+          },
+        });
+        return;
+      }
+
       const attribution = getAttribution();
       await submitTrialRegistration({
         guardianName: form.guardianName,
@@ -135,13 +150,14 @@ export function RegisterPage() {
             {sessions.map((session) => (
               <option key={session.id} value={session.id}>
                 {session.title} · {formatDateTime(session.startsAt)}
+                {session.reservationFeeAmount > 0
+                  ? ` · ${money(session.reservationFeeAmount)}席位保留费`
+                  : ''}
               </option>
             ))}
           </select>
 
-          {error && (
-            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
-          )}
+          {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
           <button type="submit" className="pwbtn pwbtn-primary w-full" disabled={submitting}>
             {submitting ? '提交中...' : '提交预约'}

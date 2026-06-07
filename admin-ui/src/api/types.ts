@@ -18,6 +18,15 @@ export interface Course {
   category: string;
   ageRange: string;
   durationMinutes: number;
+  providerInstitutionId?: string | null;
+  defaultTeacherId?: string | null;
+  teachingLocationLabel?: string | null;
+  paymentReceiverType?: 'platform' | 'provider' | 'other';
+  paymentReceiverInstitutionId?: string | null;
+  paymentReceiverName?: string | null;
+  trialDescription?: string;
+  reservationNotice?: string;
+  onlineSalesEnabled?: boolean;
   status: string;
   summary: string;
   content?: string;
@@ -188,7 +197,34 @@ export interface TrialSession {
   endsAt: string;
   capacity: number;
   bookedCount: number;
+  reservationFeeAmount: number;
+  reservationNotice: string;
   status: string;
+}
+
+export interface SeatReservation {
+  id: string;
+  orderNo: string;
+  leadId?: string | null;
+  campusId?: string | null;
+  courseId?: string | null;
+  trialSessionId?: string | null;
+  originalTrialSessionId?: string | null;
+  guardianName: string;
+  phone: string;
+  studentName: string;
+  grade: string;
+  reservationFeeAmount: number;
+  reservationStatus: string;
+  paymentStatus: string;
+  checkInStatus: string;
+  rescheduleCount: number;
+  cancelBefore?: string | null;
+  checkedInAt?: string | null;
+  rescheduledAt?: string | null;
+  source: string;
+  medium?: string | null;
+  createdAt: string;
 }
 
 export interface Student {
@@ -252,13 +288,90 @@ export interface LessonAccount {
 export interface Order {
   id: string;
   orderNo: string;
+  orderType?: 'package_purchase' | 'seat_reservation' | 'manual_package_grant' | string;
   amount: number;
   paidAmount: number;
   lessonCount: number;
+  paymentReceiverType?: 'platform' | 'provider' | 'other' | string;
+  paymentReceiverInstitutionId?: string | null;
+  paymentReceiverName?: string | null;
+  paymentMethod?: string | null;
+  offlinePaymentNote?: string | null;
   status: string;
+  paidAt?: string | null;
   createdAt: string;
   student?: { name: string };
   course?: { name: string };
+  package?: { name: string; lessonCount: number; priceAmount: number };
+}
+
+export interface CourseContractPaymentRecord {
+  id: string;
+  courseContractId: string;
+  orderId?: string | null;
+  paidAmount: number;
+  paymentMethod?: string | null;
+  paidAt: string;
+  note?: string | null;
+  createdByAccountId?: string | null;
+  createdAt: string;
+}
+
+export interface CourseContract {
+  id: string;
+  studentId: string;
+  courseId: string;
+  classId?: string | null;
+  packageId?: string | null;
+  orderId?: string | null;
+  contractNo: string;
+  title: string;
+  lessonCount: number;
+  paidAmount: number;
+  paymentMethod?: string | null;
+  paymentReceiverType: 'platform' | 'provider' | 'other' | string;
+  paymentReceiverInstitutionId?: string | null;
+  paymentReceiverName?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  status: 'active' | 'completed' | 'cancelled' | string;
+  note?: string | null;
+  createdByAccountId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: Student;
+  course?: Course;
+  class?: ClassGroup;
+  package?: CoursePackage;
+  order?: Order;
+  paymentRecords: CourseContractPaymentRecord[];
+}
+
+export interface SettlementBatchOrder {
+  id: string;
+  settlementBatchId: string;
+  orderId: string;
+  amount: number;
+  createdAt: string;
+  order?: Order | null;
+}
+
+export interface SettlementBatch {
+  id: string;
+  paymentReceiverType: 'platform' | 'provider' | 'other' | string;
+  paymentReceiverInstitutionId?: string | null;
+  paymentReceiverName: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  orderCount: number;
+  totalAmount: number;
+  status: 'settled' | 'voided' | string;
+  note?: string | null;
+  createdByAccountId?: string | null;
+  settledAt: string;
+  voidedAt?: string | null;
+  createdAt: string;
+  orders: SettlementBatchOrder[];
 }
 
 export interface PaymentProviderItem {
@@ -333,6 +446,16 @@ export interface PublicSiteSettings {
   icpUrl: string;
 }
 
+export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+
+export interface BusinessModelSettings {
+  mode: BusinessMode;
+  onlinePackageSalesEnabled: boolean;
+  manualPackageGrantEnabled: boolean;
+  packagePriceDisplayEnabled: boolean;
+  seatReservationFeeEnabled: boolean;
+}
+
 export interface OrganizationSettings {
   id: string;
   name: string;
@@ -341,6 +464,7 @@ export interface OrganizationSettings {
   address: string | null;
   publicProfile: PublicProfile;
   publicSite: PublicSiteSettings;
+  businessModel: BusinessModelSettings;
   branding: OrganizationBranding;
 }
 

@@ -9,6 +9,9 @@ import {
   syncOrderPayment,
   type Course,
   type CoursePackage,
+  type BusinessModelSettings,
+  type PublicInstitution,
+  type PublicTeacher,
   type ParentOrder,
   type PaymentIntent,
 } from '../../services/api';
@@ -63,6 +66,15 @@ Page({
     loading: true,
     notFound: false,
     course: null as Course | null,
+    businessModel: null as BusinessModelSettings | null,
+    providerInstitution: null as PublicInstitution | null,
+    defaultTeacher: null as PublicTeacher | null,
+    paymentReceiverInstitution: null as PublicInstitution | null,
+    onlinePackageSalesAllowed: true,
+    providerLabel: '',
+    teacherLabel: '',
+    locationLabel: '',
+    receiverLabel: '',
     packages: [] as PackageItem[],
     contentBlocks: [] as Block[],
     showTrialForm: false,
@@ -89,9 +101,30 @@ Page({
     try {
       const payload = await fetchCourse(slug);
       wx.setNavigationBarTitle({ title: payload.course.name });
+      const onlinePackageSalesAllowed =
+        Boolean(payload.businessModel.onlinePackageSalesEnabled) &&
+        payload.businessModel.mode !== 'reservation_platform' &&
+        payload.course.onlineSalesEnabled !== false;
+      const receiverLabel =
+        payload.course.paymentReceiverName ||
+        payload.paymentReceiverInstitution?.name ||
+        (payload.course.paymentReceiverType === 'provider'
+          ? payload.providerInstitution?.name
+          : payload.course.paymentReceiverType === 'platform'
+            ? '平台'
+            : '');
       this.setData({
         loading: false,
         course: payload.course,
+        businessModel: payload.businessModel,
+        providerInstitution: payload.providerInstitution ?? null,
+        defaultTeacher: payload.defaultTeacher ?? null,
+        paymentReceiverInstitution: payload.paymentReceiverInstitution ?? null,
+        onlinePackageSalesAllowed,
+        providerLabel: payload.providerInstitution?.name || '平台自有 / 待确认',
+        teacherLabel: payload.defaultTeacher?.name || '场次确认',
+        locationLabel: payload.course.teachingLocationLabel || '到店确认',
+        receiverLabel,
         packages: payload.coursePackages.map((item) => ({ ...item, priceLabel: money(item.priceAmount) })),
         contentBlocks: parseBlocks(payload.course.content),
       });
@@ -109,6 +142,10 @@ Page({
   },
 
   onBuyTap(event: { currentTarget: { dataset: { id?: string } } }) {
+    if (!this.data.onlinePackageSalesAllowed) {
+      wx.showToast({ title: '请先预约试听，到店确认正式方案', icon: 'none' });
+      return;
+    }
     const packageId = event.currentTarget.dataset.id;
     const packages = this.data.packages as PackageItem[];
     const selectedPackage = packages.find((item: PackageItem) => item.id === packageId) ?? null;

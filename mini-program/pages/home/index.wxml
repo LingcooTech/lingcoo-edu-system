@@ -74,10 +74,11 @@
       <view class="eyebrow">Trial</view>
       <view class="section-title">本周公开课</view>
       <view wx:if="{{trialSessions.length}}" class="trial-list">
-        <view wx:for="{{trialSessions}}" wx:key="id" class="card trial-card">
+        <navigator wx:for="{{trialSessions}}" wx:key="id" class="card trial-card" url="/pages/trial-detail/index?id={{item.id}}">
           <view class="course-name">{{item.title}}</view>
           <view class="muted trial-meta">{{item.startsAtLabel}} · 已报名 {{item.bookedCount}}/{{item.capacity}}</view>
-        </view>
+          <view wx:if="{{item.reservationFeeLabel}}" class="trial-fee">{{item.reservationFeeLabel}}</view>
+        </navigator>
       </view>
       <view wx:else class="empty">近期暂无公开课，可直接预约心仪课程的试听。</view>
     </view>

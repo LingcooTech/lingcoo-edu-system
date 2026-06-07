@@ -7,6 +7,7 @@ import {
   createPaymentIntent,
   fetchCoursePackages,
   fetchPaymentProviders,
+  loadHome,
   mockPayOrder,
   syncPayment,
   type CheckoutInfo,
@@ -50,6 +51,7 @@ export function CheckoutPage() {
   const [step, setStep] = useState<Step>('select');
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [providers, setProviders] = useState<PaymentProviderStatus[]>(DEFAULT_PROVIDERS);
+  const [onlinePackageSalesAllowed, setOnlinePackageSalesAllowed] = useState(true);
   const [orderNo, setOrderNo] = useState('');
   const [checkout, setCheckout] = useState<CheckoutInfo | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,10 +63,17 @@ export function CheckoutPage() {
     Promise.all([
       fetchCoursePackages(),
       fetchPaymentProviders().catch(() => DEFAULT_PROVIDERS),
+      loadHome().catch(() => null),
     ])
-      .then(([packages, paymentProviders]) => {
+      .then(([packages, paymentProviders, home]) => {
         setPkg(packages.find((p) => p.id === packageId) ?? null);
         setProviders(paymentProviders);
+        const businessModel = home?.organization.businessModel;
+        setOnlinePackageSalesAllowed(
+          !businessModel ||
+            (businessModel.onlinePackageSalesEnabled &&
+              businessModel.mode !== 'reservation_platform'),
+        );
       })
       .finally(() => setLoading(false));
 
@@ -162,10 +171,12 @@ export function CheckoutPage() {
     return <main className="px-5 py-10 text-center text-sm text-slate-500">加载中...</main>;
   }
 
-  if (!pkg) {
+  if (!pkg || !onlinePackageSalesAllowed) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-10 text-center">
-        <p className="text-sm text-slate-500">课时包不存在或已下架。</p>
+        <p className="text-sm text-slate-500">
+          {!pkg ? '课时包不存在或已下架。' : '当前机构不支持线上购买课时包。'}
+        </p>
         <Link to="/" className="mt-4 inline-block text-sm font-medium text-blue-600">
           返回首页
         </Link>

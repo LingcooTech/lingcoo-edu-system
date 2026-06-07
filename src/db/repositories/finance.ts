@@ -11,6 +11,10 @@ export type Order = typeof schema.orders.$inferSelect;
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type DbOrTx = Database | Tx;
 
+function generateOrderNo() {
+  return `EDU${Date.now()}${randomBytes(2).toString('hex').toUpperCase()}`;
+}
+
 export async function listOrders(db: Database) {
   return db.select().from(schema.orders).orderBy(desc(schema.orders.createdAt));
 }
@@ -40,9 +44,7 @@ export async function sumPaidRevenue(db: Database) {
   const rows = await db
     .select({ paidAmount: schema.orders.paidAmount, status: schema.orders.status })
     .from(schema.orders);
-  return rows
-    .filter((row) => row.status === 'paid')
-    .reduce((sum, row) => sum + row.paidAmount, 0);
+  return rows.filter((row) => row.status === 'paid').reduce((sum, row) => sum + row.paidAmount, 0);
 }
 
 /**
@@ -55,23 +57,37 @@ export async function createOrder(
   input: {
     studentId: string;
     courseId: string;
+    packageId?: string | null;
+    orderType?: (typeof schema.orderTypeEnum.enumValues)[number];
     amount: number;
     paidAmount: number;
     lessonCount: number;
     status: (typeof schema.orderStatusEnum.enumValues)[number];
+    paymentReceiverType?: (typeof schema.paymentReceiverTypeEnum.enumValues)[number];
+    paymentReceiverInstitutionId?: string | null;
+    paymentReceiverName?: string | null;
+    paymentMethod?: string | null;
+    offlinePaymentNote?: string | null;
   },
 ) {
   return db.transaction(async (tx) => {
-    const orderNo = `EDU${Date.now()}`;
+    const orderNo = generateOrderNo();
     const [order] = await tx
       .insert(schema.orders)
       .values({
         studentId: input.studentId,
         courseId: input.courseId,
+        packageId: input.packageId ?? null,
         orderNo,
+        orderType: input.orderType ?? 'manual_package_grant',
         amount: input.amount,
         paidAmount: input.paidAmount,
         lessonCount: input.lessonCount,
+        paymentReceiverType: input.paymentReceiverType ?? 'platform',
+        paymentReceiverInstitutionId: input.paymentReceiverInstitutionId ?? null,
+        paymentReceiverName: input.paymentReceiverName ?? null,
+        paymentMethod: input.paymentMethod ?? null,
+        offlinePaymentNote: input.offlinePaymentNote ?? null,
         status: input.status,
         paidAt: input.status === 'paid' ? new Date() : null,
       })
@@ -111,9 +127,12 @@ export async function createPackageOrder(
     channelId?: string | null;
     campaignId?: string | null;
     medium?: string | null;
+    paymentReceiverType?: (typeof schema.paymentReceiverTypeEnum.enumValues)[number];
+    paymentReceiverInstitutionId?: string | null;
+    paymentReceiverName?: string | null;
   },
 ): Promise<Order> {
-  const orderNo = `EDU${Date.now()}${randomBytes(2).toString('hex').toUpperCase()}`;
+  const orderNo = generateOrderNo();
   const [order] = await db
     .insert(schema.orders)
     .values({
@@ -122,11 +141,56 @@ export async function createPackageOrder(
       studentId: input.studentId,
       courseId: input.courseId,
       orderNo,
+      orderType: 'package_purchase',
       amount: input.amount,
       paidAmount: 0,
       lessonCount: input.lessonCount,
       currency: input.currency ?? 'CNY',
       status: 'pending',
+      paymentReceiverType: input.paymentReceiverType ?? 'platform',
+      paymentReceiverInstitutionId: input.paymentReceiverInstitutionId ?? null,
+      paymentReceiverName: input.paymentReceiverName ?? null,
+      source: input.source ?? 'unknown',
+      channelId: input.channelId ?? null,
+      campaignId: input.campaignId ?? null,
+      medium: input.medium ?? null,
+    })
+    .returning();
+  return order;
+}
+
+export async function createSeatReservationOrder(
+  db: DbOrTx,
+  input: {
+    accountId?: string | null;
+    courseId: string;
+    amount: number;
+    currency?: string;
+    source?: string;
+    channelId?: string | null;
+    campaignId?: string | null;
+    medium?: string | null;
+    paymentReceiverType?: (typeof schema.paymentReceiverTypeEnum.enumValues)[number];
+    paymentReceiverInstitutionId?: string | null;
+    paymentReceiverName?: string | null;
+  },
+): Promise<Order> {
+  const orderNo = generateOrderNo();
+  const [order] = await db
+    .insert(schema.orders)
+    .values({
+      accountId: input.accountId ?? null,
+      courseId: input.courseId,
+      orderNo,
+      orderType: 'seat_reservation',
+      amount: input.amount,
+      paidAmount: 0,
+      lessonCount: 0,
+      currency: input.currency ?? 'CNY',
+      status: 'pending',
+      paymentReceiverType: input.paymentReceiverType ?? 'platform',
+      paymentReceiverInstitutionId: input.paymentReceiverInstitutionId ?? null,
+      paymentReceiverName: input.paymentReceiverName ?? null,
       source: input.source ?? 'unknown',
       channelId: input.channelId ?? null,
       campaignId: input.campaignId ?? null,
@@ -203,7 +267,12 @@ export async function markOrderPaidAndCredit(
       .where(eq(schema.orders.id, order.id))
       .returning();
 
-    if (order.studentId && order.courseId && order.lessonCount > 0) {
+    if (
+      ['package_purchase', 'manual_package_grant'].includes(order.orderType) &&
+      order.studentId &&
+      order.courseId &&
+      order.lessonCount > 0
+    ) {
       await applyLessonDelta(tx, {
         studentId: order.studentId,
         courseId: order.courseId,
@@ -212,6 +281,51 @@ export async function markOrderPaidAndCredit(
         relatedEntityType: 'order',
         relatedEntityId: order.id,
       });
+    }
+
+    if (order.orderType === 'seat_reservation') {
+      const [reservation] = await tx
+        .select()
+        .from(schema.seatReservations)
+        .where(eq(schema.seatReservations.orderNo, order.orderNo))
+        .limit(1)
+        .for('update');
+
+      if (reservation && reservation.reservationStatus !== 'reserved') {
+        await tx
+          .update(schema.seatReservations)
+          .set({
+            reservationStatus: 'reserved',
+            paymentStatus: 'paid',
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.seatReservations.id, reservation.id));
+
+        if (reservation.trialSessionId) {
+          const [trialSession] = await tx
+            .select()
+            .from(schema.trialSessions)
+            .where(eq(schema.trialSessions.id, reservation.trialSessionId))
+            .limit(1)
+            .for('update');
+          if (trialSession) {
+            await tx
+              .update(schema.trialSessions)
+              .set({
+                bookedCount: trialSession.bookedCount + 1,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.trialSessions.id, trialSession.id));
+          }
+        }
+
+        if (reservation.leadId) {
+          await tx
+            .update(schema.leads)
+            .set({ status: 'trial_booked', updatedAt: new Date() })
+            .where(eq(schema.leads.id, reservation.leadId));
+        }
+      }
     }
 
     await tx

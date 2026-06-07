@@ -1,0 +1,114 @@
+.header,
+.fee-card,
+.order-card,
+.form-card {
+  padding: 30rpx;
+}
+
+.trial-title {
+  margin-top: 16rpx;
+}
+
+.summary {
+  margin-top: 14rpx;
+}
+
+.meta-grid {
+  display: grid;
+  gap: 14rpx;
+  margin-top: 24rpx;
+}
+
+.meta-card {
+  border-radius: 18rpx;
+  background: #f7faf8;
+  padding: 18rpx;
+}
+
+.meta-label {
+  color: #6c766f;
+  font-size: 22rpx;
+}
+
+.meta-value {
+  margin-top: 8rpx;
+  color: #1f2b24;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.fee-card {
+  border-color: rgba(161, 92, 18, 0.2);
+  background: #fffaf0;
+}
+
+.fee-copy {
+  margin-top: 12rpx;
+}
+
+.notice-text {
+  margin-top: 16rpx;
+  white-space: pre-wrap;
+  color: #7a4f00;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.order-no {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+}
+
+.order-status {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #f2f0ea;
+  color: #5d655f;
+  padding: 8rpx 16rpx;
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.order-status.pending {
+  background: #fff4d8;
+  color: #8a5a00;
+}
+
+.order-status.paid {
+  background: #e9f4ef;
+  color: #1f6f5b;
+}
+
+.order-line {
+  margin-top: 20rpx;
+}
+
+.order-amount {
+  color: #1f2b24;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.pay-button,
+.submit-button,
+.account-button {
+  margin-top: 22rpx;
+  width: 100%;
+}
+
+.form-hint {
+  margin: 10rpx 0 22rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.empty-state {
+  padding-top: 120rpx;
+  text-align: center;
+}
+
+.empty-button {
+  margin-top: 28rpx;
+}

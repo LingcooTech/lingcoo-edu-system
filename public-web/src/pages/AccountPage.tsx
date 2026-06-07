@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
+  CalendarClock,
   CalendarDays,
   CheckSquare,
   ClipboardList,
@@ -18,16 +19,19 @@ import {
   fetchParentAttendance,
   fetchParentLessonAccounts,
   fetchParentOrders,
+  fetchParentSeatReservations,
   fetchTeacherDashboard,
   fetchTeacherSessionAttendance,
   publicApi,
   recordTeacherAttendance,
+  rescheduleParentSeatReservation,
   type AttendanceStatus,
   type AuthAccount,
   type ChildStudent,
   type ParentAttendanceRecord,
   type ParentLessonAccount,
   type ParentOrder,
+  type ParentSeatReservation,
   type TeacherClass,
   type TeacherClassSession,
 } from '@/api/client';
@@ -38,9 +42,23 @@ import { formatDateTime, money } from '@/lib/utils';
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   pending: '待支付',
+  unpaid: '未支付',
   paid: '已支付',
   refunded: '已退款',
   cancelled: '已取消',
+};
+
+const RESERVATION_STATUS_LABEL: Record<string, string> = {
+  pending_payment: '待支付',
+  reserved: '已保留',
+  cancelled: '已取消',
+  expired: '已过期',
+};
+
+const CHECK_IN_STATUS_LABEL: Record<string, string> = {
+  pending: '待到课',
+  checked_in: '已签到',
+  no_show: '未到课',
 };
 
 const SESSION_STATUS_LABEL: Record<string, string> = {
@@ -72,6 +90,20 @@ function SectionHeading({ icon, children }: { icon: ReactNode; children: ReactNo
 
 function EmptyCard({ children }: { children: ReactNode }) {
   return <div className="pwcard text-muted p-4 text-sm">{children}</div>;
+}
+
+function orderTitle(order: ParentOrder) {
+  if (order.orderType === 'seat_reservation') return '试听席位保留费';
+  if (order.orderType === 'manual_package_grant') return order.package?.name ?? '线下添加课时包';
+  return order.package?.name ?? '课时包订单';
+}
+
+function orderMeta(order: ParentOrder) {
+  const courseName = order.course?.name;
+  if (order.orderType === 'seat_reservation') {
+    return [order.orderNo, courseName, '不计入课时'].filter(Boolean).join(' · ');
+  }
+  return [order.orderNo, courseName, `${order.lessonCount} 课时`].filter(Boolean).join(' · ');
 }
 
 export function AccountPage() {
@@ -118,7 +150,11 @@ export function AccountPage() {
           <div>
             <h1 className="text-ink text-2xl font-bold">{account.displayName}，欢迎您回来</h1>
             <p className="text-muted mt-1 text-sm">
-              {account.role === 'teacher' ? '老师工作台' : account.role === 'admin' ? '管理员' : '家长中心'}
+              {account.role === 'teacher'
+                ? '老师工作台'
+                : account.role === 'admin'
+                  ? '管理员'
+                  : '家长中心'}
               {' · '}
               {account.email ?? account.phone}
             </p>
@@ -163,10 +199,21 @@ function ParentView({ account }: { account: AuthAccount }) {
   const [children, setChildren] = useState<ChildStudent[]>([]);
   const [accounts, setAccounts] = useState<ParentLessonAccount[]>([]);
   const [orders, setOrders] = useState<ParentOrder[]>([]);
+  const [seatReservations, setSeatReservations] = useState<ParentSeatReservation[]>([]);
   const [attendance, setAttendance] = useState<ParentAttendanceRecord[]>([]);
+  const [rescheduleTarget, setRescheduleTarget] = useState<ParentSeatReservation | null>(null);
+  const [rescheduleSessionId, setRescheduleSessionId] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyMessage, setVerifyMessage] = useState('');
   const [emailVerified, setEmailVerified] = useState(account.emailVerified);
+
+  const reloadSeatReservations = useCallback(() => {
+    fetchParentSeatReservations()
+      .then(setSeatReservations)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     fetchChildren()
@@ -178,10 +225,11 @@ function ParentView({ account }: { account: AuthAccount }) {
     fetchParentOrders()
       .then(setOrders)
       .catch(() => undefined);
+    reloadSeatReservations();
     fetchParentAttendance()
       .then(setAttendance)
       .catch(() => undefined);
-  }, []);
+  }, [reloadSeatReservations]);
 
   async function verifyEmail() {
     setVerifyMessage('');
@@ -194,6 +242,31 @@ function ParentView({ account }: { account: AuthAccount }) {
       setVerifyMessage('邮箱验证成功');
     } catch (err) {
       setVerifyMessage(err instanceof Error ? err.message : '验证失败');
+    }
+  }
+
+  function openReschedule(reservation: ParentSeatReservation) {
+    setRescheduleTarget(reservation);
+    setRescheduleSessionId(reservation.rescheduleOptions[0]?.id ?? '');
+    setRescheduleError('');
+  }
+
+  async function submitReschedule() {
+    if (!rescheduleTarget || !rescheduleSessionId) {
+      setRescheduleError('请选择目标场次');
+      return;
+    }
+    setRescheduling(true);
+    setRescheduleError('');
+    try {
+      await rescheduleParentSeatReservation(rescheduleTarget.id, rescheduleSessionId);
+      setRescheduleTarget(null);
+      setRescheduleSessionId('');
+      reloadSeatReservations();
+    } catch (err) {
+      setRescheduleError(err instanceof Error ? err.message : '改期失败');
+    } finally {
+      setRescheduling(false);
     }
   }
 
@@ -243,7 +316,74 @@ function ParentView({ account }: { account: AuthAccount }) {
       </section>
 
       <section className="mt-6">
-        <SectionHeading icon={<Wallet className="text-brand h-4 w-4" />}>课时包 / 余额</SectionHeading>
+        <SectionHeading icon={<CalendarClock className="text-brand h-4 w-4" />}>
+          试听席位
+        </SectionHeading>
+        {seatReservations.length === 0 ? (
+          <EmptyCard>暂无试听席位预约。</EmptyCard>
+        ) : (
+          <div className="grid gap-2">
+            {seatReservations.map((reservation) => {
+              const canOpenReschedule =
+                reservation.canReschedule && reservation.rescheduleOptions.length > 0;
+              return (
+                <div key={reservation.id} className="pwcard p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-ink text-sm font-semibold">
+                        {reservation.trialSession?.title ?? '试听预约'}
+                      </div>
+                      <div className="text-muted mt-1 text-xs">
+                        {reservation.course?.name ?? '课程待确认'} · {reservation.studentName}
+                      </div>
+                    </div>
+                    <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                      {RESERVATION_STATUS_LABEL[reservation.reservationStatus] ??
+                        reservation.reservationStatus}
+                    </span>
+                  </div>
+                  <div className="text-ink-soft mt-3 grid gap-1 text-xs">
+                    <span>
+                      {reservation.trialSession
+                        ? formatDateTime(reservation.trialSession.startsAt)
+                        : '时间待确认'}
+                    </span>
+                    <span>
+                      {reservation.campus?.name ?? '地点待确认'} ·{' '}
+                      {money(reservation.reservationFeeAmount)}
+                    </span>
+                    <span>
+                      {ORDER_STATUS_LABEL[reservation.paymentStatus] ?? reservation.paymentStatus} ·{' '}
+                      {CHECK_IN_STATUS_LABEL[reservation.checkInStatus] ??
+                        reservation.checkInStatus}{' '}
+                      · 改期 {reservation.rescheduleCount}/1
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {canOpenReschedule ? (
+                      <button
+                        type="button"
+                        className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                        onClick={() => openReschedule(reservation)}
+                      >
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        改期
+                      </button>
+                    ) : reservation.canReschedule ? (
+                      <span className="text-muted text-xs">暂无可改期场次</span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6">
+        <SectionHeading icon={<Wallet className="text-brand h-4 w-4" />}>
+          课时包 / 余额
+        </SectionHeading>
         {accounts.length === 0 ? (
           <EmptyCard>暂无课时账户。</EmptyCard>
         ) : (
@@ -259,7 +399,9 @@ function ParentView({ account }: { account: AuthAccount }) {
       </section>
 
       <section className="mt-6">
-        <SectionHeading icon={<CheckSquare className="text-brand h-4 w-4" />}>签到记录</SectionHeading>
+        <SectionHeading icon={<CheckSquare className="text-brand h-4 w-4" />}>
+          签到记录
+        </SectionHeading>
         {attendance.length === 0 ? (
           <EmptyCard>暂无签到记录。</EmptyCard>
         ) : (
@@ -293,19 +435,79 @@ function ParentView({ account }: { account: AuthAccount }) {
             {orders.map((order) => (
               <div key={order.id} className="pwcard p-4">
                 <div className="flex items-center justify-between">
+                  <div className="text-ink text-sm font-semibold">{orderTitle(order)}</div>
                   <div className="text-ink text-sm font-semibold">{money(order.amount)}</div>
-                  <div className="text-muted text-xs">
-                    {ORDER_STATUS_LABEL[order.status] ?? order.status}
-                  </div>
                 </div>
-                <div className="text-muted mt-1 text-xs">
-                  {order.orderNo} · {order.lessonCount} 课时
+                <div className="text-muted mt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span>{orderMeta(order)}</span>
+                  <span>{ORDER_STATUS_LABEL[order.status] ?? order.status}</span>
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      <Modal
+        open={Boolean(rescheduleTarget)}
+        onClose={() => setRescheduleTarget(null)}
+        title="改期试听席位"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="pwbtn pwbtn-outline px-4 py-2"
+              onClick={() => setRescheduleTarget(null)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="pwbtn pwbtn-primary px-4 py-2"
+              onClick={submitReschedule}
+              disabled={rescheduling || !rescheduleSessionId}
+            >
+              {rescheduling ? '改期中...' : '确认改期'}
+            </button>
+          </div>
+        }
+      >
+        {rescheduleTarget ? (
+          <div className="space-y-3">
+            <div>
+              <div className="text-ink text-sm font-semibold">
+                {rescheduleTarget.trialSession?.title ?? '试听预约'}
+              </div>
+              <div className="text-muted mt-1 text-xs">
+                {rescheduleTarget.studentName} ·{' '}
+                {rescheduleTarget.trialSession
+                  ? formatDateTime(rescheduleTarget.trialSession.startsAt)
+                  : '时间待确认'}
+              </div>
+            </div>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink font-medium">目标场次</span>
+              <select
+                className="border-line rounded-xl border bg-white px-3 py-2"
+                value={rescheduleSessionId}
+                onChange={(event) => setRescheduleSessionId(event.target.value)}
+              >
+                <option value="">选择目标场次</option>
+                {rescheduleTarget.rescheduleOptions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.title} · {formatDateTime(session.startsAt)} · {session.bookedCount}/
+                    {session.capacity}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-muted text-xs">每笔试听席位保留费预约仅可改期一次。</p>
+            {rescheduleError && (
+              <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{rescheduleError}</div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </>
   );
 }
@@ -333,7 +535,9 @@ function TeacherView() {
   return (
     <>
       <section className="mt-6">
-        <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>我的课表</SectionHeading>
+        <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
+          我的课表
+        </SectionHeading>
         {sessions.length === 0 ? (
           <EmptyCard>暂无排课。</EmptyCard>
         ) : (
@@ -375,7 +579,9 @@ function TeacherView() {
       </section>
 
       <section className="mt-6">
-        <SectionHeading icon={<UsersRound className="text-brand h-4 w-4" />}>我的班级</SectionHeading>
+        <SectionHeading icon={<UsersRound className="text-brand h-4 w-4" />}>
+          我的班级
+        </SectionHeading>
         {classes.length === 0 ? (
           <EmptyCard>暂无班级。</EmptyCard>
         ) : (
@@ -403,7 +609,9 @@ function TeacherView() {
                       {student.name} · {student.grade}
                     </span>
                   ))}
-                  {item.students.length === 0 && <span className="text-muted text-xs">暂无学员</span>}
+                  {item.students.length === 0 && (
+                    <span className="text-muted text-xs">暂无学员</span>
+                  )}
                 </div>
               </div>
             ))}

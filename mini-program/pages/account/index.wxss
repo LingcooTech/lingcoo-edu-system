@@ -174,7 +174,8 @@
 .balance-pill,
 .order-status,
 .attendance-status,
-.notice-status {
+.notice-status,
+.seat-status {
   flex-shrink: 0;
   border-radius: 999rpx;
   padding: 8rpx 16rpx;
@@ -190,20 +191,34 @@
 
 .order-status,
 .attendance-status,
-.notice-status {
+.notice-status,
+.seat-status {
   background: #f2f0ea;
   color: #5d655f;
 }
 
 .order-status.pending,
-.notice-status.unread {
+.notice-status.unread,
+.seat-status.pending_payment {
   background: #fff4d8;
   color: #8a5a00;
 }
 
-.order-status.paid {
+.order-status.paid,
+.seat-status.reserved {
   background: #e9f4ef;
   color: #1f6f5b;
+}
+
+.seat-status.cancelled,
+.seat-status.expired {
+  background: #f8e7e7;
+  color: #9a3412;
+}
+
+.reschedule-button {
+  display: inline-block;
+  margin-top: 16rpx;
 }
 
 .order-line,

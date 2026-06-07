@@ -1,30 +1,400 @@
-import type { Order } from '@/api/types';
+import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+
+import { apiPost } from '@/api/client';
+import type { CoursePackage, Order, Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
+import { Drawer } from '@/components/shared/Drawer';
+import { Field, FieldRow } from '@/components/shared/FormField';
+import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
+import { useToast } from '@/components/shared/Toast';
 import { money } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
 
+const ORDER_TYPE_LABEL: Record<string, string> = {
+  package_purchase: '线上课时包',
+  manual_package_grant: '线下添加课时包',
+  seat_reservation: '试听席位保留费',
+};
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: '待支付',
+  paid: '已支付',
+  refunded: '已退款',
+  cancelled: '已取消',
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  wechat_pay: '微信支付',
+  alipay: '支付宝',
+  mock: '模拟支付',
+  cash: '现金',
+  bank_transfer: '银行转账',
+  wechat_offline: '微信线下',
+  alipay_offline: '支付宝线下',
+  offline_other: '其他线下',
+};
+
+const PAYMENT_RECEIVER_TYPE_LABEL: Record<string, string> = {
+  platform: '平台收款',
+  provider: '课程提供方收款',
+  other: '其他收款方',
+};
+
+const ORDER_TYPE_OPTIONS = [
+  { value: 'package_purchase', label: ORDER_TYPE_LABEL.package_purchase },
+  { value: 'manual_package_grant', label: ORDER_TYPE_LABEL.manual_package_grant },
+  { value: 'seat_reservation', label: ORDER_TYPE_LABEL.seat_reservation },
+];
+
+const ORDER_STATUS_OPTIONS = [
+  { value: 'pending', label: ORDER_STATUS_LABEL.pending },
+  { value: 'paid', label: ORDER_STATUS_LABEL.paid },
+  { value: 'refunded', label: ORDER_STATUS_LABEL.refunded },
+  { value: 'cancelled', label: ORDER_STATUS_LABEL.cancelled },
+];
+
+const PAYMENT_RECEIVER_TYPE_OPTIONS = [
+  { value: 'platform', label: PAYMENT_RECEIVER_TYPE_LABEL.platform },
+  { value: 'provider', label: PAYMENT_RECEIVER_TYPE_LABEL.provider },
+  { value: 'other', label: PAYMENT_RECEIVER_TYPE_LABEL.other },
+];
+
+function orderSearchText(order: Order) {
+  return [
+    order.orderNo,
+    order.student?.name,
+    order.course?.name,
+    order.package?.name,
+    order.paymentReceiverName,
+    order.paymentMethod ? PAYMENT_METHOD_LABEL[order.paymentMethod] : '',
+    order.offlinePaymentNote,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 export function OrdersPage() {
-  const { data } = useApiResource<Order>('/v1/orders', 'orders');
+  const toast = useToast();
+  const { data, setData } = useApiResource<Order>('/v1/orders', 'orders');
+  const { data: students } = useApiResource<Student>('/v1/students', 'students');
+  const { data: packages } = useApiResource<CoursePackage>('/v1/course-packages', 'coursePackages');
+  const activePackages = useMemo(
+    () => packages.filter((coursePackage) => coursePackage.status === 'active'),
+    [packages],
+  );
+
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    studentId: '',
+    packageId: '',
+    paidYuan: '',
+    paymentMethod: 'wechat_offline',
+    offlinePaymentNote: '',
+  });
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [receiverTypeFilter, setReceiverTypeFilter] = useState('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
+
+  const selectedPackage = activePackages.find((item) => item.id === form.packageId);
+  const paymentMethods = useMemo(
+    () =>
+      Array.from(new Set(data.map((order) => order.paymentMethod).filter(Boolean) as string[]))
+        .sort()
+        .map((method) => ({ value: method, label: PAYMENT_METHOD_LABEL[method] ?? method })),
+    [data],
+  );
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return data.filter((order) => {
+      if (typeFilter !== 'all' && order.orderType !== typeFilter) return false;
+      if (statusFilter !== 'all' && order.status !== statusFilter) return false;
+      if (receiverTypeFilter !== 'all' && order.paymentReceiverType !== receiverTypeFilter) {
+        return false;
+      }
+      if (paymentMethodFilter !== 'all' && order.paymentMethod !== paymentMethodFilter) {
+        return false;
+      }
+      if (normalizedQuery && !orderSearchText(order).includes(normalizedQuery)) return false;
+      return true;
+    });
+  }, [data, paymentMethodFilter, query, receiverTypeFilter, statusFilter, typeFilter]);
+
+  const summary = useMemo(() => {
+    const paidOrders = filtered.filter((order) => order.status === 'paid');
+    const pendingOrders = filtered.filter((order) => order.status === 'pending');
+    return {
+      paidAmount: paidOrders.reduce((sum, order) => sum + order.paidAmount, 0),
+      pendingAmount: pendingOrders.reduce((sum, order) => sum + order.amount, 0),
+      seatReservationAmount: filtered
+        .filter((order) => order.orderType === 'seat_reservation')
+        .reduce(
+          (sum, order) => sum + (order.status === 'paid' ? order.paidAmount : order.amount),
+          0,
+        ),
+      manualGrantCount: filtered.filter((order) => order.orderType === 'manual_package_grant')
+        .length,
+    };
+  }, [filtered]);
+
+  function openManualGrant() {
+    const firstPackage = activePackages[0];
+    setForm({
+      studentId: students[0]?.id ?? '',
+      packageId: firstPackage?.id ?? '',
+      paidYuan: firstPackage ? String(firstPackage.priceAmount / 100) : '',
+      paymentMethod: 'wechat_offline',
+      offlinePaymentNote: '',
+    });
+    setOpen(true);
+  }
+
+  async function submitManualGrant() {
+    if (!form.studentId || !form.packageId) {
+      toast.error('请选择学员和课时包');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { order } = await apiPost<{ order: Order }>('/v1/orders/manual-package-grants', {
+        studentId: form.studentId,
+        packageId: form.packageId,
+        paidAmount: Math.round((Number(form.paidYuan) || 0) * 100),
+        paymentMethod: form.paymentMethod,
+        offlinePaymentNote: form.offlinePaymentNote.trim() || undefined,
+      });
+      setData([order, ...data]);
+      toast.success('课时包已添加，课时余额已更新');
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '添加失败');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <PageFrame section="orders">
+    <PageFrame
+      section="orders"
+      actions={
+        <div className="flex flex-wrap justify-end gap-2">
+          <select
+            className="form-input w-auto py-1.5"
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value)}
+          >
+            <option value="all">全部类型</option>
+            {ORDER_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="form-input w-auto py-1.5"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option value="all">全部状态</option>
+            {ORDER_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="form-input w-auto py-1.5"
+            value={receiverTypeFilter}
+            onChange={(event) => setReceiverTypeFilter(event.target.value)}
+          >
+            <option value="all">全部收款方</option>
+            {PAYMENT_RECEIVER_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="form-input w-auto py-1.5"
+            value={paymentMethodFilter}
+            onChange={(event) => setPaymentMethodFilter(event.target.value)}
+          >
+            <option value="all">全部支付方式</option>
+            {paymentMethods.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <input
+            className="form-input w-52 py-1.5"
+            placeholder="搜索订单/学员/课程/收款方"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <button type="button" className="btn btn-primary" onClick={openManualGrant}>
+            <Plus className="h-4 w-4" />
+            线下添加课时包
+          </button>
+        </div>
+      }
+    >
+      <div className="metric-grid mb-6">
+        <MetricCard label="筛选订单" value={filtered.length} hint={`全部 ${data.length} 笔`} />
+        <MetricCard label="已收金额" value={money(summary.paidAmount)} hint="筛选范围内已支付" />
+        <MetricCard label="待收金额" value={money(summary.pendingAmount)} hint="筛选范围内待支付" />
+        <MetricCard
+          label="占位费订单"
+          value={money(summary.seatReservationAmount)}
+          hint={`${summary.manualGrantCount} 笔线下课时包添加`}
+        />
+      </div>
+
       <DataTable
         columns={[
           { key: 'orderNo', header: '订单号', cell: (row) => row.orderNo },
+          {
+            key: 'type',
+            header: '类型',
+            cell: (row) => ORDER_TYPE_LABEL[row.orderType ?? ''] ?? row.orderType ?? '-',
+          },
           { key: 'student', header: '学员', cell: (row) => row.student?.name ?? '-' },
           { key: 'course', header: '课程', cell: (row) => row.course?.name ?? '-' },
+          { key: 'package', header: '课时包', cell: (row) => row.package?.name ?? '-' },
           { key: 'amount', header: '实收', cell: (row) => money(row.paidAmount) },
           { key: 'lessons', header: '课时', cell: (row) => `${row.lessonCount} 节` },
+          {
+            key: 'receiver',
+            header: '收款方',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">{row.paymentReceiverName ?? '-'}</span>
+                <span className="cell-subtitle">
+                  {row.paymentReceiverType
+                    ? (PAYMENT_RECEIVER_TYPE_LABEL[row.paymentReceiverType] ??
+                      row.paymentReceiverType)
+                    : '-'}
+                </span>
+              </div>
+            ),
+          },
+          {
+            key: 'method',
+            header: '支付方式',
+            cell: (row) =>
+              row.paymentMethod
+                ? (PAYMENT_METHOD_LABEL[row.paymentMethod] ?? row.paymentMethod)
+                : '-',
+          },
           {
             key: 'status',
             header: '状态',
             cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
           },
         ]}
-        data={data}
+        data={filtered}
+        emptyMessage="没有符合筛选条件的订单。"
       />
+
+      <Drawer
+        open={open}
+        onClose={() => setOpen(false)}
+        title="线下添加课时包"
+        description="线下确认收款后，为学员添加课时并生成可追溯订单。"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+              取消
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={submitManualGrant}
+              disabled={saving}
+            >
+              {saving ? '添加中...' : '确认添加'}
+            </button>
+          </>
+        }
+      >
+        <Field label="学员" required>
+          <select
+            className="form-input"
+            value={form.studentId}
+            onChange={(event) => setForm({ ...form, studentId: event.target.value })}
+          >
+            <option value="">选择学员</option>
+            {students.map((student) => (
+              <option key={student.id} value={student.id}>
+                {student.name} · {student.grade}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="课时包" required>
+          <select
+            className="form-input"
+            value={form.packageId}
+            onChange={(event) => {
+              const coursePackage = activePackages.find((item) => item.id === event.target.value);
+              setForm({
+                ...form,
+                packageId: event.target.value,
+                paidYuan: coursePackage ? String(coursePackage.priceAmount / 100) : form.paidYuan,
+              });
+            }}
+          >
+            <option value="">选择课时包</option>
+            {activePackages.map((coursePackage) => (
+              <option key={coursePackage.id} value={coursePackage.id}>
+                {coursePackage.name} · {coursePackage.lessonCount} 节 ·{' '}
+                {money(coursePackage.priceAmount)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {selectedPackage && (
+          <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
+            系统将添加 {selectedPackage.lessonCount} 节课时。
+          </div>
+        )}
+        <FieldRow>
+          <Field label="线下实收(元)">
+            <input
+              className="form-input"
+              type="number"
+              value={form.paidYuan}
+              onChange={(event) => setForm({ ...form, paidYuan: event.target.value })}
+            />
+          </Field>
+          <Field label="支付方式">
+            <select
+              className="form-input"
+              value={form.paymentMethod}
+              onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}
+            >
+              <option value="wechat_offline">微信线下</option>
+              <option value="alipay_offline">支付宝线下</option>
+              <option value="bank_transfer">银行转账</option>
+              <option value="cash">现金</option>
+              <option value="offline_other">其他线下</option>
+            </select>
+          </Field>
+        </FieldRow>
+        <Field label="备注">
+          <textarea
+            className="form-input h-20"
+            value={form.offlinePaymentNote}
+            onChange={(event) => setForm({ ...form, offlinePaymentNote: event.target.value })}
+          />
+        </Field>
+      </Drawer>
     </PageFrame>
   );
 }

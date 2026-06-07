@@ -1,5 +1,6 @@
 export function money(amount: number): string {
-  return `¥${(amount / 100).toFixed(0)}`;
+  const yuan = amount / 100;
+  return Number.isInteger(yuan) ? `¥${yuan.toFixed(0)}` : `¥${yuan.toFixed(2)}`;
 }
 
 export function formatDateTime(value: string): string {

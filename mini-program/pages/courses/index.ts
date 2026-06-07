@@ -1,4 +1,4 @@
-import { fetchCourses, type Course } from '../../services/api';
+import { fetchCourses, loadHome, type BusinessModelSettings, type Course } from '../../services/api';
 import { coursePriceLabel } from '../../utils/format';
 
 type CourseListItem = Course & { priceLabel: string };
@@ -7,6 +7,7 @@ Page({
   data: {
     loading: true,
     courses: [] as CourseListItem[],
+    businessModel: null as BusinessModelSettings | null,
   },
 
   onLoad() {
@@ -20,10 +21,14 @@ Page({
   async load() {
     this.setData({ loading: true });
     try {
-      const courses = await fetchCourses();
+      const [courses, home] = await Promise.all([fetchCourses(), loadHome().catch(() => null)]);
       this.setData({
         loading: false,
-        courses: courses.map((course) => ({ ...course, priceLabel: coursePriceLabel(course) })),
+        businessModel: home?.organization.businessModel ?? null,
+        courses: courses.map((course) => ({
+          ...course,
+          priceLabel: coursePriceLabel(course, home?.organization.businessModel.mode),
+        })),
       });
     } catch (error) {
       this.setData({ loading: false, courses: [] });

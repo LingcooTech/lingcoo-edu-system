@@ -1,5 +1,5 @@
 import { loadHome, type Course, type HomePayload, type TrialSession } from '../../services/api';
-import { coursePriceLabel, formatDateTime, navigateToWebPath } from '../../utils/format';
+import { coursePriceLabel, formatDateTime, money, navigateToWebPath } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
 
 interface HomeState {
@@ -18,7 +18,7 @@ interface HomeState {
   phone: string;
   businessHours: string;
   courses: Array<Course & { priceLabel: string }>;
-  trialSessions: Array<TrialSession & { startsAtLabel: string }>;
+  trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   bodyBlocks: Block[];
 }
 
@@ -68,11 +68,15 @@ function toState(home: HomePayload): HomeState {
     businessHours: profile.businessHours,
     courses: home.featuredCourses.map((course) => ({
       ...course,
-      priceLabel: coursePriceLabel(course),
+      priceLabel: coursePriceLabel(course, home.organization.businessModel.mode),
     })),
     trialSessions: home.trialSessions.map((session) => ({
       ...session,
       startsAtLabel: formatDateTime(session.startsAt),
+      reservationFeeLabel:
+        session.reservationFeeAmount > 0
+          ? `${money(session.reservationFeeAmount)} 试听席位保留费`
+          : '',
     })),
     bodyBlocks: parseBlocks(profile.bodyBlocks),
   };

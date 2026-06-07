@@ -7,9 +7,11 @@ import {
   fetchParentLessonAccounts,
   fetchParentNotifications,
   fetchParentOrders,
+  fetchParentSeatReservations,
   hasToken,
   logout,
   markParentNotificationRead,
+  rescheduleParentSeatReservation,
   setToken,
   wechatMiniLogin,
   type AuthAccount,
@@ -18,6 +20,7 @@ import {
   type ParentLessonAccount,
   type ParentNotification,
   type ParentOrder,
+  type ParentSeatReservation,
 } from '../../services/api';
 import { requestSubscribe } from '../../services/subscribe';
 import { formatDateTime, money } from '../../utils/format';
@@ -43,6 +46,18 @@ type AttendanceItem = ParentAttendance & {
   studentName: string;
 };
 
+type SeatReservationItem = ParentSeatReservation & {
+  courseName: string;
+  feeLabel: string;
+  startsAtLabel: string;
+  campusName: string;
+  reservationStatusLabel: string;
+  paymentStatusLabel: string;
+  checkInStatusLabel: string;
+  rescheduleOptionLabels: string[];
+  canSelfReschedule: boolean;
+};
+
 type NotificationItem = ParentNotification & {
   createdAtLabel: string;
   statusLabel: string;
@@ -51,11 +66,37 @@ type NotificationItem = ParentNotification & {
 function orderStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     pending: '待支付',
+    unpaid: '未支付',
     paid: '已支付',
     cancelled: '已取消',
     refunded: '已退款',
   };
   return labels[status] || status;
+}
+
+function reservationStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending_payment: '待支付',
+    reserved: '已保留',
+    cancelled: '已取消',
+    expired: '已过期',
+  };
+  return labels[status] || status;
+}
+
+function checkInStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: '待到课',
+    checked_in: '已签到',
+    no_show: '未到课',
+  };
+  return labels[status] || status;
+}
+
+function orderTitle(order: ParentOrder): string {
+  if (order.orderType === 'seat_reservation') return '试听席位保留费';
+  if (order.orderType === 'manual_package_grant') return order.package?.name || '线下课时包';
+  return order.package?.name || `${order.lessonCount} 课时包`;
 }
 
 function attendanceStatusLabel(status: string): string {
@@ -95,6 +136,7 @@ Page({
     defaultPassword: '',
     children: [] as ParentChild[],
     lessonAccounts: [] as LessonAccountItem[],
+    seatReservations: [] as SeatReservationItem[],
     orders: [] as OrderItem[],
     attendance: [] as AttendanceItem[],
     notifications: [] as NotificationItem[],
@@ -130,13 +172,15 @@ Page({
     if (!this.data.account) return;
     this.setData({ refreshing: true });
     try {
-      const [children, lessonAccounts, orders, attendance, notifications] = await Promise.all([
-        fetchParentChildren(),
-        fetchParentLessonAccounts(),
-        fetchParentOrders(),
-        fetchParentAttendance(),
-        fetchParentNotifications(),
-      ]);
+      const [children, lessonAccounts, seatReservations, orders, attendance, notifications] =
+        await Promise.all([
+          fetchParentChildren(),
+          fetchParentLessonAccounts(),
+          fetchParentSeatReservations(),
+          fetchParentOrders(),
+          fetchParentAttendance(),
+          fetchParentNotifications(),
+        ]);
 
       const lessonItems: LessonAccountItem[] = lessonAccounts.map((item) => ({
         ...item,
@@ -148,10 +192,27 @@ Page({
         ...item,
         amountLabel: money(item.amount),
         createdAtLabel: formatDateTime(item.createdAt),
-        packageName: item.package?.name || `${item.lessonCount} 课时包`,
+        packageName: orderTitle(item),
         statusLabel: orderStatusLabel(item.status),
         studentName: item.student?.name || '未关联学员',
         courseName: item.course?.name || '未关联课程',
+      }));
+      const seatItems: SeatReservationItem[] = seatReservations.map((item) => ({
+        ...item,
+        courseName: item.course?.name || '课程待确认',
+        feeLabel: money(item.reservationFeeAmount),
+        startsAtLabel: item.trialSession
+          ? formatDateTime(item.trialSession.startsAt)
+          : '时间待确认',
+        campusName: item.campus?.name || '地点待确认',
+        reservationStatusLabel: reservationStatusLabel(item.reservationStatus),
+        paymentStatusLabel: orderStatusLabel(item.paymentStatus),
+        checkInStatusLabel: checkInStatusLabel(item.checkInStatus),
+        rescheduleOptionLabels: item.rescheduleOptions.map(
+          (session) =>
+            `${session.title} · ${formatDateTime(session.startsAt)} · ${session.bookedCount}/${session.capacity}`,
+        ),
+        canSelfReschedule: item.canReschedule && item.rescheduleOptions.length > 0,
       }));
       const attendanceItems: AttendanceItem[] = attendance.map((item) => ({
         ...item,
@@ -168,6 +229,7 @@ Page({
       this.setData({
         children,
         lessonAccounts: lessonItems,
+        seatReservations: seatItems,
         orders: orderItems,
         attendance: attendanceItems,
         notifications: notificationItems,
@@ -195,6 +257,7 @@ Page({
       defaultPassword: '',
       children: [],
       lessonAccounts: [],
+      seatReservations: [],
       orders: [],
       attendance: [],
       notifications: [],
@@ -324,6 +387,41 @@ Page({
         icon: 'none',
       });
     }
+  },
+
+  async onRescheduleSeatReservation(event: {
+    currentTarget: { dataset: { id?: string } };
+    detail: { value?: string | number };
+  }) {
+    const id = event.currentTarget.dataset.id;
+    const optionIndex = Number(event.detail.value ?? -1);
+    if (!id || Number.isNaN(optionIndex)) return;
+
+    const reservation = (this.data.seatReservations as SeatReservationItem[]).find(
+      (item) => item.id === id,
+    );
+    const target = reservation?.rescheduleOptions[optionIndex];
+    const label = reservation?.rescheduleOptionLabels[optionIndex];
+    if (!reservation || !target || !label) return;
+
+    wx.showModal({
+      title: '确认改期',
+      content: `改到：${label}`,
+      confirmText: '确认',
+      success: async (result) => {
+        if (!result.confirm) return;
+        try {
+          await rescheduleParentSeatReservation(reservation.id, target.id);
+          await this.loadParentCenter();
+          wx.showToast({ title: '改期成功', icon: 'success' });
+        } catch (error) {
+          wx.showToast({
+            title: error instanceof Error ? error.message : '改期失败',
+            icon: 'none',
+          });
+        }
+      },
+    });
   },
 
   async onSubscribeLessonNotifications() {

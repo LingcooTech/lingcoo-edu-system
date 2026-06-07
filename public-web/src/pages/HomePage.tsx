@@ -11,19 +11,28 @@ import {
   Star,
 } from 'lucide-react';
 
-import { loadHome, type Course, type HomePayload, type TrialSession } from '@/api/client';
+import {
+  loadHome,
+  type BusinessModelSettings,
+  type Course,
+  type HomePayload,
+  type TrialSession,
+} from '@/api/client';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
 import { formatDateTime, money } from '@/lib/utils';
 
-function coursePriceLabel(course: Course) {
+function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings) {
   if (
     !course.packageCount ||
     course.startingPriceAmount === null ||
     course.startingPriceAmount === undefined
   ) {
     return '可预约试听';
+  }
+  if (businessModel?.mode === 'reservation_platform') {
+    return `${money(course.startingPriceAmount)} 参考`;
   }
   return `${money(course.startingPriceAmount)} 起`;
 }
@@ -42,6 +51,7 @@ export function HomePage() {
   const courses = home?.featuredCourses ?? [];
   const sessions = home?.trialSessions ?? [];
   const profile = organization?.publicProfile;
+  const businessModel = organization?.businessModel;
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
   const testimonials = profile?.testimonials ?? [];
@@ -231,7 +241,7 @@ export function HomePage() {
                   </div>
                 </div>
                 <div className="text-ink shrink-0 text-sm font-semibold">
-                  {coursePriceLabel(course)}
+                  {coursePriceLabel(course, businessModel)}
                 </div>
               </div>
               <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">{course.summary}</p>
@@ -261,6 +271,11 @@ export function HomePage() {
               <div className="text-muted mt-2 text-xs">
                 已报名 {session.bookedCount}/{session.capacity}
               </div>
+              {session.reservationFeeAmount > 0 && (
+                <div className="mt-2 text-xs text-amber-700">
+                  {money(session.reservationFeeAmount)} 试听席位保留费
+                </div>
+              )}
             </Link>
           ))}
           {sessions.length === 0 && (

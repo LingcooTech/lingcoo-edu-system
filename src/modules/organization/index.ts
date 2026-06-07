@@ -5,6 +5,11 @@ import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import {
+  mergeBusinessModel,
+  normalizeBusinessModel,
+  readBusinessModel,
+} from '../../lib/business-model.js';
+import {
   mergePublicProfile,
   normalizePublicProfile,
   readPublicProfile,
@@ -77,6 +82,16 @@ const publicSiteSchema = z
   })
   .optional();
 
+const businessModelSchema = z
+  .object({
+    mode: z.enum(['course_sales', 'reservation_platform', 'hybrid']).optional(),
+    onlinePackageSalesEnabled: z.boolean().optional(),
+    manualPackageGrantEnabled: z.boolean().optional(),
+    packagePriceDisplayEnabled: z.boolean().optional(),
+    seatReservationFeeEnabled: z.boolean().optional(),
+  })
+  .optional();
+
 const organizationSchema = z.object({
   name: z.string().min(1).max(160).optional(),
   brandName: z.string().min(1).max(160).optional(),
@@ -85,6 +100,7 @@ const organizationSchema = z.object({
   publicProfile: publicProfileSchema.optional(),
   branding: brandingSchema,
   publicSite: publicSiteSchema,
+  businessModel: businessModelSchema,
 });
 
 const campusSchema = z.object({
@@ -112,6 +128,7 @@ export const organizationModule: AppModule = {
           ...organization,
           publicProfile: readPublicProfile(settings),
           publicSite: readPublicSite(settings),
+          businessModel: readBusinessModel(settings),
           branding: settings.branding ?? {},
         },
       };
@@ -132,6 +149,9 @@ export const organizationModule: AppModule = {
       if (body.publicSite !== undefined) {
         settings = mergePublicSite(settings, normalizePublicSite(body.publicSite));
       }
+      if (body.businessModel !== undefined) {
+        settings = mergeBusinessModel(settings, normalizeBusinessModel(body.businessModel));
+      }
 
       const updated = await organizationRepo.updateOrganization(app.db, {
         name: body.name,
@@ -146,6 +166,7 @@ export const organizationModule: AppModule = {
           ...updated,
           publicProfile: readPublicProfile(updated.settings),
           publicSite: readPublicSite(updated.settings),
+          businessModel: readBusinessModel(updated.settings),
           branding: readSettings(updated.settings).branding ?? {},
         },
       };

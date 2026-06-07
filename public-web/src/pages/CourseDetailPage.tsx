@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Clock, Layers } from 'lucide-react';
+import { Building2, ChevronLeft, Clock, Layers, MapPin, UserRound } from 'lucide-react';
 
-import { fetchCourse, type Course, type CoursePackage } from '@/api/client';
+import {
+  fetchCourse,
+  type BusinessModelSettings,
+  type Course,
+  type CoursePackage,
+  type PublicInstitution,
+  type PublicTeacher,
+} from '@/api/client';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
@@ -12,6 +19,11 @@ export function CourseDetailPage() {
   const { slug = '' } = useParams();
   const [course, setCourse] = useState<Course | null>(null);
   const [packages, setPackages] = useState<CoursePackage[]>([]);
+  const [businessModel, setBusinessModel] = useState<BusinessModelSettings | null>(null);
+  const [providerInstitution, setProviderInstitution] = useState<PublicInstitution | null>(null);
+  const [defaultTeacher, setDefaultTeacher] = useState<PublicTeacher | null>(null);
+  const [paymentReceiverInstitution, setPaymentReceiverInstitution] =
+    useState<PublicInstitution | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound'>('loading');
 
   const contentBlocks = useMemo(() => parseBlocks(course?.content), [course]);
@@ -22,6 +34,10 @@ export function CourseDetailPage() {
       .then((payload) => {
         setCourse(payload.course);
         setPackages(payload.coursePackages);
+        setBusinessModel(payload.businessModel);
+        setProviderInstitution(payload.providerInstitution ?? null);
+        setDefaultTeacher(payload.defaultTeacher ?? null);
+        setPaymentReceiverInstitution(payload.paymentReceiverInstitution ?? null);
         setStatus('ready');
       })
       .catch(() => setStatus('notfound'));
@@ -47,6 +63,19 @@ export function CourseDetailPage() {
       </Layout>
     );
   }
+
+  const onlinePackageSalesAllowed =
+    Boolean(businessModel?.onlinePackageSalesEnabled) &&
+    businessModel?.mode !== 'reservation_platform' &&
+    course.onlineSalesEnabled !== false;
+  const paymentReceiverLabel =
+    course.paymentReceiverName ||
+    paymentReceiverInstitution?.name ||
+    (course.paymentReceiverType === 'provider'
+      ? providerInstitution?.name
+      : course.paymentReceiverType === 'platform'
+        ? '平台'
+        : '');
 
   return (
     <Layout>
@@ -74,6 +103,27 @@ export function CourseDetailPage() {
           </span>
         </div>
 
+        <section className="border-line mt-5 grid gap-3 rounded-2xl border bg-surface p-4 text-sm sm:grid-cols-2">
+          <div className="text-ink-soft flex items-center gap-2">
+            <Building2 className="text-brand h-4 w-4" />
+            <span>课程提供方：{providerInstitution?.name ?? '平台自有 / 待确认'}</span>
+          </div>
+          <div className="text-ink-soft flex items-center gap-2">
+            <UserRound className="text-brand h-4 w-4" />
+            <span>授课老师：{defaultTeacher?.name ?? '场次确认'}</span>
+          </div>
+          <div className="text-ink-soft flex items-center gap-2">
+            <MapPin className="text-brand h-4 w-4" />
+            <span>授课地点：{course.teachingLocationLabel || '到店确认'}</span>
+          </div>
+          {paymentReceiverLabel && (
+            <div className="text-ink-soft flex items-center gap-2">
+              <Building2 className="text-brand h-4 w-4" />
+              <span>收款方：{paymentReceiverLabel}</span>
+            </div>
+          )}
+        </section>
+
         {contentBlocks.length > 0 && (
           <div className="mt-6">
             <BlockRenderer blocks={contentBlocks} />
@@ -82,7 +132,9 @@ export function CourseDetailPage() {
 
         {packages.length > 0 && (
           <section className="mt-8">
-            <h2 className="text-ink text-base font-semibold">课时包</h2>
+            <h2 className="text-ink text-base font-semibold">
+              {onlinePackageSalesAllowed ? '课时包' : '正式课程参考方案'}
+            </h2>
             <div className="mt-3 grid gap-3">
               {packages.map((pkg) => (
                 <div key={pkg.id} className="pwcard p-4">
@@ -96,12 +148,39 @@ export function CourseDetailPage() {
                   {pkg.description && (
                     <p className="text-ink-soft mt-2 text-sm leading-6">{pkg.description}</p>
                   )}
-                  <Link to={`/checkout/${pkg.id}`} className="pwbtn pwbtn-outline mt-3 w-full">
-                    购买课时包
-                  </Link>
+                  {onlinePackageSalesAllowed ? (
+                    <Link to={`/checkout/${pkg.id}`} className="pwbtn pwbtn-outline mt-3 w-full">
+                      购买课时包
+                    </Link>
+                  ) : (
+                    <Link to={`/register?course=${course.slug}`} className="pwbtn pwbtn-outline mt-3 w-full">
+                      预约试听后到店确认
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {(course.trialDescription || course.reservationNotice) && (
+          <section className="mt-8 space-y-3">
+            {course.trialDescription && (
+              <div className="pwcard p-4">
+                <h2 className="text-ink text-base font-semibold">试听说明</h2>
+                <p className="text-ink-soft mt-2 whitespace-pre-wrap text-sm leading-6">
+                  {course.trialDescription}
+                </p>
+              </div>
+            )}
+            {course.reservationNotice && (
+              <div className="pwcard p-4">
+                <h2 className="text-ink text-base font-semibold">预约规则</h2>
+                <p className="text-ink-soft mt-2 whitespace-pre-wrap text-sm leading-6">
+                  {course.reservationNotice}
+                </p>
+              </div>
+            )}
           </section>
         )}
       </article>

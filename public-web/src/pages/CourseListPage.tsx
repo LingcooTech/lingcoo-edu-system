@@ -1,33 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { fetchCourses, type Course } from '@/api/client';
+import { fetchCourses, loadHome, type BusinessModelSettings, type Course } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { money } from '@/lib/utils';
 
-function coursePriceLabel(course: Course) {
-  if (!course.packageCount || course.startingPriceAmount === null || course.startingPriceAmount === undefined) {
+function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings) {
+  if (
+    !course.packageCount ||
+    course.startingPriceAmount === null ||
+    course.startingPriceAmount === undefined
+  ) {
     return '可预约试听';
+  }
+  if (businessModel?.mode === 'reservation_platform') {
+    return `${money(course.startingPriceAmount)} 参考`;
   }
   return `${money(course.startingPriceAmount)} 起`;
 }
 
 export function CourseListPage() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [businessModel, setBusinessModel] = useState<BusinessModelSettings | undefined>();
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>('all');
 
   useEffect(() => {
-    fetchCourses()
-      .then(setCourses)
+    Promise.all([fetchCourses(), loadHome().catch(() => null)])
+      .then(([courseList, home]) => {
+        setCourses(courseList);
+        setBusinessModel(home?.organization.businessModel);
+      })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const categories = useMemo(
-    () => Array.from(new Set(courses.map((c) => c.category))),
-    [courses],
-  );
+  const categories = useMemo(() => Array.from(new Set(courses.map((c) => c.category))), [courses]);
   const visible = useMemo(
     () => (category === 'all' ? courses : courses.filter((c) => c.category === category)),
     [courses, category],
@@ -77,13 +85,21 @@ export function CourseListPage() {
                     </div>
                   </div>
                   <div className="text-ink shrink-0 text-sm font-semibold">
-                    {coursePriceLabel(course)}
+                    {coursePriceLabel(course, businessModel)}
                   </div>
                 </div>
-                <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">{course.summary}</p>
+                <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">
+                  {course.summary}
+                </p>
                 <div className="text-muted mt-2 text-xs">
-                  {course.packageCount ? `${course.packageCount} 个课时包` : '暂未上架课时包'} · 单节{' '}
-                  {course.durationMinutes} 分钟
+                  {course.packageCount
+                    ? businessModel?.mode === 'reservation_platform'
+                      ? `${course.packageCount} 个参考方案`
+                      : `${course.packageCount} 个课时包`
+                    : businessModel?.mode === 'reservation_platform'
+                      ? '暂无参考方案'
+                      : '暂未上架课时包'}{' '}
+                  · 单节 {course.durationMinutes} 分钟
                 </div>
               </Link>
             ))

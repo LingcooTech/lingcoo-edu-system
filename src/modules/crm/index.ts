@@ -7,6 +7,7 @@ import type { Campaign } from '../../db/repositories/crm.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as trialRepo from '../../db/repositories/trial.js';
+import { readBusinessModel, requiresSeatReservationFee } from '../../lib/business-model.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
@@ -117,6 +118,25 @@ function readSettings(settings: unknown) {
 
 function toDate(value?: string) {
   return value ? new Date(value) : null;
+}
+
+async function rejectSeatReservationFeeBypass(
+  app: Parameters<AppModule['register']>[0],
+  trialSessionId?: string,
+) {
+  if (!trialSessionId) return;
+  const [organization, trialSession] = await Promise.all([
+    organizationRepo.requireOrganization(app.db),
+    trialRepo.requireTrialSession(app.db, trialSessionId),
+  ]);
+  if (
+    requiresSeatReservationFee(
+      readBusinessModel(organization.settings),
+      trialSession.reservationFeeAmount,
+    )
+  ) {
+    throw unprocessable('本场试听需先支付试听席位保留费，请通过试听场次详情预约。');
+  }
 }
 
 async function resolveCourseId(
@@ -520,6 +540,7 @@ export const crmModule: AppModule = {
       const { campaignCode } = request.params as { campaignCode: string };
       const body = leadRegistrationSchema.omit({ campaign: true }).parse(request.body);
       const campaign = await crmRepo.requireActiveCampaignByCode(app.db, campaignCode);
+      await rejectSeatReservationFeeBypass(app, body.trialSessionId);
       const lead = await createLeadFromRegistration(app, body, campaign);
       const course = lead.courseId
         ? await catalogRepo.requireCourse(app.db, lead.courseId).catch(() => null)
@@ -559,6 +580,7 @@ export const crmModule: AppModule = {
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
           publicSite: readPublicSite(organization.settings),
+          businessModel: readBusinessModel(organization.settings),
           branding: readSettings(organization.settings).branding ?? {},
         },
       };

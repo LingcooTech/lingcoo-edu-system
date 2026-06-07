@@ -1,13 +1,18 @@
 import { z } from 'zod';
 import QRCode from 'qrcode';
+import type { FastifyRequest } from 'fastify';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
+import * as financeRepo from '../../db/repositories/finance.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as seatReservationRepo from '../../db/repositories/seat-reservations.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
+import * as schema from '../../db/schema.js';
+import { readBusinessModel, requiresSeatReservationFee } from '../../lib/business-model.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
@@ -21,6 +26,8 @@ const trialSessionSchema = z.object({
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
   capacity: z.number().int().positive(),
+  reservationFeeAmount: z.number().int().nonnegative().default(0),
+  reservationNotice: z.string().default(''),
   status: z.enum(['open', 'closed', 'cancelled']).default('open'),
 });
 
@@ -38,6 +45,22 @@ const registrationSchema = z.object({
   campaign: z.string().optional(),
   course: z.string().optional(),
   medium: z.string().optional(),
+});
+
+const seatReservationSchema = z.object({
+  trialSessionId: z.string(),
+  guardianName: z.string().min(1),
+  phone: z.string().min(6),
+  studentName: z.string().min(1),
+  grade: z.string().min(1),
+  source: z.string().default('unknown'),
+  campaign: z.string().optional(),
+  course: z.string().optional(),
+  medium: z.string().optional(),
+});
+
+const seatReservationRescheduleSchema = z.object({
+  trialSessionId: z.string(),
 });
 
 function notFound(message: string): Error {
@@ -62,18 +85,30 @@ function normalizeTrialSessionPatch(body: z.infer<typeof trialSessionUpdateSchem
   };
 }
 
+async function readOptionalParentAccountId(request: FastifyRequest) {
+  try {
+    await request.jwtVerify();
+  } catch {
+    return null;
+  }
+  const payload = request.user as { sub?: unknown; role?: unknown };
+  return payload.role === 'parent' && typeof payload.sub === 'string' ? payload.sub : null;
+}
+
 async function attachPackageSummary(
   app: Parameters<AppModule['register']>[0],
   courses: Awaited<ReturnType<typeof catalogRepo.listPublishedCourses>>,
+  options: { showPackagePrice?: boolean } = {},
 ) {
   const packages = await packagesRepo.listActivePackages(app.db);
+  const showPackagePrice = options.showPackagePrice ?? true;
   return courses.map((course) => {
     const coursePackages = packages.filter((item) => item.courseId === course.id);
     const prices = coursePackages.map((item) => item.priceAmount);
     return {
       ...course,
       packageCount: coursePackages.length,
-      startingPriceAmount: prices.length > 0 ? Math.min(...prices) : null,
+      startingPriceAmount: showPackagePrice && prices.length > 0 ? Math.min(...prices) : null,
     };
   });
 }
@@ -89,7 +124,10 @@ export const trialModule: AppModule = {
         trialRepo.listOpenTrialSessions(app.db),
         organizationRepo.listCampuses(app.db),
       ]);
-      const featuredCourses = await attachPackageSummary(app, courses);
+      const businessModel = readBusinessModel(organization.settings);
+      const featuredCourses = await attachPackageSummary(app, courses, {
+        showPackagePrice: businessModel.packagePriceDisplayEnabled,
+      });
       return {
         organization: {
           id: organization.id,
@@ -99,6 +137,7 @@ export const trialModule: AppModule = {
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
           publicSite: readPublicSite(organization.settings),
+          businessModel,
           branding: readSettings(organization.settings).branding ?? {},
         },
         featuredCourses,
@@ -108,8 +147,17 @@ export const trialModule: AppModule = {
     });
 
     app.get('/public/courses', async () => {
-      const courses = await catalogRepo.listPublishedCourses(app.db);
-      return { courses: await attachPackageSummary(app, courses) };
+      const [courses, organization] = await Promise.all([
+        catalogRepo.listPublishedCourses(app.db),
+        organizationRepo.requireOrganization(app.db),
+      ]);
+      const businessModel = readBusinessModel(organization.settings);
+      return {
+        courses: await attachPackageSummary(app, courses, {
+          showPackagePrice: businessModel.packagePriceDisplayEnabled,
+        }),
+        businessModel,
+      };
     });
 
     app.get('/public/trial-sessions', async () => {
@@ -139,6 +187,7 @@ export const trialModule: AppModule = {
           address: organization.address,
           publicProfile: readPublicProfile(organization.settings),
           publicSite: readPublicSite(organization.settings),
+          businessModel: readBusinessModel(organization.settings),
           branding: readSettings(organization.settings).branding ?? {},
         },
       };
@@ -216,6 +265,15 @@ export const trialModule: AppModule = {
         if (trialSession.bookedCount >= trialSession.capacity) {
           throw unprocessable('Trial session is full');
         }
+        const organization = await organizationRepo.requireOrganization(app.db);
+        if (
+          requiresSeatReservationFee(
+            readBusinessModel(organization.settings),
+            trialSession.reservationFeeAmount,
+          )
+        ) {
+          throw unprocessable('本场试听需先支付试听席位保留费，请通过试听场次详情预约。');
+        }
         courseId = trialSession.courseId;
       }
 
@@ -256,6 +314,95 @@ export const trialModule: AppModule = {
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
     });
 
+    app.post('/public/seat-reservations', async (request) => {
+      const body = seatReservationSchema.parse(request.body);
+      const [organization, trialSession] = await Promise.all([
+        organizationRepo.requireOrganization(app.db),
+        trialRepo.requireTrialSession(app.db, body.trialSessionId),
+      ]);
+      const businessModel = readBusinessModel(organization.settings);
+      if (!businessModel.seatReservationFeeEnabled) {
+        throw unprocessable('Seat reservation fee is not enabled');
+      }
+      if (trialSession.status !== 'open') {
+        throw unprocessable('Trial session is not open');
+      }
+      if (trialSession.bookedCount >= trialSession.capacity) {
+        throw unprocessable('Trial session is full');
+      }
+      if (!requiresSeatReservationFee(businessModel, trialSession.reservationFeeAmount)) {
+        throw unprocessable('This trial session has no reservation fee');
+      }
+
+      const course = await catalogRepo.requireCourse(app.db, trialSession.courseId);
+      const { channelId, campaignId } = await crmRepo.resolveAttribution(app.db, {
+        source: body.source,
+        campaignCode: body.campaign,
+      });
+      const cancelBefore = new Date(trialSession.startsAt.getTime() - 12 * 60 * 60 * 1000);
+      const accountId = await readOptionalParentAccountId(request);
+
+      const result = await app.db.transaction(async (tx) => {
+        const [lead] = await tx
+          .insert(schema.leads)
+          .values({
+            campusId: trialSession.campusId,
+            courseId: trialSession.courseId,
+            trialSessionId: trialSession.id,
+            guardianName: body.guardianName,
+            phone: body.phone,
+            studentName: body.studentName,
+            grade: body.grade,
+            source: body.source,
+            channelId,
+            campaignId,
+            medium: body.medium ?? null,
+            status: 'new',
+          })
+          .returning();
+        const order = await financeRepo.createSeatReservationOrder(tx, {
+          accountId,
+          courseId: course.id,
+          amount: trialSession.reservationFeeAmount,
+          source: body.source,
+          channelId,
+          campaignId,
+          medium: body.medium ?? null,
+          paymentReceiverType: course.paymentReceiverType,
+          paymentReceiverInstitutionId: course.paymentReceiverInstitutionId,
+          paymentReceiverName:
+            course.paymentReceiverName || organization.brandName || organization.name,
+        });
+        const seatReservation = await seatReservationRepo.createSeatReservation(tx, {
+          orderId: order.id,
+          orderNo: order.orderNo,
+          leadId: lead.id,
+          campusId: trialSession.campusId,
+          courseId: trialSession.courseId,
+          trialSessionId: trialSession.id,
+          guardianName: body.guardianName,
+          phone: body.phone,
+          studentName: body.studentName,
+          grade: body.grade,
+          reservationFeeAmount: trialSession.reservationFeeAmount,
+          reservationStatus: 'pending_payment',
+          paymentStatus: 'unpaid',
+          checkInStatus: 'pending',
+          cancelBefore,
+          source: body.source,
+          channelId,
+          campaignId,
+          medium: body.medium ?? null,
+        });
+        return { lead, order, seatReservation };
+      });
+
+      return {
+        ...result,
+        message: '已创建试听席位保留订单，请完成支付以保留名额。',
+      };
+    });
+
     app.get('/v1/trial-sessions', { preHandler: app.requireAdmin }, async () => {
       return { trialSessions: await trialRepo.listTrialSessions(app.db) };
     });
@@ -271,6 +418,8 @@ export const trialModule: AppModule = {
         startsAt: new Date(body.startsAt),
         endsAt: new Date(body.endsAt),
         capacity: body.capacity,
+        reservationFeeAmount: body.reservationFeeAmount,
+        reservationNotice: body.reservationNotice,
         status: body.status,
         bookedCount: 0,
       });
@@ -318,6 +467,61 @@ export const trialModule: AppModule = {
         const { trialSessionId } = request.params as { trialSessionId: string };
         await trialRepo.requireTrialSession(app.db, trialSessionId);
         return { leads: await crmRepo.listLeadsByTrialSession(app.db, trialSessionId) };
+      },
+    );
+
+    app.get(
+      '/v1/trial-sessions/:trialSessionId/seat-reservations',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { trialSessionId } = request.params as { trialSessionId: string };
+        await trialRepo.requireTrialSession(app.db, trialSessionId);
+        return {
+          seatReservations: await seatReservationRepo.listSeatReservationsByTrialSession(
+            app.db,
+            trialSessionId,
+          ),
+        };
+      },
+    );
+
+    app.post(
+      '/v1/seat-reservations/:seatReservationId/check-in',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { seatReservationId } = request.params as { seatReservationId: string };
+        return seatReservationRepo.checkInSeatReservation(app.db, seatReservationId);
+      },
+    );
+
+    app.post(
+      '/v1/seat-reservations/:seatReservationId/no-show',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { seatReservationId } = request.params as { seatReservationId: string };
+        return seatReservationRepo.markSeatReservationNoShow(app.db, seatReservationId);
+      },
+    );
+
+    app.post(
+      '/v1/seat-reservations/:seatReservationId/cancel',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { seatReservationId } = request.params as { seatReservationId: string };
+        return seatReservationRepo.cancelSeatReservation(app.db, seatReservationId);
+      },
+    );
+
+    app.post(
+      '/v1/seat-reservations/:seatReservationId/reschedule',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { seatReservationId } = request.params as { seatReservationId: string };
+        const body = seatReservationRescheduleSchema.parse(request.body);
+        return seatReservationRepo.rescheduleSeatReservation(app.db, {
+          reservationId: seatReservationId,
+          trialSessionId: body.trialSessionId,
+        });
       },
     );
 

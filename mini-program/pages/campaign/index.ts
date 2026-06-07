@@ -5,7 +5,7 @@ import {
   type TrialSession,
 } from '../../services/api';
 import { requestSubscribe } from '../../services/subscribe';
-import { formatDateTime } from '../../utils/format';
+import { formatDateTime, money } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
 
 interface CampaignState {
@@ -15,8 +15,9 @@ interface CampaignState {
   code: string;
   payload: CampaignLandingPayload | null;
   contentBlocks: Block[];
-  trialSessions: Array<TrialSession & { startsAtLabel: string }>;
+  trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   trialSessionId: string;
+  selectedRequiresReservationFee: boolean;
 }
 
 const initialState: CampaignState = {
@@ -28,6 +29,7 @@ const initialState: CampaignState = {
   contentBlocks: [],
   trialSessions: [],
   trialSessionId: '',
+  selectedRequiresReservationFee: false,
 };
 
 function decodeScene(scene?: string): Record<string, string> {
@@ -38,6 +40,20 @@ function decodeScene(scene?: string): Record<string, string> {
     if (key && value) acc[key] = value;
     return acc;
   }, {});
+}
+
+function requiresReservationFee(
+  payload: CampaignLandingPayload | null,
+  trialSessions: CampaignState['trialSessions'],
+  trialSessionId: string,
+): boolean {
+  if (!payload?.organization.businessModel.seatReservationFeeEnabled) return false;
+  const selected = trialSessions.find((session) => session.id === trialSessionId);
+  return Boolean(selected && selected.reservationFeeAmount > 0);
+}
+
+function prefillStorageKey(trialSessionId: string): string {
+  return `trial_registration_prefill:${trialSessionId}`;
 }
 
 Page({
@@ -62,13 +78,23 @@ Page({
       const trialSessions = payload.trialSessions.map((session) => ({
         ...session,
         startsAtLabel: formatDateTime(session.startsAt),
+        reservationFeeLabel:
+          session.reservationFeeAmount > 0
+            ? `${money(session.reservationFeeAmount)} 试听席位保留费`
+            : '',
       }));
+      const trialSessionId = trialSessions[0]?.id ?? '';
       this.setData({
         loading: false,
         payload,
         contentBlocks: parseBlocks(payload.campaign.content),
         trialSessions,
-        trialSessionId: trialSessions[0]?.id ?? '',
+        trialSessionId,
+        selectedRequiresReservationFee: requiresReservationFee(
+          payload,
+          trialSessions,
+          trialSessionId,
+        ),
       });
     } catch {
       this.setData({ loading: false, notFound: true });
@@ -76,7 +102,15 @@ Page({
   },
 
   onTrialChange(event: { detail: { value: string } }) {
-    this.setData({ trialSessionId: event.detail.value });
+    const trialSessionId = event.detail.value;
+    this.setData({
+      trialSessionId,
+      selectedRequiresReservationFee: requiresReservationFee(
+        this.data.payload,
+        this.data.trialSessions,
+        trialSessionId,
+      ),
+    });
   },
 
   async onSubmit(event: {
@@ -98,6 +132,17 @@ Page({
 
     if (!guardianName || !phone || !studentName || !grade) {
       wx.showToast({ title: '请补全报名信息', icon: 'none' });
+      return;
+    }
+
+    if (this.data.selectedRequiresReservationFee) {
+      wx.setStorageSync(prefillStorageKey(this.data.trialSessionId), {
+        guardianName,
+        phone,
+        studentName,
+        grade,
+      });
+      wx.navigateTo({ url: `/pages/trial-detail/index?id=${this.data.trialSessionId}` });
       return;
     }
 

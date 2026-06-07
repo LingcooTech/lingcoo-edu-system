@@ -606,6 +606,866 @@ test('creates and mock-pays a public package order', async () => {
   }
 });
 
+test('creates, voids, and recreates settlement batches for paid receiver orders', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+  const paidAt = futureDateFromSuffix(suffix, 2040);
+
+  try {
+    const [admin] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'admin',
+        email: `settlement-admin-${suffix}@example.com`,
+        passwordHash: hashPassword('test-password'),
+        displayName: 'Settlement Admin',
+      })
+      .returning();
+    const adminToken = await app.jwt.sign({ sub: admin.id, role: 'admin' }, { expiresIn: '1h' });
+
+    const [campus] = await app.db
+      .insert(schema.campuses)
+      .values({ name: `Settlement Campus ${suffix.slice(0, 8)}` })
+      .returning();
+    const [guardian] = await app.db
+      .insert(schema.guardians)
+      .values({
+        name: `Settlement Guardian ${suffix.slice(0, 8)}`,
+        phone: phoneFromSuffix(suffix, '139'),
+      })
+      .returning();
+    const [student] = await app.db
+      .insert(schema.students)
+      .values({
+        guardianId: guardian.id,
+        name: `Settlement Student ${suffix.slice(0, 8)}`,
+        grade: '二年级',
+        status: 'active',
+      })
+      .returning();
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        campusId: campus.id,
+        slug: `settlement-course-${suffix}`,
+        name: 'Settlement Course',
+        category: '书法',
+        ageRange: '6-9 岁',
+        durationMinutes: 60,
+        paymentReceiverType: 'provider',
+        paymentReceiverName: '结算合作方',
+        summary: 'Settlement course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [firstOrder, secondOrder] = await app.db
+      .insert(schema.orders)
+      .values([
+        {
+          studentId: student.id,
+          courseId: course.id,
+          orderNo: `SETTLE${suffix.slice(0, 8)}A`,
+          orderType: 'seat_reservation',
+          amount: 990,
+          paidAmount: 990,
+          lessonCount: 0,
+          paymentReceiverType: 'provider',
+          paymentReceiverName: '结算合作方',
+          status: 'paid',
+          paidAt,
+          source: 'test',
+        },
+        {
+          studentId: student.id,
+          courseId: course.id,
+          orderNo: `SETTLE${suffix.slice(0, 8)}B`,
+          orderType: 'manual_package_grant',
+          amount: 88000,
+          paidAmount: 88000,
+          lessonCount: 8,
+          paymentReceiverType: 'provider',
+          paymentReceiverName: '结算合作方',
+          status: 'paid',
+          paidAt: new Date(paidAt.getTime() + 60_000),
+          source: 'test',
+        },
+      ])
+      .returning();
+
+    const listBefore = await app.inject({
+      method: 'GET',
+      url: '/v1/settlement-batches',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(listBefore.statusCode, 200, listBefore.body);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/settlement-batches',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        paymentReceiverType: 'provider',
+        paymentReceiverName: '结算合作方',
+        startsAt: new Date(paidAt.getTime() - 60_000).toISOString(),
+        endsAt: new Date(paidAt.getTime() + 120_000).toISOString(),
+      },
+    });
+    assert.equal(created.statusCode, 200, created.body);
+    const createdPayload = created.json();
+    assert.equal(createdPayload.settlementBatch.orderCount, 2);
+    assert.equal(
+      createdPayload.settlementBatch.totalAmount,
+      firstOrder.paidAmount + secondOrder.paidAmount,
+    );
+    assert.equal(createdPayload.settlementBatch.orders.length, 2);
+
+    const repeated = await app.inject({
+      method: 'POST',
+      url: '/v1/settlement-batches',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        paymentReceiverType: 'provider',
+        paymentReceiverName: '结算合作方',
+        startsAt: new Date(paidAt.getTime() - 60_000).toISOString(),
+        endsAt: new Date(paidAt.getTime() + 120_000).toISOString(),
+      },
+    });
+    assert.equal(repeated.statusCode, 422);
+
+    const voided = await app.inject({
+      method: 'POST',
+      url: `/v1/settlement-batches/${createdPayload.settlementBatch.id}/void`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(voided.statusCode, 200, voided.body);
+    assert.equal(voided.json().settlementBatch.status, 'voided');
+
+    const recreated = await app.inject({
+      method: 'POST',
+      url: '/v1/settlement-batches',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        paymentReceiverType: 'provider',
+        paymentReceiverName: '结算合作方',
+        startsAt: new Date(paidAt.getTime() - 60_000).toISOString(),
+        endsAt: new Date(paidAt.getTime() + 120_000).toISOString(),
+      },
+    });
+    assert.equal(recreated.statusCode, 200, recreated.body);
+    assert.equal(recreated.json().settlementBatch.orderCount, 2);
+  } finally {
+    await app.close();
+  }
+});
+
+test('creates a course contract with offline payment, lesson credit and class enrollment', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+
+  try {
+    const [admin] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'admin',
+        email: `contract-admin-${suffix}@example.com`,
+        passwordHash: hashPassword('test-password'),
+        displayName: 'Contract Admin',
+      })
+      .returning();
+    const adminToken = await app.jwt.sign({ sub: admin.id, role: 'admin' }, { expiresIn: '1h' });
+
+    const [campus] = await app.db
+      .insert(schema.campuses)
+      .values({ name: `Contract Campus ${suffix.slice(0, 8)}` })
+      .returning();
+    const [institution] = await app.db
+      .insert(schema.institutions)
+      .values({
+        name: `Contract Provider ${suffix.slice(0, 8)}`,
+        status: 'active',
+      })
+      .returning();
+    const [guardian] = await app.db
+      .insert(schema.guardians)
+      .values({
+        name: `Contract Guardian ${suffix.slice(0, 8)}`,
+        phone: phoneFromSuffix(suffix, '136'),
+      })
+      .returning();
+    const [student] = await app.db
+      .insert(schema.students)
+      .values({
+        guardianId: guardian.id,
+        name: `Contract Student ${suffix.slice(0, 8)}`,
+        grade: '一年级',
+        status: 'active',
+      })
+      .returning();
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        campusId: campus.id,
+        slug: `contract-course-${suffix}`,
+        name: 'Contract Course',
+        category: '魔方',
+        ageRange: '6-9 岁',
+        durationMinutes: 60,
+        providerInstitutionId: institution.id,
+        paymentReceiverType: 'provider',
+        paymentReceiverInstitutionId: institution.id,
+        paymentReceiverName: institution.name,
+        summary: 'Contract course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [coursePackage] = await app.db
+      .insert(schema.coursePackages)
+      .values({
+        courseId: course.id,
+        name: '16 课时正式班',
+        description: '',
+        lessonCount: 16,
+        priceAmount: 168000,
+        status: 'active',
+      })
+      .returning();
+    const [teacher] = await app.db
+      .insert(schema.teachers)
+      .values({ name: `Contract Teacher ${suffix.slice(0, 8)}`, status: 'active' })
+      .returning();
+    const [classroom] = await app.db
+      .insert(schema.classrooms)
+      .values({
+        campusId: campus.id,
+        name: `Contract Room ${suffix.slice(0, 8)}`,
+        capacity: 8,
+        status: 'active',
+      })
+      .returning();
+    const [classGroup] = await app.db
+      .insert(schema.classes)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        teacherId: teacher.id,
+        classroomId: classroom.id,
+        name: `Contract Class ${suffix.slice(0, 8)}`,
+        capacity: 8,
+        status: 'active',
+      })
+      .returning();
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/course-contracts',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        studentId: student.id,
+        courseId: course.id,
+        classId: classGroup.id,
+        packageId: coursePackage.id,
+        lessonCount: coursePackage.lessonCount,
+        paidAmount: 158000,
+        paymentMethod: 'wechat_offline',
+        startsAt: futureDateFromSuffix(suffix, 2040).toISOString(),
+        note: '线下优惠收款',
+      },
+    });
+    assert.equal(created.statusCode, 200, created.body);
+    const createdPayload = created.json();
+    assert.equal(createdPayload.courseContract.status, 'active');
+    assert.equal(createdPayload.courseContract.student.id, student.id);
+    assert.equal(createdPayload.courseContract.course.id, course.id);
+    assert.equal(createdPayload.courseContract.package.id, coursePackage.id);
+    assert.equal(createdPayload.courseContract.order.orderType, 'manual_package_grant');
+    assert.equal(createdPayload.courseContract.order.status, 'paid');
+    assert.equal(createdPayload.courseContract.order.amount, coursePackage.priceAmount);
+    assert.equal(createdPayload.courseContract.order.paidAmount, 158000);
+    assert.equal(createdPayload.courseContract.order.paymentReceiverType, 'provider');
+    assert.equal(createdPayload.courseContract.order.paymentReceiverName, institution.name);
+    assert.equal(createdPayload.paymentRecord.paidAmount, 158000);
+    assert.equal(createdPayload.enrollment.classId, classGroup.id);
+
+    const [lessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, student.id),
+          eq(schema.lessonAccounts.courseId, course.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(lessonAccount);
+    assert.equal(lessonAccount.balance, coursePackage.lessonCount);
+
+    const [lessonTransaction] = await app.db
+      .select()
+      .from(schema.lessonTransactions)
+      .where(
+        and(
+          eq(schema.lessonTransactions.studentId, student.id),
+          eq(schema.lessonTransactions.relatedEntityType, 'course_contract'),
+          eq(schema.lessonTransactions.relatedEntityId, createdPayload.courseContract.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(lessonTransaction);
+    assert.equal(lessonTransaction.amount, coursePackage.lessonCount);
+
+    const [enrollment] = await app.db
+      .select()
+      .from(schema.classEnrollments)
+      .where(
+        and(
+          eq(schema.classEnrollments.classId, classGroup.id),
+          eq(schema.classEnrollments.studentId, student.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(enrollment);
+    assert.equal(enrollment.active, true);
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/v1/course-contracts',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(listed.statusCode, 200, listed.body);
+    const listedContract = listed
+      .json()
+      .courseContracts.find((item: { id: string }) => item.id === createdPayload.courseContract.id);
+    assert.ok(listedContract);
+    assert.equal(listedContract.student.name, student.name);
+    assert.equal(listedContract.class.name, classGroup.name);
+    assert.equal(listedContract.paymentRecords.length, 1);
+
+    const completed = await app.inject({
+      method: 'PATCH',
+      url: `/v1/course-contracts/${createdPayload.courseContract.id}/status`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { status: 'completed' },
+    });
+    assert.equal(completed.statusCode, 200, completed.body);
+    assert.equal(completed.json().courseContract.status, 'completed');
+
+    const [attendedLead] = await app.db
+      .insert(schema.leads)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        trialSessionId: null,
+        guardianName: `Lead Contract Guardian ${suffix.slice(0, 8)}`,
+        phone: phoneFromSuffix(suffix, '137'),
+        studentName: `Lead Contract Student ${suffix.slice(0, 8)}`,
+        grade: '大班',
+        source: 'test',
+        status: 'trial_attended',
+      })
+      .returning();
+
+    const fromLead = await app.inject({
+      method: 'POST',
+      url: `/v1/crm/leads/${attendedLead.id}/course-contract`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        courseId: course.id,
+        classId: classGroup.id,
+        packageId: coursePackage.id,
+        lessonCount: coursePackage.lessonCount,
+        paidAmount: 168000,
+        paymentMethod: 'bank_transfer',
+        school: '测试小学',
+        note: '普通试听转正式课',
+      },
+    });
+    assert.equal(fromLead.statusCode, 200, fromLead.body);
+    const fromLeadPayload = fromLead.json();
+    assert.equal(fromLeadPayload.courseContract.order.orderType, 'manual_package_grant');
+    assert.equal(fromLeadPayload.lead.status, 'paid');
+    assert.equal(fromLeadPayload.lead.convertedStudentId, fromLeadPayload.student.id);
+    assert.equal(fromLeadPayload.student.school, '测试小学');
+    assert.equal(fromLeadPayload.enrollment.classId, classGroup.id);
+
+    const [seatLead] = await app.db
+      .insert(schema.leads)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        guardianName: `Seat Contract Guardian ${suffix.slice(0, 8)}`,
+        phone: phoneFromSuffix(suffix, '138'),
+        studentName: `Seat Contract Student ${suffix.slice(0, 8)}`,
+        grade: '中班',
+        source: 'test',
+        status: 'trial_attended',
+      })
+      .returning();
+    const [seatOrder] = await app.db
+      .insert(schema.orders)
+      .values({
+        studentId: null,
+        courseId: course.id,
+        orderNo: `SEATCON${suffix.replaceAll('-', '').slice(0, 12)}`,
+        orderType: 'seat_reservation',
+        amount: 990,
+        paidAmount: 990,
+        lessonCount: 0,
+        paymentReceiverType: 'provider',
+        paymentReceiverInstitutionId: institution.id,
+        paymentReceiverName: institution.name,
+        status: 'paid',
+        paidAt: new Date(),
+        source: 'test',
+      })
+      .returning();
+    const [seatReservation] = await app.db
+      .insert(schema.seatReservations)
+      .values({
+        orderId: seatOrder.id,
+        orderNo: seatOrder.orderNo,
+        leadId: seatLead.id,
+        campusId: campus.id,
+        courseId: course.id,
+        guardianName: seatLead.guardianName,
+        phone: seatLead.phone,
+        studentName: seatLead.studentName,
+        grade: seatLead.grade,
+        reservationFeeAmount: 990,
+        reservationStatus: 'reserved',
+        paymentStatus: 'paid',
+        checkInStatus: 'checked_in',
+        checkedInAt: new Date(),
+        source: 'test',
+      })
+      .returning();
+
+    const fromSeat = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${seatReservation.id}/course-contract`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        courseId: course.id,
+        classId: classGroup.id,
+        packageId: coursePackage.id,
+        lessonCount: coursePackage.lessonCount,
+        paidAmount: 168000,
+        paymentMethod: 'wechat_offline',
+        note: '占位费到课转正式课',
+      },
+    });
+    assert.equal(fromSeat.statusCode, 200, fromSeat.body);
+    const fromSeatPayload = fromSeat.json();
+    assert.equal(fromSeatPayload.courseContract.courseId, course.id);
+    assert.equal(fromSeatPayload.seatReservation.id, seatReservation.id);
+    assert.equal(fromSeatPayload.lead.status, 'paid');
+    assert.equal(fromSeatPayload.lead.convertedStudentId, fromSeatPayload.student.id);
+  } finally {
+    await app.close();
+  }
+});
+
+test('creates and mock-pays a public seat reservation without crediting lessons', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+  const phone = phoneFromSuffix(suffix, '135');
+
+  const [organization] = await app.db.select().from(schema.organization).limit(1);
+  const previousSettings = organization?.settings;
+
+  try {
+    assert.ok(organization);
+    const existingSettings =
+      previousSettings && typeof previousSettings === 'object' && !Array.isArray(previousSettings)
+        ? (previousSettings as Record<string, unknown>)
+        : {};
+    await app.db
+      .update(schema.organization)
+      .set({
+        settings: {
+          ...existingSettings,
+          businessModel: {
+            mode: 'reservation_platform',
+            onlinePackageSalesEnabled: false,
+            manualPackageGrantEnabled: true,
+            packagePriceDisplayEnabled: true,
+            seatReservationFeeEnabled: true,
+          },
+        },
+      })
+      .where(eq(schema.organization.id, organization.id));
+
+    const [campus] = await app.db
+      .insert(schema.campuses)
+      .values({ name: `Seat Campus ${suffix.slice(0, 8)}` })
+      .returning();
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        campusId: campus.id,
+        slug: `seat-reservation-${suffix}`,
+        name: 'Seat Reservation Course',
+        category: '书法',
+        ageRange: '6-9 岁',
+        durationMinutes: 60,
+        paymentReceiverType: 'provider',
+        paymentReceiverName: '亦安书画',
+        summary: 'Seat reservation course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const startsAt = futureDateFromSuffix(suffix, 2040);
+    const [trialSession] = await app.db
+      .insert(schema.trialSessions)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        title: '周六硬笔书法公开课',
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 60 * 60 * 1000),
+        capacity: 6,
+        bookedCount: 0,
+        reservationFeeAmount: 990,
+        reservationNotice: '开课前12小时以前可改期一次。',
+        status: 'open',
+      })
+      .returning();
+
+    const rejectedTrialRegistration = await app.inject({
+      method: 'POST',
+      url: '/public/trial-registrations',
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'Bypass Guardian',
+        phone: phoneFromSuffix(suffix, '134'),
+        studentName: 'Bypass Student',
+        grade: '大班',
+        source: 'h5',
+      },
+    });
+    assert.equal(rejectedTrialRegistration.statusCode, 422);
+    assert.match(rejectedTrialRegistration.json().message, /席位保留费/);
+
+    const [channel] = await app.db
+      .insert(schema.channels)
+      .values({ code: `seat-${suffix.slice(0, 8)}`, name: 'Seat Channel' })
+      .returning();
+    const [campaign] = await app.db
+      .insert(schema.campaigns)
+      .values({
+        channelId: channel.id,
+        code: `seat-${suffix.slice(9, 17)}`,
+        name: 'Seat Campaign',
+        courseSlug: course.slug,
+        medium: 'qr_code',
+        status: 'active',
+      })
+      .returning();
+    const rejectedCampaignParticipation = await app.inject({
+      method: 'POST',
+      url: `/public/crm/campaigns/${campaign.code}/participations`,
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'Campaign Bypass Guardian',
+        phone: phoneFromSuffix(suffix, '133'),
+        studentName: 'Campaign Bypass Student',
+        grade: '大班',
+        source: 'campaign',
+      },
+    });
+    assert.equal(rejectedCampaignParticipation.statusCode, 422);
+    assert.match(rejectedCampaignParticipation.json().message, /席位保留费/);
+
+    const [rejectedSession] = await app.db
+      .select()
+      .from(schema.trialSessions)
+      .where(eq(schema.trialSessions.id, trialSession.id))
+      .limit(1);
+    assert.equal(rejectedSession.bookedCount, 0);
+
+    const reservation = await app.inject({
+      method: 'POST',
+      url: '/public/seat-reservations',
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'Seat Guardian',
+        phone,
+        studentName: 'Seat Student',
+        grade: '大班',
+        source: 'h5',
+        medium: 'trial_qr',
+      },
+    });
+    assert.equal(reservation.statusCode, 200, reservation.body);
+    const reservationPayload = reservation.json();
+    assert.equal(reservationPayload.order.orderType, 'seat_reservation');
+    assert.equal(reservationPayload.order.amount, 990);
+    assert.equal(reservationPayload.order.lessonCount, 0);
+    assert.equal(reservationPayload.order.paymentReceiverType, 'provider');
+    assert.equal(reservationPayload.order.paymentReceiverName, '亦安书画');
+    assert.equal(reservationPayload.seatReservation.reservationStatus, 'pending_payment');
+    assert.equal(reservationPayload.seatReservation.paymentStatus, 'unpaid');
+    assert.equal(reservationPayload.lead.status, 'new');
+
+    const [unpaidSession] = await app.db
+      .select()
+      .from(schema.trialSessions)
+      .where(eq(schema.trialSessions.id, trialSession.id))
+      .limit(1);
+    assert.equal(unpaidSession.bookedCount, 0);
+
+    const intent = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${reservationPayload.order.orderNo}/payment-intent`,
+      payload: { provider: 'mock' },
+    });
+    assert.equal(intent.statusCode, 200, intent.body);
+    assert.equal(intent.json().item.nextAction, 'mock_pay');
+
+    const paid = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${reservationPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(paid.statusCode, 200, paid.body);
+    assert.equal(paid.json().item.status, 'paid');
+    assert.equal(paid.json().item.lessonCount, 0);
+
+    const [paidReservation] = await app.db
+      .select()
+      .from(schema.seatReservations)
+      .where(eq(schema.seatReservations.id, reservationPayload.seatReservation.id))
+      .limit(1);
+    assert.equal(paidReservation.reservationStatus, 'reserved');
+    assert.equal(paidReservation.paymentStatus, 'paid');
+
+    const [paidLead] = await app.db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, reservationPayload.lead.id))
+      .limit(1);
+    assert.equal(paidLead.status, 'trial_booked');
+
+    const [paidSession] = await app.db
+      .select()
+      .from(schema.trialSessions)
+      .where(eq(schema.trialSessions.id, trialSession.id))
+      .limit(1);
+    assert.equal(paidSession.bookedCount, 1);
+
+    const adminToken = await app.jwt.sign(
+      { sub: randomUUID(), role: 'admin' },
+      { expiresIn: '1h' },
+    );
+    const checkIn = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${paidReservation.id}/check-in`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(checkIn.statusCode, 200, checkIn.body);
+    assert.equal(checkIn.json().seatReservation.checkInStatus, 'checked_in');
+
+    const [attendedLead] = await app.db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, reservationPayload.lead.id))
+      .limit(1);
+    assert.equal(attendedLead.status, 'trial_attended');
+
+    const cancelCheckedIn = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${paidReservation.id}/cancel`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(cancelCheckedIn.statusCode, 422);
+
+    const secondReservation = await app.inject({
+      method: 'POST',
+      url: '/public/seat-reservations',
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'Seat Guardian 2',
+        phone: phoneFromSuffix(suffix, '132'),
+        studentName: 'Seat Student 2',
+        grade: '大班',
+        source: 'h5',
+        medium: 'trial_qr',
+      },
+    });
+    assert.equal(secondReservation.statusCode, 200, secondReservation.body);
+    const secondReservationPayload = secondReservation.json();
+    const secondPaid = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${secondReservationPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(secondPaid.statusCode, 200, secondPaid.body);
+
+    const [twoPaidSession] = await app.db
+      .select()
+      .from(schema.trialSessions)
+      .where(eq(schema.trialSessions.id, trialSession.id))
+      .limit(1);
+    assert.equal(twoPaidSession.bookedCount, 2);
+
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${secondReservationPayload.seatReservation.id}/cancel`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(cancelled.statusCode, 200, cancelled.body);
+    assert.equal(cancelled.json().seatReservation.reservationStatus, 'cancelled');
+    assert.equal(cancelled.json().trialSession.bookedCount, 1);
+
+    const noShowReservation = await app.inject({
+      method: 'POST',
+      url: '/public/seat-reservations',
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'Seat Guardian 3',
+        phone: phoneFromSuffix(suffix, '131'),
+        studentName: 'Seat Student 3',
+        grade: '大班',
+        source: 'h5',
+        medium: 'trial_qr',
+      },
+    });
+    assert.equal(noShowReservation.statusCode, 200, noShowReservation.body);
+    const noShowReservationPayload = noShowReservation.json();
+    const noShowPaid = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${noShowReservationPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(noShowPaid.statusCode, 200, noShowPaid.body);
+
+    const noShow = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${noShowReservationPayload.seatReservation.id}/no-show`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(noShow.statusCode, 200, noShow.body);
+    assert.equal(noShow.json().seatReservation.checkInStatus, 'no_show');
+
+    const [noShowLead] = await app.db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, noShowReservationPayload.lead.id))
+      .limit(1);
+    assert.equal(noShowLead.status, 'follow_up');
+
+    const [noShowSession] = await app.db
+      .select()
+      .from(schema.trialSessions)
+      .where(eq(schema.trialSessions.id, trialSession.id))
+      .limit(1);
+    assert.equal(noShowSession.bookedCount, 2);
+
+    const targetStartsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const [targetTrialSession] = await app.db
+      .insert(schema.trialSessions)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        title: '周日硬笔书法公开课',
+        startsAt: targetStartsAt,
+        endsAt: new Date(targetStartsAt.getTime() + 60 * 60 * 1000),
+        capacity: 6,
+        bookedCount: 0,
+        reservationFeeAmount: 990,
+        reservationNotice: '开课前12小时以前可改期一次。',
+        status: 'open',
+      })
+      .returning();
+    const rescheduleReservation = await app.inject({
+      method: 'POST',
+      url: '/public/seat-reservations',
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'Seat Guardian 4',
+        phone: phoneFromSuffix(suffix, '130'),
+        studentName: 'Seat Student 4',
+        grade: '大班',
+        source: 'h5',
+        medium: 'trial_qr',
+      },
+    });
+    assert.equal(rescheduleReservation.statusCode, 200, rescheduleReservation.body);
+    const rescheduleReservationPayload = rescheduleReservation.json();
+    const reschedulePaid = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${rescheduleReservationPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(reschedulePaid.statusCode, 200, reschedulePaid.body);
+
+    const pastTargetStartsAt = new Date(Date.now() - 60 * 60 * 1000);
+    const [pastTargetTrialSession] = await app.db
+      .insert(schema.trialSessions)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        title: '已过期硬笔书法公开课',
+        startsAt: pastTargetStartsAt,
+        endsAt: new Date(pastTargetStartsAt.getTime() + 60 * 60 * 1000),
+        capacity: 6,
+        bookedCount: 0,
+        reservationFeeAmount: 990,
+        reservationNotice: '开课前12小时以前可改期一次。',
+        status: 'open',
+      })
+      .returning();
+    const expiredTargetReschedule = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${rescheduleReservationPayload.seatReservation.id}/reschedule`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { trialSessionId: pastTargetTrialSession.id },
+    });
+    assert.equal(expiredTargetReschedule.statusCode, 422);
+
+    const rescheduled = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${rescheduleReservationPayload.seatReservation.id}/reschedule`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { trialSessionId: targetTrialSession.id },
+    });
+    assert.equal(rescheduled.statusCode, 200, rescheduled.body);
+    assert.equal(rescheduled.json().seatReservation.trialSessionId, targetTrialSession.id);
+    assert.equal(rescheduled.json().seatReservation.originalTrialSessionId, trialSession.id);
+    assert.equal(rescheduled.json().seatReservation.rescheduleCount, 1);
+    assert.equal(rescheduled.json().previousTrialSession.bookedCount, 2);
+    assert.equal(rescheduled.json().trialSession.bookedCount, 1);
+
+    const [rescheduledLead] = await app.db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, rescheduleReservationPayload.lead.id))
+      .limit(1);
+    assert.equal(rescheduledLead.trialSessionId, targetTrialSession.id);
+    assert.equal(rescheduledLead.status, 'trial_booked');
+
+    const repeatedReschedule = await app.inject({
+      method: 'POST',
+      url: `/v1/seat-reservations/${rescheduleReservationPayload.seatReservation.id}/reschedule`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { trialSessionId: trialSession.id },
+    });
+    assert.equal(repeatedReschedule.statusCode, 422);
+
+    const lessonAccounts = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(eq(schema.lessonAccounts.courseId, course.id));
+    assert.equal(lessonAccounts.length, 0);
+  } finally {
+    if (organization) {
+      await app.db
+        .update(schema.organization)
+        .set({ settings: previousSettings ?? {} })
+        .where(eq(schema.organization.id, organization.id));
+    }
+    await app.close();
+  }
+});
+
 test('creates a WeChat Mini Program payment intent for a bound parent order', async () => {
   const payEnv: AppEnv = {
     ...testEnv,
@@ -619,6 +1479,8 @@ test('creates a WeChat Mini Program payment intent for a bound parent order', as
   const originalFetch = globalThis.fetch;
   const suffix = randomUUID();
   let requestXml = '';
+  let organizationId: string | null = null;
+  let previousSettings: unknown = null;
 
   globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
     requestXml = String(init?.body ?? '');
@@ -717,7 +1579,190 @@ test('creates a WeChat Mini Program payment intent for a bound parent order', as
       requestXml,
       new RegExp(`<openid><!\\[CDATA\\[openid-jsapi-${suffix}\\]\\]></openid>`),
     );
+
+    const [organization] = await app.db.select().from(schema.organization).limit(1);
+    assert.ok(organization);
+    organizationId = organization.id;
+    previousSettings = organization.settings;
+    const existingSettings =
+      previousSettings && typeof previousSettings === 'object' && !Array.isArray(previousSettings)
+        ? (previousSettings as Record<string, unknown>)
+        : {};
+    await app.db
+      .update(schema.organization)
+      .set({
+        settings: {
+          ...existingSettings,
+          businessModel: {
+            mode: 'reservation_platform',
+            onlinePackageSalesEnabled: false,
+            manualPackageGrantEnabled: true,
+            packagePriceDisplayEnabled: true,
+            seatReservationFeeEnabled: true,
+          },
+        },
+      })
+      .where(eq(schema.organization.id, organization.id));
+
+    const [campus] = await app.db
+      .insert(schema.campuses)
+      .values({ name: `JSAPI Seat Campus ${suffix.slice(0, 8)}` })
+      .returning();
+    const startsAt = futureDateFromSuffix(suffix, 2040);
+    const [trialSession] = await app.db
+      .insert(schema.trialSessions)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        title: 'JSAPI Seat Trial',
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 60 * 60 * 1000),
+        capacity: 8,
+        reservationFeeAmount: 1990,
+        reservationNotice: '',
+        status: 'open',
+      })
+      .returning();
+
+    const seatReservation = await app.inject({
+      method: 'POST',
+      url: '/public/seat-reservations',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'JSAPI Seat Guardian',
+        phone: guardian.phone,
+        studentName: 'JSAPI Seat Student',
+        grade: '大班',
+        source: 'mini_program',
+        medium: 'wechat_mini_program',
+      },
+    });
+    assert.equal(seatReservation.statusCode, 200, seatReservation.body);
+    const seatReservationPayload = seatReservation.json();
+    assert.equal(seatReservationPayload.order.orderType, 'seat_reservation');
+    assert.equal(seatReservationPayload.order.accountId, account.id);
+
+    const seatIntent = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${seatReservationPayload.order.orderNo}/wechat-mini-payment-intent`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(seatIntent.statusCode, 200, seatIntent.body);
+    assert.equal(seatIntent.json().item.mode, 'mini_program_jsapi');
+    assert.equal(seatIntent.json().item.nextAction, 'request_payment');
+    assert.match(requestXml, /试听席位保留费/);
+
+    const parentCenterSeatReservation = await app.inject({
+      method: 'POST',
+      url: '/public/seat-reservations',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        trialSessionId: trialSession.id,
+        guardianName: 'JSAPI Parent Center Guardian',
+        phone: guardian.phone,
+        studentName: 'JSAPI Parent Center Student',
+        grade: '大班',
+        source: 'mini_program',
+        medium: 'wechat_mini_program',
+      },
+    });
+    assert.equal(parentCenterSeatReservation.statusCode, 200, parentCenterSeatReservation.body);
+    const parentCenterSeatReservationPayload = parentCenterSeatReservation.json();
+
+    const seatPaid = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${parentCenterSeatReservationPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(seatPaid.statusCode, 200, seatPaid.body);
+
+    const targetStartsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const [targetTrialSession] = await app.db
+      .insert(schema.trialSessions)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        title: 'JSAPI Seat Trial Target',
+        startsAt: targetStartsAt,
+        endsAt: new Date(targetStartsAt.getTime() + 60 * 60 * 1000),
+        capacity: 8,
+        reservationFeeAmount: 1990,
+        reservationNotice: '',
+        status: 'open',
+      })
+      .returning();
+    type ParentSeatReservationPayload = typeof schema.seatReservations.$inferSelect & {
+      canReschedule: boolean;
+      trialSession: typeof schema.trialSessions.$inferSelect;
+      rescheduleOptions: (typeof schema.trialSessions.$inferSelect)[];
+    };
+
+    const parentSeatReservations = await app.inject({
+      method: 'GET',
+      url: '/public/me/seat-reservations',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(parentSeatReservations.statusCode, 200, parentSeatReservations.body);
+    const parentSeatReservationsPayload = parentSeatReservations.json() as {
+      seatReservations: ParentSeatReservationPayload[];
+    };
+    const parentSeatReservation = parentSeatReservationsPayload.seatReservations.find(
+      (item) => item.id === parentCenterSeatReservationPayload.seatReservation.id,
+    );
+    assert.ok(parentSeatReservation);
+    assert.equal(parentSeatReservation.canReschedule, true);
+    assert.equal(parentSeatReservation.trialSession.id, trialSession.id);
+    assert.ok(
+      parentSeatReservation.rescheduleOptions.some(
+        (session: typeof schema.trialSessions.$inferSelect) => session.id === targetTrialSession.id,
+      ),
+    );
+
+    const parentRescheduled = await app.inject({
+      method: 'POST',
+      url: `/public/me/seat-reservations/${parentCenterSeatReservationPayload.seatReservation.id}/reschedule`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { trialSessionId: targetTrialSession.id },
+    });
+    assert.equal(parentRescheduled.statusCode, 200, parentRescheduled.body);
+    assert.equal(parentRescheduled.json().seatReservation.trialSessionId, targetTrialSession.id);
+    assert.equal(parentRescheduled.json().seatReservation.rescheduleCount, 1);
+
+    const otherParentToken = await app.jwt.sign(
+      { sub: randomUUID(), role: 'parent' },
+      { expiresIn: '1h' },
+    );
+    const otherParentReschedule = await app.inject({
+      method: 'POST',
+      url: `/public/me/seat-reservations/${parentCenterSeatReservationPayload.seatReservation.id}/reschedule`,
+      headers: { authorization: `Bearer ${otherParentToken}` },
+      payload: { trialSessionId: trialSession.id },
+    });
+    assert.equal(otherParentReschedule.statusCode, 404);
+
+    const updatedParentSeatReservations = await app.inject({
+      method: 'GET',
+      url: '/public/me/seat-reservations',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(updatedParentSeatReservations.statusCode, 200, updatedParentSeatReservations.body);
+    const updatedParentSeatReservationsPayload = updatedParentSeatReservations.json() as {
+      seatReservations: ParentSeatReservationPayload[];
+    };
+    const updatedParentSeatReservation = updatedParentSeatReservationsPayload.seatReservations.find(
+      (item) => item.id === parentCenterSeatReservationPayload.seatReservation.id,
+    );
+    assert.ok(updatedParentSeatReservation);
+    assert.equal(updatedParentSeatReservation.canReschedule, false);
+    assert.equal(updatedParentSeatReservation.trialSession.id, targetTrialSession.id);
+    assert.equal(updatedParentSeatReservation.rescheduleCount, 1);
   } finally {
+    if (organizationId) {
+      await app.db
+        .update(schema.organization)
+        .set({ settings: previousSettings ?? {} })
+        .where(eq(schema.organization.id, organizationId));
+    }
     globalThis.fetch = originalFetch;
     await app.close();
   }

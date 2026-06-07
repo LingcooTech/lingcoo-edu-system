@@ -57,6 +57,13 @@
   line-height: 1.6;
 }
 
+.trial-fee {
+  margin-top: 8rpx;
+  color: #a15c12;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
 .form-hint {
   margin-bottom: 22rpx;
 }

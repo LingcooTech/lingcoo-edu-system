@@ -6,9 +6,12 @@ export function money(cents?: number | null): string {
 export function coursePriceLabel(input: {
   packageCount?: number;
   startingPriceAmount?: number | null;
-}): string {
+}, mode?: 'course_sales' | 'reservation_platform' | 'hybrid'): string {
   if (!input.packageCount || input.startingPriceAmount === null || input.startingPriceAmount === undefined) {
     return '可预约试听';
+  }
+  if (mode === 'reservation_platform') {
+    return `${money(input.startingPriceAmount)} 参考`;
   }
   return `${money(input.startingPriceAmount)} 起`;
 }

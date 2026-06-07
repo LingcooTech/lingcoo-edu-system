@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { fetchTrialSessions, type TrialSession } from '@/api/client';
 import { Layout } from '@/components/Layout';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, money } from '@/lib/utils';
 
 export function TrialListPage() {
   const [sessions, setSessions] = useState<TrialSession[]>([]);
@@ -21,7 +21,9 @@ export function TrialListPage() {
       <section className="container-narrow py-8">
         <div className="eyebrow">Trial</div>
         <h1 className="text-ink mt-1 text-2xl font-bold">公开课 / 试听课</h1>
-        <p className="text-ink-soft mt-2 text-sm leading-6">选择一节公开课,扫码或填表即可预约名额。</p>
+        <p className="text-ink-soft mt-2 text-sm leading-6">
+          选择一节公开课,扫码或填表即可预约名额。
+        </p>
 
         <div className="mt-5 grid gap-3">
           {loading ? (
@@ -34,7 +36,14 @@ export function TrialListPage() {
               return (
                 <div key={session.id} className="pwcard p-4">
                   <div className="text-ink text-sm font-semibold">{session.title}</div>
-                  <div className="text-ink-soft mt-2 text-sm">{formatDateTime(session.startsAt)}</div>
+                  <div className="text-ink-soft mt-2 text-sm">
+                    {formatDateTime(session.startsAt)}
+                  </div>
+                  {session.reservationFeeAmount > 0 && (
+                    <div className="mt-2 text-xs text-amber-700">
+                      {money(session.reservationFeeAmount)} 试听席位保留费
+                    </div>
+                  )}
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-muted text-xs">
                       已报名 {session.bookedCount}/{session.capacity}
@@ -42,10 +51,7 @@ export function TrialListPage() {
                     {full ? (
                       <span className="text-muted text-xs">名额已满</span>
                     ) : (
-                      <Link
-                        to={`/trials/${session.id}`}
-                        className="pwbtn pwbtn-primary px-4 py-2"
-                      >
+                      <Link to={`/trials/${session.id}`} className="pwbtn pwbtn-primary px-4 py-2">
                         预约
                       </Link>
                     )}

@@ -99,6 +99,31 @@
     </view>
 
     <view class="section card panel">
+      <view class="section-title">试听席位</view>
+      <view wx:if="{{seatReservations.length}}" class="item-list">
+        <view wx:for="{{seatReservations}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.trialSession ? item.trialSession.title : '试听预约'}}</view>
+              <view class="muted row-meta">{{item.courseName}} · {{item.studentName}}</view>
+            </view>
+            <view class="seat-status {{item.reservationStatus}}">{{item.reservationStatusLabel}}</view>
+          </view>
+          <view class="muted row-meta">{{item.startsAtLabel}} · {{item.campusName}}</view>
+          <view class="row-between order-line">
+            <view class="muted row-meta">{{item.paymentStatusLabel}} · {{item.checkInStatusLabel}} · 改期 {{item.rescheduleCount}}/1</view>
+            <view class="order-amount">{{item.feeLabel}}</view>
+          </view>
+          <picker wx:if="{{item.canSelfReschedule}}" mode="selector" range="{{item.rescheduleOptionLabels}}" data-id="{{item.id}}" bindchange="onRescheduleSeatReservation">
+            <view class="mini-button reschedule-button">改期</view>
+          </picker>
+          <view wx:elif="{{item.canReschedule}}" class="muted row-meta">暂无可改期场次</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无试听席位预约</view>
+    </view>
+
+    <view class="section card panel">
       <view class="section-title">订单</view>
       <view wx:if="{{orders.length}}" class="item-list">
         <view wx:for="{{orders}}" wx:key="id" class="stack-row">

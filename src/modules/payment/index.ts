@@ -3,9 +3,11 @@ import { z } from 'zod';
 
 import * as crmRepo from '../../db/repositories/crm.js';
 import * as financeRepo from '../../db/repositories/finance.js';
+import * as organizationRepo from '../../db/repositories/organization.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import { requireCourse } from '../../db/repositories/catalog.js';
 import * as schema from '../../db/schema.js';
+import { canUseOnlinePackageSales, readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { hashPassword } from '../../lib/password.js';
 import type { AppModule } from '../types.js';
@@ -89,7 +91,14 @@ export const paymentModule: AppModule = {
       if (!courseId) {
         throw httpError(422, '该课时包未绑定课程，暂不能购买');
       }
-      await requireCourse(app.db, courseId);
+      const [course, organization] = await Promise.all([
+        requireCourse(app.db, courseId),
+        organizationRepo.requireOrganization(app.db),
+      ]);
+      const businessModel = readBusinessModel(organization.settings);
+      if (!canUseOnlinePackageSales(businessModel, course.onlineSalesEnabled)) {
+        throw httpError(403, '当前机构不支持线上购买课时包，请预约试听或到店确认');
+      }
       const phone = normalizePhone(body.guardianPhone);
       const defaultPassword = defaultPasswordForPhone(phone);
       const attribution = await crmRepo.resolveAttribution(app.db, {
@@ -197,6 +206,10 @@ export const paymentModule: AppModule = {
           amount: pkg.priceAmount,
           lessonCount: pkg.lessonCount,
           currency: 'CNY',
+          paymentReceiverType: course.paymentReceiverType,
+          paymentReceiverInstitutionId: course.paymentReceiverInstitutionId,
+          paymentReceiverName:
+            course.paymentReceiverName || organization.brandName || organization.name,
           source: body.source ?? lead?.source ?? 'unknown',
           channelId: attribution.channelId ?? lead?.channelId ?? null,
           campaignId: attribution.campaignId ?? lead?.campaignId ?? null,
