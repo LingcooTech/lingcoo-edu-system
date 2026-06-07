@@ -12,12 +12,14 @@ export function Modal({
   title,
   children,
   footer,
+  panelClassName = '',
 }: {
   open: boolean;
   onClose: () => void;
   title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  panelClassName?: string;
 }) {
   useEffect(() => {
     if (!open) {
@@ -41,14 +43,22 @@ export function Modal({
     return null;
   }
 
+  const widthClass = panelClassName || 'max-w-md';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
       role="dialog"
       aria-modal="true"
     >
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="bg-surface border-line relative z-10 w-full max-w-md rounded-t-3xl p-6 shadow-xl sm:rounded-3xl sm:border">
+      <div
+        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className={`bg-surface border-line relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-3xl p-6 shadow-xl sm:rounded-3xl sm:border ${widthClass}`}
+      >
         {title ? (
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-ink text-lg font-bold">{title}</h2>

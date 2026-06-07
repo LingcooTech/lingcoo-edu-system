@@ -6,7 +6,6 @@ import { AboutPage } from '@/pages/AboutPage';
 import { CampaignLandingPage } from '@/pages/CampaignLandingPage';
 import { ChangePasswordPage } from '@/pages/ChangePasswordPage';
 import { CheckInPage } from '@/pages/CheckInPage';
-import { CheckoutPage } from '@/pages/CheckoutPage';
 import { CourseDetailPage } from '@/pages/CourseDetailPage';
 import { CourseListPage } from '@/pages/CourseListPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
@@ -61,7 +60,6 @@ export function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/teacher" element={<AccountPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
-          <Route path="/checkout/:packageId" element={<CheckoutPage />} />
         </Routes>
         <AuthModal />
       </SessionProvider>

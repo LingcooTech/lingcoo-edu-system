@@ -266,6 +266,15 @@ export const paymentModule: AppModule = {
       });
     });
 
+    app.get('/public/orders/:orderNo/status', async (request) => {
+      const { orderNo } = request.params as { orderNo: string };
+      const order = await financeRepo.findOrderByOrderNo(app.db, orderNo);
+      if (!order) {
+        throw httpError(404, 'Order not found');
+      }
+      return { item: order };
+    });
+
     // Development-only shortcut to drive the buy→credit loop without a provider.
     app.post('/public/orders/:orderNo/mock-pay', async (request) => {
       const { orderNo } = request.params as { orderNo: string };
@@ -367,6 +376,17 @@ export const paymentModule: AppModule = {
     app.get('/v1/payment-providers', { preHandler: app.requireAdmin }, async () => {
       return new PaymentSettingsService(app).getOverview({ includeMock: true });
     });
+
+    app.post(
+      '/v1/orders/:orderNo/payment-sync',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { orderNo } = request.params as { orderNo: string };
+        return new PaymentService(app).syncProviderPayment({
+          orderNo,
+        });
+      },
+    );
 
     app.get('/v1/payment-settings', { preHandler: app.requireAdmin }, async () => {
       return new PaymentSettingsService(app).getOverview();

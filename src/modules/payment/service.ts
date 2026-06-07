@@ -15,7 +15,7 @@ import type {
   LivePaymentProviderCode,
   PaymentIntent,
   PaymentNotificationResult,
-  PaymentProviderCode
+  PaymentProviderCode,
 } from './providers/types.js';
 import { PaymentSettingsService } from './settings-service.js';
 
@@ -43,7 +43,9 @@ async function attachQrCodeDataUrl(intent: PaymentIntent): Promise<PaymentIntent
     return intent;
   }
 
-  const qrCodeText = String(intent.payload.qrCodeText ?? intent.payload.codeUrl ?? intent.payload.qrCode ?? '').trim();
+  const qrCodeText = String(
+    intent.payload.qrCodeText ?? intent.payload.codeUrl ?? intent.payload.qrCode ?? '',
+  ).trim();
   if (!qrCodeText) {
     throw httpError(500, 'Payment provider did not return a QR code');
   }
@@ -56,14 +58,14 @@ async function attachQrCodeDataUrl(intent: PaymentIntent): Promise<PaymentIntent
       codeUrl: String(intent.payload.codeUrl ?? qrCodeText),
       qrCodeDataUrl: await QRCode.toDataURL(qrCodeText, {
         margin: 1,
-        width: 280
-      })
-    }
+        width: 280,
+      }),
+    },
   };
 }
 
 /**
- * Orchestrates payment for course-package orders: builds a provider payment
+ * Orchestrates payment for public checkout orders: builds a provider payment
  * intent (mock / WeChat / Alipay), handles the idempotent settlement on
  * callback or reconciliation, and fires the parent notification. All money
  * mutations route through the transactional `financeRepo.markOrderPaidAndCredit`.
@@ -112,8 +114,8 @@ export class PaymentService {
         orderNo: order.orderNo,
         subject: buildOrderSubject(order),
         amount: order.amount,
-        currency: order.currency
-      }
+        currency: order.currency,
+      },
     });
 
     await financeRepo.markPaymentPrepared(this.app.db, order.orderNo, provider);
@@ -190,7 +192,7 @@ export class PaymentService {
       integrationStatus: this.app.appEnv.NODE_ENV === 'production' ? 'not_configured' : 'mock',
       nextAction: order.status === 'paid' ? 'none' : 'mock_pay',
       nextStep: 'Development only: call mock-pay to mark this order as paid.',
-      payload: {}
+      payload: {},
     };
 
     return { item: intent };
@@ -214,7 +216,7 @@ export class PaymentService {
       amount: order.amount,
       currency: order.currency,
       paidAt: new Date(),
-      raw: { source: 'mock' }
+      raw: { source: 'mock' },
     });
 
     // Idempotent: a repeated mock-pay returns success but skips the second
@@ -226,7 +228,9 @@ export class PaymentService {
     return { item: result.order };
   }
 
-  async handlePaymentNotification(notification: Extract<PaymentNotificationResult, { kind: 'paid' }>) {
+  async handlePaymentNotification(
+    notification: Extract<PaymentNotificationResult, { kind: 'paid' }>,
+  ) {
     const result = await financeRepo.markOrderPaidAndCredit(this.app.db, {
       orderNo: notification.orderNo,
       provider: notification.provider,
@@ -235,7 +239,7 @@ export class PaymentService {
       amount: notification.amount,
       currency: notification.currency,
       paidAt: notification.paidAt,
-      raw: notification.payload
+      raw: notification.payload,
     });
 
     // Duplicate provider callback for an already-paid order: ACK it (so the
@@ -263,8 +267,8 @@ export class PaymentService {
         reconciliation: {
           status: 'paid',
           source: 'current_state',
-          reason: 'Order already marked as paid'
-        }
+          reason: 'Order already marked as paid',
+        },
       };
     }
 
@@ -282,14 +286,14 @@ export class PaymentService {
         subject: buildOrderSubject(order),
         amount: order.amount,
         currency: order.currency,
-        providerOrderId: order.providerOrderId
-      }
+        providerOrderId: order.providerOrderId,
+      },
     });
 
     if (query.kind === 'paid') {
       const result = await this.handlePaymentNotification({
         ...query,
-        providerEventId: `query_paid:${query.provider}:${query.providerOrderId}:${query.orderNo}`
+        providerEventId: `query_paid:${query.provider}:${query.providerOrderId}:${query.orderNo}`,
       });
 
       return {
@@ -300,8 +304,8 @@ export class PaymentService {
           source: 'provider_query',
           reason: result.alreadyPaid
             ? 'Provider query confirmed payment (already recorded)'
-            : 'Provider query confirmed payment'
-        }
+            : 'Provider query confirmed payment',
+        },
       };
     }
 
@@ -311,8 +315,8 @@ export class PaymentService {
       reconciliation: {
         status: query.kind,
         source: 'provider_query',
-        reason: query.reason
-      }
+        reason: query.reason,
+      },
     };
   }
 
@@ -334,7 +338,7 @@ export class PaymentService {
       ctaLabel: '查看订单',
       ctaUrl: '/account',
       sourceEventName: 'payment.paid',
-      dedupeKey: `payment.paid:${order.orderNo}:${provider}:${providerOrderId}`
+      dedupeKey: `payment.paid:${order.orderNo}:${provider}:${providerOrderId}`,
     });
     await this.sendWechatMiniPaymentSubscribe(order);
   }
@@ -346,7 +350,11 @@ export class PaymentService {
       return;
     }
 
-    const identity = await accountsRepo.findWechatIdentityByAccount(this.app.db, order.accountId, appId);
+    const identity = await accountsRepo.findWechatIdentityByAccount(
+      this.app.db,
+      order.accountId,
+      appId,
+    );
     if (!identity) {
       return;
     }
@@ -375,7 +383,10 @@ export class PaymentService {
         );
       }
     } catch (error) {
-      this.app.log.warn({ err: error, orderNo: order.orderNo }, 'wechat mini payment subscribe failed');
+      this.app.log.warn(
+        { err: error, orderNo: order.orderNo },
+        'wechat mini payment subscribe failed',
+      );
     }
   }
 
@@ -387,15 +398,20 @@ export class PaymentService {
       provider,
       amount: order.amount,
       currency: order.currency,
-      mode: provider === 'alipay' ? 'page_redirect' : provider === 'wechat_pay' ? 'native_qr' : 'mock_mini_program',
+      mode:
+        provider === 'alipay'
+          ? 'page_redirect'
+          : provider === 'wechat_pay'
+            ? 'native_qr'
+            : 'mock_mini_program',
       status: 'paid',
       configured: true,
       integrationStatus: provider === 'mock' ? 'mock' : 'live',
       nextAction: 'none',
       nextStep: 'Order is already paid.',
       payload: {
-        providerOrderId: order.providerOrderId ?? ''
-      }
+        providerOrderId: order.providerOrderId ?? '',
+      },
     };
   }
 }

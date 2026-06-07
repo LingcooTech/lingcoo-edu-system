@@ -292,6 +292,9 @@ export interface Order {
   amount: number;
   paidAmount: number;
   lessonCount: number;
+  currency?: string;
+  paymentProvider?: string | null;
+  providerOrderId?: string | null;
   paymentReceiverType?: 'platform' | 'provider' | 'other' | string;
   paymentReceiverInstitutionId?: string | null;
   paymentReceiverName?: string | null;

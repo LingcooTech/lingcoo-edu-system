@@ -231,6 +231,9 @@ export interface ParentOrder {
   paidAmount?: number;
   status: string;
   lessonCount: number;
+  currency?: string;
+  paymentProvider?: string | null;
+  providerOrderId?: string | null;
   createdAt: string;
   course?: Course | null;
   package?: CoursePackage | null;
@@ -640,6 +643,10 @@ export async function mockPayOrder(orderNo: string) {
       method: 'POST',
     })
   ).item;
+}
+
+export async function fetchOrderStatus(orderNo: string) {
+  return (await publicApi<{ item: ParentOrder }>(`/public/orders/${orderNo}/status`)).item;
 }
 
 export interface PaymentSyncResult {

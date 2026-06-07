@@ -1,21 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, Loader2, MapPin, UsersRound } from 'lucide-react';
+import { CalendarDays, MapPin, UsersRound } from 'lucide-react';
 
 import {
-  createPaymentIntent,
   createSeatReservation,
-  fetchPaymentProviders,
   fetchTrialSession,
-  mockPayOrder,
-  syncPayment,
   submitTrialRegistration,
-  type PaymentIntent,
-  type PaymentProvider,
-  type PaymentProviderStatus,
   type TrialDetail,
 } from '@/api/client';
+import { CheckoutModal, type CheckoutTarget } from '@/components/CheckoutModal';
 import { Layout } from '@/components/Layout';
 import { getAttribution } from '@/lib/attribution';
 import { formatDateTime, money } from '@/lib/utils';
@@ -46,20 +40,6 @@ function readPrefillForm(state: unknown): Partial<TrialForm> {
   };
 }
 
-const DEFAULT_PROVIDERS: PaymentProviderStatus[] = [
-  { code: 'wechat_pay', label: '微信支付', configured: false, supportedModes: ['native_qr'] },
-  { code: 'alipay', label: '支付宝', configured: false, supportedModes: ['page_redirect'] },
-];
-
-if (import.meta.env.DEV) {
-  DEFAULT_PROVIDERS.push({
-    code: 'mock',
-    label: '模拟支付（开发）',
-    configured: true,
-    supportedModes: ['mock_mini_program'],
-  });
-}
-
 export function TrialDetailPage() {
   const { trialId = '' } = useParams();
   const navigate = useNavigate();
@@ -72,11 +52,8 @@ export function TrialDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [paymentOrderNo, setPaymentOrderNo] = useState('');
-  const [intent, setIntent] = useState<PaymentIntent | null>(null);
-  const [providers, setProviders] = useState<PaymentProviderStatus[]>(DEFAULT_PROVIDERS);
-  const [paying, setPaying] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -84,32 +61,7 @@ export function TrialDetailPage() {
       .then(setDetail)
       .catch(() => setDetail(null))
       .finally(() => setLoading(false));
-    fetchPaymentProviders()
-      .then(setProviders)
-      .catch(() => setProviders(DEFAULT_PROVIDERS));
   }, [trialId]);
-
-  useEffect(
-    () => () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    },
-    [],
-  );
-
-  function startPolling(orderNo: string) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const result = await syncPayment(orderNo);
-        if (result.item.status === 'paid') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          navigate('/register/success');
-        }
-      } catch {
-        // Keep polling while the provider is syncing.
-      }
-    }, 3000);
-  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -127,8 +79,18 @@ export function TrialDetailPage() {
           course: detail.course.slug,
           medium: attribution.medium ?? 'trial_qr',
         });
-        setPaymentOrderNo(payload.order.orderNo);
-        setIntent(null);
+        setCheckoutTarget({
+          type: 'order',
+          orderNo: payload.order.orderNo,
+          title: detail.trialSession.title,
+          subtitle: `${detail.course.name} · ${formatDateTime(detail.trialSession.startsAt)}`,
+          amount: detail.trialSession.reservationFeeAmount,
+          successTitle: '席位已保留',
+          successMessage: '支付成功后，本场试听名额已为孩子保留。',
+          successActionLabel: '查看预约',
+          successActionHref: '/account',
+        });
+        setCheckoutOpen(true);
       } else {
         await submitTrialRegistration({
           ...form,
@@ -175,50 +137,6 @@ export function TrialDetailPage() {
   const requiresReservationFee =
     detail.organization.businessModel.seatReservationFeeEnabled &&
     detail.trialSession.reservationFeeAmount > 0;
-  const providerByCode = new Map(providers.map((provider) => [provider.code, provider]));
-  const liveProviders = providers.filter((provider) => provider.code !== 'mock');
-  const mockProvider = providerByCode.get('mock');
-
-  async function pay(provider: PaymentProvider) {
-    if (!paymentOrderNo) return;
-    setPaying(true);
-    setError('');
-    try {
-      const created = await createPaymentIntent(paymentOrderNo, provider);
-      setIntent(created);
-      if (created.status === 'paid') {
-        navigate('/register/success');
-        return;
-      }
-      if (created.nextAction === 'redirect' && created.payload.checkoutUrl) {
-        startPolling(paymentOrderNo);
-        window.location.href = created.payload.checkoutUrl;
-        return;
-      }
-      if (created.nextAction === 'render_qr') {
-        startPolling(paymentOrderNo);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '发起支付失败');
-    } finally {
-      setPaying(false);
-    }
-  }
-
-  async function payMock() {
-    if (!paymentOrderNo) return;
-    setPaying(true);
-    setError('');
-    try {
-      await mockPayOrder(paymentOrderNo);
-      if (pollRef.current) clearInterval(pollRef.current);
-      navigate('/register/success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '模拟支付失败');
-    } finally {
-      setPaying(false);
-    }
-  }
 
   return (
     <Layout>
@@ -255,7 +173,7 @@ export function TrialDetailPage() {
         </article>
 
         <div className="pwcard h-fit space-y-3 p-5">
-          {!paymentOrderNo ? (
+          {!checkoutTarget ? (
             <form className="space-y-3" onSubmit={submit}>
               <div>
                 <h2 className="text-ink text-lg font-semibold">
@@ -316,53 +234,31 @@ export function TrialDetailPage() {
           ) : (
             <div className="space-y-3">
               <div>
-                <h2 className="text-ink text-lg font-semibold">支付试听席位保留费</h2>
-                <p className="text-muted mt-1 text-xs">订单 {paymentOrderNo}</p>
-              </div>
-              {intent && intent.nextAction === 'render_qr' && intent.payload.qrCodeDataUrl && (
-                <div className="border-line rounded-2xl border p-4 text-center">
-                  <img
-                    src={intent.payload.qrCodeDataUrl}
-                    alt="支付二维码"
-                    className="mx-auto h-56 w-56"
-                  />
-                  <div className="text-muted mt-2 flex items-center justify-center gap-2 text-xs">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    等待支付结果...
-                  </div>
-                </div>
-              )}
-              <div className="grid gap-2">
-                {liveProviders.map((provider) => (
-                  <button
-                    key={provider.code}
-                    type="button"
-                    onClick={() => pay(provider.code)}
-                    disabled={paying || !provider.configured}
-                    className="pwbtn pwbtn-primary w-full disabled:opacity-60"
-                  >
-                    {provider.label}
-                    {!provider.configured ? '（未开通）' : ''}
-                  </button>
-                ))}
-                {mockProvider && (
-                  <button
-                    type="button"
-                    onClick={() => (intent?.provider === 'mock' ? payMock() : pay('mock'))}
-                    disabled={paying || !mockProvider.configured}
-                    className="pwbtn pwbtn-outline w-full disabled:opacity-60"
-                  >
-                    {intent?.provider === 'mock' ? '确认模拟支付' : '模拟支付（开发）'}
-                  </button>
-                )}
+                <h2 className="text-ink text-lg font-semibold">试听席位保留费待支付</h2>
+                <p className="text-muted mt-1 text-xs">
+                  订单 {checkoutTarget.type === 'order' ? checkoutTarget.orderNo : '-'}
+                </p>
               </div>
               {error && (
                 <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
               )}
+              <button
+                type="button"
+                className="pwbtn pwbtn-primary w-full"
+                onClick={() => setCheckoutOpen(true)}
+              >
+                继续支付保留名额
+              </button>
             </div>
           )}
         </div>
       </section>
+      <CheckoutModal
+        open={checkoutOpen}
+        target={checkoutTarget}
+        onClose={() => setCheckoutOpen(false)}
+        onSuccess={() => navigate('/register/success')}
+      />
     </Layout>
   );
 }

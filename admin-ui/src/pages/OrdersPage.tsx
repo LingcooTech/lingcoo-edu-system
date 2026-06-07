@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Plus, RefreshCw } from 'lucide-react';
 
-import { apiPost } from '@/api/client';
+import { api, apiPost } from '@/api/client';
 import type { CoursePackage, Order, Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
@@ -37,6 +37,11 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   offline_other: '其他线下',
 };
 
+const LIVE_PAYMENT_PROVIDER_LABEL: Record<string, string> = {
+  wechat_pay: '微信支付',
+  alipay: '支付宝',
+};
+
 const PAYMENT_RECEIVER_TYPE_LABEL: Record<string, string> = {
   platform: '平台收款',
   provider: '课程提供方收款',
@@ -69,12 +74,29 @@ function orderSearchText(order: Order) {
     order.course?.name,
     order.package?.name,
     order.paymentReceiverName,
+    order.paymentProvider ? LIVE_PAYMENT_PROVIDER_LABEL[order.paymentProvider] : '',
     order.paymentMethod ? PAYMENT_METHOD_LABEL[order.paymentMethod] : '',
     order.offlinePaymentNote,
   ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
+
+function paymentChannelLabel(order: Order) {
+  if (order.paymentProvider) {
+    return LIVE_PAYMENT_PROVIDER_LABEL[order.paymentProvider] ?? order.paymentProvider;
+  }
+  return order.paymentMethod
+    ? (PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod)
+    : '-';
+}
+
+function canSyncPayment(order: Order) {
+  return (
+    order.status === 'pending' &&
+    Boolean(order.paymentProvider && LIVE_PAYMENT_PROVIDER_LABEL[order.paymentProvider])
+  );
 }
 
 export function OrdersPage() {
@@ -101,13 +123,24 @@ export function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [receiverTypeFilter, setReceiverTypeFilter] = useState('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
+  const [syncingOrderNo, setSyncingOrderNo] = useState('');
+  const [reloading, setReloading] = useState(false);
 
   const selectedPackage = activePackages.find((item) => item.id === form.packageId);
   const paymentMethods = useMemo(
     () =>
-      Array.from(new Set(data.map((order) => order.paymentMethod).filter(Boolean) as string[]))
+      Array.from(
+        new Set(
+          data
+            .map((order) => order.paymentProvider || order.paymentMethod)
+            .filter(Boolean) as string[],
+        ),
+      )
         .sort()
-        .map((method) => ({ value: method, label: PAYMENT_METHOD_LABEL[method] ?? method })),
+        .map((method) => ({
+          value: method,
+          label: LIVE_PAYMENT_PROVIDER_LABEL[method] ?? PAYMENT_METHOD_LABEL[method] ?? method,
+        })),
     [data],
   );
   const filtered = useMemo(() => {
@@ -118,7 +151,11 @@ export function OrdersPage() {
       if (receiverTypeFilter !== 'all' && order.paymentReceiverType !== receiverTypeFilter) {
         return false;
       }
-      if (paymentMethodFilter !== 'all' && order.paymentMethod !== paymentMethodFilter) {
+      if (
+        paymentMethodFilter !== 'all' &&
+        order.paymentMethod !== paymentMethodFilter &&
+        order.paymentProvider !== paymentMethodFilter
+      ) {
         return false;
       }
       if (normalizedQuery && !orderSearchText(order).includes(normalizedQuery)) return false;
@@ -142,6 +179,29 @@ export function OrdersPage() {
         .length,
     };
   }, [filtered]);
+
+  const reloadOrders = useCallback(async () => {
+    setReloading(true);
+    try {
+      const payload = await api<{ orders: Order[] }>('/v1/orders');
+      setData(payload.orders ?? []);
+    } finally {
+      setReloading(false);
+    }
+  }, [setData]);
+
+  const hasPendingProviderOrders = useMemo(
+    () => data.some((order) => order.status === 'pending' && Boolean(order.paymentProvider)),
+    [data],
+  );
+
+  useEffect(() => {
+    if (!hasPendingProviderOrders) return;
+    const timer = window.setInterval(() => {
+      void reloadOrders().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [hasPendingProviderOrders, reloadOrders]);
 
   function openManualGrant() {
     const firstPackage = activePackages[0];
@@ -176,6 +236,29 @@ export function OrdersPage() {
       toast.error(err instanceof Error ? err.message : '添加失败');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function syncPaymentOrder(order: Order) {
+    if (!canSyncPayment(order)) {
+      toast.error('该订单尚未发起线上支付，不能同步三方支付状态');
+      return;
+    }
+    setSyncingOrderNo(order.orderNo);
+    try {
+      const result = await api<{
+        changed: boolean;
+        item: Order;
+        reconciliation: { status: string; source: string; reason: string };
+      }>(`/v1/orders/${encodeURIComponent(order.orderNo)}/payment-sync`, { method: 'POST' });
+      await reloadOrders();
+      toast.success(
+        `${result.item.status === 'paid' ? '订单已同步为已支付' : '订单状态已同步'}：${result.reconciliation.reason}`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '同步失败');
+    } finally {
+      setSyncingOrderNo('');
     }
   }
 
@@ -238,6 +321,15 @@ export function OrdersPage() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => void reloadOrders().catch(() => toast.error('刷新订单失败'))}
+            disabled={reloading}
+          >
+            <RefreshCw className={`h-4 w-4 ${reloading ? 'animate-spin' : ''}`} />
+            刷新
+          </button>
           <button type="button" className="btn btn-primary" onClick={openManualGrant}>
             <Plus className="h-4 w-4" />
             线下添加课时包
@@ -287,15 +379,29 @@ export function OrdersPage() {
           {
             key: 'method',
             header: '支付方式',
-            cell: (row) =>
-              row.paymentMethod
-                ? (PAYMENT_METHOD_LABEL[row.paymentMethod] ?? row.paymentMethod)
-                : '-',
+            cell: (row) => paymentChannelLabel(row),
           },
           {
             key: 'status',
             header: '状态',
             cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+          },
+          {
+            key: 'actions',
+            header: '操作',
+            cell: (row) => (
+              <button
+                type="button"
+                className="btn btn-secondary px-2 py-1 text-xs"
+                onClick={() => void syncPaymentOrder(row)}
+                disabled={!canSyncPayment(row) || syncingOrderNo === row.orderNo}
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${syncingOrderNo === row.orderNo ? 'animate-spin' : ''}`}
+                />
+                {syncingOrderNo === row.orderNo ? '同步中' : '同步'}
+              </button>
+            ),
           },
         ]}
         data={filtered}

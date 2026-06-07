@@ -12,6 +12,7 @@ import {
 } from '@/api/client';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
+import { CheckoutModal, type CheckoutTarget } from '@/components/CheckoutModal';
 import { Layout } from '@/components/Layout';
 import { money } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ export function CourseDetailPage() {
   const [paymentReceiverInstitution, setPaymentReceiverInstitution] =
     useState<PublicInstitution | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound'>('loading');
+  const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
 
   const contentBlocks = useMemo(() => parseBlocks(course?.content), [course]);
 
@@ -147,9 +149,23 @@ export function CourseDetailPage() {
                     <p className="text-ink-soft mt-2 text-sm leading-6">{pkg.description}</p>
                   )}
                   {onlinePackageSalesAllowed ? (
-                    <Link to={`/checkout/${pkg.id}`} className="pwbtn pwbtn-outline mt-3 w-full">
+                    <button
+                      type="button"
+                      className="pwbtn pwbtn-outline mt-3 w-full"
+                      onClick={() =>
+                        setCheckoutTarget({
+                          type: 'package',
+                          packageId: pkg.id,
+                          title: pkg.name,
+                          subtitle: `${pkg.lessonCount} 课时 · ${course.name}`,
+                          description: pkg.description,
+                          amount: pkg.priceAmount,
+                          lessonCount: pkg.lessonCount,
+                        })
+                      }
+                    >
                       购买课时包
-                    </Link>
+                    </button>
                   ) : (
                     <Link
                       to={`/register?course=${course.slug}`}
@@ -195,6 +211,12 @@ export function CourseDetailPage() {
           </Link>
         </div>
       </div>
+
+      <CheckoutModal
+        open={Boolean(checkoutTarget)}
+        target={checkoutTarget}
+        onClose={() => setCheckoutTarget(null)}
+      />
     </Layout>
   );
 }
