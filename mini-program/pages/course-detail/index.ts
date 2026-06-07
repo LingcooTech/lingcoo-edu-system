@@ -34,7 +34,11 @@ function orderStatusLabel(status: string): string {
 
 function payloadString(payload: Record<string, unknown>, key: string): string {
   const value = payload[key];
-  return typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value);
+  return typeof value === 'string'
+    ? value
+    : value === undefined || value === null
+      ? ''
+      : String(value);
 }
 
 function requestWechatPayment(intent: PaymentIntent): Promise<void> {
@@ -103,7 +107,6 @@ Page({
       wx.setNavigationBarTitle({ title: payload.course.name });
       const onlinePackageSalesAllowed =
         Boolean(payload.businessModel.onlinePackageSalesEnabled) &&
-        payload.businessModel.mode !== 'reservation_platform' &&
         payload.course.onlineSalesEnabled !== false;
       const receiverLabel =
         payload.course.paymentReceiverName ||
@@ -125,7 +128,10 @@ Page({
         teacherLabel: payload.defaultTeacher?.name || '场次确认',
         locationLabel: payload.course.teachingLocationLabel || '到店确认',
         receiverLabel,
-        packages: payload.coursePackages.map((item) => ({ ...item, priceLabel: money(item.priceAmount) })),
+        packages: payload.coursePackages.map((item) => ({
+          ...item,
+          priceLabel: money(item.priceAmount),
+        })),
         contentBlocks: parseBlocks(payload.course.content),
       });
     } catch {

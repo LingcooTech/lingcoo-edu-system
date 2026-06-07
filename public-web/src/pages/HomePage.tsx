@@ -31,10 +31,9 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
   ) {
     return '可预约试听';
   }
-  if (businessModel?.mode === 'reservation_platform') {
-    return `${money(course.startingPriceAmount)} 参考`;
-  }
-  return `${money(course.startingPriceAmount)} 起`;
+  return businessModel?.onlinePackageSalesEnabled
+    ? `${money(course.startingPriceAmount)} 起`
+    : `${money(course.startingPriceAmount)} 参考`;
 }
 
 export function HomePage() {

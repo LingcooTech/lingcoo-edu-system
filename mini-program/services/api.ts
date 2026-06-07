@@ -44,10 +44,7 @@ export interface TrialSession {
   reservationNotice: string;
 }
 
-export type BusinessMode = 'course_sales' | 'reservation_platform';
-
 export interface BusinessModelSettings {
-  mode: BusinessMode;
   onlinePackageSalesEnabled: boolean;
   manualPackageGrantEnabled: boolean;
   packagePriceDisplayEnabled: boolean;

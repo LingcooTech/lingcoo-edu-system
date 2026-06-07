@@ -13,10 +13,9 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
   ) {
     return '可预约试听';
   }
-  if (businessModel?.mode === 'reservation_platform') {
-    return `${money(course.startingPriceAmount)} 参考`;
-  }
-  return `${money(course.startingPriceAmount)} 起`;
+  return businessModel?.onlinePackageSalesEnabled
+    ? `${money(course.startingPriceAmount)} 起`
+    : `${money(course.startingPriceAmount)} 参考`;
 }
 
 export function CourseListPage() {
@@ -93,12 +92,12 @@ export function CourseListPage() {
                 </p>
                 <div className="text-muted mt-2 text-xs">
                   {course.packageCount
-                    ? businessModel?.mode === 'reservation_platform'
-                      ? `${course.packageCount} 个参考方案`
-                      : `${course.packageCount} 个课时包`
-                    : businessModel?.mode === 'reservation_platform'
-                      ? '暂无参考方案'
-                      : '暂未上架课时包'}{' '}
+                    ? businessModel?.onlinePackageSalesEnabled
+                      ? `${course.packageCount} 个课时包`
+                      : `${course.packageCount} 个参考方案`
+                    : businessModel?.onlinePackageSalesEnabled
+                      ? '暂未上架课时包'
+                      : '暂无参考方案'}{' '}
                   · 单节 {course.durationMinutes} 分钟
                 </div>
               </Link>

@@ -4,7 +4,12 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Course, Institution, Teacher } from '@/api/types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
-import { COURSE_ALLOWED, parseBlocks, serializeBlocks, type Block } from '@/components/editor/blocks';
+import {
+  COURSE_ALLOWED,
+  parseBlocks,
+  serializeBlocks,
+  type Block,
+} from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -161,9 +166,7 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const { course } = await apiDelete<{ course: Course }>(
-        `${COURSE_BASE()}/${deleteTarget.id}`,
-      );
+      const { course } = await apiDelete<{ course: Course }>(`${COURSE_BASE()}/${deleteTarget.id}`);
       setCourses(courses.filter((item) => item.id !== course.id));
       toast.success('课程已删除');
       setDeleteTarget(null);
@@ -246,7 +249,7 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? '编辑课程' : '新增课程'}
-        description="维护课程展示、课程提供方、授课与收款信息；是否允许线上售卖由业务模式和课程开关共同决定。"
+        description="维护课程展示、课程提供方、授课与收款信息；是否允许线上售卖由业务开关和课程开关共同决定。"
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
@@ -316,9 +319,7 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
             <select
               className="form-input"
               value={form.providerInstitutionId}
-              onChange={(event) =>
-                setForm({ ...form, providerInstitutionId: event.target.value })
-              }
+              onChange={(event) => setForm({ ...form, providerInstitutionId: event.target.value })}
             >
               <option value="">平台自有 / 待填写</option>
               {institutions.map((institution) => (
@@ -447,7 +448,7 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
   );
 
   return embedded ? (
-    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
+    <div className="[&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-header>div]:hidden [&_.page-shell]:p-0">
       {page}
     </div>
   ) : (

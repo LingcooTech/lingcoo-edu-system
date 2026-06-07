@@ -84,7 +84,7 @@ export const adminSections = [
       { key: 'orders', label: '订单收款', path: '/operations/orders', icon: ReceiptText },
       {
         key: 'businessModel',
-        label: '业务模式',
+        label: '业务开关',
         path: '/operations/business-model',
         icon: Settings,
       },
@@ -192,7 +192,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   businessModel: {
     eyebrow: 'Operations',
-    title: '业务模式',
+    title: '业务开关',
   },
   contracts: {
     eyebrow: 'Operations',

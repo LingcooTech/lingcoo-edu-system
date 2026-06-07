@@ -141,7 +141,7 @@ export const financeModule: AppModule = {
         ]);
         const businessModel = readBusinessModel(organization.settings);
         if (!businessModel.manualPackageGrantEnabled) {
-          throw httpError(403, '当前业务模式未开启后台手动添加课时包');
+          throw httpError(403, '当前业务开关未开启后台手动添加课时包');
         }
         if (pkg.status !== 'active') {
           throw httpError(422, '该课时包已下架');

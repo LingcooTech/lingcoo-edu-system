@@ -1,4 +1,9 @@
-import { fetchCourses, loadHome, type BusinessModelSettings, type Course } from '../../services/api';
+import {
+  fetchCourses,
+  loadHome,
+  type BusinessModelSettings,
+  type Course,
+} from '../../services/api';
 import { coursePriceLabel } from '../../utils/format';
 
 type CourseListItem = Course & { priceLabel: string };
@@ -27,7 +32,10 @@ Page({
         businessModel: home?.organization.businessModel ?? null,
         courses: courses.map((course) => ({
           ...course,
-          priceLabel: coursePriceLabel(course, home?.organization.businessModel.mode),
+          priceLabel: coursePriceLabel(
+            course,
+            home?.organization.businessModel.onlinePackageSalesEnabled,
+          ),
         })),
       });
     } catch (error) {

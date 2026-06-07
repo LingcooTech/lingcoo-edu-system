@@ -54,7 +54,7 @@ export const courseContractsModule: AppModule = {
       ]);
       const businessModel = readBusinessModel(organization.settings);
       if (!businessModel.manualPackageGrantEnabled) {
-        throw httpError(403, '当前业务模式未开启后台手动添加课时包');
+        throw httpError(403, '当前业务开关未开启后台手动添加课时包');
       }
 
       return {

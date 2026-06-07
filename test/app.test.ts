@@ -1086,7 +1086,6 @@ test('creates and mock-pays a public seat reservation without crediting lessons'
         settings: {
           ...existingSettings,
           businessModel: {
-            mode: 'reservation_platform',
             onlinePackageSalesEnabled: false,
             manualPackageGrantEnabled: true,
             packagePriceDisplayEnabled: true,
@@ -1594,7 +1593,6 @@ test('creates a WeChat Mini Program payment intent for a bound parent order', as
         settings: {
           ...existingSettings,
           businessModel: {
-            mode: 'reservation_platform',
             onlinePackageSalesEnabled: false,
             manualPackageGrantEnabled: true,
             packagePriceDisplayEnabled: true,

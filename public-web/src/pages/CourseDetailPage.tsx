@@ -65,9 +65,7 @@ export function CourseDetailPage() {
   }
 
   const onlinePackageSalesAllowed =
-    Boolean(businessModel?.onlinePackageSalesEnabled) &&
-    businessModel?.mode !== 'reservation_platform' &&
-    course.onlineSalesEnabled !== false;
+    Boolean(businessModel?.onlinePackageSalesEnabled) && course.onlineSalesEnabled !== false;
   const paymentReceiverLabel =
     course.paymentReceiverName ||
     paymentReceiverInstitution?.name ||
@@ -103,7 +101,7 @@ export function CourseDetailPage() {
           </span>
         </div>
 
-        <section className="border-line mt-5 grid gap-3 rounded-2xl border bg-surface p-4 text-sm sm:grid-cols-2">
+        <section className="border-line bg-surface mt-5 grid gap-3 rounded-2xl border p-4 text-sm sm:grid-cols-2">
           <div className="text-ink-soft flex items-center gap-2">
             <Building2 className="text-brand h-4 w-4" />
             <span>课程提供方：{providerInstitution?.name ?? '平台自有 / 待确认'}</span>
@@ -153,7 +151,10 @@ export function CourseDetailPage() {
                       购买课时包
                     </Link>
                   ) : (
-                    <Link to={`/register?course=${course.slug}`} className="pwbtn pwbtn-outline mt-3 w-full">
+                    <Link
+                      to={`/register?course=${course.slug}`}
+                      className="pwbtn pwbtn-outline mt-3 w-full"
+                    >
                       预约试听后到店确认
                     </Link>
                   )}
@@ -168,7 +169,7 @@ export function CourseDetailPage() {
             {course.trialDescription && (
               <div className="pwcard p-4">
                 <h2 className="text-ink text-base font-semibold">试听说明</h2>
-                <p className="text-ink-soft mt-2 whitespace-pre-wrap text-sm leading-6">
+                <p className="text-ink-soft mt-2 text-sm leading-6 whitespace-pre-wrap">
                   {course.trialDescription}
                 </p>
               </div>
@@ -176,7 +177,7 @@ export function CourseDetailPage() {
             {course.reservationNotice && (
               <div className="pwcard p-4">
                 <h2 className="text-ink text-base font-semibold">预约规则</h2>
-                <p className="text-ink-soft mt-2 whitespace-pre-wrap text-sm leading-6">
+                <p className="text-ink-soft mt-2 text-sm leading-6 whitespace-pre-wrap">
                   {course.reservationNotice}
                 </p>
               </div>

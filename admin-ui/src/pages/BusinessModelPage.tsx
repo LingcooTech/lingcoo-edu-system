@@ -4,10 +4,8 @@ import type { FormEvent } from 'react';
 import { fetchOrganization, saveOrganization } from '@/api/client';
 import type { BusinessModelSettings } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
-import { Field } from '@/components/shared/FormField';
 
 const DEFAULT_BUSINESS_MODEL: BusinessModelSettings = {
-  mode: 'course_sales',
   onlinePackageSalesEnabled: true,
   manualPackageGrantEnabled: true,
   packagePriceDisplayEnabled: true,
@@ -36,7 +34,7 @@ export function BusinessModelPage() {
     try {
       const updated = await saveOrganization({ businessModel });
       setBusinessModel(updated.businessModel ?? DEFAULT_BUSINESS_MODEL);
-      setMessage('业务模式已保存');
+      setMessage('业务开关已保存');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -52,39 +50,16 @@ export function BusinessModelPage() {
         ) : (
           <>
             <div>
-              <div className="text-sm font-semibold">业务模式</div>
+              <div className="text-sm font-semibold">业务开关</div>
               <p className="text-muted-foreground mt-1 text-sm">
-                控制公开端是否售卖长期课时包，以及试听/公开课是否启用占位费。
+                通过开关组合控制公开端购买、价格展示、试听占位费和线下课时管理能力。
               </p>
             </div>
             <div className="mt-4 grid gap-4">
-              <Field label="平台定位">
-                <select
-                  className="form-input"
-                  value={businessModel.mode}
-                  onChange={(event) => {
-                    const mode = event.target.value as BusinessModelSettings['mode'];
-                    setBusinessModel((current) => ({
-                      ...current,
-                      mode,
-                      onlinePackageSalesEnabled:
-                        mode === 'reservation_platform' ? false : current.onlinePackageSalesEnabled,
-                      seatReservationFeeEnabled:
-                        mode === 'reservation_platform' ? true : current.seatReservationFeeEnabled,
-                    }));
-                  }}
-                >
-                  <option value="course_sales">售课机构：公开端可购买课时包</option>
-                  <option value="reservation_platform">
-                    运营平台：公开端只预约，线下成交后管课时
-                  </option>
-                </select>
-              </Field>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={businessModel.onlinePackageSalesEnabled}
-                  disabled={businessModel.mode === 'reservation_platform'}
                   onChange={(event) =>
                     setBusinessModel({
                       ...businessModel,
@@ -136,7 +111,7 @@ export function BusinessModelPage() {
             </div>
             {message && <p className="text-muted-foreground mt-4 text-sm">{message}</p>}
             <button className="btn btn-primary mt-4" disabled={saving}>
-              {saving ? '保存中...' : '保存业务模式'}
+              {saving ? '保存中...' : '保存业务开关'}
             </button>
           </>
         )}

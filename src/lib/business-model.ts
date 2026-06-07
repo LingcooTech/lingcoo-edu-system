@@ -1,7 +1,4 @@
-export type BusinessMode = 'course_sales' | 'reservation_platform';
-
 export interface BusinessModelSettings {
-  mode: BusinessMode;
   onlinePackageSalesEnabled: boolean;
   manualPackageGrantEnabled: boolean;
   packagePriceDisplayEnabled: boolean;
@@ -9,7 +6,6 @@ export interface BusinessModelSettings {
 }
 
 export const defaultBusinessModel: BusinessModelSettings = {
-  mode: 'course_sales',
   onlinePackageSalesEnabled: true,
   manualPackageGrantEnabled: true,
   packagePriceDisplayEnabled: true,
@@ -24,44 +20,38 @@ function readBool(value: unknown, fallback: boolean) {
   return typeof value === 'boolean' ? value : fallback;
 }
 
-function readMode(value: unknown): BusinessMode {
-  return value === 'reservation_platform' || value === 'course_sales'
-    ? value
-    : defaultBusinessModel.mode;
-}
-
 export function normalizeBusinessModel(input: unknown): BusinessModelSettings {
   const raw = isRecord(input) ? input : {};
-  const mode = readMode(raw.mode);
-  const modeDefaults =
-    mode === 'reservation_platform'
+  // Legacy settings written before the switch-only model used mode to imply
+  // defaults. Keep that fallback so old reservation-platform configs do not
+  // accidentally enable online package sales after upgrade.
+  const fallback =
+    raw.mode === 'reservation_platform'
       ? {
           ...defaultBusinessModel,
-          mode,
           onlinePackageSalesEnabled: false,
           manualPackageGrantEnabled: true,
           packagePriceDisplayEnabled: true,
           seatReservationFeeEnabled: true,
         }
-      : { ...defaultBusinessModel, mode };
+      : defaultBusinessModel;
 
   return {
-    mode,
     onlinePackageSalesEnabled: readBool(
       raw.onlinePackageSalesEnabled,
-      modeDefaults.onlinePackageSalesEnabled,
+      fallback.onlinePackageSalesEnabled,
     ),
     manualPackageGrantEnabled: readBool(
       raw.manualPackageGrantEnabled,
-      modeDefaults.manualPackageGrantEnabled,
+      fallback.manualPackageGrantEnabled,
     ),
     packagePriceDisplayEnabled: readBool(
       raw.packagePriceDisplayEnabled,
-      modeDefaults.packagePriceDisplayEnabled,
+      fallback.packagePriceDisplayEnabled,
     ),
     seatReservationFeeEnabled: readBool(
       raw.seatReservationFeeEnabled,
-      modeDefaults.seatReservationFeeEnabled,
+      fallback.seatReservationFeeEnabled,
     ),
   };
 }
@@ -82,11 +72,7 @@ export function canUseOnlinePackageSales(
   businessModel: BusinessModelSettings,
   courseOnlineSalesEnabled = true,
 ) {
-  return (
-    businessModel.onlinePackageSalesEnabled &&
-    businessModel.mode !== 'reservation_platform' &&
-    courseOnlineSalesEnabled
-  );
+  return businessModel.onlinePackageSalesEnabled && courseOnlineSalesEnabled;
 }
 
 export function requiresSeatReservationFee(

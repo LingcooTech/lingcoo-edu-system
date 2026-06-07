@@ -8,7 +8,7 @@ export function coursePriceLabel(
     packageCount?: number;
     startingPriceAmount?: number | null;
   },
-  mode?: 'course_sales' | 'reservation_platform',
+  onlinePackageSalesEnabled?: boolean,
 ): string {
   if (
     !input.packageCount ||
@@ -17,10 +17,9 @@ export function coursePriceLabel(
   ) {
     return '可预约试听';
   }
-  if (mode === 'reservation_platform') {
-    return `${money(input.startingPriceAmount)} 参考`;
-  }
-  return `${money(input.startingPriceAmount)} 起`;
+  return onlinePackageSalesEnabled
+    ? `${money(input.startingPriceAmount)} 起`
+    : `${money(input.startingPriceAmount)} 参考`;
 }
 
 export function formatDateTime(value?: string): string {

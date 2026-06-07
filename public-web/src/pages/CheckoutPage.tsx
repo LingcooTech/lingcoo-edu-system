@@ -69,11 +69,7 @@ export function CheckoutPage() {
         setPkg(packages.find((p) => p.id === packageId) ?? null);
         setProviders(paymentProviders);
         const businessModel = home?.organization.businessModel;
-        setOnlinePackageSalesAllowed(
-          !businessModel ||
-            (businessModel.onlinePackageSalesEnabled &&
-              businessModel.mode !== 'reservation_platform'),
-        );
+        setOnlinePackageSalesAllowed(!businessModel || businessModel.onlinePackageSalesEnabled);
       })
       .finally(() => setLoading(false));
 

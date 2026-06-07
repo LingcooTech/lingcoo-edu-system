@@ -68,7 +68,10 @@ function toState(home: HomePayload): HomeState {
     businessHours: profile.businessHours,
     courses: home.featuredCourses.map((course) => ({
       ...course,
-      priceLabel: coursePriceLabel(course, home.organization.businessModel.mode),
+      priceLabel: coursePriceLabel(
+        course,
+        home.organization.businessModel.onlinePackageSalesEnabled,
+      ),
     })),
     trialSessions: home.trialSessions.map((session) => ({
       ...session,
