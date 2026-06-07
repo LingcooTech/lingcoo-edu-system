@@ -199,15 +199,22 @@
 
 .order-status.pending,
 .notice-status.unread,
+.notice-status.submitted,
 .seat-status.pending_payment {
   background: #fff4d8;
   color: #8a5a00;
 }
 
 .order-status.paid,
+.notice-status.reviewed,
 .seat-status.reserved {
   background: #e9f4ef;
   color: #1f6f5b;
+}
+
+.notice-status.needs_revision {
+  background: #f8e7e7;
+  color: #9a3412;
 }
 
 .seat-status.cancelled,
@@ -219,6 +226,44 @@
 .reschedule-button {
   display: inline-block;
   margin-top: 16rpx;
+}
+
+.homework-form {
+  display: grid;
+  gap: 18rpx;
+  margin-top: 22rpx;
+}
+
+.picker-field {
+  min-height: 88rpx;
+  border: 1rpx solid rgba(31, 43, 36, 0.12);
+  border-radius: 18rpx;
+  background: #fff;
+  color: #1f2b24;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 88rpx;
+  padding: 0 24rpx;
+}
+
+.homework-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 180rpx;
+  line-height: 1.6;
+  padding: 22rpx 24rpx;
+}
+
+.homework-textarea.small {
+  min-height: 130rpx;
+}
+
+.homework-submit {
+  width: 100%;
+}
+
+.homework-list {
+  margin-top: 28rpx;
 }
 
 .order-line,
@@ -233,10 +278,17 @@
 }
 
 .attendance-topic,
-.notice-body {
+.notice-body,
+.teacher-feedback {
   margin-top: 10rpx;
   font-size: 25rpx;
   line-height: 1.6;
+}
+
+.teacher-feedback {
+  border-radius: 18rpx;
+  background: #f2f0ea;
+  padding: 18rpx;
 }
 
 .compact-empty {

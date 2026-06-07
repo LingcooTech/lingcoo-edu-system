@@ -44,7 +44,7 @@ export interface TrialSession {
   reservationNotice: string;
 }
 
-export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+export type BusinessMode = 'course_sales' | 'reservation_platform';
 
 export interface BusinessModelSettings {
   mode: BusinessMode;
@@ -351,6 +351,48 @@ export interface ParentAttendance {
   student?: { id: string; name: string };
 }
 
+export interface ParentCheckInSession {
+  sessionId: string;
+  startsAt: string;
+  endsAt: string;
+  topic: string;
+  status: string;
+  student: { id: string; name: string; grade: string };
+  class: { id: string; name: string };
+  course: Course | null;
+  classroom: { id: string; name: string } | null;
+  checkedIn: boolean;
+  attendanceStatus: string | null;
+  canCheckIn: boolean;
+}
+
+export interface ParentHomeworkCheckIn {
+  id: string;
+  accountId?: string | null;
+  studentId: string;
+  courseId?: string | null;
+  classSessionId?: string | null;
+  title: string;
+  content: string;
+  imageUrls: string[];
+  reviewStatus: string;
+  teacherFeedback: string;
+  reviewedByTeacherId?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string } | null;
+  course?: Course | null;
+  session?: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    topic: string;
+    status: string;
+  } | null;
+  class?: { id: string; name: string } | null;
+}
+
 export interface ParentNotification {
   id: string;
   category: string;
@@ -611,6 +653,42 @@ export async function fetchParentOrders(): Promise<ParentOrder[]> {
 
 export async function fetchParentAttendance(): Promise<ParentAttendance[]> {
   return (await request<{ attendance: ParentAttendance[] }>('/public/me/attendance')).attendance;
+}
+
+export async function fetchParentCheckInSessions(): Promise<ParentCheckInSession[]> {
+  return (
+    await request<{ checkInSessions: ParentCheckInSession[] }>('/public/me/check-in-sessions')
+  ).checkInSessions;
+}
+
+export function submitParentCheckIn(
+  sessionId: string,
+  studentId: string,
+): Promise<{ attendanceRecord: unknown; message: string }> {
+  return request(`/public/me/check-in-sessions/${encodeURIComponent(sessionId)}/check-in`, {
+    method: 'POST',
+    data: { studentId },
+  });
+}
+
+export async function fetchParentHomeworkCheckIns(): Promise<ParentHomeworkCheckIn[]> {
+  return (
+    await request<{ homeworkCheckIns: ParentHomeworkCheckIn[] }>('/public/me/homework-check-ins')
+  ).homeworkCheckIns;
+}
+
+export function createParentHomeworkCheckIn(input: {
+  studentId: string;
+  courseId?: string | null;
+  classSessionId?: string | null;
+  title?: string;
+  content: string;
+  imageUrls?: string[];
+}): Promise<{ homeworkCheckIn: ParentHomeworkCheckIn; message: string }> {
+  return request('/public/me/homework-check-ins', {
+    method: 'POST',
+    data: input,
+  });
 }
 
 export async function fetchParentNotifications(): Promise<ParentNotification[]> {

@@ -38,7 +38,7 @@ export interface TrialSession {
   reservationNotice: string;
 }
 
-export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+export type BusinessMode = 'course_sales' | 'reservation_platform';
 
 export interface BusinessModelSettings {
   mode: BusinessMode;
@@ -219,8 +219,11 @@ export interface ChildStudent {
 
 export interface ParentLessonAccount {
   id: string;
+  studentId: string;
+  courseId: string;
   balance: number;
-  student?: { name: string };
+  student?: { id: string; name: string };
+  course?: Course | null;
 }
 
 export interface ParentOrder {
@@ -418,6 +421,98 @@ export async function rescheduleParentSeatReservation(
     method: 'POST',
     body: JSON.stringify({ trialSessionId }),
   });
+}
+
+export interface ParentCheckInSession {
+  sessionId: string;
+  startsAt: string;
+  endsAt: string;
+  topic: string;
+  status: string;
+  student: { id: string; name: string; grade: string };
+  class: { id: string; name: string };
+  course: Course | null;
+  classroom: { id: string; name: string } | null;
+  checkedIn: boolean;
+  attendanceStatus: AttendanceStatus | null;
+  canCheckIn: boolean;
+}
+
+export async function fetchParentCheckInSessions() {
+  return (
+    await publicApi<{ checkInSessions: ParentCheckInSession[] }>('/public/me/check-in-sessions')
+  ).checkInSessions;
+}
+
+export async function submitParentCheckIn(sessionId: string, studentId: string) {
+  return publicApi<{ attendanceRecord: SessionAttendanceRecord | null; message: string }>(
+    `/public/me/check-in-sessions/${sessionId}/check-in`,
+    { method: 'POST', body: JSON.stringify({ studentId }) },
+  );
+}
+
+export interface ParentHomeworkCheckIn {
+  id: string;
+  accountId?: string | null;
+  studentId: string;
+  courseId?: string | null;
+  classSessionId?: string | null;
+  title: string;
+  content: string;
+  imageUrls: string[];
+  reviewStatus: string;
+  teacherFeedback: string;
+  reviewedByTeacherId?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string } | null;
+  course?: Course | null;
+  session?: TeacherClassSession | null;
+  class?: { id: string; name: string } | null;
+}
+
+export interface TeacherHomeworkCheckIn extends ParentHomeworkCheckIn {
+  student?: { id: string; name: string; grade: string } | null;
+  reviewer?: { id: string; name: string } | null;
+}
+
+export async function fetchParentHomeworkCheckIns() {
+  return (
+    await publicApi<{ homeworkCheckIns: ParentHomeworkCheckIn[] }>('/public/me/homework-check-ins')
+  ).homeworkCheckIns;
+}
+
+export async function createParentHomeworkCheckIn(input: {
+  studentId: string;
+  courseId?: string | null;
+  classSessionId?: string | null;
+  title?: string;
+  content: string;
+  imageUrls?: string[];
+}) {
+  return publicApi<{ homeworkCheckIn: ParentHomeworkCheckIn; message: string }>(
+    '/public/me/homework-check-ins',
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export async function fetchTeacherHomeworkCheckIns() {
+  return (
+    await publicApi<{ homeworkCheckIns: TeacherHomeworkCheckIn[] }>(
+      '/public/teacher/homework-check-ins',
+    )
+  ).homeworkCheckIns;
+}
+
+export async function reviewTeacherHomeworkCheckIn(
+  homeworkCheckInId: string,
+  input: { reviewStatus: 'reviewed' | 'needs_revision'; teacherFeedback: string },
+) {
+  return publicApi<{ homeworkCheckIn: TeacherHomeworkCheckIn }>(
+    `/public/teacher/homework-check-ins/${homeworkCheckInId}/review`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
 }
 
 export async function submitCampaignParticipation(code: string, input: TrialRegistrationInput) {

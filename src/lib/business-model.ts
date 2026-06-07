@@ -1,4 +1,4 @@
-export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+export type BusinessMode = 'course_sales' | 'reservation_platform';
 
 export interface BusinessModelSettings {
   mode: BusinessMode;
@@ -25,7 +25,7 @@ function readBool(value: unknown, fallback: boolean) {
 }
 
 function readMode(value: unknown): BusinessMode {
-  return value === 'reservation_platform' || value === 'hybrid' || value === 'course_sales'
+  return value === 'reservation_platform' || value === 'course_sales'
     ? value
     : defaultBusinessModel.mode;
 }

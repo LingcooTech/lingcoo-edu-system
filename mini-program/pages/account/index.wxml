@@ -124,6 +124,85 @@
     </view>
 
     <view class="section card panel">
+      <view class="section-title">上课签到</view>
+      <view wx:if="{{checkInSessions.length}}" class="item-list">
+        <view wx:for="{{checkInSessions}}" wx:key="checkInKey" class="stack-row">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.courseName}} · {{item.topic}}</view>
+              <view class="muted row-meta">{{item.student.name}} · {{item.class.name}}</view>
+            </view>
+            <view wx:if="{{item.checkedIn}}" class="attendance-status">{{item.attendanceStatusLabel}}</view>
+            <button
+              wx:else
+              class="mini-button"
+              data-session-id="{{item.sessionId}}"
+              data-student-id="{{item.student.id}}"
+              data-key="{{item.checkInKey}}"
+              loading="{{checkingInKey == item.checkInKey}}"
+              disabled="{{checkingInKey == item.checkInKey || !item.canCheckIn}}"
+              bindtap="onParentCheckIn"
+            >
+              签到
+            </button>
+          </view>
+          <view class="muted row-meta">{{item.startsAtLabel}} · {{item.classroomName}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无可签到课次</view>
+    </view>
+
+    <view class="section card panel">
+      <view class="section-title">作业打卡</view>
+      <view class="homework-form">
+        <picker
+          wx:if="{{homeworkTargetLabels.length}}"
+          mode="selector"
+          range="{{homeworkTargetLabels}}"
+          value="{{homeworkTargetIndex}}"
+          bindchange="onHomeworkTargetChange"
+        >
+          <view class="picker-field">{{homeworkTargetLabels[homeworkTargetIndex]}}</view>
+        </picker>
+        <view wx:else class="empty compact-empty">暂无可打卡学员</view>
+        <textarea
+          class="form-field homework-textarea"
+          value="{{homeworkContent}}"
+          placeholder="完成内容、练习情况或需要老师关注的问题"
+          bindinput="onHomeworkContentInput"
+        />
+        <textarea
+          class="form-field homework-textarea small"
+          value="{{homeworkImageUrls}}"
+          placeholder="图片链接，可选，一行一个"
+          bindinput="onHomeworkImageUrlsInput"
+        />
+        <button
+          class="btn btn-primary homework-submit"
+          loading="{{submittingHomework}}"
+          disabled="{{submittingHomework || !homeworkTargetLabels.length}}"
+          bindtap="onHomeworkSubmit"
+        >
+          {{submittingHomework ? '提交中...' : '提交打卡'}}
+        </button>
+      </view>
+      <view wx:if="{{homeworkCheckIns.length}}" class="item-list homework-list">
+        <view wx:for="{{homeworkCheckIns}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="muted row-meta">{{item.createdAtLabel}}</view>
+            </view>
+            <view class="notice-status {{item.reviewStatus}}">{{item.reviewStatusLabel}}</view>
+          </view>
+          <view wx:if="{{item.content}}" class="body-text attendance-topic">{{item.content}}</view>
+          <view wx:if="{{item.teacherFeedback}}" class="body-text teacher-feedback">{{item.teacherFeedback}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无作业打卡</view>
+    </view>
+
+    <view class="section card panel">
       <view class="section-title">订单</view>
       <view wx:if="{{orders.length}}" class="item-list">
         <view wx:for="{{orders}}" wx:key="id" class="stack-row">

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
@@ -69,6 +70,11 @@ const teacherAttendanceSchema = z.object({
       note: z.string().optional(),
     }),
   ),
+});
+
+const teacherHomeworkReviewSchema = z.object({
+  reviewStatus: z.enum(['reviewed', 'needs_revision']).default('reviewed'),
+  teacherFeedback: z.string().trim().max(2000).default(''),
 });
 
 function notFound(message: string): Error {
@@ -159,6 +165,105 @@ export const teachingModule: AppModule = {
       return { account, session };
     }
 
+    async function loadTeacherHomeworkScope(accountId: string) {
+      const account = await accountsRepo.findById(app.db, accountId);
+      if (!account?.teacherId) {
+        throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
+      }
+
+      const [classes, courses, students, sessions, teachers] = await Promise.all([
+        schedulingRepo.listClasses(app.db),
+        catalogRepo.listCourses(app.db),
+        peopleRepo.listStudents(app.db),
+        schedulingRepo.listClassSessions(app.db),
+        teachingRepo.listTeachers(app.db),
+      ]);
+      const myClasses = classes.filter((classGroup) => classGroup.teacherId === account.teacherId);
+      const enrollments = (
+        await Promise.all(
+          myClasses.map((classGroup) => schedulingRepo.listEnrollments(app.db, classGroup.id)),
+        )
+      ).flat();
+      const studentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
+      const courseIds = new Set(myClasses.map((classGroup) => classGroup.courseId));
+      const classIds = new Set(myClasses.map((classGroup) => classGroup.id));
+      const classByStudentCourse = new Map<string, typeof schema.classes.$inferSelect>();
+
+      for (const classGroup of myClasses) {
+        const classEnrollments = enrollments.filter(
+          (enrollment) => enrollment.classId === classGroup.id,
+        );
+        for (const enrollment of classEnrollments) {
+          classByStudentCourse.set(`${enrollment.studentId}:${classGroup.courseId}`, classGroup);
+        }
+      }
+
+      return {
+        account,
+        teacherId: account.teacherId,
+        studentIds,
+        courseIds,
+        classIds,
+        classByStudentCourse,
+        classById: new Map(classes.map((classGroup) => [classGroup.id, classGroup])),
+        courseById: new Map(courses.map((course) => [course.id, course])),
+        studentById: new Map(students.map((student) => [student.id, student])),
+        sessionById: new Map(sessions.map((session) => [session.id, session])),
+        teacherById: new Map(teachers.map((teacher) => [teacher.id, teacher])),
+      };
+    }
+
+    type TeacherHomeworkScope = Awaited<ReturnType<typeof loadTeacherHomeworkScope>>;
+
+    function canAccessHomework(
+      scope: TeacherHomeworkScope,
+      item: typeof schema.homeworkCheckIns.$inferSelect,
+    ) {
+      if (!scope.studentIds.has(item.studentId)) {
+        return false;
+      }
+      if (item.classSessionId) {
+        const session = scope.sessionById.get(item.classSessionId);
+        if (!session || !scope.classIds.has(session.classId)) {
+          return false;
+        }
+      }
+      return !item.courseId || scope.courseIds.has(item.courseId);
+    }
+
+    function enrichTeacherHomework(
+      scope: TeacherHomeworkScope,
+      items: (typeof schema.homeworkCheckIns.$inferSelect)[],
+    ) {
+      return items.map((item) => {
+        const session = item.classSessionId
+          ? (scope.sessionById.get(item.classSessionId) ?? null)
+          : null;
+        const classGroup = session
+          ? (scope.classById.get(session.classId) ?? null)
+          : item.courseId
+            ? (scope.classByStudentCourse.get(`${item.studentId}:${item.courseId}`) ?? null)
+            : null;
+        const reviewer = item.reviewedByTeacherId
+          ? (scope.teacherById.get(item.reviewedByTeacherId) ?? null)
+          : null;
+        return {
+          ...item,
+          student: scope.studentById.get(item.studentId)
+            ? {
+                id: item.studentId,
+                name: scope.studentById.get(item.studentId)!.name,
+                grade: scope.studentById.get(item.studentId)!.grade,
+              }
+            : null,
+          course: item.courseId ? (scope.courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          reviewer: reviewer ? { id: reviewer.id, name: reviewer.name } : null,
+        };
+      });
+    }
+
     app.get(
       '/public/teacher/sessions/:sessionId/attendance',
       { preHandler: app.requireRole('teacher') },
@@ -216,6 +321,74 @@ export const teachingModule: AppModule = {
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
         return { attendanceRecords };
+      },
+    );
+
+    app.get(
+      '/public/teacher/homework-check-ins',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        const studentIds = Array.from(scope.studentIds);
+        if (studentIds.length === 0) {
+          return { homeworkCheckIns: [] };
+        }
+
+        const items = await app.db
+          .select()
+          .from(schema.homeworkCheckIns)
+          .where(inArray(schema.homeworkCheckIns.studentId, studentIds))
+          .orderBy(desc(schema.homeworkCheckIns.createdAt));
+
+        return {
+          homeworkCheckIns: enrichTeacherHomework(
+            scope,
+            items.filter((item) => canAccessHomework(scope, item)),
+          ),
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/homework-check-ins/:homeworkCheckInId/review',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { homeworkCheckInId } = request.params as { homeworkCheckInId: string };
+        const body = teacherHomeworkReviewSchema.parse(request.body);
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        const [item] = await app.db
+          .select()
+          .from(schema.homeworkCheckIns)
+          .where(eq(schema.homeworkCheckIns.id, homeworkCheckInId))
+          .limit(1);
+        if (!item) {
+          throw notFound('Homework check-in not found');
+        }
+        if (!canAccessHomework(scope, item)) {
+          throw Object.assign(new Error('无权批阅该作业打卡'), { statusCode: 403 });
+        }
+
+        const [updated] = await app.db
+          .update(schema.homeworkCheckIns)
+          .set({
+            reviewStatus: body.reviewStatus,
+            teacherFeedback: body.teacherFeedback,
+            reviewedByTeacherId: scope.teacherId,
+            reviewedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.homeworkCheckIns.id, homeworkCheckInId),
+              inArray(schema.homeworkCheckIns.studentId, Array.from(scope.studentIds)),
+            ),
+          )
+          .returning();
+        if (!updated) {
+          throw notFound('Homework check-in not found');
+        }
+
+        return { homeworkCheckIn: enrichTeacherHomework(scope, [updated])[0] };
       },
     );
 

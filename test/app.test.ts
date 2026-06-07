@@ -1914,3 +1914,137 @@ test('creates lesson consumption notifications after admin attendance once', asy
     await app.close();
   }
 });
+
+test('lets a parent check in for class and submit homework from parent center', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+
+  try {
+    const fixture = await createLessonNotificationFixture(app, suffix, {
+      appId: testEnv.WECHAT_MINI_PROGRAM_APP_ID!,
+      startsAt: new Date(Date.now() + 30 * 60 * 1000),
+      balance: 3,
+    });
+    const parentToken = await app.jwt.sign(
+      { sub: fixture.account.id, role: 'parent' },
+      { expiresIn: '1h' },
+    );
+
+    const checkInList = await app.inject({
+      method: 'GET',
+      url: '/public/me/check-in-sessions',
+      headers: { authorization: `Bearer ${parentToken}` },
+    });
+    assert.equal(checkInList.statusCode, 200, checkInList.body);
+    const checkInPayload = checkInList.json();
+    const checkInItem = checkInPayload.checkInSessions.find(
+      (item: { sessionId: string; student: { id: string } }) =>
+        item.sessionId === fixture.session.id && item.student.id === fixture.student.id,
+    );
+    assert.ok(checkInItem);
+    assert.equal(checkInItem.canCheckIn, true);
+
+    const checkIn = await app.inject({
+      method: 'POST',
+      url: `/public/me/check-in-sessions/${fixture.session.id}/check-in`,
+      headers: { authorization: `Bearer ${parentToken}` },
+      payload: { studentId: fixture.student.id },
+    });
+    assert.equal(checkIn.statusCode, 200, checkIn.body);
+    assert.match(checkIn.json().message, /签到成功/);
+
+    const [afterCheckInAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(eq(schema.lessonAccounts.id, fixture.lessonAccount.id))
+      .limit(1);
+    assert.equal(afterCheckInAccount.balance, 2);
+
+    const repeatedCheckIn = await app.inject({
+      method: 'POST',
+      url: `/public/me/check-in-sessions/${fixture.session.id}/check-in`,
+      headers: { authorization: `Bearer ${parentToken}` },
+      payload: { studentId: fixture.student.id },
+    });
+    assert.equal(repeatedCheckIn.statusCode, 200, repeatedCheckIn.body);
+    assert.match(repeatedCheckIn.json().message, /已签到/);
+
+    const [afterRepeatedAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(eq(schema.lessonAccounts.id, fixture.lessonAccount.id))
+      .limit(1);
+    assert.equal(afterRepeatedAccount.balance, 2);
+
+    const homework = await app.inject({
+      method: 'POST',
+      url: '/public/me/homework-check-ins',
+      headers: { authorization: `Bearer ${parentToken}` },
+      payload: {
+        studentId: fixture.student.id,
+        courseId: fixture.course.id,
+        content: '今天完成控笔练习 2 页。',
+        imageUrls: ['https://cdn.example.com/homework/sample.jpg'],
+      },
+    });
+    assert.equal(homework.statusCode, 200, homework.body);
+    const homeworkPayload = homework.json();
+    assert.equal(homeworkPayload.homeworkCheckIn.student.id, fixture.student.id);
+    assert.equal(homeworkPayload.homeworkCheckIn.course.id, fixture.course.id);
+    assert.equal(homeworkPayload.homeworkCheckIn.imageUrls.length, 1);
+
+    const [teacherAccount] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'teacher',
+        phone: phoneFromSuffix(randomUUID(), '138'),
+        passwordHash: hashPassword('test-password'),
+        displayName: fixture.teacher.name,
+        teacherId: fixture.teacher.id,
+      })
+      .returning();
+    const teacherToken = await app.jwt.sign(
+      { sub: teacherAccount.id, role: 'teacher' },
+      { expiresIn: '1h' },
+    );
+
+    const teacherHomeworkList = await app.inject({
+      method: 'GET',
+      url: '/public/teacher/homework-check-ins',
+      headers: { authorization: `Bearer ${teacherToken}` },
+    });
+    assert.equal(teacherHomeworkList.statusCode, 200, teacherHomeworkList.body);
+    const teacherHomework = teacherHomeworkList
+      .json()
+      .homeworkCheckIns.find(
+        (item: { id: string }) => item.id === homeworkPayload.homeworkCheckIn.id,
+      );
+    assert.ok(teacherHomework);
+    assert.equal(teacherHomework.reviewStatus, 'submitted');
+
+    const review = await app.inject({
+      method: 'POST',
+      url: `/public/teacher/homework-check-ins/${homeworkPayload.homeworkCheckIn.id}/review`,
+      headers: { authorization: `Bearer ${teacherToken}` },
+      payload: {
+        reviewStatus: 'needs_revision',
+        teacherFeedback: '控笔很好，第二页第三行需要重写。',
+      },
+    });
+    assert.equal(review.statusCode, 200, review.body);
+    assert.equal(review.json().homeworkCheckIn.reviewStatus, 'needs_revision');
+    assert.equal(review.json().homeworkCheckIn.reviewer.id, fixture.teacher.id);
+
+    const homeworkList = await app.inject({
+      method: 'GET',
+      url: '/public/me/homework-check-ins',
+      headers: { authorization: `Bearer ${parentToken}` },
+    });
+    assert.equal(homeworkList.statusCode, 200, homeworkList.body);
+    assert.equal(homeworkList.json().homeworkCheckIns.length, 1);
+    assert.equal(homeworkList.json().homeworkCheckIns[0].reviewStatus, 'needs_revision');
+    assert.match(homeworkList.json().homeworkCheckIns[0].teacherFeedback, /第三行/);
+  } finally {
+    await app.close();
+  }
+});

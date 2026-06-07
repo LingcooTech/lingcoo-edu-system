@@ -22,7 +22,6 @@ import type {
   PaymentProviderItem,
   PublicNavItem,
   PublicSiteSettings,
-  BusinessModelSettings,
   SystemSettingOverview,
 } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
@@ -37,7 +36,6 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const brandTabs = [
   { key: 'identity', label: '基础 VI' },
-  { key: 'business', label: '业务模式' },
   { key: 'navigation', label: 'Header 菜单' },
   { key: 'footer', label: 'Footer 备案' },
 ] as const;
@@ -70,14 +68,6 @@ const DEFAULT_SITE: PublicSiteSettings = {
   },
   icpNumber: '',
   icpUrl: '',
-};
-
-const DEFAULT_BUSINESS_MODEL: BusinessModelSettings = {
-  mode: 'course_sales',
-  onlinePackageSalesEnabled: true,
-  manualPackageGrantEnabled: true,
-  packagePriceDisplayEnabled: true,
-  seatReservationFeeEnabled: false,
 };
 
 const inputClass = 'mt-1 w-full rounded-lg border px-3 py-2 text-sm';
@@ -144,8 +134,6 @@ export function SettingsPage() {
   const [smtpOverview, setSmtpOverview] = useState<SystemSettingOverview | null>(null);
   const [qiniuOverview, setQiniuOverview] = useState<SystemSettingOverview | null>(null);
   const [publicSite, setPublicSite] = useState<PublicSiteSettings>(DEFAULT_SITE);
-  const [businessModel, setBusinessModel] =
-    useState<BusinessModelSettings>(DEFAULT_BUSINESS_MODEL);
 
   const [org, setOrg] = useState({
     name: '',
@@ -303,7 +291,6 @@ export function SettingsPage() {
           radius: organization.branding.radius ?? '',
         });
         setPublicSite(normalizeSite(organization.publicSite));
-        setBusinessModel(organization.businessModel ?? DEFAULT_BUSINESS_MODEL);
         hydratePayment(payment.items);
         hydrateSmtp(smtpData);
         hydrateQiniu(qiniuData);
@@ -359,21 +346,6 @@ export function SettingsPage() {
         radius: updated.branding.radius ?? '',
       }));
       setMessage('品牌 VI 已保存');
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : '保存失败');
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  async function submitBusinessModel(event: FormEvent) {
-    event.preventDefault();
-    setSaving('business');
-    setMessage('');
-    try {
-      const updated = await saveOrganization({ businessModel });
-      setBusinessModel(updated.businessModel ?? DEFAULT_BUSINESS_MODEL);
-      setMessage('业务模式已保存');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -754,97 +726,6 @@ export function SettingsPage() {
                   </div>
                   <button className={`${buttonClass} mt-4`} disabled={saving === 'brand'}>
                     {saving === 'brand' ? '保存中...' : '保存品牌 VI'}
-                  </button>
-                </form>
-              )}
-
-              {brandTab === 'business' && (
-                <form className="resource-card mt-4 p-5" onSubmit={submitBusinessModel}>
-                  <div className="text-sm font-semibold">业务模式</div>
-                  <div className="mt-4 grid gap-4">
-                    <Field label="平台定位">
-                      <select
-                        className="form-input"
-                        value={businessModel.mode}
-                        onChange={(event) => {
-                          const mode = event.target.value as BusinessModelSettings['mode'];
-                          setBusinessModel((current) => ({
-                            ...current,
-                            mode,
-                            onlinePackageSalesEnabled:
-                              mode === 'reservation_platform'
-                                ? false
-                                : current.onlinePackageSalesEnabled,
-                            seatReservationFeeEnabled:
-                              mode === 'reservation_platform'
-                                ? true
-                                : current.seatReservationFeeEnabled,
-                          }));
-                        }}
-                      >
-                        <option value="course_sales">售课机构：公开端可购买课时包</option>
-                        <option value="reservation_platform">
-                          成长教室：公开端只预约，线下成交后管课时
-                        </option>
-                        <option value="hybrid">混合模式：为后续课程级控制预留</option>
-                      </select>
-                    </Field>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={businessModel.onlinePackageSalesEnabled}
-                        disabled={businessModel.mode === 'reservation_platform'}
-                        onChange={(event) =>
-                          setBusinessModel({
-                            ...businessModel,
-                            onlinePackageSalesEnabled: event.target.checked,
-                          })
-                        }
-                      />
-                      允许公开端在线购买长期课时包
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={businessModel.manualPackageGrantEnabled}
-                        onChange={(event) =>
-                          setBusinessModel({
-                            ...businessModel,
-                            manualPackageGrantEnabled: event.target.checked,
-                          })
-                        }
-                      />
-                      允许后台线下收款后手动添加课时包
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={businessModel.packagePriceDisplayEnabled}
-                        onChange={(event) =>
-                          setBusinessModel({
-                            ...businessModel,
-                            packagePriceDisplayEnabled: event.target.checked,
-                          })
-                        }
-                      />
-                      公开展示正式课程/课时包参考价格
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={businessModel.seatReservationFeeEnabled}
-                        onChange={(event) =>
-                          setBusinessModel({
-                            ...businessModel,
-                            seatReservationFeeEnabled: event.target.checked,
-                          })
-                        }
-                      />
-                      启用试听/公开课占位费
-                    </label>
-                  </div>
-                  <button className={`${buttonClass} mt-4`} disabled={saving === 'business'}>
-                    {saving === 'business' ? '保存中...' : '保存业务模式'}
                   </button>
                 </form>
               )}

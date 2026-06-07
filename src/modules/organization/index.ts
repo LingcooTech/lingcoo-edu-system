@@ -84,7 +84,7 @@ const publicSiteSchema = z
 
 const businessModelSchema = z
   .object({
-    mode: z.enum(['course_sales', 'reservation_platform', 'hybrid']).optional(),
+    mode: z.enum(['course_sales', 'reservation_platform']).optional(),
     onlinePackageSalesEnabled: z.boolean().optional(),
     manualPackageGrantEnabled: z.boolean().optional(),
     packagePriceDisplayEnabled: z.boolean().optional(),

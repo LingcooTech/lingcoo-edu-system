@@ -8,15 +8,35 @@ import * as notificationsRepo from '../../db/repositories/notifications.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as seatReservationRepo from '../../db/repositories/seat-reservations.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
+import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
 
 const seatReservationRescheduleSchema = z.object({
   trialSessionId: z.string(),
 });
+
+const parentCheckInSchema = z.object({
+  studentId: z.string().uuid(),
+});
+
+const homeworkCheckInSchema = z
+  .object({
+    studentId: z.string().uuid(),
+    courseId: z.string().uuid().optional().nullable(),
+    classSessionId: z.string().uuid().optional().nullable(),
+    title: z.string().trim().max(160).optional(),
+    content: z.string().trim().max(2000).default(''),
+    imageUrls: z.array(z.string().trim().url().max(500)).max(9).default([]),
+  })
+  .refine((value) => value.content || value.imageUrls.length > 0, {
+    message: '请填写作业打卡内容或图片',
+  });
 
 function canRescheduleSeatReservation(
   reservation: typeof schema.seatReservations.$inferSelect,
@@ -34,6 +54,12 @@ function canRescheduleSeatReservation(
 export const parentCenterModule: AppModule = {
   name: 'parent-center',
   async register(app) {
+    const lessonNotifications = new LessonNotificationService({
+      db: app.db,
+      env: app.appEnv,
+      log: app.log,
+    });
+
     // Resolves the students linked to the authenticated parent account. A parent
     // account links to a guardian (CRM contact); students reference that guardian.
     async function resolveChildren(accountId: string) {
@@ -67,6 +93,81 @@ export const parentCenterModule: AppModule = {
         throw httpError(404, 'Seat reservation not found');
       }
       return row.seatReservation;
+    }
+
+    function requireOwnedStudent(
+      students: (typeof schema.students.$inferSelect)[],
+      studentId: string,
+    ) {
+      const student = students.find((item) => item.id === studentId);
+      if (!student) {
+        throw httpError(403, '无权操作该学员');
+      }
+      return student;
+    }
+
+    async function assertCourseBelongsToStudent(studentId: string, courseId: string) {
+      const [lessonAccount] = await app.db
+        .select({ id: schema.lessonAccounts.id })
+        .from(schema.lessonAccounts)
+        .where(
+          and(
+            eq(schema.lessonAccounts.studentId, studentId),
+            eq(schema.lessonAccounts.courseId, courseId),
+          ),
+        )
+        .limit(1);
+      if (lessonAccount) {
+        return;
+      }
+
+      const [enrollment] = await app.db
+        .select({ id: schema.classEnrollments.id })
+        .from(schema.classEnrollments)
+        .innerJoin(schema.classes, eq(schema.classEnrollments.classId, schema.classes.id))
+        .where(
+          and(
+            eq(schema.classEnrollments.studentId, studentId),
+            eq(schema.classEnrollments.active, true),
+            eq(schema.classes.courseId, courseId),
+          ),
+        )
+        .limit(1);
+      if (!enrollment) {
+        throw httpError(422, '该学员未关联所选课程');
+      }
+    }
+
+    async function enrichHomeworkCheckIns(
+      students: (typeof schema.students.$inferSelect)[],
+      items: (typeof schema.homeworkCheckIns.$inferSelect)[],
+    ) {
+      if (items.length === 0) {
+        return [];
+      }
+      const [courses, sessions, classes] = await Promise.all([
+        catalogRepo.listCourses(app.db),
+        schedulingRepo.listClassSessions(app.db),
+        schedulingRepo.listClasses(app.db),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const sessionById = new Map(sessions.map((session) => [session.id, session]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+
+      return items.map((item) => {
+        const session = item.classSessionId ? (sessionById.get(item.classSessionId) ?? null) : null;
+        const classGroup = session ? (classById.get(session.classId) ?? null) : null;
+        return {
+          ...item,
+          student: studentById.get(item.studentId)
+            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+            : null,
+          course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+        };
+      });
     }
 
     app.get('/public/me/children', { preHandler: app.requireParent }, async (request) => {
@@ -193,6 +294,180 @@ export const parentCenterModule: AppModule = {
       },
     );
 
+    app.get('/public/me/check-in-sessions', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = students.map((student) => student.id);
+      if (studentIds.length === 0) {
+        return { checkInSessions: [] };
+      }
+
+      const enrollments = await app.db
+        .select()
+        .from(schema.classEnrollments)
+        .where(
+          and(
+            inArray(schema.classEnrollments.studentId, studentIds),
+            eq(schema.classEnrollments.active, true),
+          ),
+        );
+      if (enrollments.length === 0) {
+        return { checkInSessions: [] };
+      }
+
+      const classIds = Array.from(new Set(enrollments.map((enrollment) => enrollment.classId)));
+      const now = new Date();
+      const windowStartsAt = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+      const windowEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const [sessions, classes, courses, classrooms] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.classSessions)
+          .where(inArray(schema.classSessions.classId, classIds)),
+        schedulingRepo.listClasses(app.db),
+        catalogRepo.listCourses(app.db),
+        teachingRepo.listClassrooms(app.db),
+      ]);
+      const visibleSessions = sessions
+        .filter(
+          (session) =>
+            session.status === 'scheduled' &&
+            session.endsAt >= windowStartsAt &&
+            session.startsAt <= windowEndsAt,
+        )
+        .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+      if (visibleSessions.length === 0) {
+        return { checkInSessions: [] };
+      }
+
+      const sessionIds = visibleSessions.map((session) => session.id);
+      const attendanceRecords = await app.db
+        .select()
+        .from(schema.attendanceRecords)
+        .where(
+          and(
+            inArray(schema.attendanceRecords.classSessionId, sessionIds),
+            inArray(schema.attendanceRecords.studentId, studentIds),
+          ),
+        );
+
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const classroomById = new Map(classrooms.map((classroom) => [classroom.id, classroom]));
+      const enrollmentsByClassId = new Map<string, typeof enrollments>();
+      for (const enrollment of enrollments) {
+        enrollmentsByClassId.set(enrollment.classId, [
+          ...(enrollmentsByClassId.get(enrollment.classId) ?? []),
+          enrollment,
+        ]);
+      }
+      const attendanceBySessionStudent = new Map(
+        attendanceRecords.map((record) => [`${record.classSessionId}:${record.studentId}`, record]),
+      );
+
+      return {
+        checkInSessions: visibleSessions.flatMap((session) => {
+          const classGroup = classById.get(session.classId);
+          if (!classGroup) {
+            return [];
+          }
+          const course = courseById.get(classGroup.courseId) ?? null;
+          const classroom = classroomById.get(session.classroomId) ?? null;
+          return (enrollmentsByClassId.get(session.classId) ?? []).flatMap((enrollment) => {
+            const student = studentById.get(enrollment.studentId);
+            if (!student) {
+              return [];
+            }
+            const attendanceRecord = attendanceBySessionStudent.get(`${session.id}:${student.id}`);
+            return [
+              {
+                sessionId: session.id,
+                startsAt: session.startsAt,
+                endsAt: session.endsAt,
+                topic: session.topic,
+                status: session.status,
+                student: { id: student.id, name: student.name, grade: student.grade },
+                class: { id: classGroup.id, name: classGroup.name },
+                course,
+                classroom,
+                checkedIn: Boolean(attendanceRecord),
+                attendanceStatus: attendanceRecord?.status ?? null,
+                canCheckIn: !attendanceRecord,
+              },
+            ];
+          });
+        }),
+      };
+    });
+
+    app.post(
+      '/public/me/check-in-sessions/:sessionId/check-in',
+      { preHandler: app.requireParent },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const body = parentCheckInSchema.parse(request.body);
+        const { students } = await resolveChildren(request.account!.id);
+        requireOwnedStudent(students, body.studentId);
+
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) {
+          throw httpError(404, 'Class session not found');
+        }
+        if (session.status === 'cancelled') {
+          throw httpError(422, '课次已取消');
+        }
+
+        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        if (!classGroup) {
+          throw httpError(404, 'Class not found');
+        }
+        const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
+        const enrolled = enrollments.some((enrollment) => enrollment.studentId === body.studentId);
+        if (!enrolled) {
+          throw httpError(422, '该学员未报名本班级');
+        }
+
+        const existingRecords = await attendanceRepo.listAttendanceForSession(app.db, sessionId);
+        const alreadyCheckedIn = existingRecords.some(
+          (record) => record.studentId === body.studentId,
+        );
+        if (session.status === 'completed' && !alreadyCheckedIn) {
+          throw httpError(422, '课次已完成');
+        }
+
+        const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
+        const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
+          sessionId,
+          courseId: classGroup.courseId,
+          records: [{ studentId: body.studentId, status: 'present', note: '家长中心签到' }],
+          completeSession: false,
+        });
+        await lessonNotifications.notifyLessonConsumedForAttendance({
+          sessionId,
+          records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
+        });
+
+        const latestAttendanceRecords = alreadyCheckedIn
+          ? existingRecords
+          : await attendanceRepo.listAttendanceForSession(app.db, sessionId);
+        const checkedInStudentIds = new Set(
+          latestAttendanceRecords.map((record) => record.studentId),
+        );
+        if (
+          enrollments.length > 0 &&
+          enrollments.every((enrollment) => checkedInStudentIds.has(enrollment.studentId))
+        ) {
+          await schedulingRepo.markSessionCompleted(app.db, sessionId);
+        }
+
+        return {
+          attendanceRecord:
+            attendanceRecords.find((record) => record.studentId === body.studentId) ?? null,
+          message: alreadyCheckedIn ? '已签到，无需重复操作。' : '签到成功，课时已自动扣减。',
+        };
+      },
+    );
+
     app.get('/public/me/attendance', { preHandler: app.requireParent }, async (request) => {
       const { students } = await resolveChildren(request.account!.id);
       const studentIds = students.map((s) => s.id);
@@ -207,6 +482,70 @@ export const parentCenterModule: AppModule = {
         })),
       };
     });
+
+    app.get('/public/me/homework-check-ins', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = students.map((student) => student.id);
+      if (studentIds.length === 0) {
+        return { homeworkCheckIns: [] };
+      }
+      const items = await app.db
+        .select()
+        .from(schema.homeworkCheckIns)
+        .where(inArray(schema.homeworkCheckIns.studentId, studentIds))
+        .orderBy(desc(schema.homeworkCheckIns.createdAt));
+      return { homeworkCheckIns: await enrichHomeworkCheckIns(students, items) };
+    });
+
+    app.post(
+      '/public/me/homework-check-ins',
+      { preHandler: app.requireParent },
+      async (request) => {
+        const body = homeworkCheckInSchema.parse(request.body);
+        const { students } = await resolveChildren(request.account!.id);
+        requireOwnedStudent(students, body.studentId);
+
+        let courseId = body.courseId ?? null;
+        if (body.classSessionId) {
+          const session = await schedulingRepo.findSession(app.db, body.classSessionId);
+          if (!session) {
+            throw httpError(404, 'Class session not found');
+          }
+          const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+          if (!classGroup) {
+            throw httpError(404, 'Class not found');
+          }
+          const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
+          const enrolled = enrollments.some(
+            (enrollment) => enrollment.studentId === body.studentId,
+          );
+          if (!enrolled) {
+            throw httpError(422, '该学员未报名本班级');
+          }
+          courseId = classGroup.courseId;
+        } else if (courseId) {
+          await assertCourseBelongsToStudent(body.studentId, courseId);
+        }
+
+        const [item] = await app.db
+          .insert(schema.homeworkCheckIns)
+          .values({
+            accountId: request.account!.id,
+            studentId: body.studentId,
+            courseId,
+            classSessionId: body.classSessionId ?? null,
+            title: body.title || '作业打卡',
+            content: body.content,
+            imageUrls: body.imageUrls,
+          })
+          .returning();
+
+        return {
+          homeworkCheckIn: (await enrichHomeworkCheckIns(students, [item]))[0],
+          message: '作业打卡已提交',
+        };
+      },
+    );
 
     app.get('/public/me/notifications', { preHandler: app.requireParent }, async (request) => {
       const items = await notificationsRepo.listForRecipient(app.db, {

@@ -1,9 +1,12 @@
 import {
   bindWechatMiniPhone,
   clearToken,
+  createParentHomeworkCheckIn,
   fetchMe,
   fetchParentAttendance,
+  fetchParentCheckInSessions,
   fetchParentChildren,
+  fetchParentHomeworkCheckIns,
   fetchParentLessonAccounts,
   fetchParentNotifications,
   fetchParentOrders,
@@ -13,10 +16,13 @@ import {
   markParentNotificationRead,
   rescheduleParentSeatReservation,
   setToken,
+  submitParentCheckIn,
   wechatMiniLogin,
   type AuthAccount,
+  type ParentCheckInSession,
   type ParentAttendance,
   type ParentChild,
+  type ParentHomeworkCheckIn,
   type ParentLessonAccount,
   type ParentNotification,
   type ParentOrder,
@@ -46,6 +52,21 @@ type AttendanceItem = ParentAttendance & {
   studentName: string;
 };
 
+type CheckInItem = ParentCheckInSession & {
+  checkInKey: string;
+  startsAtLabel: string;
+  courseName: string;
+  classroomName: string;
+  attendanceStatusLabel: string;
+};
+
+type HomeworkItem = ParentHomeworkCheckIn & {
+  createdAtLabel: string;
+  studentName: string;
+  courseName: string;
+  reviewStatusLabel: string;
+};
+
 type SeatReservationItem = ParentSeatReservation & {
   courseName: string;
   feeLabel: string;
@@ -61,6 +82,13 @@ type SeatReservationItem = ParentSeatReservation & {
 type NotificationItem = ParentNotification & {
   createdAtLabel: string;
   statusLabel: string;
+};
+
+type HomeworkTarget = {
+  key: string;
+  studentId: string;
+  courseId?: string | null;
+  label: string;
 };
 
 function orderStatusLabel(status: string): string {
@@ -116,6 +144,15 @@ function notificationStatusLabel(status: string): string {
   return status;
 }
 
+function homeworkReviewStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    submitted: '待批阅',
+    reviewed: '已批阅',
+    needs_revision: '需订正',
+  };
+  return labels[status] || status;
+}
+
 function emptyStats() {
   return {
     childCount: 0,
@@ -137,8 +174,17 @@ Page({
     children: [] as ParentChild[],
     lessonAccounts: [] as LessonAccountItem[],
     seatReservations: [] as SeatReservationItem[],
+    checkInSessions: [] as CheckInItem[],
+    checkingInKey: '',
     orders: [] as OrderItem[],
     attendance: [] as AttendanceItem[],
+    homeworkCheckIns: [] as HomeworkItem[],
+    homeworkTargets: [] as HomeworkTarget[],
+    homeworkTargetLabels: [] as string[],
+    homeworkTargetIndex: 0,
+    homeworkContent: '',
+    homeworkImageUrls: '',
+    submittingHomework: false,
     notifications: [] as NotificationItem[],
     stats: emptyStats(),
   },
@@ -172,15 +218,25 @@ Page({
     if (!this.data.account) return;
     this.setData({ refreshing: true });
     try {
-      const [children, lessonAccounts, seatReservations, orders, attendance, notifications] =
-        await Promise.all([
-          fetchParentChildren(),
-          fetchParentLessonAccounts(),
-          fetchParentSeatReservations(),
-          fetchParentOrders(),
-          fetchParentAttendance(),
-          fetchParentNotifications(),
-        ]);
+      const [
+        children,
+        lessonAccounts,
+        seatReservations,
+        checkInSessions,
+        orders,
+        attendance,
+        homeworkCheckIns,
+        notifications,
+      ] = await Promise.all([
+        fetchParentChildren(),
+        fetchParentLessonAccounts(),
+        fetchParentSeatReservations(),
+        fetchParentCheckInSessions(),
+        fetchParentOrders(),
+        fetchParentAttendance(),
+        fetchParentHomeworkCheckIns(),
+        fetchParentNotifications(),
+      ]);
 
       const lessonItems: LessonAccountItem[] = lessonAccounts.map((item) => ({
         ...item,
@@ -220,6 +276,36 @@ Page({
         statusLabel: attendanceStatusLabel(item.status),
         studentName: item.student?.name || '未知学员',
       }));
+      const checkInItems: CheckInItem[] = checkInSessions.map((item) => ({
+        ...item,
+        checkInKey: `${item.sessionId}:${item.student.id}`,
+        startsAtLabel: formatDateTime(item.startsAt),
+        courseName: item.course?.name || '课程',
+        classroomName: item.classroom?.name || '教室待确认',
+        attendanceStatusLabel: item.attendanceStatus
+          ? attendanceStatusLabel(item.attendanceStatus)
+          : '已签到',
+      }));
+      const homeworkItems: HomeworkItem[] = homeworkCheckIns.map((item) => ({
+        ...item,
+        createdAtLabel: formatDateTime(item.createdAt),
+        studentName: item.student?.name || '未知学员',
+        courseName: item.course?.name || item.title,
+        reviewStatusLabel: homeworkReviewStatusLabel(item.reviewStatus),
+      }));
+      const homeworkTargets: HomeworkTarget[] = lessonItems.length
+        ? lessonItems.map((item) => ({
+            key: item.id,
+            studentId: item.studentId,
+            courseId: item.courseId,
+            label: `${item.studentName} · ${item.courseName}`,
+          }))
+        : children.map((child) => ({
+            key: `child:${child.id}`,
+            studentId: child.id,
+            courseId: null,
+            label: child.name,
+          }));
       const notificationItems: NotificationItem[] = notifications.map((item) => ({
         ...item,
         createdAtLabel: formatDateTime(item.createdAt),
@@ -230,8 +316,16 @@ Page({
         children,
         lessonAccounts: lessonItems,
         seatReservations: seatItems,
+        checkInSessions: checkInItems,
         orders: orderItems,
         attendance: attendanceItems,
+        homeworkCheckIns: homeworkItems,
+        homeworkTargets,
+        homeworkTargetLabels: homeworkTargets.map((target) => target.label),
+        homeworkTargetIndex:
+          this.data.homeworkTargetIndex >= homeworkTargets.length
+            ? 0
+            : this.data.homeworkTargetIndex,
         notifications: notificationItems,
         stats: {
           childCount: children.length,
@@ -258,8 +352,17 @@ Page({
       children: [],
       lessonAccounts: [],
       seatReservations: [],
+      checkInSessions: [],
+      checkingInKey: '',
       orders: [],
       attendance: [],
+      homeworkCheckIns: [],
+      homeworkTargets: [],
+      homeworkTargetLabels: [],
+      homeworkTargetIndex: 0,
+      homeworkContent: '',
+      homeworkImageUrls: '',
+      submittingHomework: false,
       notifications: [],
       stats: emptyStats(),
     });
@@ -422,6 +525,79 @@ Page({
         }
       },
     });
+  },
+
+  async onParentCheckIn(event: {
+    currentTarget: { dataset: { sessionId?: string; studentId?: string; key?: string } };
+  }) {
+    const { sessionId, studentId, key } = event.currentTarget.dataset;
+    if (!sessionId || !studentId || !key) return;
+    this.setData({ checkingInKey: key });
+    try {
+      const result = await submitParentCheckIn(sessionId, studentId);
+      await this.loadParentCenter();
+      wx.showToast({ title: result.message || '签到成功', icon: 'success' });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '签到失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ checkingInKey: '' });
+    }
+  },
+
+  onHomeworkTargetChange(event: { detail: { value?: string | number } }) {
+    const index = Number(event.detail.value ?? 0);
+    if (Number.isNaN(index)) return;
+    this.setData({ homeworkTargetIndex: index });
+  },
+
+  onHomeworkContentInput(event: { detail: { value?: string } }) {
+    this.setData({ homeworkContent: event.detail.value || '' });
+  },
+
+  onHomeworkImageUrlsInput(event: { detail: { value?: string } }) {
+    this.setData({ homeworkImageUrls: event.detail.value || '' });
+  },
+
+  async onHomeworkSubmit() {
+    const targets = this.data.homeworkTargets as HomeworkTarget[];
+    const target = targets[this.data.homeworkTargetIndex] || targets[0];
+    const content = String(this.data.homeworkContent || '').trim();
+    const imageUrls = String(this.data.homeworkImageUrls || '')
+      .split(/[\n,]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!target) {
+      wx.showToast({ title: '请选择学员', icon: 'none' });
+      return;
+    }
+    if (!content && imageUrls.length === 0) {
+      wx.showToast({ title: '请填写打卡内容', icon: 'none' });
+      return;
+    }
+
+    this.setData({ submittingHomework: true });
+    try {
+      const result = await createParentHomeworkCheckIn({
+        studentId: target.studentId,
+        courseId: target.courseId ?? null,
+        content,
+        imageUrls,
+      });
+      this.setData({ homeworkContent: '', homeworkImageUrls: '' });
+      await this.loadParentCenter();
+      wx.showToast({ title: result.message || '已提交', icon: 'success' });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '提交失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ submittingHomework: false });
+    }
   },
 
   async onSubscribeLessonNotifications() {

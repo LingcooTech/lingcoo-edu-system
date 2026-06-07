@@ -15,7 +15,6 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { RegisterSuccessPage } from '@/pages/RegisterSuccessPage';
 import { StudentStoriesPage } from '@/pages/StudentStoriesPage';
 import { TeacherDetailPage } from '@/pages/TeacherDetailPage';
-import { TeacherPage } from '@/pages/TeacherPage';
 import { TeachersPage } from '@/pages/TeachersPage';
 import { TrialDetailPage } from '@/pages/TrialDetailPage';
 import { TrialListPage } from '@/pages/TrialListPage';
@@ -60,7 +59,7 @@ export function App() {
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/account" element={<AccountPage />} />
-          <Route path="/teacher" element={<TeacherPage />} />
+          <Route path="/teacher" element={<AccountPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="/checkout/:packageId" element={<CheckoutPage />} />
         </Routes>

@@ -3,11 +3,18 @@ export function money(cents?: number | null): string {
   return `¥${(cents / 100).toFixed(2)}`;
 }
 
-export function coursePriceLabel(input: {
-  packageCount?: number;
-  startingPriceAmount?: number | null;
-}, mode?: 'course_sales' | 'reservation_platform' | 'hybrid'): string {
-  if (!input.packageCount || input.startingPriceAmount === null || input.startingPriceAmount === undefined) {
+export function coursePriceLabel(
+  input: {
+    packageCount?: number;
+    startingPriceAmount?: number | null;
+  },
+  mode?: 'course_sales' | 'reservation_platform',
+): string {
+  if (
+    !input.packageCount ||
+    input.startingPriceAmount === null ||
+    input.startingPriceAmount === undefined
+  ) {
     return '可预约试听';
   }
   if (mode === 'reservation_platform') {

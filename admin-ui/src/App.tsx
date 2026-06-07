@@ -5,6 +5,7 @@ import { fetchMe, getToken, type AuthAccount } from '@/api/client';
 import { Shell } from '@/components/layout/Shell';
 import { AccountsPage } from '@/pages/AccountsPage';
 import { AttendancePage } from '@/pages/AttendancePage';
+import { BusinessModelPage } from '@/pages/BusinessModelPage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
@@ -105,6 +106,7 @@ const router = createBrowserRouter(
         { path: 'academic/attendance', element: <AttendancePage /> },
         // 运营管理
         { path: 'operations/orders', element: <OrdersPage /> },
+        { path: 'operations/business-model', element: <BusinessModelPage /> },
         { path: 'operations/contracts', element: <CourseContractsPage /> },
         { path: 'operations/lessons', element: <LessonsPage /> },
         { path: 'operations/accounts', element: <AccountsPage /> },
@@ -128,6 +130,7 @@ const router = createBrowserRouter(
         { path: 'classrooms', element: <ClassroomsPage /> },
         { path: 'campuses', element: <CampusesPage /> },
         { path: 'orders', element: <OrdersPage /> },
+        { path: 'business-model', element: <BusinessModelPage /> },
         { path: 'contracts', element: <CourseContractsPage /> },
         { path: 'settings', element: <SettingsPage /> },
         { path: 'accounts', element: <AccountsPage /> },

@@ -534,6 +534,40 @@ export const attendanceRecords = pgTable(
   }),
 );
 
+export const homeworkCheckIns = pgTable(
+  'homework_checkins',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    classSessionId: uuid('class_session_id').references(() => classSessions.id, {
+      onDelete: 'set null',
+    }),
+    title: varchar('title', { length: 160 }).notNull().default('作业打卡'),
+    content: text('content').notNull().default(''),
+    imageUrls: jsonb('image_urls')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    reviewStatus: varchar('review_status', { length: 40 }).notNull().default('submitted'),
+    teacherFeedback: text('teacher_feedback').notNull().default(''),
+    reviewedByTeacherId: uuid('reviewed_by_teacher_id').references(() => teachers.id, {
+      onDelete: 'set null',
+    }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    studentIdx: index('homework_checkins_student_idx').on(table.studentId, table.createdAt),
+    courseIdx: index('homework_checkins_course_idx').on(table.courseId, table.createdAt),
+    sessionIdx: index('homework_checkins_session_idx').on(table.classSessionId),
+  }),
+);
+
 export const lessonAccounts = pgTable(
   'lesson_accounts',
   {

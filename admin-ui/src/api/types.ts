@@ -446,7 +446,7 @@ export interface PublicSiteSettings {
   icpUrl: string;
 }
 
-export type BusinessMode = 'course_sales' | 'reservation_platform' | 'hybrid';
+export type BusinessMode = 'course_sales' | 'reservation_platform';
 
 export interface BusinessModelSettings {
   mode: BusinessMode;
