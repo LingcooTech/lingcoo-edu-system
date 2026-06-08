@@ -226,4 +226,13 @@ body {
   .hero-media {
     @apply border-line bg-surface aspect-[4/3] overflow-hidden rounded-[2rem] border shadow-sm;
   }
+
+  /* Hide the scrollbar on horizontally-scrollable rails (filter pills, section nav). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

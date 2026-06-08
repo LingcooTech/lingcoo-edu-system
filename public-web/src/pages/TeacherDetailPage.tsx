@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   Award,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   GraduationCap,
   MessageCircle,
   School,
+  ShieldCheck,
   Sparkles,
+  X,
 } from 'lucide-react';
 
-import { fetchPublicTeacher, type Course, type PublicTeacherDetail } from '@/api/client';
+import {
+  fetchPublicTeacher,
+  type Course,
+  type PublicTeacher,
+  type PublicTeacherDetail,
+} from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { money } from '@/lib/utils';
 
@@ -37,11 +45,8 @@ export function TeacherDetailPage() {
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <Link
-          to="/teachers"
-          className="text-ink-soft hover:text-ink inline-flex items-center gap-1 text-sm no-underline"
-        >
-          <ArrowLeft className="h-4 w-4" />
+        <Link to="/teachers" className="text-muted hover:text-ink inline-flex items-center text-sm">
+          <ChevronLeft className="h-4 w-4" />
           返回教师团队
         </Link>
 
@@ -61,49 +66,70 @@ function TeacherDetailSkeleton() {
   return (
     <div className="mt-6">
       <div className="pwcard p-5 sm:p-7">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="grid gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]">
-            <div className="skeleton h-36 w-full" />
-            <div>
-              <div className="skeleton h-5 w-28" />
-              <div className="skeleton mt-3 h-9 w-1/2" />
-              <div className="skeleton mt-3 h-4 w-2/3" />
-              <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
-                <div className="skeleton h-16" />
-                <div className="skeleton h-16" />
-                <div className="skeleton h-16" />
-              </div>
-            </div>
-          </div>
-          <div>
+        <div className="flex flex-col gap-5 sm:flex-row">
+          <div className="skeleton h-28 w-28 shrink-0 sm:h-36 sm:w-36" />
+          <div className="flex-1">
             <div className="skeleton h-5 w-28" />
-            <div className="skeleton mt-4 h-11 w-full" />
-            <div className="skeleton mt-3 h-11 w-full" />
+            <div className="skeleton mt-3 h-9 w-1/2" />
+            <div className="skeleton mt-3 h-4 w-2/3" />
+            <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
+              <div className="skeleton h-16" />
+              <div className="skeleton h-16" />
+              <div className="skeleton h-16" />
+            </div>
           </div>
         </div>
       </div>
-      <div className="skeleton mt-8 h-40 w-full" />
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-6">
+          <div className="skeleton h-40 w-full" />
+          <div className="skeleton h-40 w-full" />
+        </div>
+        <div className="skeleton h-64 w-full" />
+      </div>
     </div>
   );
 }
 
 function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
   const { teacher, institution } = detail;
+  const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null);
   const profileSections = teacherProfileSections(teacher);
   const stats = teacherStats(teacher);
   const classPhotos = teacher.classPhotoUrls ?? [];
   const studentWorks = teacher.studentWorkUrls ?? [];
   const testimonials = teacher.parentTestimonials ?? [];
   const hasIntro = Boolean(teacher.bio?.trim() || teacher.tagline?.trim());
+  const closeViewer = () => setViewer(null);
+  const showPrev = () => {
+    setViewer((current) =>
+      current
+        ? {
+            ...current,
+            index: (current.index - 1 + current.urls.length) % current.urls.length,
+          }
+        : current,
+    );
+  };
+  const showNext = () => {
+    setViewer((current) =>
+      current
+        ? {
+            ...current,
+            index: (current.index + 1) % current.urls.length,
+          }
+        : current,
+    );
+  };
 
   return (
     <>
       <header className="pwcard mt-6 p-5 shadow-sm sm:p-7">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
-          <div className="grid gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
             <TeacherAvatar teacher={teacher} />
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               {institution ? <InstitutionMark institution={institution} className="mb-3" /> : null}
               <h1 className="text-ink text-3xl font-semibold tracking-tight sm:text-4xl">
                 {teacher.name}
@@ -151,7 +177,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
       </header>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {hasIntro ? (
             <section className="pwcard p-5 sm:p-6">
               <SectionHead title="老师简介" />
@@ -181,15 +207,29 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
             </section>
           ) : null}
 
-          {classPhotos.length > 0 ? <GallerySection title="课堂实拍" urls={classPhotos} /> : null}
+          {classPhotos.length > 0 ? (
+            <GallerySection
+              id="class-photos"
+              title="课堂实拍"
+              urls={classPhotos}
+              onOpen={(index) => setViewer({ urls: classPhotos, index })}
+            />
+          ) : null}
 
           {studentWorks.length > 0 || testimonials.length > 0 ? (
-            <ResultsSection works={studentWorks} testimonials={testimonials} />
+            <ResultsSection
+              id="student-results"
+              works={studentWorks}
+              testimonials={testimonials}
+              onOpenWork={(index) => setViewer({ urls: studentWorks, index })}
+            />
           ) : null}
         </div>
 
         <aside className="grid gap-4 lg:sticky lg:top-24">
-          {detail.courses.length > 0 ? <CoursesSection courses={detail.courses} /> : null}
+          {detail.courses.length > 0 ? (
+            <CoursesSection id="teacher-courses" courses={detail.courses} />
+          ) : null}
 
           {teacher.specialties.length > 0 ? (
             <section className="pwcard p-5">
@@ -205,23 +245,27 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
           ) : null}
         </aside>
       </div>
+
+      {viewer ? (
+        <Lightbox
+          urls={viewer.urls}
+          index={viewer.index}
+          onClose={closeViewer}
+          onPrev={showPrev}
+          onNext={showNext}
+        />
+      ) : null}
     </>
   );
 }
 
 function TeacherAvatar({ teacher }: { teacher: PublicTeacherDetail['teacher'] }) {
+  const base = 'border-line h-28 w-28 shrink-0 rounded-2xl border object-cover shadow-sm sm:h-36 sm:w-36';
   if (teacher.avatarUrl) {
-    return (
-      <img
-        src={teacher.avatarUrl}
-        alt={teacher.name}
-        className="border-line h-44 w-full rounded-2xl border object-cover shadow-sm sm:h-48"
-      />
-    );
+    return <img src={teacher.avatarUrl} alt={teacher.name} className={base} />;
   }
-
   return (
-    <div className="border-line text-brand bg-brand-soft flex h-44 w-full items-center justify-center rounded-2xl border sm:h-48">
+    <div className={`${base} bg-brand-soft text-brand flex items-center justify-center`}>
       <GraduationCap className="h-10 w-10" />
     </div>
   );
@@ -334,13 +378,17 @@ function coursePriceLabel(course: Course) {
   return `${money(course.startingPriceAmount)} 起`;
 }
 
-function CoursesSection({ courses }: { courses: Course[] }) {
+function CoursesSection({ id, courses }: { id: string; courses: Course[] }) {
   return (
-    <section className="pwcard p-5">
+    <section id={id} className="pwcard scroll-mt-32 p-5 sm:p-6">
       <SectionHead title="主讲课程" />
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {courses.map((course) => (
-          <div key={course.id} className="border-line rounded-2xl border p-4">
+          <Link
+            key={course.id}
+            to={`/courses/${course.slug}`}
+            className="border-line pwcard-hover block rounded-2xl border p-4 no-underline"
+          >
             <div className="text-ink text-base font-semibold">{course.name}</div>
             <div className="text-muted mt-1 text-xs">
               {course.category} · {course.ageRange} · {course.durationMinutes} 分钟
@@ -349,37 +397,64 @@ function CoursesSection({ courses }: { courses: Course[] }) {
               <p className="text-ink-soft mt-3 line-clamp-2 text-sm leading-6">{course.summary}</p>
             ) : null}
             <div className="text-ink mt-3 text-sm font-semibold">{coursePriceLabel(course)}</div>
-          </div>
+          </Link>
         ))}
       </div>
     </section>
   );
 }
 
-function GallerySection({ title, urls }: { title: string; urls: string[] }) {
+function GallerySection({
+  id,
+  title,
+  urls,
+  onOpen,
+}: {
+  id: string;
+  title: string;
+  urls: string[];
+  onOpen: (index: number) => void;
+}) {
   return (
-    <section className="pwcard p-5 sm:p-6">
+    <section id={id} className="pwcard scroll-mt-32 p-5 sm:p-6">
       <SectionHead title={title} />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {urls.slice(0, 8).map((url, index) => (
-          <img
+          <button
             key={`${url}-${index}`}
-            src={url}
-            alt=""
-            className="border-line aspect-[4/3] w-full rounded-2xl border bg-white object-cover"
-          />
+            type="button"
+            onClick={() => onOpen(index)}
+            className="group border-line focus-visible:ring-brand/40 block overflow-hidden rounded-2xl border outline-none focus-visible:ring-2"
+            aria-label={`查看${title}第 ${index + 1} 张`}
+          >
+            <img
+              src={url}
+              alt={`${title} ${index + 1}`}
+              className="aspect-[4/3] w-full bg-white object-cover transition duration-300 group-hover:scale-105"
+            />
+          </button>
         ))}
       </div>
     </section>
   );
 }
 
-function ResultsSection({ works, testimonials }: { works: string[]; testimonials: string[] }) {
+function ResultsSection({
+  id,
+  works,
+  testimonials,
+  onOpenWork,
+}: {
+  id: string;
+  works: string[];
+  testimonials: string[];
+  onOpenWork: (index: number) => void;
+}) {
   const showWorks = works.length > 0;
   const showTestimonials = testimonials.length > 0;
 
   return (
-    <section className="pwcard p-5 sm:p-6">
+    <section id={id} className="pwcard scroll-mt-32 p-5 sm:p-6">
       <SectionHead title="学员作品与家长反馈" />
       <div
         className={[
@@ -390,27 +465,216 @@ function ResultsSection({ works, testimonials }: { works: string[]; testimonials
         {showWorks ? (
           <div className="grid grid-cols-2 gap-3">
             {works.slice(0, 6).map((url, index) => (
-              <img
+              <button
                 key={`${url}-${index}`}
-                src={url}
-                alt=""
-                className="border-line aspect-[4/3] w-full rounded-2xl border bg-white object-cover"
-              />
+                type="button"
+                onClick={() => onOpenWork(index)}
+                className="group border-line focus-visible:ring-brand/40 block overflow-hidden rounded-2xl border outline-none focus-visible:ring-2"
+                aria-label={`查看学员作品第 ${index + 1} 张`}
+              >
+                <img
+                  src={url}
+                  alt={`学员作品 ${index + 1}`}
+                  className="aspect-[4/3] w-full bg-white object-cover transition duration-300 group-hover:scale-105"
+                />
+              </button>
             ))}
           </div>
         ) : null}
 
         {showTestimonials ? (
-          <div className="grid gap-3">
+          <div className="grid content-start gap-3">
             {testimonials.slice(0, 4).map((item, index) => (
-              <blockquote key={`${item}-${index}`} className="bg-paper/60 rounded-2xl p-4">
-                <p className="text-ink-soft text-sm leading-7">“{item}”</p>
+              <blockquote
+                key={`${item}-${index}`}
+                className="bg-paper/60 border-line relative rounded-2xl border p-4 pt-7"
+              >
+                <span
+                  aria-hidden
+                  className="text-brand/30 absolute top-1 left-3 text-4xl leading-none font-serif"
+                >
+                  &ldquo;
+                </span>
+                <p className="text-ink-soft text-sm leading-7">{item}</p>
               </blockquote>
             ))}
           </div>
         ) : null}
       </div>
     </section>
+  );
+}
+
+function BookingCard({
+  teacher,
+  courseCount,
+}: {
+  teacher: PublicTeacherDetail['teacher'];
+  courseCount: number;
+}) {
+  return (
+    <div className="pwcard p-5 lg:sticky lg:top-24">
+      <div className="eyebrow">预约</div>
+      <div className="text-ink mt-2 text-lg font-semibold">和 {teacher.name} 老师上课</div>
+      <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary mt-4 w-full">
+        预约试听
+      </Link>
+      {teacher.wechatQrUrl ? (
+        <a
+          href={teacher.wechatQrUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="pwbtn pwbtn-outline mt-2 w-full"
+        >
+          <MessageCircle className="h-4 w-4" />
+          微信联系
+        </a>
+      ) : null}
+      <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
+          免注册预约，老师电话确认时间
+        </div>
+        <div className="flex items-center gap-2">
+          <GraduationCap className="text-brand h-4 w-4 shrink-0" />
+          {teacher.teachingYears ? `${teacher.teachingYears}教学经验` : '专业授课老师'}
+        </div>
+        {courseCount > 0 ? (
+          <div className="flex items-center gap-2">
+            <BookOpen className="text-brand h-4 w-4 shrink-0" />
+            主讲 {courseCount} 门课程
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function MobileBookingBar({ teacher }: { teacher: PublicTeacherDetail['teacher'] }) {
+  return (
+    <div className="border-line bg-surface/95 sticky bottom-0 z-20 border-t backdrop-blur lg:hidden">
+      <div className="container-narrow flex items-center gap-3 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-ink truncate text-base leading-tight font-semibold">
+            {teacher.name}
+            {teacher.title ? ` · ${teacher.title}` : ''}
+          </div>
+          <div className="text-muted truncate text-xs">免注册预约 · 老师电话确认时间</div>
+        </div>
+        <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary shrink-0">
+          预约试听
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function OtherTeachersSection({ teachers }: { teachers: PublicTeacher[] }) {
+  return (
+    <section className="mt-10">
+      <h2 className="text-ink text-lg font-semibold">其他老师</h2>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {teachers.map((teacher) => (
+          <Link
+            key={teacher.id}
+            to={`/teachers/${teacher.id}`}
+            className="pwcard pwcard-hover flex items-center gap-3 p-3 no-underline"
+          >
+            {teacher.avatarUrl ? (
+              <img
+                src={teacher.avatarUrl}
+                alt={teacher.name}
+                className="h-14 w-14 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="bg-brand-soft text-brand flex h-14 w-14 shrink-0 items-center justify-center rounded-xl">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-ink truncate font-medium">{teacher.name}</div>
+              <div className="text-muted truncate text-xs">
+                {teacher.title || teacher.specialties[0] || '课程老师'}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Lightbox({
+  urls,
+  index,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  urls: string[];
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const multiple = urls.length > 1;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片预览"
+      onClick={onClose}
+      className="bg-ink/90 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="关闭预览"
+        className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+      >
+        <X className="h-5 w-5" />
+      </button>
+
+      {multiple ? (
+        <>
+          <button
+            type="button"
+            aria-label="上一张"
+            onClick={(event) => {
+              event.stopPropagation();
+              onPrev();
+            }}
+            className="absolute left-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:left-6"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            aria-label="下一张"
+            onClick={(event) => {
+              event.stopPropagation();
+              onNext();
+            }}
+            className="absolute right-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:right-6"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        </>
+      ) : null}
+
+      <img
+        src={urls[index]}
+        alt={`预览图 ${index + 1}`}
+        onClick={(event) => event.stopPropagation()}
+        className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
+      />
+
+      {multiple ? (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs text-white">
+          {index + 1} / {urls.length}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
