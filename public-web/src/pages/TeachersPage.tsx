@@ -60,10 +60,10 @@ export function TeachersPage() {
 
   function tabClassName(active: boolean) {
     return [
-      'inline-flex h-11 max-w-44 items-center justify-center rounded-full border px-4 text-sm transition',
+      'inline-flex h-11 max-w-44 items-center justify-center rounded-full border px-4 text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-brand/30',
       active
-        ? 'border-[#c9a76d] bg-white text-[#17324d] shadow-sm'
-        : 'border-line bg-surface/70 text-ink-soft hover:border-[#c9a76d]/70 hover:text-ink',
+        ? 'border-brand bg-surface text-ink shadow-sm'
+        : 'border-line bg-surface/70 text-ink-soft hover:border-brand/60 hover:text-ink',
     ].join(' ');
   }
 
@@ -89,11 +89,15 @@ export function TeachersPage() {
           </div>
         )}
 
-        <div className="mt-8 grid gap-5 md:grid-cols-3">
-          {loading ? (
-            <p className="text-muted text-sm">加载中…</p>
-          ) : visibleTeachers.length ? (
-            visibleTeachers.map((teacher) => (
+        {loading ? (
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <TeacherCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : visibleTeachers.length ? (
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {visibleTeachers.map((teacher) => (
               <TeacherCard
                 key={teacher.id}
                 teacher={teacher}
@@ -101,11 +105,11 @@ export function TeachersPage() {
                   teacher.institutionId ? institutionById.get(teacher.institutionId) : undefined
                 }
               />
-            ))
-          ) : (
-            <p className="text-muted text-sm">教师信息待上线。</p>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <TeachersEmptyState />
+        )}
       </section>
     </Layout>
   );
@@ -142,7 +146,7 @@ function TeacherCard({
       to={`/teachers/${teacher.id}`}
       className="pwcard group relative block overflow-hidden p-5 no-underline transition hover:-translate-y-0.5 hover:shadow-lg"
     >
-      <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#17324d,#c9a76d)]" />
+      <div className="from-ink to-brand absolute inset-x-0 top-0 h-1 bg-gradient-to-r" />
       <div className="flex items-start gap-4">
         {teacher.avatarUrl ? (
           <img
@@ -163,7 +167,7 @@ function TeacherCard({
                 <InstitutionMark institution={institution} />
               </div>
             ) : (
-              <div className="mb-2 inline-flex max-w-full items-center rounded-full bg-[#fbf7ec] px-2.5 py-1 text-xs text-[#17324d]">
+              <div className="chip mb-2 max-w-full">
                 <InstitutionMark institution={institution} />
               </div>
             )
@@ -207,5 +211,41 @@ function TeacherCard({
         <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
       </div>
     </Link>
+  );
+}
+
+function TeacherCardSkeleton() {
+  return (
+    <div className="pwcard p-5">
+      <div className="flex items-start gap-4">
+        <div className="skeleton h-20 w-20 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="skeleton h-5 w-20" />
+          <div className="skeleton mt-3 h-6 w-2/3" />
+          <div className="skeleton mt-2 h-3.5 w-1/2" />
+        </div>
+      </div>
+      <div className="skeleton mt-4 h-12 w-full" />
+      <div className="mt-4 flex gap-2">
+        <div className="skeleton h-6 w-14" />
+        <div className="skeleton h-6 w-14" />
+      </div>
+    </div>
+  );
+}
+
+function TeachersEmptyState() {
+  return (
+    <div className="pwcard mt-8 flex flex-col items-center px-6 py-16 text-center">
+      <div className="bg-brand-soft text-brand flex h-12 w-12 items-center justify-center rounded-2xl">
+        <GraduationCap className="h-6 w-6" />
+      </div>
+      <p className="text-ink mt-4 text-sm font-medium">教师信息待上线</p>
+      <p className="text-muted mt-1 text-sm">老师团队正在整理中，欢迎先预约试听。</p>
+      <Link to="/register" className="pwbtn pwbtn-primary mt-5">
+        预约试听
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
   );
 }

@@ -40,7 +40,7 @@ body {
   }
 
   .pwbtn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-3 text-sm font-semibold transition-colors disabled:opacity-60;
+    @apply focus-visible:ring-brand/40 focus-visible:ring-offset-paper inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   /* Primary CTA = ink (near-black), the Apple-neutral default. */
@@ -50,6 +50,25 @@ body {
 
   .pwbtn-outline {
     @apply border-line bg-surface text-ink hover:bg-paper border;
+  }
+
+  /* Clickable card affordance: pair with .pwcard on Link/button cards. */
+  .pwcard-hover {
+    @apply hover:border-brand/40 transition duration-200 hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  /* Form field with a calm clay focus ring (replaces ad-hoc inline inputs). */
+  .pwinput {
+    @apply border-line bg-surface text-ink placeholder:text-muted focus:border-brand focus:ring-brand/25 w-full rounded-xl border px-3.5 py-3 text-sm transition outline-none focus:ring-2;
+  }
+
+  .pwlabel {
+    @apply text-ink-soft mb-1.5 block text-xs font-medium;
+  }
+
+  /* Loading placeholder block. */
+  .skeleton {
+    @apply bg-line/70 animate-pulse rounded-xl;
   }
 
   .eyebrow {

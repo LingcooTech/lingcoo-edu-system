@@ -48,7 +48,7 @@ export function TeacherDetailPage() {
         </Link>
 
         {loading ? (
-          <p className="text-muted mt-8 text-sm">加载中…</p>
+          <TeacherDetailSkeleton />
         ) : notFound || !detail ? (
           <p className="text-muted mt-8 text-sm">没有找到这位老师，可能已下线。</p>
         ) : (
@@ -56,6 +56,29 @@ export function TeacherDetailPage() {
         )}
       </section>
     </Layout>
+  );
+}
+
+function TeacherDetailSkeleton() {
+  return (
+    <div className="mt-6">
+      <div className="bg-brand-soft border-line rounded-3xl border p-5 sm:p-7">
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="skeleton h-28 w-28 sm:h-36 sm:w-36" />
+          <div className="flex-1">
+            <div className="skeleton h-5 w-28" />
+            <div className="skeleton mt-3 h-9 w-1/2" />
+            <div className="skeleton mt-3 h-4 w-2/3" />
+            <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
+              <div className="skeleton h-16" />
+              <div className="skeleton h-16" />
+              <div className="skeleton h-16" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="skeleton mt-8 h-40 w-full" />
+    </div>
   );
 }
 
@@ -69,17 +92,17 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
 
   return (
     <>
-      <header className="relative mt-6 overflow-hidden rounded-3xl border border-[#d8c39a]/70 bg-[#fbf7ec] p-5 shadow-sm sm:p-7">
+      <header className="border-line bg-brand-soft relative mt-6 overflow-hidden rounded-3xl border p-5 shadow-sm sm:p-7">
         <div className="grid gap-6 lg:grid-cols-[auto_1fr_170px] lg:items-start">
           <div className="flex gap-4">
             {teacher.avatarUrl ? (
               <img
                 src={teacher.avatarUrl}
                 alt={teacher.name}
-                className="h-28 w-28 rounded-2xl border border-[#d8c39a]/70 object-cover shadow-sm sm:h-36 sm:w-36"
+                className="border-line h-28 w-28 rounded-2xl border object-cover shadow-sm sm:h-36 sm:w-36"
               />
             ) : (
-              <div className="bg-brand-soft text-brand flex h-28 w-28 items-center justify-center rounded-2xl border border-[#d8c39a]/70 sm:h-36 sm:w-36">
+              <div className="border-line text-brand bg-surface flex h-28 w-28 items-center justify-center rounded-2xl border sm:h-36 sm:w-36">
                 <GraduationCap className="h-10 w-10" />
               </div>
             )}
@@ -91,7 +114,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
             {teacher.title ? (
               <div className="text-ink-soft mt-2 text-base font-medium">{teacher.title}</div>
             ) : null}
-            <div className="mt-3 flex items-center gap-1 text-[#c68b2c]" aria-label="五星评价">
+            <div className="text-brand mt-3 flex items-center gap-1" aria-label="五星评价">
               {Array.from({ length: 5 }).map((_, index) => (
                 <Star key={index} className="h-4 w-4 fill-current" />
               ))}
@@ -104,7 +127,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
             {stats.length > 0 ? (
               <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
                 {stats.map((item) => (
-                  <div key={item.label} className="rounded-2xl bg-white/75 px-3 py-3">
+                  <div key={item.label} className="bg-surface/70 rounded-2xl px-3 py-3">
                     <div className="text-ink text-lg font-semibold">{item.value}</div>
                     <div className="text-muted mt-0.5 text-xs">{item.label}</div>
                   </div>
@@ -145,9 +168,9 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
           {teacher.wechatQrUrl ? (
             <div
               id="teacher-wechat"
-              className="hidden rounded-2xl bg-white/70 p-3 lg:block lg:justify-self-end"
+              className="bg-surface/70 hidden rounded-2xl p-3 lg:block lg:justify-self-end"
             >
-              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#17324d]">
+              <div className="text-ink mb-2 flex items-center gap-1.5 text-xs font-semibold">
                 <MessageCircle className="h-4 w-4" />
                 微信咨询
               </div>
@@ -164,7 +187,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
       {teacher.teachingPhilosophy ? (
         <section className="pwcard mt-8 p-5 sm:p-6">
           <SectionHead eyebrow="Method" title="教学理念" />
-          <p className="text-ink mt-4 max-w-3xl border-l-2 border-[#c9a76d] pl-4 text-base leading-8 whitespace-pre-line">
+          <p className="text-ink border-brand mt-4 max-w-3xl border-l-2 pl-4 text-base leading-8 whitespace-pre-line">
             {teacher.teachingPhilosophy}
           </p>
         </section>
@@ -263,7 +286,7 @@ function ProfileSection({ section }: { section: TeacherProfileSection }) {
   return (
     <article className="border-line/80 bg-paper/40 rounded-2xl border p-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#17324d] text-white">
+        <div className="bg-ink flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white">
           <Icon className="h-5 w-5" />
         </div>
         <h3 className="text-ink text-base font-semibold">{section.label}</h3>
@@ -273,7 +296,7 @@ function ProfileSection({ section }: { section: TeacherProfileSection }) {
         <ul className="text-ink-soft mt-4 space-y-2 text-sm leading-7">
           {lines.map((line) => (
             <li key={line} className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#c9a76d]" />
+              <span className="bg-brand mt-2 h-1.5 w-1.5 shrink-0 rounded-full" />
               <span>{line}</span>
             </li>
           ))}
@@ -282,9 +305,7 @@ function ProfileSection({ section }: { section: TeacherProfileSection }) {
         <p
           className={[
             'mt-4 text-sm leading-7 whitespace-pre-line',
-            section.tone === 'quote'
-              ? 'text-ink border-l-2 border-[#c9a76d] pl-4'
-              : 'text-ink-soft',
+            section.tone === 'quote' ? 'text-ink border-brand border-l-2 pl-4' : 'text-ink-soft',
           ].join(' ')}
         >
           {section.text}
@@ -319,7 +340,7 @@ function CoursesSection({ courses }: { courses: Course[] }) {
           <Link
             key={course.id}
             to={`/courses/${course.slug}`}
-            className="pwcard block p-5 no-underline"
+            className="pwcard pwcard-hover block p-5 no-underline"
           >
             <div className="text-ink text-base font-semibold">{course.name}</div>
             <div className="text-muted mt-1 text-xs">
@@ -404,7 +425,7 @@ function InstitutionMark({
 
   return (
     <span
-      className={`inline-flex h-10 max-w-full items-center rounded-full bg-white/70 px-3 text-sm font-medium text-[#17324d] ${className}`}
+      className={`bg-surface/70 text-ink inline-flex h-10 max-w-full items-center rounded-full px-3 text-sm font-medium ${className}`}
     >
       <span className="truncate">{institution.name}</span>
     </span>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, MapPin, UsersRound } from 'lucide-react';
+import { CalendarDays, ChevronLeft, MapPin, UsersRound } from 'lucide-react';
 
 import {
   createSeatReservation,
@@ -110,12 +110,10 @@ export function TrialDetailPage() {
     }
   }
 
-  const inputClass = 'border-line w-full rounded-xl border bg-surface px-3.5 py-3 text-sm';
-
   if (loading) {
     return (
       <Layout>
-        <div className="container-narrow text-muted py-12 text-sm">加载中…</div>
+        <TrialDetailSkeleton />
       </Layout>
     );
   }
@@ -123,7 +121,7 @@ export function TrialDetailPage() {
   if (!detail) {
     return (
       <Layout>
-        <div className="container-narrow py-12 text-center">
+        <div className="container-narrow py-16 text-center">
           <p className="text-ink-soft text-sm">试听课不存在或已关闭。</p>
           <Link to="/trials" className="pwbtn pwbtn-outline mt-4">
             查看全部试听
@@ -133,124 +131,189 @@ export function TrialDetailPage() {
     );
   }
 
-  const full = detail.trialSession.bookedCount >= detail.trialSession.capacity;
+  const remaining = Math.max(0, detail.trialSession.capacity - detail.trialSession.bookedCount);
+  const full = remaining === 0;
+  const pct =
+    detail.trialSession.capacity > 0
+      ? Math.min(
+          100,
+          Math.round((detail.trialSession.bookedCount / detail.trialSession.capacity) * 100),
+        )
+      : 0;
   const requiresReservationFee =
     detail.organization.businessModel.seatReservationFeeEnabled &&
     detail.trialSession.reservationFeeAmount > 0;
 
   return (
     <Layout>
-      <section className="container-narrow grid gap-6 py-8 lg:grid-cols-[1fr_420px]">
-        <article className="pwcard p-6 md:p-8">
-          <div className="eyebrow">Trial Booking</div>
-          <h1 className="text-ink mt-2 text-3xl font-bold">{detail.trialSession.title}</h1>
-          <p className="text-ink-soft mt-3 text-sm leading-7">{detail.course.summary}</p>
-          <div className="text-ink-soft mt-6 grid gap-3 text-sm sm:grid-cols-3">
-            <div className="bg-paper rounded-2xl p-4">
-              <CalendarDays className="text-brand mb-2 h-5 w-5" />
-              {formatDateTime(detail.trialSession.startsAt)}
-            </div>
-            <div className="bg-paper rounded-2xl p-4">
-              <MapPin className="text-brand mb-2 h-5 w-5" />
-              {detail.campus?.name ?? detail.organization.address ?? '校区待确认'}
-            </div>
-            <div className="bg-paper rounded-2xl p-4">
-              <UsersRound className="text-brand mb-2 h-5 w-5" />
-              已报名 {detail.trialSession.bookedCount}/{detail.trialSession.capacity}
-            </div>
-          </div>
-          {requiresReservationFee && (
-            <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">
-              本场需支付 {money(detail.trialSession.reservationFeeAmount)}
-              试听席位保留费，支付成功后保留名额。
-              {detail.trialSession.reservationNotice && (
-                <div className="mt-1 whitespace-pre-wrap">
-                  {detail.trialSession.reservationNotice}
-                </div>
-              )}
-            </div>
-          )}
-        </article>
+      <section className="container-narrow py-8">
+        <Link to="/trials" className="text-muted hover:text-ink inline-flex items-center text-sm">
+          <ChevronLeft className="h-4 w-4" />
+          全部试听
+        </Link>
 
-        <div className="pwcard h-fit space-y-3 p-5">
-          {!checkoutTarget ? (
-            <form className="space-y-3" onSubmit={submit}>
-              <div>
-                <h2 className="text-ink text-lg font-semibold">
-                  {requiresReservationFee ? '提交并保留试听席位' : '提交试听报名'}
-                </h2>
-                <p className="text-muted mt-1 text-xs">
-                  {requiresReservationFee
-                    ? '提交后支付席位保留费，支付成功后锁定名额。'
-                    : '提交后自动生成预约试听阶段的线索。'}
-                </p>
+        <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
+          <article className="pwcard p-6 md:p-8">
+            <div className="eyebrow">Trial Booking</div>
+            <h1 className="text-ink mt-2 text-3xl font-bold tracking-tight">
+              {detail.trialSession.title}
+            </h1>
+            <Link
+              to={`/courses/${detail.course.slug}`}
+              className="text-brand mt-2 inline-flex items-center text-sm font-medium hover:underline"
+            >
+              {detail.course.name}
+            </Link>
+            <p className="text-ink-soft mt-3 text-sm leading-7">{detail.course.summary}</p>
+
+            <div className="text-ink-soft mt-6 grid gap-3 text-sm sm:grid-cols-3">
+              <div className="bg-paper rounded-2xl p-4">
+                <CalendarDays className="text-brand mb-2 h-5 w-5" />
+                {formatDateTime(detail.trialSession.startsAt)}
               </div>
-              <input
-                className={inputClass}
-                placeholder="家长姓名"
-                value={form.guardianName}
-                onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
-                required
-              />
-              <input
-                className={inputClass}
-                placeholder="手机号"
-                inputMode="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                required
-              />
-              <input
-                className={inputClass}
-                placeholder="孩子姓名"
-                value={form.studentName}
-                onChange={(e) => setForm({ ...form, studentName: e.target.value })}
-                required
-              />
-              <input
-                className={inputClass}
-                placeholder="年级 / 年龄"
-                value={form.grade}
-                onChange={(e) => setForm({ ...form, grade: e.target.value })}
-                required
-              />
-              {error && (
-                <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
-              )}
-              <button
-                type="submit"
-                className="pwbtn pwbtn-primary w-full"
-                disabled={submitting || full}
-              >
-                {full
-                  ? '名额已满'
-                  : submitting
-                    ? '提交中...'
-                    : requiresReservationFee
-                      ? `支付 ${money(detail.trialSession.reservationFeeAmount)} 保留名额`
-                      : '预约这节试听课'}
-              </button>
-            </form>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <h2 className="text-ink text-lg font-semibold">试听席位保留费待支付</h2>
-                <p className="text-muted mt-1 text-xs">
-                  订单 {checkoutTarget.type === 'order' ? checkoutTarget.orderNo : '-'}
-                </p>
+              <div className="bg-paper rounded-2xl p-4">
+                <MapPin className="text-brand mb-2 h-5 w-5" />
+                {detail.campus?.name ?? detail.organization.address ?? '校区待确认'}
               </div>
-              {error && (
-                <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
-              )}
-              <button
-                type="button"
-                className="pwbtn pwbtn-primary w-full"
-                onClick={() => setCheckoutOpen(true)}
-              >
-                继续支付保留名额
-              </button>
+              <div className="bg-paper rounded-2xl p-4">
+                <UsersRound className="text-brand mb-2 h-5 w-5" />
+                已报名 {detail.trialSession.bookedCount}/{detail.trialSession.capacity}
+              </div>
             </div>
-          )}
+
+            <div className="mt-4">
+              <div className="bg-line h-1.5 w-full overflow-hidden rounded-full">
+                <div
+                  className={full ? 'bg-muted h-full rounded-full' : 'bg-brand h-full rounded-full'}
+                  style={{ width: `${full ? 100 : Math.max(pct, 4)}%` }}
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-xs">
+                <span className="text-muted">名额</span>
+                <span className={full ? 'text-muted' : 'text-brand font-medium'}>
+                  {full ? '名额已满' : `剩 ${remaining} 席`}
+                </span>
+              </div>
+            </div>
+
+            {requiresReservationFee && (
+              <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+                本场需支付 {money(detail.trialSession.reservationFeeAmount)}
+                试听席位保留费，支付成功后保留名额。
+                {detail.trialSession.reservationNotice && (
+                  <div className="mt-1 whitespace-pre-wrap">
+                    {detail.trialSession.reservationNotice}
+                  </div>
+                )}
+              </div>
+            )}
+          </article>
+
+          <div className="pwcard h-fit space-y-3 p-5 lg:sticky lg:top-24">
+            {!checkoutTarget ? (
+              <form className="space-y-3" onSubmit={submit}>
+                <div>
+                  <h2 className="text-ink text-lg font-semibold">
+                    {requiresReservationFee ? '提交并保留试听席位' : '提交试听报名'}
+                  </h2>
+                  <p className="text-muted mt-1 text-xs">
+                    {requiresReservationFee
+                      ? '提交后支付席位保留费，支付成功后锁定名额。'
+                      : '提交后自动生成预约试听阶段的线索。'}
+                  </p>
+                </div>
+                <div>
+                  <label className="pwlabel" htmlFor="trial-guardian">
+                    家长姓名
+                  </label>
+                  <input
+                    id="trial-guardian"
+                    className="pwinput"
+                    placeholder="请输入家长姓名"
+                    value={form.guardianName}
+                    onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="pwlabel" htmlFor="trial-phone">
+                    手机号
+                  </label>
+                  <input
+                    id="trial-phone"
+                    className="pwinput"
+                    placeholder="用于老师联系确认"
+                    inputMode="tel"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="pwlabel" htmlFor="trial-student">
+                    孩子姓名
+                  </label>
+                  <input
+                    id="trial-student"
+                    className="pwinput"
+                    placeholder="请输入孩子姓名"
+                    value={form.studentName}
+                    onChange={(e) => setForm({ ...form, studentName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="pwlabel" htmlFor="trial-grade">
+                    年级 / 年龄
+                  </label>
+                  <input
+                    id="trial-grade"
+                    className="pwinput"
+                    placeholder="如：二年级 / 7 岁"
+                    value={form.grade}
+                    onChange={(e) => setForm({ ...form, grade: e.target.value })}
+                    required
+                  />
+                </div>
+                {error && (
+                  <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
+                )}
+                <button
+                  type="submit"
+                  className="pwbtn pwbtn-primary w-full"
+                  disabled={submitting || full}
+                >
+                  {full
+                    ? '名额已满'
+                    : submitting
+                      ? '提交中...'
+                      : requiresReservationFee
+                        ? `支付 ${money(detail.trialSession.reservationFeeAmount)} 保留名额`
+                        : '预约这节试听课'}
+                </button>
+                <p className="text-muted text-center text-xs">免注册 · 信息仅用于本次试听联系</p>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <h2 className="text-ink text-lg font-semibold">试听席位保留费待支付</h2>
+                  <p className="text-muted mt-1 text-xs">
+                    订单 {checkoutTarget.type === 'order' ? checkoutTarget.orderNo : '-'}
+                  </p>
+                </div>
+                {error && (
+                  <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
+                )}
+                <button
+                  type="button"
+                  className="pwbtn pwbtn-primary w-full"
+                  onClick={() => setCheckoutOpen(true)}
+                >
+                  继续支付保留名额
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </section>
       <CheckoutModal
@@ -260,5 +323,34 @@ export function TrialDetailPage() {
         onSuccess={() => navigate('/register/success')}
       />
     </Layout>
+  );
+}
+
+function TrialDetailSkeleton() {
+  return (
+    <section className="container-narrow py-8">
+      <div className="skeleton h-4 w-20" />
+      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div className="pwcard p-6 md:p-8">
+          <div className="skeleton h-4 w-24" />
+          <div className="skeleton mt-3 h-9 w-2/3" />
+          <div className="skeleton mt-3 h-4 w-full" />
+          <div className="skeleton mt-2 h-4 w-4/5" />
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="skeleton h-20" />
+            <div className="skeleton h-20" />
+            <div className="skeleton h-20" />
+          </div>
+        </div>
+        <div className="pwcard h-fit space-y-3 p-5">
+          <div className="skeleton h-6 w-32" />
+          <div className="skeleton h-11 w-full" />
+          <div className="skeleton h-11 w-full" />
+          <div className="skeleton h-11 w-full" />
+          <div className="skeleton h-11 w-full" />
+          <div className="skeleton h-12 w-full" />
+        </div>
+      </div>
+    </section>
   );
 }

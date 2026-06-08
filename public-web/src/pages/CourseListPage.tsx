@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowRight, BookOpen, Clock } from 'lucide-react';
 
 import { fetchCourses, loadHome, type BusinessModelSettings, type Course } from '@/api/client';
 import { Layout } from '@/components/Layout';
@@ -16,6 +17,24 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
   return businessModel?.onlinePackageSalesEnabled
     ? `${money(course.startingPriceAmount)} 起`
     : `${money(course.startingPriceAmount)} 参考`;
+}
+
+function coursePlanLabel(course: Course, businessModel?: BusinessModelSettings) {
+  if (course.packageCount) {
+    return businessModel?.onlinePackageSalesEnabled
+      ? `${course.packageCount} 个课时包`
+      : `${course.packageCount} 个参考方案`;
+  }
+  return businessModel?.onlinePackageSalesEnabled ? '暂未上架课时包' : '暂无参考方案';
+}
+
+function filterClass(active: boolean) {
+  return [
+    'inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-brand/30',
+    active
+      ? 'border-ink bg-ink text-white'
+      : 'border-line bg-surface text-ink-soft hover:border-brand/50 hover:text-ink',
+  ].join(' ');
 }
 
 export function CourseListPage() {
@@ -42,15 +61,24 @@ export function CourseListPage() {
 
   return (
     <Layout>
-      <section className="container-narrow py-8">
+      <section className="container-narrow py-10">
         <div className="eyebrow">Courses</div>
-        <h1 className="text-ink mt-1 text-2xl font-bold">全部课程</h1>
+        <h1 className="section-title mt-2">全部课程</h1>
+        <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
+          按年龄与方向开设的小班课程，先预约试听，老师会电话确认适合的班型与时间。
+        </p>
+        {!loading && courses.length > 0 && (
+          <p className="text-muted mt-3 text-xs">
+            共 {courses.length} 门课程
+            {category !== 'all' ? ` · 当前「${category}」${visible.length} 门` : ''}
+          </p>
+        )}
 
         {categories.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap gap-2">
             <button
               type="button"
-              className={category === 'all' ? 'chip bg-ink text-white' : 'chip'}
+              className={filterClass(category === 'all')}
               onClick={() => setCategory('all')}
             >
               全部
@@ -59,7 +87,7 @@ export function CourseListPage() {
               <button
                 key={item}
                 type="button"
-                className={category === item ? 'chip bg-ink text-white' : 'chip'}
+                className={filterClass(category === item)}
                 onClick={() => setCategory(item)}
               >
                 {item}
@@ -68,43 +96,78 @@ export function CourseListPage() {
           </div>
         )}
 
-        <div className="mt-5 grid gap-3">
-          {loading ? (
-            <p className="text-muted text-sm">加载中…</p>
-          ) : visible.length === 0 ? (
-            <p className="text-muted text-sm">暂无课程</p>
-          ) : (
-            visible.map((course) => (
-              <Link key={course.id} to={`/courses/${course.slug}`} className="pwcard block p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-ink text-sm font-semibold">{course.name}</div>
-                    <div className="text-muted mt-1 text-xs">
-                      {course.category} · {course.ageRange}
-                    </div>
-                  </div>
-                  <div className="text-ink shrink-0 text-sm font-semibold">
-                    {coursePriceLabel(course, businessModel)}
-                  </div>
+        {loading ? (
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <CourseCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visible.map((course) => (
+              <Link
+                key={course.id}
+                to={`/courses/${course.slug}`}
+                className="pwcard pwcard-hover flex flex-col p-5 no-underline"
+              >
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="chip">{course.category}</span>
+                  <span className="chip">{course.ageRange}</span>
                 </div>
-                <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">
+                <h2 className="text-ink mt-3 text-base font-semibold">{course.name}</h2>
+                <p className="text-ink-soft mt-2 line-clamp-2 flex-1 text-sm leading-6">
                   {course.summary}
                 </p>
-                <div className="text-muted mt-2 text-xs">
-                  {course.packageCount
-                    ? businessModel?.onlinePackageSalesEnabled
-                      ? `${course.packageCount} 个课时包`
-                      : `${course.packageCount} 个参考方案`
-                    : businessModel?.onlinePackageSalesEnabled
-                      ? '暂未上架课时包'
-                      : '暂无参考方案'}{' '}
-                  · 单节 {course.durationMinutes} 分钟
+                <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
+                  <span className="text-muted inline-flex items-center gap-1.5 text-xs">
+                    <Clock className="h-3.5 w-3.5" />
+                    {coursePlanLabel(course, businessModel)} · {course.durationMinutes} 分钟
+                  </span>
+                  <span className="text-ink text-sm font-semibold">
+                    {coursePriceLabel(course, businessModel)}
+                  </span>
                 </div>
               </Link>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </Layout>
+  );
+}
+
+function CourseCardSkeleton() {
+  return (
+    <div className="pwcard p-5">
+      <div className="flex gap-1.5">
+        <div className="skeleton h-5 w-14" />
+        <div className="skeleton h-5 w-16" />
+      </div>
+      <div className="skeleton mt-3 h-5 w-2/3" />
+      <div className="skeleton mt-3 h-3.5 w-full" />
+      <div className="skeleton mt-2 h-3.5 w-4/5" />
+      <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
+        <div className="skeleton h-3.5 w-32" />
+        <div className="skeleton h-4 w-12" />
+      </div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="pwcard mt-7 flex flex-col items-center px-6 py-14 text-center">
+      <div className="bg-brand-soft text-brand flex h-12 w-12 items-center justify-center rounded-2xl">
+        <BookOpen className="h-6 w-6" />
+      </div>
+      <p className="text-ink mt-4 text-sm font-medium">该分类下暂无课程</p>
+      <p className="text-muted mt-1 text-sm">可以先预约试听，老师会推荐适合孩子的课程。</p>
+      <Link to="/register" className="pwbtn pwbtn-primary mt-5">
+        预约试听
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
   );
 }
