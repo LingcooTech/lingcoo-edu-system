@@ -4,12 +4,10 @@ import {
   ArrowLeft,
   Award,
   BookOpen,
-  Camera,
   GraduationCap,
   MessageCircle,
   School,
   Sparkles,
-  Star,
 } from 'lucide-react';
 
 import { fetchPublicTeacher, type Course, type PublicTeacherDetail } from '@/api/client';
@@ -62,18 +60,25 @@ export function TeacherDetailPage() {
 function TeacherDetailSkeleton() {
   return (
     <div className="mt-6">
-      <div className="bg-brand-soft border-line rounded-3xl border p-5 sm:p-7">
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="skeleton h-28 w-28 sm:h-36 sm:w-36" />
-          <div className="flex-1">
-            <div className="skeleton h-5 w-28" />
-            <div className="skeleton mt-3 h-9 w-1/2" />
-            <div className="skeleton mt-3 h-4 w-2/3" />
-            <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
-              <div className="skeleton h-16" />
-              <div className="skeleton h-16" />
-              <div className="skeleton h-16" />
+      <div className="pwcard p-5 sm:p-7">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="grid gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]">
+            <div className="skeleton h-36 w-full" />
+            <div>
+              <div className="skeleton h-5 w-28" />
+              <div className="skeleton mt-3 h-9 w-1/2" />
+              <div className="skeleton mt-3 h-4 w-2/3" />
+              <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
+                <div className="skeleton h-16" />
+                <div className="skeleton h-16" />
+                <div className="skeleton h-16" />
+              </div>
             </div>
+          </div>
+          <div>
+            <div className="skeleton h-5 w-28" />
+            <div className="skeleton mt-4 h-11 w-full" />
+            <div className="skeleton mt-3 h-11 w-full" />
           </div>
         </div>
       </div>
@@ -89,133 +94,136 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
   const classPhotos = teacher.classPhotoUrls ?? [];
   const studentWorks = teacher.studentWorkUrls ?? [];
   const testimonials = teacher.parentTestimonials ?? [];
+  const hasIntro = Boolean(teacher.bio?.trim() || teacher.tagline?.trim());
 
   return (
     <>
-      <header className="border-line bg-brand-soft relative mt-6 overflow-hidden rounded-3xl border p-5 shadow-sm sm:p-7">
-        <div className="grid gap-6 lg:grid-cols-[auto_1fr_170px] lg:items-start">
-          <div className="flex gap-4">
-            {teacher.avatarUrl ? (
-              <img
-                src={teacher.avatarUrl}
-                alt={teacher.name}
-                className="border-line h-28 w-28 rounded-2xl border object-cover shadow-sm sm:h-36 sm:w-36"
-              />
-            ) : (
-              <div className="border-line text-brand bg-surface flex h-28 w-28 items-center justify-center rounded-2xl border sm:h-36 sm:w-36">
-                <GraduationCap className="h-10 w-10" />
-              </div>
-            )}
-          </div>
+      <header className="pwcard mt-6 p-5 shadow-sm sm:p-7">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
+          <div className="grid gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]">
+            <TeacherAvatar teacher={teacher} />
 
-          <div className="min-w-0">
-            {institution ? <InstitutionMark institution={institution} className="mb-3" /> : null}
-            <h1 className="text-ink text-3xl font-semibold tracking-tight">{teacher.name}</h1>
-            {teacher.title ? (
-              <div className="text-ink-soft mt-2 text-base font-medium">{teacher.title}</div>
-            ) : null}
-            <div className="text-brand mt-3 flex items-center gap-1" aria-label="五星评价">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <Star key={index} className="h-4 w-4 fill-current" />
-              ))}
-            </div>
-
-            {teacher.tagline ? (
-              <p className="text-ink mt-4 max-w-2xl text-lg leading-8">{teacher.tagline}</p>
-            ) : null}
-
-            {stats.length > 0 ? (
-              <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
-                {stats.map((item) => (
-                  <div key={item.label} className="bg-surface/70 rounded-2xl px-3 py-3">
-                    <div className="text-ink text-lg font-semibold">{item.value}</div>
-                    <div className="text-muted mt-0.5 text-xs">{item.label}</div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-wrap gap-2" aria-label="擅长方向">
-              {teacher.specialties.map((item) => (
-                <span key={item} className="chip">
-                  {item}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary">
-                预约试听
-              </Link>
-              {teacher.wechatQrUrl ? (
-                <a
-                  href={teacher.wechatQrUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="pwbtn pwbtn-outline lg:hidden"
-                >
-                  微信咨询
-                </a>
+            <div className="min-w-0">
+              {institution ? <InstitutionMark institution={institution} className="mb-3" /> : null}
+              <h1 className="text-ink text-3xl font-semibold tracking-tight sm:text-4xl">
+                {teacher.name}
+              </h1>
+              {teacher.title ? (
+                <div className="text-ink-soft mt-2 text-base font-medium">{teacher.title}</div>
               ) : null}
-              {teacher.wechatQrUrl ? (
-                <a href="#teacher-wechat" className="pwbtn pwbtn-outline hidden lg:inline-flex">
-                  微信咨询
-                </a>
+
+              {teacher.tagline ? (
+                <p className="text-ink border-brand mt-4 max-w-2xl border-l-2 pl-4 text-base leading-8 sm:text-lg">
+                  {teacher.tagline}
+                </p>
+              ) : null}
+
+              {stats.length > 0 ? (
+                <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
+                  {stats.map((item) => (
+                    <div key={item.label} className="bg-paper/70 rounded-2xl px-3 py-3">
+                      <div className="text-ink text-lg font-semibold">{item.value}</div>
+                      <div className="text-muted mt-0.5 text-xs">{item.label}</div>
+                    </div>
+                  ))}
+                </div>
               ) : null}
             </div>
           </div>
 
-          {teacher.wechatQrUrl ? (
-            <div
-              id="teacher-wechat"
-              className="bg-surface/70 hidden rounded-2xl p-3 lg:block lg:justify-self-end"
-            >
-              <div className="text-ink mb-2 flex items-center gap-1.5 text-xs font-semibold">
+          <aside className="border-line flex flex-col justify-center gap-3 border-t pt-5 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+            <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary w-full">
+              预约试听
+            </Link>
+            {teacher.wechatQrUrl ? (
+              <a
+                href={teacher.wechatQrUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="pwbtn pwbtn-outline w-full"
+              >
                 <MessageCircle className="h-4 w-4" />
-                微信咨询
-              </div>
-              <img
-                src={teacher.wechatQrUrl}
-                alt={`${teacher.name}的微信二维码`}
-                className="aspect-square w-36 rounded-xl bg-white object-contain p-2"
-              />
-            </div>
-          ) : null}
+                微信联系
+              </a>
+            ) : null}
+          </aside>
         </div>
       </header>
 
-      {teacher.teachingPhilosophy ? (
-        <section className="pwcard mt-8 p-5 sm:p-6">
-          <SectionHead eyebrow="Method" title="教学理念" />
-          <p className="text-ink border-brand mt-4 max-w-3xl border-l-2 pl-4 text-base leading-8 whitespace-pre-line">
-            {teacher.teachingPhilosophy}
-          </p>
-        </section>
-      ) : null}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <div className="space-y-6">
+          {hasIntro ? (
+            <section className="pwcard p-5 sm:p-6">
+              <SectionHead title="老师简介" />
+              <p className="text-ink-soft mt-4 max-w-3xl text-base leading-8 whitespace-pre-line">
+                {teacher.bio || teacher.tagline}
+              </p>
+            </section>
+          ) : null}
 
-      {detail.courses.length > 0 ? <CoursesSection courses={detail.courses} /> : null}
+          {teacher.teachingPhilosophy ? (
+            <section className="pwcard p-5 sm:p-6">
+              <SectionHead title="教学方法" />
+              <p className="text-ink-soft mt-4 max-w-3xl text-base leading-8 whitespace-pre-line">
+                {teacher.teachingPhilosophy}
+              </p>
+            </section>
+          ) : null}
 
-      {classPhotos.length > 0 ? (
-        <GallerySection title="课堂实拍" eyebrow="Classroom" urls={classPhotos} icon={Camera} />
-      ) : null}
+          {profileSections.length > 0 ? (
+            <section className="pwcard p-5 sm:p-6">
+              <SectionHead title="教学经历与资质" />
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                {profileSections.map((section) => (
+                  <ProfileSection key={section.key} section={section} />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-      {studentWorks.length > 0 ? (
-        <GallerySection title="学员作品" eyebrow="Works" urls={studentWorks} icon={BookOpen} />
-      ) : null}
+          {classPhotos.length > 0 ? <GallerySection title="课堂实拍" urls={classPhotos} /> : null}
 
-      {testimonials.length > 0 ? <TestimonialsSection items={testimonials} /> : null}
+          {studentWorks.length > 0 || testimonials.length > 0 ? (
+            <ResultsSection works={studentWorks} testimonials={testimonials} />
+          ) : null}
+        </div>
 
-      {profileSections.length > 0 ? (
-        <section className="pwcard mt-8 p-5 sm:p-6">
-          <SectionHead eyebrow="Profile" title="教学经历与资质" />
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {profileSections.map((section) => (
-              <ProfileSection key={section.key} section={section} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+        <aside className="grid gap-4 lg:sticky lg:top-24">
+          {detail.courses.length > 0 ? <CoursesSection courses={detail.courses} /> : null}
+
+          {teacher.specialties.length > 0 ? (
+            <section className="pwcard p-5">
+              <SectionHead title="擅长方向" />
+              <div className="mt-4 flex flex-wrap gap-2">
+                {teacher.specialties.map((item) => (
+                  <span key={item} className="chip">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </aside>
+      </div>
     </>
+  );
+}
+
+function TeacherAvatar({ teacher }: { teacher: PublicTeacherDetail['teacher'] }) {
+  if (teacher.avatarUrl) {
+    return (
+      <img
+        src={teacher.avatarUrl}
+        alt={teacher.name}
+        className="border-line h-44 w-full rounded-2xl border object-cover shadow-sm sm:h-48"
+      />
+    );
+  }
+
+  return (
+    <div className="border-line text-brand bg-brand-soft flex h-44 w-full items-center justify-center rounded-2xl border sm:h-48">
+      <GraduationCap className="h-10 w-10" />
+    </div>
   );
 }
 
@@ -328,52 +336,30 @@ function coursePriceLabel(course: Course) {
 
 function CoursesSection({ courses }: { courses: Course[] }) {
   return (
-    <section className="mt-8">
-      <div className="mb-4 flex items-end justify-between">
-        <SectionHead eyebrow="Courses" title="主讲课程" />
-        <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
-          全部课程
-        </Link>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {courses.slice(0, 3).map((course) => (
-          <Link
-            key={course.id}
-            to={`/courses/${course.slug}`}
-            className="pwcard pwcard-hover block p-5 no-underline"
-          >
+    <section className="pwcard p-5">
+      <SectionHead title="主讲课程" />
+      <div className="mt-4 grid gap-3">
+        {courses.map((course) => (
+          <div key={course.id} className="border-line rounded-2xl border p-4">
             <div className="text-ink text-base font-semibold">{course.name}</div>
             <div className="text-muted mt-1 text-xs">
               {course.category} · {course.ageRange} · {course.durationMinutes} 分钟
             </div>
-            <p className="text-ink-soft mt-3 line-clamp-2 text-sm leading-6">{course.summary}</p>
-            <div className="text-ink mt-4 text-sm font-semibold">{coursePriceLabel(course)}</div>
-          </Link>
+            {course.summary ? (
+              <p className="text-ink-soft mt-3 line-clamp-2 text-sm leading-6">{course.summary}</p>
+            ) : null}
+            <div className="text-ink mt-3 text-sm font-semibold">{coursePriceLabel(course)}</div>
+          </div>
         ))}
       </div>
     </section>
   );
 }
 
-function GallerySection({
-  title,
-  eyebrow,
-  urls,
-  icon: Icon,
-}: {
-  title: string;
-  eyebrow: string;
-  urls: string[];
-  icon: typeof Camera;
-}) {
+function GallerySection({ title, urls }: { title: string; urls: string[] }) {
   return (
-    <section className="mt-8">
-      <div className="mb-4 flex items-center gap-2">
-        <div className="bg-brand-soft text-brand flex h-9 w-9 items-center justify-center rounded-full">
-          <Icon className="h-4 w-4" />
-        </div>
-        <SectionHead eyebrow={eyebrow} title={title} />
-      </div>
+    <section className="pwcard p-5 sm:p-6">
+      <SectionHead title={title} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {urls.slice(0, 8).map((url, index) => (
           <img
@@ -388,16 +374,41 @@ function GallerySection({
   );
 }
 
-function TestimonialsSection({ items }: { items: string[] }) {
+function ResultsSection({ works, testimonials }: { works: string[]; testimonials: string[] }) {
+  const showWorks = works.length > 0;
+  const showTestimonials = testimonials.length > 0;
+
   return (
-    <section className="mt-8">
-      <SectionHead eyebrow="Parents" title="家长评价" />
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        {items.slice(0, 6).map((item, index) => (
-          <blockquote key={`${item}-${index}`} className="pwcard p-5">
-            <p className="text-ink-soft text-sm leading-7">“{item}”</p>
-          </blockquote>
-        ))}
+    <section className="pwcard p-5 sm:p-6">
+      <SectionHead title="学员作品与家长反馈" />
+      <div
+        className={[
+          'mt-4 grid gap-4',
+          showWorks && showTestimonials ? 'lg:grid-cols-[minmax(0,1fr)_18rem]' : '',
+        ].join(' ')}
+      >
+        {showWorks ? (
+          <div className="grid grid-cols-2 gap-3">
+            {works.slice(0, 6).map((url, index) => (
+              <img
+                key={`${url}-${index}`}
+                src={url}
+                alt=""
+                className="border-line aspect-[4/3] w-full rounded-2xl border bg-white object-cover"
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {showTestimonials ? (
+          <div className="grid gap-3">
+            {testimonials.slice(0, 4).map((item, index) => (
+              <blockquote key={`${item}-${index}`} className="bg-paper/60 rounded-2xl p-4">
+                <p className="text-ink-soft text-sm leading-7">“{item}”</p>
+              </blockquote>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -432,11 +443,6 @@ function InstitutionMark({
   );
 }
 
-function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
-  return (
-    <div>
-      <div className="eyebrow">{eyebrow}</div>
-      <h2 className="text-ink mt-1 text-lg font-semibold">{title}</h2>
-    </div>
-  );
+function SectionHead({ title }: { title: string }) {
+  return <h2 className="text-ink text-lg font-semibold">{title}</h2>;
 }

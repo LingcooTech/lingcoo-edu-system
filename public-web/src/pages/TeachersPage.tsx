@@ -45,11 +45,6 @@ export function TeachersPage() {
     }
   }, [activeTab, tabs]);
 
-  const institutionById = useMemo(
-    () => new Map(institutions.map((institution) => [institution.id, institution])),
-    [institutions],
-  );
-
   const visibleTeachers = useMemo(
     () =>
       tabs.length === 0
@@ -90,21 +85,15 @@ export function TeachersPage() {
         )}
 
         {loading ? (
-          <div className="mt-8 grid gap-5 md:grid-cols-3">
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 6 }).map((_, index) => (
               <TeacherCardSkeleton key={index} />
             ))}
           </div>
         ) : visibleTeachers.length ? (
-          <div className="mt-8 grid gap-5 md:grid-cols-3">
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {visibleTeachers.map((teacher) => (
-              <TeacherCard
-                key={teacher.id}
-                teacher={teacher}
-                institution={
-                  teacher.institutionId ? institutionById.get(teacher.institutionId) : undefined
-                }
-              />
+              <TeacherCard key={teacher.id} teacher={teacher} />
             ))}
           </div>
         ) : (
@@ -132,103 +121,105 @@ function InstitutionMark({ institution }: { institution: PublicInstitution }) {
   return <span className="truncate font-medium">{institution.name}</span>;
 }
 
-function TeacherCard({
-  teacher,
-  institution,
-}: {
-  teacher: PublicTeacher;
-  institution?: PublicInstitution;
-}) {
+function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
   const shownSpecialties = teacher.specialties.slice(0, 3);
+  const stats = teacherStats(teacher).slice(0, 3);
+  const primaryDirection = teacher.specialties[0] ?? teacher.title ?? '课程老师';
 
   return (
     <Link
       to={`/teachers/${teacher.id}`}
-      className="pwcard group relative block overflow-hidden p-5 no-underline transition hover:-translate-y-0.5 hover:shadow-lg"
+      className="pwcard pwcard-hover group flex min-h-[28rem] flex-col overflow-hidden no-underline"
     >
-      <div className="from-ink to-brand absolute inset-x-0 top-0 h-1 bg-gradient-to-r" />
-      <div className="flex items-start gap-4">
-        {teacher.avatarUrl ? (
-          <img
-            src={teacher.avatarUrl}
-            alt={teacher.name}
-            className="border-line h-20 w-20 shrink-0 rounded-2xl border object-cover"
-          />
-        ) : (
-          <div className="bg-brand-soft text-brand flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl">
-            <GraduationCap className="h-8 w-8" />
-          </div>
-        )}
+      {teacher.avatarUrl ? (
+        <img src={teacher.avatarUrl} alt={teacher.name} className="h-48 w-full object-cover" />
+      ) : (
+        <div className="bg-brand-soft text-brand flex h-48 w-full items-center justify-center">
+          <GraduationCap className="h-12 w-12" />
+        </div>
+      )}
 
-        <div className="min-w-0 flex-1">
-          {institution ? (
-            institution.logoUrl ? (
-              <div className="mb-2 flex h-6 max-w-28 items-center">
-                <InstitutionMark institution={institution} />
-              </div>
-            ) : (
-              <div className="chip mb-2 max-w-full">
-                <InstitutionMark institution={institution} />
-              </div>
-            )
-          ) : null}
-          <h2 className="text-ink truncate text-xl font-semibold">{teacher.name}</h2>
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="chip max-w-[9rem] truncate">{primaryDirection}</span>
+          <span className="text-muted shrink-0 text-xs font-medium">可预约</span>
+        </div>
+
+        <h2 className="text-ink mt-3 truncate text-xl font-semibold">{teacher.name}</h2>
+        <div className="min-h-5">
           {teacher.title ? (
             <div className="text-muted mt-1 truncate text-xs">{teacher.title}</div>
           ) : null}
         </div>
-      </div>
 
-      {teacher.tagline ? (
-        <p className="text-ink-soft mt-4 line-clamp-2 min-h-12 text-sm leading-6">
-          {teacher.tagline}
-        </p>
-      ) : (
-        <p className="text-muted mt-4 min-h-12 text-sm leading-6">个人简介待补充</p>
-      )}
-
-      <div className="mt-4 flex min-h-8 flex-wrap gap-2">
-        {shownSpecialties.length ? (
-          <>
-            {shownSpecialties.map((item) => (
-              <span key={item} className="chip">
-                {item}
-              </span>
-            ))}
-            {teacher.specialties.length > shownSpecialties.length ? (
-              <span className="text-muted inline-flex items-center text-xs">
-                +{teacher.specialties.length - shownSpecialties.length}
-              </span>
-            ) : null}
-          </>
+        {teacher.tagline ? (
+          <p className="text-ink-soft mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6">
+            {teacher.tagline}
+          </p>
         ) : (
-          <span className="text-muted text-sm">擅长方向待补充</span>
+          <p className="text-muted mt-4 min-h-[4.5rem] text-sm leading-6">个人简介待补充</p>
         )}
-      </div>
 
-      <div className="text-ink-soft group-hover:text-ink mt-5 inline-flex items-center gap-1 text-sm font-medium">
-        查看详情
-        <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+        <div className="mt-4 flex min-h-8 flex-wrap gap-2">
+          {shownSpecialties.length ? (
+            <>
+              {shownSpecialties.map((item) => (
+                <span key={item} className="chip">
+                  {item}
+                </span>
+              ))}
+              {teacher.specialties.length > shownSpecialties.length ? (
+                <span className="text-muted inline-flex items-center text-xs">
+                  +{teacher.specialties.length - shownSpecialties.length}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="text-muted text-sm">擅长方向待补充</span>
+          )}
+        </div>
+
+        <div className="border-line text-muted mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-xs">
+          {stats.length ? (
+            stats.map((item) => (
+              <span key={item.label}>
+                <b className="text-ink text-sm">{item.value}</b> {item.label}
+              </span>
+            ))
+          ) : (
+            <span>查看完整教师档案</span>
+          )}
+          <span className="text-ink group-hover:text-brand ml-auto inline-flex items-center gap-1 font-medium">
+            详情
+            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+          </span>
+        </div>
       </div>
     </Link>
   );
 }
 
+function teacherStats(teacher: PublicTeacher) {
+  return [
+    { label: '教学', value: teacher.teachingYears },
+    { label: '学员', value: teacher.studentCount },
+    { label: '续班率', value: teacher.retentionRate },
+  ].filter((item): item is { label: string; value: string } => Boolean(item.value?.trim()));
+}
+
 function TeacherCardSkeleton() {
   return (
-    <div className="pwcard p-5">
-      <div className="flex items-start gap-4">
-        <div className="skeleton h-20 w-20 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <div className="skeleton h-5 w-20" />
-          <div className="skeleton mt-3 h-6 w-2/3" />
-          <div className="skeleton mt-2 h-3.5 w-1/2" />
+    <div className="pwcard overflow-hidden">
+      <div className="skeleton h-48 w-full rounded-none" />
+      <div className="p-5">
+        <div className="skeleton h-6 w-20" />
+        <div className="skeleton mt-4 h-6 w-1/2" />
+        <div className="skeleton mt-2 h-3.5 w-2/3" />
+        <div className="skeleton mt-4 h-16 w-full" />
+        <div className="mt-4 flex gap-2">
+          <div className="skeleton h-6 w-14" />
+          <div className="skeleton h-6 w-14" />
         </div>
-      </div>
-      <div className="skeleton mt-4 h-12 w-full" />
-      <div className="mt-4 flex gap-2">
-        <div className="skeleton h-6 w-14" />
-        <div className="skeleton h-6 w-14" />
       </div>
     </div>
   );
