@@ -306,6 +306,23 @@ export interface Order {
   student?: { name: string };
   course?: { name: string };
   package?: { name: string; lessonCount: number; priceAmount: number };
+  refundRequests?: RefundRequest[];
+}
+
+export interface RefundRequest {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  accountId?: string | null;
+  amount: number;
+  reason: 'schedule_conflict' | 'course_not_fit' | 'duplicate_payment' | 'service_issue' | 'other' | string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
+  buyerNote?: string | null;
+  adminNote?: string | null;
+  decidedByAccountId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CourseContractPaymentRecord {

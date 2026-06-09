@@ -5,7 +5,6 @@ import { Check, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import {
   createOrder,
   createPaymentIntent,
-  fetchOrderStatus,
   fetchPaymentProviders,
   mockPayOrder,
   syncPayment,
@@ -98,6 +97,7 @@ export function CheckoutModal({
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
+  const [paymentHint, setPaymentHint] = useState('');
   const [redirectOpened, setRedirectOpened] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -114,6 +114,7 @@ export function CheckoutModal({
     setIntent(null);
     setCheckout(null);
     setError('');
+    setPaymentHint('');
     setBusy(false);
     setSyncing(false);
     setRedirectOpened(false);
@@ -131,23 +132,37 @@ export function CheckoutModal({
 
   function markPaid(order: ParentOrder, checkoutInfo = checkout) {
     clearTimer(pollRef);
+    setError('');
+    setPaymentHint('');
     setStep('done');
     onSuccess?.(order, checkoutInfo);
   }
 
+  async function reconcilePayment(no: string, options: { showPendingHint?: boolean } = {}) {
+    const result = await syncPayment(no);
+    if (result.item.status === 'paid') {
+      markPaid(result.item);
+      return true;
+    }
+
+    if (options.showPendingHint) {
+      setPaymentHint(result.reconciliation.reason || '支付还未完成，扫码付款后稍候片刻。');
+    }
+    return false;
+  }
+
   function startPolling(no: string) {
     clearTimer(pollRef);
-    pollRef.current = setInterval(async () => {
+    const tick = async () => {
       try {
-        const order = await fetchOrderStatus(no);
-        if (order.status === 'paid') {
-          markPaid(order);
-        }
+        await reconcilePayment(no);
       } catch {
         // Keep polling through short network hiccups; the manual sync button
         // below lets the user reconcile explicitly after completing payment.
       }
-    }, 3000);
+    };
+    void tick();
+    pollRef.current = setInterval(() => void tick(), 3000);
   }
 
   async function ensureOrder() {
@@ -186,6 +201,7 @@ export function CheckoutModal({
   async function pay(provider: PaymentProvider) {
     setBusy(true);
     setError('');
+    setPaymentHint('');
     try {
       const currentOrderNo = await ensureOrder();
       const created = await createPaymentIntent(currentOrderNo, provider);
@@ -194,7 +210,7 @@ export function CheckoutModal({
       setRedirectOpened(false);
 
       if (created.status === 'paid') {
-        markPaid(await fetchOrderStatus(currentOrderNo));
+        await reconcilePayment(currentOrderNo);
         return;
       }
 
@@ -214,6 +230,7 @@ export function CheckoutModal({
   async function payMock() {
     setBusy(true);
     setError('');
+    setPaymentHint('');
     try {
       const currentOrderNo = await ensureOrder();
       const order = await mockPayOrder(currentOrderNo);
@@ -229,13 +246,9 @@ export function CheckoutModal({
     if (!orderNo) return;
     setSyncing(true);
     setError('');
+    setPaymentHint('');
     try {
-      const result = await syncPayment(orderNo);
-      if (result.item.status === 'paid') {
-        markPaid(result.item);
-      } else {
-        setError(result.reconciliation.reason || '暂未查询到支付成功记录，请稍后再试');
-      }
+      await reconcilePayment(orderNo, { showPendingHint: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : '验单失败，请稍后再试');
     } finally {
@@ -429,6 +442,12 @@ export function CheckoutModal({
                       <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
                       {syncing ? '验单中...' : '已支付，立即验单'}
                     </button>
+                  ) : null}
+
+                  {paymentHint ? (
+                    <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                      {paymentHint}
+                    </div>
                   ) : null}
                 </section>
               )}

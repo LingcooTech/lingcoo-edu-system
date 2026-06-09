@@ -8,6 +8,7 @@ import * as notificationsRepo from '../../db/repositories/notifications.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as refundsRepo from '../../db/repositories/refunds.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as seatReservationRepo from '../../db/repositories/seat-reservations.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
@@ -210,9 +211,20 @@ export const parentCenterModule: AppModule = {
         catalogRepo.listCourses(app.db),
         packagesRepo.listPackages(app.db),
       ]);
+      const refundRequests = await refundsRepo.listRefundRequestsForOrders(
+        app.db,
+        orders.map((order) => order.id),
+      );
       const studentById = new Map(students.map((student) => [student.id, student]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
       const packageById = new Map(packages.map((pkg) => [pkg.id, pkg]));
+      const refundRequestsByOrderId = new Map<string, typeof refundRequests>();
+      for (const refund of refundRequests) {
+        refundRequestsByOrderId.set(refund.orderId, [
+          ...(refundRequestsByOrderId.get(refund.orderId) ?? []),
+          refund,
+        ]);
+      }
 
       return {
         orders: orders.map((order) => ({
@@ -220,6 +232,7 @@ export const parentCenterModule: AppModule = {
           student: order.studentId ? (studentById.get(order.studentId) ?? null) : null,
           course: order.courseId ? (courseById.get(order.courseId) ?? null) : null,
           package: order.packageId ? (packageById.get(order.packageId) ?? null) : null,
+          refundRequests: refundRequestsByOrderId.get(order.id) ?? [],
         })),
       };
     });

@@ -601,6 +601,38 @@ test('creates and mock-pays a public package order', async () => {
       .limit(1);
     assert.ok(lessonAccount);
     assert.equal(lessonAccount.balance, pkg.lessonCount);
+
+    await app.db
+      .update(schema.orders)
+      .set({ status: 'refunded', paidAmount: 0, updatedAt: new Date() })
+      .where(eq(schema.orders.id, checkoutPayload.order.id));
+
+    const refundedSync = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${checkoutPayload.order.orderNo}/payment-sync`,
+    });
+    assert.equal(refundedSync.statusCode, 200, refundedSync.body);
+    assert.equal(refundedSync.json().item.status, 'refunded');
+    assert.equal(refundedSync.json().reconciliation.status, 'refunded');
+
+    const lateMockPay = await app.inject({
+      method: 'POST',
+      url: `/public/orders/${checkoutPayload.order.orderNo}/mock-pay`,
+    });
+    assert.equal(lateMockPay.statusCode, 409);
+
+    const [unchangedLessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, checkoutPayload.order.studentId),
+          eq(schema.lessonAccounts.courseId, course.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(unchangedLessonAccount);
+    assert.equal(unchangedLessonAccount.balance, pkg.lessonCount);
   } finally {
     await app.close();
   }

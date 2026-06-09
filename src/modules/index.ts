@@ -9,6 +9,7 @@ import { notificationsModule } from './notifications/index.js';
 import { parentCenterModule } from './parent-center/index.js';
 import { paymentModule } from './payment/index.js';
 import { peopleModule } from './people/index.js';
+import { refundModule } from './refund/index.js';
 import { reportModule } from './report/index.js';
 import { schedulingModule } from './scheduling/index.js';
 import { systemModule } from './system/index.js';
@@ -35,6 +36,7 @@ export const appModules: AppModule[] = [
   notificationsModule,
   parentCenterModule,
   paymentModule,
+  refundModule,
 ];
 
 export function getModuleNames(): string[] {

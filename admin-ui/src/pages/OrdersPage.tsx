@@ -26,6 +26,21 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   cancelled: '已取消',
 };
 
+const REFUND_STATUS_LABEL: Record<string, string> = {
+  pending: '退款待审',
+  approved: '退款通过',
+  rejected: '退款拒绝',
+  cancelled: '退款取消',
+};
+
+const REFUND_REASON_LABEL: Record<string, string> = {
+  schedule_conflict: '时间冲突',
+  course_not_fit: '课程不合适',
+  duplicate_payment: '重复支付',
+  service_issue: '服务问题',
+  other: '其他原因',
+};
+
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   wechat_pay: '微信支付',
   alipay: '支付宝',
@@ -77,6 +92,11 @@ function orderSearchText(order: Order) {
     order.paymentProvider ? LIVE_PAYMENT_PROVIDER_LABEL[order.paymentProvider] : '',
     order.paymentMethod ? PAYMENT_METHOD_LABEL[order.paymentMethod] : '',
     order.offlinePaymentNote,
+    ...(order.refundRequests ?? []).map((refund) =>
+      [REFUND_STATUS_LABEL[refund.status], REFUND_REASON_LABEL[refund.reason], refund.buyerNote]
+        .filter(Boolean)
+        .join(' '),
+    ),
   ]
     .filter(Boolean)
     .join(' ')
@@ -97,6 +117,10 @@ function canSyncPayment(order: Order) {
     order.status === 'pending' &&
     Boolean(order.paymentProvider && LIVE_PAYMENT_PROVIDER_LABEL[order.paymentProvider])
   );
+}
+
+function pendingRefund(order: Order) {
+  return order.refundRequests?.find((refund) => refund.status === 'pending') ?? null;
 }
 
 export function OrdersPage() {
@@ -124,6 +148,7 @@ export function OrdersPage() {
   const [receiverTypeFilter, setReceiverTypeFilter] = useState('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [syncingOrderNo, setSyncingOrderNo] = useState('');
+  const [decidingRefundId, setDecidingRefundId] = useState('');
   const [reloading, setReloading] = useState(false);
 
   const selectedPackage = activePackages.find((item) => item.id === form.packageId);
@@ -177,6 +202,7 @@ export function OrdersPage() {
         ),
       manualGrantCount: filtered.filter((order) => order.orderType === 'manual_package_grant')
         .length,
+      pendingRefundCount: filtered.filter((order) => pendingRefund(order)).length,
     };
   }, [filtered]);
 
@@ -259,6 +285,37 @@ export function OrdersPage() {
       toast.error(err instanceof Error ? err.message : '同步失败');
     } finally {
       setSyncingOrderNo('');
+    }
+  }
+
+  async function decideRefund(order: Order, decision: 'approve' | 'reject') {
+    const refund = pendingRefund(order);
+    if (!refund) {
+      toast.error('该订单没有待审核退款申请');
+      return;
+    }
+
+    const adminNote =
+      decision === 'reject'
+        ? window.prompt('请输入拒绝原因（家长可见）')?.trim()
+        : window.prompt('请输入退款备注（可选，家长可见）')?.trim();
+    if (decision === 'reject' && !adminNote) {
+      toast.error('拒绝退款必须填写原因');
+      return;
+    }
+
+    setDecidingRefundId(refund.id);
+    try {
+      await apiPost(`/v1/refunds/${encodeURIComponent(refund.id)}/decision`, {
+        decision,
+        adminNote: adminNote || undefined,
+      });
+      await reloadOrders();
+      toast.success(decision === 'approve' ? '退款已通过，订单已回滚' : '退款已拒绝');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '退款审核失败');
+    } finally {
+      setDecidingRefundId('');
     }
   }
 
@@ -346,6 +403,11 @@ export function OrdersPage() {
           value={money(summary.seatReservationAmount)}
           hint={`${summary.manualGrantCount} 笔线下课时包添加`}
         />
+        <MetricCard
+          label="待审退款"
+          value={summary.pendingRefundCount}
+          hint="筛选范围内退款申请"
+        />
       </div>
 
       <DataTable
@@ -384,24 +446,62 @@ export function OrdersPage() {
           {
             key: 'status',
             header: '状态',
-            cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+            cell: (row) => (
+              <div className="cell-stack">
+                <StatusPill tone={statusToTone(row.status)} label={row.status} />
+                {row.refundRequests?.[0] ? (
+                  <span className="cell-subtitle">
+                    {REFUND_STATUS_LABEL[row.refundRequests[0].status] ??
+                      row.refundRequests[0].status}
+                    {' · '}
+                    {REFUND_REASON_LABEL[row.refundRequests[0].reason] ??
+                      row.refundRequests[0].reason}
+                  </span>
+                ) : null}
+              </div>
+            ),
           },
           {
             key: 'actions',
             header: '操作',
-            cell: (row) => (
-              <button
-                type="button"
-                className="btn btn-secondary px-2 py-1 text-xs"
-                onClick={() => void syncPaymentOrder(row)}
-                disabled={!canSyncPayment(row) || syncingOrderNo === row.orderNo}
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${syncingOrderNo === row.orderNo ? 'animate-spin' : ''}`}
-                />
-                {syncingOrderNo === row.orderNo ? '同步中' : '同步'}
-              </button>
-            ),
+            cell: (row) => {
+              const refund = pendingRefund(row);
+              return (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    className="btn btn-secondary px-2 py-1 text-xs"
+                    onClick={() => void syncPaymentOrder(row)}
+                    disabled={!canSyncPayment(row) || syncingOrderNo === row.orderNo}
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${syncingOrderNo === row.orderNo ? 'animate-spin' : ''}`}
+                    />
+                    {syncingOrderNo === row.orderNo ? '同步中' : '同步'}
+                  </button>
+                  {refund ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary px-2 py-1 text-xs"
+                        onClick={() => void decideRefund(row, 'approve')}
+                        disabled={decidingRefundId === refund.id}
+                      >
+                        通过退款
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary px-2 py-1 text-xs"
+                        onClick={() => void decideRefund(row, 'reject')}
+                        disabled={decidingRefundId === refund.id}
+                      >
+                        拒绝
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              );
+            },
           },
         ]}
         data={filtered}

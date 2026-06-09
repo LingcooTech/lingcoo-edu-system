@@ -38,6 +38,10 @@ function formatMessageTime(date = new Date()) {
   return date.toISOString().replace('T', ' ').slice(0, 16);
 }
 
+function notPayableReason(order: Order) {
+  return `Order is ${order.status} and cannot be paid`;
+}
+
 async function attachQrCodeDataUrl(intent: PaymentIntent): Promise<PaymentIntent> {
   if (intent.nextAction !== 'render_qr') {
     return intent;
@@ -93,6 +97,10 @@ export class PaymentService {
       return { item: this.buildPaidIntent(order, provider) };
     }
 
+    if (order.status !== 'pending') {
+      throw httpError(409, notPayableReason(order));
+    }
+
     if (provider === 'mock') {
       return this.createMockIntent(order);
     }
@@ -138,6 +146,9 @@ export class PaymentService {
     }
     if (order.status === 'paid') {
       return { item: this.buildPaidIntent(order, 'wechat_pay') };
+    }
+    if (order.status !== 'pending') {
+      throw httpError(409, notPayableReason(order));
     }
 
     const adapter = getPaymentProvider('wechat_pay');
@@ -268,6 +279,18 @@ export class PaymentService {
           status: 'paid',
           source: 'current_state',
           reason: 'Order already marked as paid',
+        },
+      };
+    }
+
+    if (order.status !== 'pending') {
+      return {
+        changed: false,
+        item: order,
+        reconciliation: {
+          status: order.status,
+          source: 'current_state',
+          reason: notPayableReason(order),
         },
       };
     }

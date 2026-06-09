@@ -4,6 +4,7 @@ import * as financeRepo from '../../db/repositories/finance.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as refundsRepo from '../../db/repositories/refunds.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as settlementsRepo from '../../db/repositories/settlements.js';
 import { readBusinessModel } from '../../lib/business-model.js';
@@ -58,11 +59,22 @@ export const financeModule: AppModule = {
         catalogRepo.listCourses(app.db),
         packagesRepo.listPackages(app.db),
       ]);
+      const refundRequests = await refundsRepo.listRefundRequestsForOrders(
+        app.db,
+        orders.map((order) => order.id),
+      );
       const studentById = new Map(students.map((student) => [student.id, student]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
       const packageById = new Map(
         packages.map((coursePackage) => [coursePackage.id, coursePackage]),
       );
+      const refundRequestsByOrderId = new Map<string, typeof refundRequests>();
+      for (const refund of refundRequests) {
+        refundRequestsByOrderId.set(refund.orderId, [
+          ...(refundRequestsByOrderId.get(refund.orderId) ?? []),
+          refund,
+        ]);
+      }
 
       return {
         orders: orders.map((order) => ({
@@ -70,6 +82,7 @@ export const financeModule: AppModule = {
           student: order.studentId ? studentById.get(order.studentId) : undefined,
           course: order.courseId ? courseById.get(order.courseId) : undefined,
           package: order.packageId ? packageById.get(order.packageId) : undefined,
+          refundRequests: refundRequestsByOrderId.get(order.id) ?? [],
         })),
       };
     });

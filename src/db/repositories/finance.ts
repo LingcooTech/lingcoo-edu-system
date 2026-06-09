@@ -240,10 +240,6 @@ export async function markOrderPaidAndCredit(
       throw httpError(404, `Order not found: ${input.orderNo}`);
     }
 
-    if (order.status === 'paid') {
-      return { order, alreadyPaid: true };
-    }
-
     if (order.paymentProvider && order.paymentProvider !== input.provider) {
       throw httpError(409, `Order provider mismatch for ${input.orderNo}`);
     }
@@ -252,6 +248,14 @@ export async function markOrderPaidAndCredit(
     }
     if (order.currency !== input.currency) {
       throw httpError(409, `Order currency mismatch for ${input.orderNo}`);
+    }
+
+    if (order.status === 'paid') {
+      return { order, alreadyPaid: true };
+    }
+
+    if (order.status !== 'pending') {
+      throw httpError(409, `Order is not payable from status: ${order.status}`);
     }
 
     const [updated] = await tx

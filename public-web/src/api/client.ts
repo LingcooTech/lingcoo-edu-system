@@ -237,6 +237,23 @@ export interface ParentOrder {
   createdAt: string;
   course?: Course | null;
   package?: CoursePackage | null;
+  refundRequests?: RefundRequest[];
+}
+
+export interface RefundRequest {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  accountId?: string | null;
+  amount: number;
+  reason: 'schedule_conflict' | 'course_not_fit' | 'duplicate_payment' | 'service_issue' | 'other' | string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
+  buyerNote?: string | null;
+  adminNote?: string | null;
+  decidedByAccountId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CheckoutInfo {
@@ -257,6 +274,24 @@ export async function fetchParentLessonAccounts() {
 
 export async function fetchParentOrders() {
   return (await publicApi<{ orders: ParentOrder[] }>('/public/me/orders')).orders;
+}
+
+export async function applyOrderRefund(
+  orderNo: string,
+  input: {
+    reason: 'schedule_conflict' | 'course_not_fit' | 'duplicate_payment' | 'service_issue' | 'other';
+    buyerNote?: string;
+  },
+) {
+  return (
+    await publicApi<{ refund: RefundRequest }>(
+      `/public/me/orders/${encodeURIComponent(orderNo)}/refund`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    )
+  ).refund;
 }
 
 export interface CoursePackage {
@@ -630,23 +665,33 @@ export async function fetchPaymentProviders() {
 
 export async function createPaymentIntent(orderNo: string, provider: PaymentProvider) {
   return (
-    await publicApi<{ item: PaymentIntent }>(`/public/orders/${orderNo}/payment-intent`, {
-      method: 'POST',
-      body: JSON.stringify({ provider }),
-    })
+    await publicApi<{ item: PaymentIntent }>(
+      `/public/orders/${encodeURIComponent(orderNo)}/payment-intent`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ provider }),
+      },
+    )
   ).item;
 }
 
 export async function mockPayOrder(orderNo: string) {
   return (
-    await publicApi<{ item: ParentOrder }>(`/public/orders/${orderNo}/mock-pay`, {
-      method: 'POST',
-    })
+    await publicApi<{ item: ParentOrder }>(
+      `/public/orders/${encodeURIComponent(orderNo)}/mock-pay`,
+      {
+        method: 'POST',
+      },
+    )
   ).item;
 }
 
 export async function fetchOrderStatus(orderNo: string) {
-  return (await publicApi<{ item: ParentOrder }>(`/public/orders/${orderNo}/status`)).item;
+  return (
+    await publicApi<{ item: ParentOrder }>(
+      `/public/orders/${encodeURIComponent(orderNo)}/status`,
+    )
+  ).item;
 }
 
 export interface PaymentSyncResult {
@@ -656,9 +701,12 @@ export interface PaymentSyncResult {
 }
 
 export async function syncPayment(orderNo: string) {
-  return publicApi<PaymentSyncResult>(`/public/orders/${orderNo}/payment-sync`, {
-    method: 'POST',
-  });
+  return publicApi<PaymentSyncResult>(
+    `/public/orders/${encodeURIComponent(orderNo)}/payment-sync`,
+    {
+      method: 'POST',
+    },
+  );
 }
 
 // --- Teacher front-office read-only views ---

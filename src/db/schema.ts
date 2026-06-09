@@ -89,6 +89,19 @@ export const orderTypeEnum = pgEnum('order_type', [
   'manual_package_grant',
 ]);
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'refunded', 'cancelled']);
+export const refundRequestStatusEnum = pgEnum('refund_request_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled',
+]);
+export const refundReasonEnum = pgEnum('refund_reason', [
+  'schedule_conflict',
+  'course_not_fit',
+  'duplicate_payment',
+  'service_issue',
+  'other',
+]);
 export const settlementBatchStatusEnum = pgEnum('settlement_batch_status', ['settled', 'voided']);
 export const courseContractStatusEnum = pgEnum('course_contract_status', [
   'active',
@@ -1007,5 +1020,37 @@ export const payments = pgTable(
   },
   (table) => ({
     orderNoIdx: index('payments_order_no_idx').on(table.orderNo),
+  }),
+);
+
+export const refundRequests = pgTable(
+  'refund_requests',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'restrict' }),
+    orderNo: varchar('order_no', { length: 64 }).notNull(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    amount: integer('amount').notNull(),
+    reason: refundReasonEnum('reason').notNull(),
+    status: refundRequestStatusEnum('status').notNull().default('pending'),
+    buyerNote: text('buyer_note'),
+    adminNote: text('admin_note'),
+    decidedByAccountId: uuid('decided_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orderIdx: index('refund_requests_order_idx').on(table.orderId),
+    orderNoIdx: index('refund_requests_order_no_idx').on(table.orderNo),
+    accountIdx: index('refund_requests_account_idx').on(table.accountId),
+    statusIdx: index('refund_requests_status_idx').on(table.status),
+    openOrderUnique: uniqueIndex('refund_requests_open_order_idx')
+      .on(table.orderId)
+      .where(sql`${table.status} = 'pending'`),
   }),
 );

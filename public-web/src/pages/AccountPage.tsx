@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import {
+  applyOrderRefund,
   createParentHomeworkCheckIn,
   fetchChildren,
   fetchParentAttendance,
@@ -95,6 +96,21 @@ const HOMEWORK_REVIEW_STATUS_LABEL: Record<string, string> = {
   reviewed: '已批阅',
   needs_revision: '需订正',
 };
+
+const REFUND_STATUS_LABEL: Record<string, string> = {
+  pending: '退款审核中',
+  approved: '退款已通过',
+  rejected: '退款未通过',
+  cancelled: '退款已取消',
+};
+
+const REFUND_REASON_OPTIONS = [
+  { value: 'schedule_conflict', label: '时间冲突' },
+  { value: 'course_not_fit', label: '课程不合适' },
+  { value: 'duplicate_payment', label: '重复支付' },
+  { value: 'service_issue', label: '服务问题' },
+  { value: 'other', label: '其他原因' },
+] as const;
 
 function SectionHeading({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
@@ -242,6 +258,12 @@ function ParentView({ account }: { account: AuthAccount }) {
   const [homeworkImageUrls, setHomeworkImageUrls] = useState('');
   const [homeworkSubmitting, setHomeworkSubmitting] = useState(false);
   const [homeworkMessage, setHomeworkMessage] = useState('');
+  const [refundTarget, setRefundTarget] = useState<ParentOrder | null>(null);
+  const [refundReason, setRefundReason] =
+    useState<(typeof REFUND_REASON_OPTIONS)[number]['value']>('schedule_conflict');
+  const [refundNote, setRefundNote] = useState('');
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [refundMessage, setRefundMessage] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyMessage, setVerifyMessage] = useState('');
   const [emailVerified, setEmailVerified] = useState(account.emailVerified);
@@ -264,6 +286,12 @@ function ParentView({ account }: { account: AuthAccount }) {
       .catch(() => undefined);
   }, []);
 
+  const reloadOrders = useCallback(() => {
+    fetchParentOrders()
+      .then(setOrders)
+      .catch(() => undefined);
+  }, []);
+
   useEffect(() => {
     fetchChildren()
       .then(setChildren)
@@ -271,16 +299,14 @@ function ParentView({ account }: { account: AuthAccount }) {
     fetchParentLessonAccounts()
       .then(setAccounts)
       .catch(() => undefined);
-    fetchParentOrders()
-      .then(setOrders)
-      .catch(() => undefined);
+    reloadOrders();
     reloadSeatReservations();
     reloadCheckInSessions();
     fetchParentAttendance()
       .then(setAttendance)
       .catch(() => undefined);
     reloadHomeworkCheckIns();
-  }, [reloadCheckInSessions, reloadHomeworkCheckIns, reloadSeatReservations]);
+  }, [reloadCheckInSessions, reloadHomeworkCheckIns, reloadOrders, reloadSeatReservations]);
 
   useEffect(() => {
     const accountTargetExists = accounts.some((item) => item.id === homeworkTargetId);
@@ -392,6 +418,32 @@ function ParentView({ account }: { account: AuthAccount }) {
       setHomeworkMessage(err instanceof Error ? err.message : '作业打卡提交失败');
     } finally {
       setHomeworkSubmitting(false);
+    }
+  }
+
+  function openRefund(order: ParentOrder) {
+    setRefundTarget(order);
+    setRefundReason('schedule_conflict');
+    setRefundNote('');
+    setRefundMessage('');
+  }
+
+  async function submitRefund() {
+    if (!refundTarget) return;
+    setRefundSubmitting(true);
+    setRefundMessage('');
+    try {
+      await applyOrderRefund(refundTarget.orderNo, {
+        reason: refundReason,
+        buyerNote: refundNote.trim() || undefined,
+      });
+      setRefundTarget(null);
+      setRefundNote('');
+      await reloadOrders();
+    } catch (err) {
+      setRefundMessage(err instanceof Error ? err.message : '退款申请提交失败');
+    } finally {
+      setRefundSubmitting(false);
     }
   }
 
@@ -723,6 +775,24 @@ function ParentView({ account }: { account: AuthAccount }) {
                   <span>{orderMeta(order)}</span>
                   <span>{ORDER_STATUS_LABEL[order.status] ?? order.status}</span>
                 </div>
+                {order.refundRequests?.length ? (
+                  <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {REFUND_STATUS_LABEL[order.refundRequests[0].status] ??
+                      order.refundRequests[0].status}
+                    {order.refundRequests[0].adminNote
+                      ? `：${order.refundRequests[0].adminNote}`
+                      : ''}
+                  </div>
+                ) : null}
+                {order.status === 'paid' && !order.refundRequests?.some((item) => item.status === 'pending') ? (
+                  <button
+                    type="button"
+                    className="border-line text-ink hover:bg-paper mt-3 inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                    onClick={() => openRefund(order)}
+                  >
+                    申请退款
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
@@ -785,6 +855,73 @@ function ParentView({ account }: { account: AuthAccount }) {
             <p className="text-muted text-xs">每笔试听席位保留费预约仅可改期一次。</p>
             {rescheduleError && (
               <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{rescheduleError}</div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(refundTarget)}
+        onClose={() => setRefundTarget(null)}
+        title="申请退款"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="pwbtn pwbtn-outline px-4 py-2"
+              onClick={() => setRefundTarget(null)}
+              disabled={refundSubmitting}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="pwbtn pwbtn-primary px-4 py-2"
+              onClick={submitRefund}
+              disabled={refundSubmitting}
+            >
+              {refundSubmitting ? '提交中...' : '提交申请'}
+            </button>
+          </div>
+        }
+      >
+        {refundTarget ? (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+              {orderTitle(refundTarget)} · {money(refundTarget.paidAmount || refundTarget.amount)}
+            </div>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink font-medium">退款原因</span>
+              <select
+                className="border-line rounded-xl border bg-white px-3 py-2"
+                value={refundReason}
+                onChange={(event) =>
+                  setRefundReason(event.target.value as typeof refundReason)
+                }
+              >
+                {REFUND_REASON_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink font-medium">补充说明</span>
+              <textarea
+                className="border-line min-h-24 rounded-xl border px-3 py-2"
+                value={refundNote}
+                onChange={(event) => setRefundNote(event.target.value)}
+                placeholder="可填写希望机构了解的情况"
+              />
+            </label>
+            <p className="text-muted text-xs">
+              退款通过后，课时包订单会自动扣回未消耗课时；试听席位会释放名额。
+            </p>
+            {refundMessage && (
+              <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
+                {refundMessage}
+              </div>
             )}
           </div>
         ) : null}
