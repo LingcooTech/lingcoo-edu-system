@@ -1,24 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, GraduationCap } from 'lucide-react';
 
-import { fetchPublicTeachers, type PublicTeacher } from '@/api/client';
+import {
+  fetchPublicInstitutions,
+  fetchPublicTeachers,
+  type PublicInstitution,
+  type PublicTeacher,
+} from '@/api/client';
 import { Layout } from '@/components/Layout';
 
 export function TeachersPage() {
   const [teachers, setTeachers] = useState<PublicTeacher[]>([]);
+  const [institutions, setInstitutions] = useState<PublicInstitution[]>([]);
+  const [activeInstitutionId, setActiveInstitutionId] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPublicTeachers()
-      .then(setTeachers)
-      .catch(() => setTeachers([]))
+    Promise.allSettled([fetchPublicTeachers(), fetchPublicInstitutions()])
+      .then(([teacherResult, institutionResult]) => {
+        setTeachers(teacherResult.status === 'fulfilled' ? teacherResult.value : []);
+        setInstitutions(institutionResult.status === 'fulfilled' ? institutionResult.value : []);
+      })
       .finally(() => setLoading(false));
   }, []);
 
+  const institutionTabs = useMemo(() => {
+    const teacherInstitutionIds = new Set(
+      teachers.map((teacher) => teacher.institutionId).filter(Boolean),
+    );
+    return institutions.filter((institution) => teacherInstitutionIds.has(institution.id));
+  }, [institutions, teachers]);
+
+  const selectedInstitutionId = institutionTabs.some(
+    (institution) => institution.id === activeInstitutionId,
+  )
+    ? activeInstitutionId
+    : (institutionTabs[0]?.id ?? '');
+
+  const visibleTeachers = selectedInstitutionId
+    ? teachers.filter((teacher) => teacher.institutionId === selectedInstitutionId)
+    : teachers;
+
   const subtitle =
     teachers.length > 0
-      ? `${teachers.length} 位老师，点击查看完整教师档案`
+      ? `${visibleTeachers.length} 位老师，点击查看完整教师档案`
       : '认识我们的老师，找到适合孩子的那一位。';
 
   return (
@@ -27,6 +53,19 @@ export function TeachersPage() {
         <div className="eyebrow">Teachers</div>
         <h1 className="section-title mt-2">教师团队</h1>
         <p className="text-ink-soft mt-2 text-sm">{subtitle}</p>
+
+        {!loading && institutionTabs.length > 0 ? (
+          <div className="no-scrollbar -mx-1 mt-6 flex gap-2 overflow-x-auto px-1 pb-1">
+            {institutionTabs.map((institution) => (
+              <InstitutionTab
+                key={institution.id}
+                institution={institution}
+                active={institution.id === selectedInstitutionId}
+                onClick={() => setActiveInstitutionId(institution.id)}
+              />
+            ))}
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -38,13 +77,49 @@ export function TeachersPage() {
           <TeachersEmptyState />
         ) : (
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {teachers.map((teacher) => (
+            {visibleTeachers.map((teacher) => (
               <TeacherCard key={teacher.id} teacher={teacher} />
             ))}
           </div>
         )}
       </section>
     </Layout>
+  );
+}
+
+function InstitutionTab({
+  institution,
+  active,
+  onClick,
+}: {
+  institution: PublicInstitution;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={institution.name}
+      aria-pressed={active}
+      onClick={onClick}
+      className={[
+        'focus-visible:ring-brand/30 inline-flex h-11 shrink-0 items-center justify-center rounded-full border px-4 text-sm whitespace-nowrap transition outline-none focus-visible:ring-2',
+        institution.logoUrl ? 'min-w-28' : '',
+        active
+          ? 'border-brand bg-surface text-ink shadow-sm'
+          : 'border-line bg-surface/70 text-ink-soft hover:border-brand/60 hover:text-ink',
+      ].join(' ')}
+    >
+      {institution.logoUrl ? (
+        <img
+          src={institution.logoUrl}
+          alt={institution.name}
+          className="max-h-7 max-w-28 object-contain"
+        />
+      ) : (
+        <span className="font-medium">{institution.name}</span>
+      )}
+    </button>
   );
 }
 

@@ -3,9 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Award,
   BookOpen,
+  CalendarCheck,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
+  MessageCircle,
   School,
   Sparkles,
   X,
@@ -150,18 +152,31 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
             </div>
           </div>
 
-          <aside className="border-line flex flex-col justify-center gap-4 border-t pt-5 text-center lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
-            <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary w-full">
+          <aside className="border-line bg-paper/60 flex flex-col justify-center gap-3 rounded-2xl border p-4 text-center lg:rounded-none lg:border-0 lg:border-l lg:bg-transparent lg:p-0 lg:pl-6">
+            <Link
+              to={`/register?teacherId=${teacher.id}`}
+              className="pwbtn pwbtn-primary h-12 w-full text-[15px] shadow-sm hover:shadow-md"
+            >
+              <CalendarCheck className="h-4 w-4" />
               预约试听
             </Link>
             {teacher.wechatQrUrl ? (
-              <div className="flex flex-col items-center gap-2">
-                <img
-                  src={teacher.wechatQrUrl}
-                  alt={`${teacher.name}老师微信二维码`}
-                  className="border-line h-28 w-28 rounded-2xl border bg-white object-contain"
-                />
-                <span className="text-muted text-xs">扫码加老师微信</span>
+              <div className="border-line bg-surface/90 rounded-2xl border p-3">
+                <div className="text-ink flex items-center justify-center gap-1.5 text-sm font-semibold">
+                  <MessageCircle className="text-brand h-4 w-4" />
+                  微信联系
+                </div>
+                <div className="mt-3 flex items-center justify-center gap-3 lg:flex-col">
+                  <img
+                    src={teacher.wechatQrUrl}
+                    alt={`${teacher.name}老师微信二维码`}
+                    className="border-line h-24 w-24 shrink-0 rounded-xl border bg-white p-1 object-contain shadow-sm sm:h-28 sm:w-28"
+                  />
+                  <div className="min-w-0 text-left lg:text-center">
+                    <div className="text-ink-soft text-xs font-medium">扫码加老师微信</div>
+                    <div className="text-muted mt-1 text-[11px] leading-5">了解课程与时间安排</div>
+                  </div>
+                </div>
               </div>
             ) : null}
           </aside>
