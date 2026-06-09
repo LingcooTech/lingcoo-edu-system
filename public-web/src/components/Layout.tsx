@@ -99,6 +99,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const organization = home?.organization;
   const navItems = navItemsFor(organization);
+  const primaryCtaText = organization?.publicProfile.ctaText || '预约试听';
+  const primaryCtaLink = organization?.publicProfile.ctaLink || '/register';
   const accountMenuPath = account?.role === 'teacher' ? '/teacher' : '/account';
   const accountMenuLabel = account?.role === 'teacher' ? '老师工作台' : '个人中心';
 
@@ -219,8 +221,8 @@ export function Layout({ children }: { children: ReactNode }) {
                 <DrawerNavItem key={`${item.to}-${item.label}`} item={item} />
               ))}
             </nav>
-            <Link to="/register" className="pwbtn pwbtn-primary mt-8 w-full">
-              预约试听
+            <Link to={primaryCtaLink} className="pwbtn pwbtn-primary mt-8 w-full">
+              {primaryCtaText}
             </Link>
             {account ? (
               <div className="mt-3 grid gap-2">

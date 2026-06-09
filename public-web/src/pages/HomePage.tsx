@@ -90,7 +90,7 @@ export function HomePage() {
       <section className="border-line bg-surface border-b">
         <div className="container-narrow hero-grid">
           <div>
-            <div className="eyebrow">社区小班成长教室</div>
+            <div className="eyebrow">{profile?.eyebrow || '社区小班成长教室'}</div>
             <h1 className="text-ink mt-4 text-4xl leading-tight font-bold tracking-tight md:text-5xl">
               {profile?.bannerTitle ||
                 profile?.headline ||
@@ -104,8 +104,8 @@ export function HomePage() {
               <Link to={profile?.ctaLink || '/register'} className="pwbtn pwbtn-primary">
                 {profile?.ctaText || '预约试听'}
               </Link>
-              <Link to="/courses" className="pwbtn pwbtn-outline">
-                浏览课程
+              <Link to={profile?.secondaryCtaLink || '/courses'} className="pwbtn pwbtn-outline">
+                {profile?.secondaryCtaText || '浏览课程'}
               </Link>
             </div>
             {stats.length > 0 && (
@@ -196,8 +196,12 @@ export function HomePage() {
       <section className="container-narrow py-8">
         <div className="bg-ink grid gap-4 rounded-[2rem] p-6 text-white md:grid-cols-2 md:p-8">
           <div>
-            <div className="text-sm font-semibold text-white/60">Visit</div>
-            <h2 className="mt-2 text-2xl font-bold">到店前先预约，老师会确认适合的班型</h2>
+            <div className="text-sm font-semibold text-white/60">
+              {profile?.visitEyebrow || 'Visit'}
+            </div>
+            <h2 className="mt-2 text-2xl font-bold">
+              {profile?.visitTitle || '到店前先预约，老师会确认适合的班型'}
+            </h2>
           </div>
           <div className="space-y-3 text-sm text-white/80">
             {organization?.address && (
@@ -221,11 +225,13 @@ export function HomePage() {
       <section className="container-narrow py-8">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <div className="eyebrow">Courses</div>
-            <h2 className="text-ink mt-1 text-xl font-bold">推荐课程</h2>
+            <div className="eyebrow">{profile?.coursesEyebrow || 'Courses'}</div>
+            <h2 className="text-ink mt-1 text-xl font-bold">
+              {profile?.coursesTitle || '推荐课程'}
+            </h2>
           </div>
           <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
-            查看全部
+            {profile?.coursesLinkLabel || '查看全部'}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -246,7 +252,9 @@ export function HomePage() {
               <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">{course.summary}</p>
             </Link>
           ))}
-          {courses.length === 0 && <p className="text-muted text-sm">课程即将上线</p>}
+          {courses.length === 0 && (
+            <p className="text-muted text-sm">{profile?.coursesEmptyText || '课程即将上线'}</p>
+          )}
         </div>
       </section>
 
@@ -254,11 +262,13 @@ export function HomePage() {
       <section className="container-narrow pb-10">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <div className="eyebrow">Trial</div>
-            <h2 className="text-ink mt-1 text-xl font-bold">本周公开课</h2>
+            <div className="eyebrow">{profile?.trialsEyebrow || 'Trial'}</div>
+            <h2 className="text-ink mt-1 text-xl font-bold">
+              {profile?.trialsTitle || '本周公开课'}
+            </h2>
           </div>
           <Link to="/trials" className="text-brand inline-flex items-center gap-1 text-sm">
-            全部公开课
+            {profile?.trialsLinkLabel || '全部公开课'}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -278,7 +288,9 @@ export function HomePage() {
             </Link>
           ))}
           {sessions.length === 0 && (
-            <p className="text-muted text-sm">近期暂无公开课，可直接预约心仪课程的试听。</p>
+            <p className="text-muted text-sm">
+              {profile?.trialsEmptyText || '近期暂无公开课，可直接预约心仪课程的试听。'}
+            </p>
           )}
         </div>
       </section>
@@ -286,8 +298,10 @@ export function HomePage() {
       {testimonials.length > 0 && (
         <section className="container-narrow pb-10">
           <div className="mb-4">
-            <div className="eyebrow">Testimonials</div>
-            <h2 className="section-title mt-1">家长评价</h2>
+            <div className="eyebrow">{profile?.testimonialsEyebrow || 'Testimonials'}</div>
+            <h2 className="section-title mt-1">
+              {profile?.testimonialsTitle || '家长评价'}
+            </h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {testimonials.slice(0, 4).map((item) => (

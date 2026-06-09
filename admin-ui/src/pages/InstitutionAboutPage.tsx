@@ -20,10 +20,13 @@ const DEFAULT_SITE: PublicSiteSettings = {
     { label: '关于', path: '/about', visible: true },
   ],
   aboutPage: {
+    eyebrow: 'About',
     title: '关于我们',
     subtitle: '',
     heroImageUrl: '',
+    operatorIntroTitle: '运营方介绍',
     operatorIntro: '',
+    brandCooperationTitle: '品牌合作',
     brandCooperation: '',
     bodyBlocks: [],
   },
@@ -99,6 +102,13 @@ export function InstitutionAboutPage() {
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-5">
             <EditorCard title="关于我们页面">
+              <Field label="页面标签">
+                <input
+                  className="form-input"
+                  value={form.aboutPage.eyebrow}
+                  onChange={(event) => updateAbout({ eyebrow: event.target.value })}
+                />
+              </Field>
               <Field label="页面标题">
                 <input
                   className="form-input"
@@ -120,11 +130,27 @@ export function InstitutionAboutPage() {
                 prefix="about/hero"
                 previewAlt="关于我们首图"
               />
+              <Field label="运营方区块标题">
+                <input
+                  className="form-input"
+                  value={form.aboutPage.operatorIntroTitle}
+                  onChange={(event) => updateAbout({ operatorIntroTitle: event.target.value })}
+                />
+              </Field>
               <Field label="运营方介绍">
                 <textarea
                   className="form-input h-32"
                   value={form.aboutPage.operatorIntro}
                   onChange={(event) => updateAbout({ operatorIntro: event.target.value })}
+                />
+              </Field>
+              <Field label="品牌合作区块标题">
+                <input
+                  className="form-input"
+                  value={form.aboutPage.brandCooperationTitle}
+                  onChange={(event) =>
+                    updateAbout({ brandCooperationTitle: event.target.value })
+                  }
                 />
               </Field>
               <Field label="品牌合作">
@@ -207,13 +233,22 @@ function AboutPreview({
               className="mb-4 h-9 max-w-44 object-contain"
             />
           ) : null}
+          <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase">
+            {site.aboutPage.eyebrow}
+          </div>
           <h2 className="text-3xl font-semibold tracking-tight">{site.aboutPage.title}</h2>
           <p className="text-muted-foreground mt-3 text-sm leading-7">{site.aboutPage.subtitle}</p>
         </div>
 
         <div className="grid gap-4">
-          <PreviewSection title="运营方介绍" content={site.aboutPage.operatorIntro} />
-          <PreviewSection title="品牌合作" content={site.aboutPage.brandCooperation} />
+          <PreviewSection
+            title={site.aboutPage.operatorIntroTitle}
+            content={site.aboutPage.operatorIntro}
+          />
+          <PreviewSection
+            title={site.aboutPage.brandCooperationTitle}
+            content={site.aboutPage.brandCooperation}
+          />
         </div>
 
         {site.aboutPage.bodyBlocks.length > 0 ? (

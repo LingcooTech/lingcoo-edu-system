@@ -7,10 +7,13 @@ export interface PublicNavItem {
 }
 
 export interface AboutPageSettings {
+  eyebrow: string;
   title: string;
   subtitle: string;
   heroImageUrl: string;
+  operatorIntroTitle: string;
   operatorIntro: string;
+  brandCooperationTitle: string;
   brandCooperation: string;
   bodyBlocks: Block[];
 }
@@ -32,11 +35,14 @@ export const defaultNavigation: PublicNavItem[] = [
 ];
 
 export const defaultAboutPage: AboutPageSettings = {
+  eyebrow: 'About',
   title: '关于我们',
   subtitle: '介绍运营方、品牌合作与长期服务能力。',
   heroImageUrl: '',
+  operatorIntroTitle: '运营方介绍',
   operatorIntro:
     '这里可以介绍机构运营方背景、团队经验、服务理念，以及为什么选择在本地社区长期经营。',
+  brandCooperationTitle: '品牌合作',
   brandCooperation: '这里可以展示品牌合作、课程联合研发、校区资源共建、活动共创等合作信息。',
   bodyBlocks: [],
 };
@@ -95,12 +101,18 @@ function normalizeAboutPage(value: unknown): AboutPageSettings {
   const raw = isRecord(value) ? value : {};
 
   return {
+    eyebrow: normalizeString(raw.eyebrow, 80) || defaultAboutPage.eyebrow,
     title: normalizeString(raw.title, 120) || defaultAboutPage.title,
     subtitle: normalizeString(raw.subtitle, 240) || defaultAboutPage.subtitle,
     heroImageUrl: normalizeString(raw.heroImageUrl, 500),
+    operatorIntroTitle:
+      normalizeString(raw.operatorIntroTitle, 80) || defaultAboutPage.operatorIntroTitle,
     operatorIntro: normalizeString(raw.operatorIntro, 5000) || defaultAboutPage.operatorIntro,
     brandCooperation:
       normalizeString(raw.brandCooperation, 5000) || defaultAboutPage.brandCooperation,
+    brandCooperationTitle:
+      normalizeString(raw.brandCooperationTitle, 80) ||
+      defaultAboutPage.brandCooperationTitle,
     bodyBlocks: normalizeBlocks(raw.bodyBlocks),
   };
 }

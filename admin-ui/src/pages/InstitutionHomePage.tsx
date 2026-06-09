@@ -16,6 +16,7 @@ import { useToast } from '@/components/shared/Toast';
 // the right mirrors the public home page. Saves via PUT /v1/organization.
 
 interface HomeForm {
+  eyebrow: string;
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImagesText: string;
@@ -29,6 +30,20 @@ interface HomeForm {
   faqText: string;
   ctaText: string;
   ctaLink: string;
+  secondaryCtaText: string;
+  secondaryCtaLink: string;
+  visitEyebrow: string;
+  visitTitle: string;
+  coursesEyebrow: string;
+  coursesTitle: string;
+  coursesLinkLabel: string;
+  coursesEmptyText: string;
+  trialsEyebrow: string;
+  trialsTitle: string;
+  trialsLinkLabel: string;
+  trialsEmptyText: string;
+  testimonialsEyebrow: string;
+  testimonialsTitle: string;
   businessHours: string;
   bodyBlocks: Block[];
 }
@@ -42,6 +57,7 @@ function linesToList(value: string): string[] {
 
 function profileToForm(profile: PublicProfile): HomeForm {
   return {
+    eyebrow: profile.eyebrow,
     bannerTitle: profile.bannerTitle,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImagesText: (profile.bannerImages?.length
@@ -60,6 +76,20 @@ function profileToForm(profile: PublicProfile): HomeForm {
     faqText: profile.faq.join('\n'),
     ctaText: profile.ctaText,
     ctaLink: profile.ctaLink,
+    secondaryCtaText: profile.secondaryCtaText,
+    secondaryCtaLink: profile.secondaryCtaLink,
+    visitEyebrow: profile.visitEyebrow,
+    visitTitle: profile.visitTitle,
+    coursesEyebrow: profile.coursesEyebrow,
+    coursesTitle: profile.coursesTitle,
+    coursesLinkLabel: profile.coursesLinkLabel,
+    coursesEmptyText: profile.coursesEmptyText,
+    trialsEyebrow: profile.trialsEyebrow,
+    trialsTitle: profile.trialsTitle,
+    trialsLinkLabel: profile.trialsLinkLabel,
+    trialsEmptyText: profile.trialsEmptyText,
+    testimonialsEyebrow: profile.testimonialsEyebrow,
+    testimonialsTitle: profile.testimonialsTitle,
     businessHours: profile.businessHours,
     bodyBlocks: profile.bodyBlocks ?? [],
   };
@@ -90,6 +120,7 @@ export function InstitutionHomePage() {
     try {
       const updated = await saveOrganization({
         publicProfile: {
+          eyebrow: form.eyebrow,
           headline: form.headline,
           introduction: form.introduction,
           bannerImages: linesToList(form.bannerImagesText),
@@ -98,6 +129,20 @@ export function InstitutionHomePage() {
           bannerSubtitle: form.bannerSubtitle,
           ctaText: form.ctaText,
           ctaLink: form.ctaLink,
+          secondaryCtaText: form.secondaryCtaText,
+          secondaryCtaLink: form.secondaryCtaLink,
+          visitEyebrow: form.visitEyebrow,
+          visitTitle: form.visitTitle,
+          coursesEyebrow: form.coursesEyebrow,
+          coursesTitle: form.coursesTitle,
+          coursesLinkLabel: form.coursesLinkLabel,
+          coursesEmptyText: form.coursesEmptyText,
+          trialsEyebrow: form.trialsEyebrow,
+          trialsTitle: form.trialsTitle,
+          trialsLinkLabel: form.trialsLinkLabel,
+          trialsEmptyText: form.trialsEmptyText,
+          testimonialsEyebrow: form.testimonialsEyebrow,
+          testimonialsTitle: form.testimonialsTitle,
           highlights: linesToList(form.highlightsText),
           promises: linesToList(form.promisesText),
           stats: linesToList(form.statsText),
@@ -133,6 +178,13 @@ export function InstitutionHomePage() {
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-5">
             <EditorCard title="首屏 Banner">
+              <Field label="首屏标签" hint="例如：社区小班成长教室">
+                <input
+                  className="form-input"
+                  value={form.eyebrow}
+                  onChange={(e) => update('eyebrow', e.target.value)}
+                />
+              </Field>
               <Field label="主标题">
                 <input
                   className="form-input"
@@ -238,6 +290,22 @@ export function InstitutionHomePage() {
                   />
                 </Field>
               </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field label="次按钮文字">
+                  <input
+                    className="form-input"
+                    value={form.secondaryCtaText}
+                    onChange={(e) => update('secondaryCtaText', e.target.value)}
+                  />
+                </Field>
+                <Field label="次按钮链接" hint="如 /courses">
+                  <input
+                    className="form-input"
+                    value={form.secondaryCtaLink}
+                    onChange={(e) => update('secondaryCtaLink', e.target.value)}
+                  />
+                </Field>
+              </div>
               <Field label="营业 / 上课时间">
                 <input
                   className="form-input"
@@ -245,6 +313,101 @@ export function InstitutionHomePage() {
                   onChange={(e) => update('businessHours', e.target.value)}
                 />
               </Field>
+            </EditorCard>
+
+            <EditorCard title="首页区块标题">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="到店区块标签">
+                  <input
+                    className="form-input"
+                    value={form.visitEyebrow}
+                    onChange={(e) => update('visitEyebrow', e.target.value)}
+                  />
+                </Field>
+                <Field label="到店区块标题">
+                  <input
+                    className="form-input"
+                    value={form.visitTitle}
+                    onChange={(e) => update('visitTitle', e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <Field label="课程标签">
+                  <input
+                    className="form-input"
+                    value={form.coursesEyebrow}
+                    onChange={(e) => update('coursesEyebrow', e.target.value)}
+                  />
+                </Field>
+                <Field label="课程标题">
+                  <input
+                    className="form-input"
+                    value={form.coursesTitle}
+                    onChange={(e) => update('coursesTitle', e.target.value)}
+                  />
+                </Field>
+                <Field label="课程链接文案">
+                  <input
+                    className="form-input"
+                    value={form.coursesLinkLabel}
+                    onChange={(e) => update('coursesLinkLabel', e.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="无课程提示">
+                <input
+                  className="form-input"
+                  value={form.coursesEmptyText}
+                  onChange={(e) => update('coursesEmptyText', e.target.value)}
+                />
+              </Field>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <Field label="公开课标签">
+                  <input
+                    className="form-input"
+                    value={form.trialsEyebrow}
+                    onChange={(e) => update('trialsEyebrow', e.target.value)}
+                  />
+                </Field>
+                <Field label="公开课标题">
+                  <input
+                    className="form-input"
+                    value={form.trialsTitle}
+                    onChange={(e) => update('trialsTitle', e.target.value)}
+                  />
+                </Field>
+                <Field label="公开课链接文案">
+                  <input
+                    className="form-input"
+                    value={form.trialsLinkLabel}
+                    onChange={(e) => update('trialsLinkLabel', e.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="无公开课提示">
+                <input
+                  className="form-input"
+                  value={form.trialsEmptyText}
+                  onChange={(e) => update('trialsEmptyText', e.target.value)}
+                />
+              </Field>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field label="评价标签">
+                  <input
+                    className="form-input"
+                    value={form.testimonialsEyebrow}
+                    onChange={(e) => update('testimonialsEyebrow', e.target.value)}
+                  />
+                </Field>
+                <Field label="评价标题">
+                  <input
+                    className="form-input"
+                    value={form.testimonialsTitle}
+                    onChange={(e) => update('testimonialsTitle', e.target.value)}
+                  />
+                </Field>
+              </div>
             </EditorCard>
 
             <EditorCard
@@ -332,6 +495,9 @@ function HomePreview({
               <div className="text-muted-foreground text-sm">{organization.name}</div>
             )}
           </div>
+          <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase">
+            {form.eyebrow || '首屏标签'}
+          </div>
           <h2 className="text-3xl font-semibold tracking-tight">
             {form.bannerTitle || organization.brandName || '机构品牌名称'}
           </h2>
@@ -344,6 +510,11 @@ function HomePreview({
           {form.ctaText ? (
             <span className="btn btn-primary pointer-events-none mt-4 inline-flex">
               {form.ctaText}
+            </span>
+          ) : null}
+          {form.secondaryCtaText ? (
+            <span className="btn btn-secondary pointer-events-none mt-4 ml-2 inline-flex">
+              {form.secondaryCtaText}
             </span>
           ) : null}
           {stats.length > 0 && (

@@ -34,7 +34,7 @@ export function AboutPage() {
         <div className="container-narrow py-10 md:py-14">
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <div className="eyebrow">{organization?.brandName ?? 'About'}</div>
+              <div className="eyebrow">{about?.eyebrow || organization?.brandName || 'About'}</div>
               <h1 className="text-ink mt-4 text-4xl leading-tight font-bold tracking-tight">
                 {about?.title ?? '关于我们'}
               </h1>
@@ -77,12 +77,12 @@ export function AboutPage() {
         <div className="grid gap-5 lg:grid-cols-2">
           <InfoPanel
             icon={<Landmark className="h-5 w-5" />}
-            title="运营方介绍"
+            title={about?.operatorIntroTitle || '运营方介绍'}
             content={about?.operatorIntro}
           />
           <InfoPanel
             icon={<Handshake className="h-5 w-5" />}
-            title="品牌合作"
+            title={about?.brandCooperationTitle || '品牌合作'}
             content={about?.brandCooperation}
           />
         </div>

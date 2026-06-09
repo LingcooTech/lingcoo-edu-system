@@ -59,10 +59,13 @@ const DEFAULT_SITE: PublicSiteSettings = {
     { label: '关于', path: '/about', visible: true },
   ],
   aboutPage: {
+    eyebrow: 'About',
     title: '关于我们',
     subtitle: '',
     heroImageUrl: '',
+    operatorIntroTitle: '运营方介绍',
     operatorIntro: '',
+    brandCooperationTitle: '品牌合作',
     brandCooperation: '',
     bodyBlocks: [],
   },

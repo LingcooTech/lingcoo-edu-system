@@ -410,6 +410,7 @@ export interface PaymentProviderOverview {
 }
 
 export interface PublicProfile {
+  eyebrow: string;
   headline: string;
   introduction: string;
   highlights: string[];
@@ -420,6 +421,20 @@ export interface PublicProfile {
   bannerSubtitle: string;
   ctaText: string;
   ctaLink: string;
+  secondaryCtaText: string;
+  secondaryCtaLink: string;
+  visitEyebrow: string;
+  visitTitle: string;
+  coursesEyebrow: string;
+  coursesTitle: string;
+  coursesLinkLabel: string;
+  coursesEmptyText: string;
+  trialsEyebrow: string;
+  trialsTitle: string;
+  trialsLinkLabel: string;
+  trialsEmptyText: string;
+  testimonialsEyebrow: string;
+  testimonialsTitle: string;
   stats: string[];
   testimonials: string[];
   gallery: string[];
@@ -451,10 +466,13 @@ export interface PublicNavItem {
 }
 
 export interface AboutPageSettings {
+  eyebrow: string;
   title: string;
   subtitle: string;
   heroImageUrl: string;
+  operatorIntroTitle: string;
   operatorIntro: string;
+  brandCooperationTitle: string;
   brandCooperation: string;
   bodyBlocks: Block[];
 }

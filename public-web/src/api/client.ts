@@ -53,6 +53,7 @@ export interface HomePayload {
     phone: string | null;
     address: string | null;
     publicProfile: {
+      eyebrow: string;
       headline: string;
       introduction: string;
       highlights: string[];
@@ -63,6 +64,20 @@ export interface HomePayload {
       bannerSubtitle: string;
       ctaText: string;
       ctaLink: string;
+      secondaryCtaText: string;
+      secondaryCtaLink: string;
+      visitEyebrow: string;
+      visitTitle: string;
+      coursesEyebrow: string;
+      coursesTitle: string;
+      coursesLinkLabel: string;
+      coursesEmptyText: string;
+      trialsEyebrow: string;
+      trialsTitle: string;
+      trialsLinkLabel: string;
+      trialsEmptyText: string;
+      testimonialsEyebrow: string;
+      testimonialsTitle: string;
       stats: string[];
       testimonials: string[];
       gallery: string[];
@@ -77,10 +92,13 @@ export interface HomePayload {
         visible: boolean;
       }>;
       aboutPage: {
+        eyebrow: string;
         title: string;
         subtitle: string;
         heroImageUrl: string;
+        operatorIntroTitle: string;
         operatorIntro: string;
+        brandCooperationTitle: string;
         brandCooperation: string;
         bodyBlocks?: Block[];
       };

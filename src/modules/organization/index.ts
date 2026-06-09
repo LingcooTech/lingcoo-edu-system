@@ -19,6 +19,7 @@ import { z } from 'zod';
 import type { AppModule } from '../types.js';
 
 const publicProfileSchema = z.object({
+  eyebrow: z.string().max(80).optional(),
   headline: z.string().max(120).optional(),
   introduction: z.string().max(1000).optional(),
   highlights: z.array(z.string().min(1).max(120)).max(6).optional(),
@@ -29,6 +30,20 @@ const publicProfileSchema = z.object({
   bannerSubtitle: z.string().max(240).optional(),
   ctaText: z.string().max(40).optional(),
   ctaLink: z.string().max(160).optional(),
+  secondaryCtaText: z.string().max(40).optional(),
+  secondaryCtaLink: z.string().max(160).optional(),
+  visitEyebrow: z.string().max(80).optional(),
+  visitTitle: z.string().max(120).optional(),
+  coursesEyebrow: z.string().max(80).optional(),
+  coursesTitle: z.string().max(80).optional(),
+  coursesLinkLabel: z.string().max(40).optional(),
+  coursesEmptyText: z.string().max(160).optional(),
+  trialsEyebrow: z.string().max(80).optional(),
+  trialsTitle: z.string().max(80).optional(),
+  trialsLinkLabel: z.string().max(40).optional(),
+  trialsEmptyText: z.string().max(160).optional(),
+  testimonialsEyebrow: z.string().max(80).optional(),
+  testimonialsTitle: z.string().max(80).optional(),
   stats: z.array(z.string().min(1).max(80)).max(6).optional(),
   testimonials: z.array(z.string().min(1).max(240)).max(8).optional(),
   gallery: z.array(z.string().min(1).max(500)).max(12).optional(),
@@ -69,10 +84,13 @@ const publicSiteSchema = z
       .optional(),
     aboutPage: z
       .object({
+        eyebrow: z.string().max(80).optional(),
         title: z.string().max(120).optional(),
         subtitle: z.string().max(240).optional(),
         heroImageUrl: z.string().max(500).optional(),
+        operatorIntroTitle: z.string().max(80).optional(),
         operatorIntro: z.string().max(5000).optional(),
+        brandCooperationTitle: z.string().max(80).optional(),
         brandCooperation: z.string().max(5000).optional(),
         bodyBlocks: z.array(z.unknown()).max(200).optional(),
       })

@@ -1,6 +1,7 @@
 import { normalizeBlocks, type Block } from './content-blocks.js';
 
 export interface PublicProfile {
+  eyebrow: string;
   headline: string;
   introduction: string;
   highlights: string[];
@@ -11,6 +12,20 @@ export interface PublicProfile {
   bannerSubtitle: string;
   ctaText: string;
   ctaLink: string;
+  secondaryCtaText: string;
+  secondaryCtaLink: string;
+  visitEyebrow: string;
+  visitTitle: string;
+  coursesEyebrow: string;
+  coursesTitle: string;
+  coursesLinkLabel: string;
+  coursesEmptyText: string;
+  trialsEyebrow: string;
+  trialsTitle: string;
+  trialsLinkLabel: string;
+  trialsEmptyText: string;
+  testimonialsEyebrow: string;
+  testimonialsTitle: string;
   stats: string[];
   testimonials: string[];
   gallery: string[];
@@ -20,6 +35,7 @@ export interface PublicProfile {
 }
 
 export const defaultPublicProfile: PublicProfile = {
+  eyebrow: '社区小班成长教室',
   headline: '社区里的儿童成长教室',
   introduction:
     '围绕儿童表达、专注、审美和动手能力设计小班课程，让孩子在熟悉的社区环境里稳定成长。',
@@ -38,6 +54,20 @@ export const defaultPublicProfile: PublicProfile = {
   bannerSubtitle: '小班教学、固定老师、课后反馈，让家长看得见孩子每一步变化。',
   ctaText: '预约试听',
   ctaLink: '/register',
+  secondaryCtaText: '浏览课程',
+  secondaryCtaLink: '/courses',
+  visitEyebrow: 'Visit',
+  visitTitle: '到店前先预约，老师会确认适合的班型',
+  coursesEyebrow: 'Courses',
+  coursesTitle: '推荐课程',
+  coursesLinkLabel: '查看全部',
+  coursesEmptyText: '课程即将上线',
+  trialsEyebrow: 'Trial',
+  trialsTitle: '本周公开课',
+  trialsLinkLabel: '全部公开课',
+  trialsEmptyText: '近期暂无公开课，可直接预约心仪课程的试听。',
+  testimonialsEyebrow: 'Testimonials',
+  testimonialsTitle: '家长评价',
   stats: ['6-8 人小班', '90 分钟沉浸课堂', '课后反馈可追踪'],
   testimonials: [
     '老师反馈很及时，孩子写字习惯比之前稳定很多。',
@@ -81,6 +111,7 @@ export function readPublicProfile(settings: unknown): PublicProfile {
   );
 
   return {
+    eyebrow: normalizeString(raw.eyebrow) || defaultPublicProfile.eyebrow,
     headline: normalizeString(raw.headline) || defaultPublicProfile.headline,
     introduction: normalizeString(raw.introduction) || defaultPublicProfile.introduction,
     highlights: normalizeStringList(raw.highlights, defaultPublicProfile.highlights, 6),
@@ -91,6 +122,24 @@ export function readPublicProfile(settings: unknown): PublicProfile {
     bannerSubtitle: normalizeString(raw.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
     ctaText: normalizeString(raw.ctaText) || defaultPublicProfile.ctaText,
     ctaLink: normalizeString(raw.ctaLink) || defaultPublicProfile.ctaLink,
+    secondaryCtaText: normalizeString(raw.secondaryCtaText) || defaultPublicProfile.secondaryCtaText,
+    secondaryCtaLink: normalizeString(raw.secondaryCtaLink) || defaultPublicProfile.secondaryCtaLink,
+    visitEyebrow: normalizeString(raw.visitEyebrow) || defaultPublicProfile.visitEyebrow,
+    visitTitle: normalizeString(raw.visitTitle) || defaultPublicProfile.visitTitle,
+    coursesEyebrow: normalizeString(raw.coursesEyebrow) || defaultPublicProfile.coursesEyebrow,
+    coursesTitle: normalizeString(raw.coursesTitle) || defaultPublicProfile.coursesTitle,
+    coursesLinkLabel:
+      normalizeString(raw.coursesLinkLabel) || defaultPublicProfile.coursesLinkLabel,
+    coursesEmptyText:
+      normalizeString(raw.coursesEmptyText) || defaultPublicProfile.coursesEmptyText,
+    trialsEyebrow: normalizeString(raw.trialsEyebrow) || defaultPublicProfile.trialsEyebrow,
+    trialsTitle: normalizeString(raw.trialsTitle) || defaultPublicProfile.trialsTitle,
+    trialsLinkLabel: normalizeString(raw.trialsLinkLabel) || defaultPublicProfile.trialsLinkLabel,
+    trialsEmptyText: normalizeString(raw.trialsEmptyText) || defaultPublicProfile.trialsEmptyText,
+    testimonialsEyebrow:
+      normalizeString(raw.testimonialsEyebrow) || defaultPublicProfile.testimonialsEyebrow,
+    testimonialsTitle:
+      normalizeString(raw.testimonialsTitle) || defaultPublicProfile.testimonialsTitle,
     stats: normalizeStringList(raw.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeStringList(raw.testimonials, defaultPublicProfile.testimonials, 8),
     gallery: normalizeStringList(raw.gallery, defaultPublicProfile.gallery, 12),
@@ -114,6 +163,7 @@ export function normalizePublicProfile(input: PublicProfileInput) {
   );
 
   return {
+    eyebrow: normalizeString(input.eyebrow) || defaultPublicProfile.eyebrow,
     headline: normalizeString(input.headline) || defaultPublicProfile.headline,
     introduction: normalizeString(input.introduction) || defaultPublicProfile.introduction,
     highlights: normalizeStringList(input.highlights, defaultPublicProfile.highlights, 6),
@@ -124,6 +174,29 @@ export function normalizePublicProfile(input: PublicProfileInput) {
     bannerSubtitle: normalizeString(input.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
     ctaText: normalizeString(input.ctaText) || defaultPublicProfile.ctaText,
     ctaLink: normalizeString(input.ctaLink) || defaultPublicProfile.ctaLink,
+    secondaryCtaText:
+      normalizeString(input.secondaryCtaText) || defaultPublicProfile.secondaryCtaText,
+    secondaryCtaLink:
+      normalizeString(input.secondaryCtaLink) || defaultPublicProfile.secondaryCtaLink,
+    visitEyebrow: normalizeString(input.visitEyebrow) || defaultPublicProfile.visitEyebrow,
+    visitTitle: normalizeString(input.visitTitle) || defaultPublicProfile.visitTitle,
+    coursesEyebrow:
+      normalizeString(input.coursesEyebrow) || defaultPublicProfile.coursesEyebrow,
+    coursesTitle: normalizeString(input.coursesTitle) || defaultPublicProfile.coursesTitle,
+    coursesLinkLabel:
+      normalizeString(input.coursesLinkLabel) || defaultPublicProfile.coursesLinkLabel,
+    coursesEmptyText:
+      normalizeString(input.coursesEmptyText) || defaultPublicProfile.coursesEmptyText,
+    trialsEyebrow: normalizeString(input.trialsEyebrow) || defaultPublicProfile.trialsEyebrow,
+    trialsTitle: normalizeString(input.trialsTitle) || defaultPublicProfile.trialsTitle,
+    trialsLinkLabel:
+      normalizeString(input.trialsLinkLabel) || defaultPublicProfile.trialsLinkLabel,
+    trialsEmptyText:
+      normalizeString(input.trialsEmptyText) || defaultPublicProfile.trialsEmptyText,
+    testimonialsEyebrow:
+      normalizeString(input.testimonialsEyebrow) || defaultPublicProfile.testimonialsEyebrow,
+    testimonialsTitle:
+      normalizeString(input.testimonialsTitle) || defaultPublicProfile.testimonialsTitle,
     stats: normalizeStringList(input.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeStringList(input.testimonials, defaultPublicProfile.testimonials, 8),
     gallery: normalizeStringList(input.gallery, defaultPublicProfile.gallery, 12),
