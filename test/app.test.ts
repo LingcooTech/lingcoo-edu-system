@@ -212,7 +212,9 @@ test('exposes the public organization home payload', async () => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(typeof response.json().organization.name, 'string');
-    assert.equal(typeof response.json().organization.publicProfile.headline, 'string');
+    assert.equal(typeof response.json().organization.publicProfile.eyebrow, 'string');
+    assert.equal(typeof response.json().organization.publicProfile.bannerTitle, 'string');
+    assert.equal(typeof response.json().organization.publicProfile.bannerSubtitle, 'string');
     assert.ok(Array.isArray(response.json().featuredCourses));
     assert.ok(Array.isArray(response.json().campuses));
   } finally {
