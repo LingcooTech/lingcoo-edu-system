@@ -58,20 +58,19 @@ export interface Organization {
   phone: string | null;
   address: string | null;
   publicProfile: {
-    headline: string;
-    introduction: string;
+    eyebrow: string;
     highlights: string[];
-    promises: string[];
     bannerImages: string[];
     bannerImageUrl: string;
     bannerTitle: string;
     bannerSubtitle: string;
     ctaText: string;
     ctaLink: string;
+    secondaryCtaText: string;
+    secondaryCtaLink: string;
     stats: string[];
     testimonials: string[];
     gallery: string[];
-    faq: string[];
     businessHours: string;
     bodyBlocks?: Block[];
   };

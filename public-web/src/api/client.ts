@@ -54,10 +54,7 @@ export interface HomePayload {
     address: string | null;
     publicProfile: {
       eyebrow: string;
-      headline: string;
-      introduction: string;
       highlights: string[];
-      promises: string[];
       bannerImages: string[];
       bannerImageUrl: string;
       bannerTitle: string;
@@ -66,22 +63,9 @@ export interface HomePayload {
       ctaLink: string;
       secondaryCtaText: string;
       secondaryCtaLink: string;
-      visitEyebrow: string;
-      visitTitle: string;
-      coursesEyebrow: string;
-      coursesTitle: string;
-      coursesLinkLabel: string;
-      coursesEmptyText: string;
-      trialsEyebrow: string;
-      trialsTitle: string;
-      trialsLinkLabel: string;
-      trialsEmptyText: string;
-      testimonialsEyebrow: string;
-      testimonialsTitle: string;
       stats: string[];
       testimonials: string[];
       gallery: string[];
-      faq: string[];
       businessHours: string;
       bodyBlocks?: Block[];
     };

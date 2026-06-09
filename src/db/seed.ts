@@ -44,10 +44,11 @@ async function seed(): Promise<void> {
           address: '社区门店一楼成长教室',
           settings: {
             publicProfile: {
-              headline: '社区里的儿童成长课堂',
-              introduction: '专注硬笔书法、创意美术与幼小衔接，让孩子在稳定陪伴中建立学习习惯。',
+              eyebrow: '社区小班成长教室',
+              bannerTitle: '社区里的儿童成长课堂',
+              bannerSubtitle: '专注硬笔书法、创意美术与幼小衔接，让孩子在稳定陪伴中建立学习习惯。',
               highlights: ['小班教学', '课后反馈', '社区近距离服务'],
-              promises: ['透明课消', '安全环境', '及时沟通'],
+              stats: ['6-8 人小班', '课后反馈', '社区近距离服务'],
             },
             branding: {
               primaryColor: '#1f6f5b',

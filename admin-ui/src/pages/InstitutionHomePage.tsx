@@ -3,47 +3,24 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { fetchOrganization, saveOrganization } from '@/api/client';
 import type { OrganizationSettings, PublicProfile } from '@/api/types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
-import { BlockRenderer } from '@/components/editor/BlockRenderer';
 import { HOME_ALLOWED, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
 import { QiniuGalleryField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
 
-// The structured publicProfile fields are edited here as module cards; list-like
-// fields use one-item-per-line textareas (same convention as system settings),
-// and a free-form module area uses the shared <BlockEditor>. A live preview on
-// the right mirrors the public home page. Saves via PUT /v1/organization.
-
 interface HomeForm {
   eyebrow: string;
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImagesText: string;
-  headline: string;
-  introduction: string;
-  highlightsText: string;
-  promisesText: string;
-  statsText: string;
-  testimonialsText: string;
-  galleryText: string;
-  faqText: string;
   ctaText: string;
   ctaLink: string;
   secondaryCtaText: string;
   secondaryCtaLink: string;
-  visitEyebrow: string;
-  visitTitle: string;
-  coursesEyebrow: string;
-  coursesTitle: string;
-  coursesLinkLabel: string;
-  coursesEmptyText: string;
-  trialsEyebrow: string;
-  trialsTitle: string;
-  trialsLinkLabel: string;
-  trialsEmptyText: string;
-  testimonialsEyebrow: string;
-  testimonialsTitle: string;
+  statsText: string;
+  highlightsText: string;
+  testimonialsText: string;
   businessHours: string;
   bodyBlocks: Block[];
 }
@@ -66,30 +43,13 @@ function profileToForm(profile: PublicProfile): HomeForm {
     )
       .filter(Boolean)
       .join('\n'),
-    headline: profile.headline,
-    introduction: profile.introduction,
-    highlightsText: profile.highlights.join('\n'),
-    promisesText: profile.promises.join('\n'),
-    statsText: profile.stats.join('\n'),
-    testimonialsText: profile.testimonials.join('\n'),
-    galleryText: profile.gallery.join('\n'),
-    faqText: profile.faq.join('\n'),
     ctaText: profile.ctaText,
     ctaLink: profile.ctaLink,
     secondaryCtaText: profile.secondaryCtaText,
     secondaryCtaLink: profile.secondaryCtaLink,
-    visitEyebrow: profile.visitEyebrow,
-    visitTitle: profile.visitTitle,
-    coursesEyebrow: profile.coursesEyebrow,
-    coursesTitle: profile.coursesTitle,
-    coursesLinkLabel: profile.coursesLinkLabel,
-    coursesEmptyText: profile.coursesEmptyText,
-    trialsEyebrow: profile.trialsEyebrow,
-    trialsTitle: profile.trialsTitle,
-    trialsLinkLabel: profile.trialsLinkLabel,
-    trialsEmptyText: profile.trialsEmptyText,
-    testimonialsEyebrow: profile.testimonialsEyebrow,
-    testimonialsTitle: profile.testimonialsTitle,
+    statsText: profile.stats.join('\n'),
+    highlightsText: profile.highlights.join('\n'),
+    testimonialsText: profile.testimonials.join('\n'),
     businessHours: profile.businessHours,
     bodyBlocks: profile.bodyBlocks ?? [],
   };
@@ -115,40 +75,25 @@ export function InstitutionHomePage() {
   }
 
   async function save() {
-    if (!form) return;
+    if (!form || !organization) return;
+    const bannerImages = linesToList(form.bannerImagesText);
     setSaving(true);
     try {
       const updated = await saveOrganization({
         publicProfile: {
           eyebrow: form.eyebrow,
-          headline: form.headline,
-          introduction: form.introduction,
-          bannerImages: linesToList(form.bannerImagesText),
-          bannerImageUrl: linesToList(form.bannerImagesText)[0] ?? '',
+          bannerImages,
+          bannerImageUrl: bannerImages[0] ?? '',
           bannerTitle: form.bannerTitle,
           bannerSubtitle: form.bannerSubtitle,
           ctaText: form.ctaText,
           ctaLink: form.ctaLink,
           secondaryCtaText: form.secondaryCtaText,
           secondaryCtaLink: form.secondaryCtaLink,
-          visitEyebrow: form.visitEyebrow,
-          visitTitle: form.visitTitle,
-          coursesEyebrow: form.coursesEyebrow,
-          coursesTitle: form.coursesTitle,
-          coursesLinkLabel: form.coursesLinkLabel,
-          coursesEmptyText: form.coursesEmptyText,
-          trialsEyebrow: form.trialsEyebrow,
-          trialsTitle: form.trialsTitle,
-          trialsLinkLabel: form.trialsLinkLabel,
-          trialsEmptyText: form.trialsEmptyText,
-          testimonialsEyebrow: form.testimonialsEyebrow,
-          testimonialsTitle: form.testimonialsTitle,
-          highlights: linesToList(form.highlightsText),
-          promises: linesToList(form.promisesText),
           stats: linesToList(form.statsText),
+          highlights: linesToList(form.highlightsText),
           testimonials: linesToList(form.testimonialsText),
-          gallery: linesToList(form.galleryText),
-          faq: linesToList(form.faqText),
+          gallery: organization.publicProfile.gallery,
           businessHours: form.businessHours,
           bodyBlocks: form.bodyBlocks,
         },
@@ -167,7 +112,12 @@ export function InstitutionHomePage() {
     <PageFrame
       section="institutionHome"
       actions={
-        <button type="button" className="btn btn-primary" onClick={save} disabled={!form || saving}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={save}
+          disabled={!form || !organization || saving}
+        >
           {saving ? '保存中...' : '保存主页'}
         </button>
       }
@@ -175,257 +125,117 @@ export function InstitutionHomePage() {
       {!form || !organization ? (
         <p className="text-muted-foreground text-sm">加载中...</p>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <div className="space-y-5">
-            <EditorCard title="首屏 Banner">
-              <Field label="首屏标签" hint="例如：社区小班成长教室">
-                <input
-                  className="form-input"
-                  value={form.eyebrow}
-                  onChange={(e) => update('eyebrow', e.target.value)}
-                />
-              </Field>
-              <Field label="主标题">
-                <input
-                  className="form-input"
-                  value={form.bannerTitle}
-                  onChange={(e) => update('bannerTitle', e.target.value)}
-                />
-              </Field>
-              <Field label="副标题">
-                <textarea
-                  className="form-input h-16"
-                  value={form.bannerSubtitle}
-                  onChange={(e) => update('bannerSubtitle', e.target.value)}
-                />
-              </Field>
-              <QiniuGalleryField
-                label="Banner 轮播图"
-                hint="可上传或从素材库勾选多张图片；首页首屏只使用这里的图片轮播"
-                value={form.bannerImagesText}
-                onChange={(value) => update('bannerImagesText', value)}
-                prefix="homepage/banner"
+        <div className="max-w-5xl space-y-5">
+          <EditorCard
+            title="首屏定位与转化"
+            description="对应首页首屏：定位、Slogan、机构介绍、轮播图、行动按钮和数据条。"
+          >
+            <Field label="定位" hint="例如：社区小班成长教室">
+              <input
+                className="form-input"
+                value={form.eyebrow}
+                onChange={(e) => update('eyebrow', e.target.value)}
               />
-              <Field label="一句话定位 headline" hint="副标题为空时展示">
-                <input
-                  className="form-input"
-                  value={form.headline}
-                  onChange={(e) => update('headline', e.target.value)}
-                />
-              </Field>
-              <Field label="机构介绍 introduction">
-                <textarea
-                  className="form-input h-24"
-                  value={form.introduction}
-                  onChange={(e) => update('introduction', e.target.value)}
-                />
-              </Field>
-            </EditorCard>
-
-            <EditorCard title="亮点与承诺">
-              <Field label="教学亮点 highlights" hint="每行一项，建议 3 条">
-                <textarea
-                  className="form-input h-24"
-                  value={form.highlightsText}
-                  onChange={(e) => update('highlightsText', e.target.value)}
-                />
-              </Field>
-              <Field label="服务承诺 promises" hint="每行一项">
-                <textarea
-                  className="form-input h-20"
-                  value={form.promisesText}
-                  onChange={(e) => update('promisesText', e.target.value)}
-                />
-              </Field>
-            </EditorCard>
-
-            <EditorCard title="数据与评价">
-              <Field label="数据条 stats" hint="每行一项，如「6-8 人小班」">
-                <textarea
-                  className="form-input h-20"
-                  value={form.statsText}
-                  onChange={(e) => update('statsText', e.target.value)}
-                />
-              </Field>
-              <Field label="家长评价 testimonials" hint="每行一条">
-                <textarea
-                  className="form-input h-24"
-                  value={form.testimonialsText}
-                  onChange={(e) => update('testimonialsText', e.target.value)}
-                />
-              </Field>
-            </EditorCard>
-
-            <EditorCard title="公开图库与常见问题">
-              <QiniuGalleryField
-                label="公开图库 gallery"
-                hint="用于学生故事等图库页面，不参与首页 Banner 轮播"
-                value={form.galleryText}
-                onChange={(value) => update('galleryText', value)}
-                prefix="homepage/gallery"
+            </Field>
+            <Field label="Slogan">
+              <input
+                className="form-input"
+                value={form.bannerTitle}
+                onChange={(e) => update('bannerTitle', e.target.value)}
               />
-              <Field label="常见问题 faq" hint="每行一条">
-                <textarea
-                  className="form-input h-20"
-                  value={form.faqText}
-                  onChange={(e) => update('faqText', e.target.value)}
-                />
-              </Field>
-            </EditorCard>
-
-            <EditorCard title="行动号召与营业信息">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="按钮文字">
-                  <input
-                    className="form-input"
-                    value={form.ctaText}
-                    onChange={(e) => update('ctaText', e.target.value)}
-                  />
-                </Field>
-                <Field label="按钮链接" hint="如 /register">
-                  <input
-                    className="form-input"
-                    value={form.ctaLink}
-                    onChange={(e) => update('ctaLink', e.target.value)}
-                  />
-                </Field>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <Field label="次按钮文字">
-                  <input
-                    className="form-input"
-                    value={form.secondaryCtaText}
-                    onChange={(e) => update('secondaryCtaText', e.target.value)}
-                  />
-                </Field>
-                <Field label="次按钮链接" hint="如 /courses">
-                  <input
-                    className="form-input"
-                    value={form.secondaryCtaLink}
-                    onChange={(e) => update('secondaryCtaLink', e.target.value)}
-                  />
-                </Field>
-              </div>
-              <Field label="营业 / 上课时间">
-                <input
-                  className="form-input"
-                  value={form.businessHours}
-                  onChange={(e) => update('businessHours', e.target.value)}
-                />
-              </Field>
-            </EditorCard>
-
-            <EditorCard title="首页区块标题">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="到店区块标签">
-                  <input
-                    className="form-input"
-                    value={form.visitEyebrow}
-                    onChange={(e) => update('visitEyebrow', e.target.value)}
-                  />
-                </Field>
-                <Field label="到店区块标题">
-                  <input
-                    className="form-input"
-                    value={form.visitTitle}
-                    onChange={(e) => update('visitTitle', e.target.value)}
-                  />
-                </Field>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <Field label="课程标签">
-                  <input
-                    className="form-input"
-                    value={form.coursesEyebrow}
-                    onChange={(e) => update('coursesEyebrow', e.target.value)}
-                  />
-                </Field>
-                <Field label="课程标题">
-                  <input
-                    className="form-input"
-                    value={form.coursesTitle}
-                    onChange={(e) => update('coursesTitle', e.target.value)}
-                  />
-                </Field>
-                <Field label="课程链接文案">
-                  <input
-                    className="form-input"
-                    value={form.coursesLinkLabel}
-                    onChange={(e) => update('coursesLinkLabel', e.target.value)}
-                  />
-                </Field>
-              </div>
-              <Field label="无课程提示">
-                <input
-                  className="form-input"
-                  value={form.coursesEmptyText}
-                  onChange={(e) => update('coursesEmptyText', e.target.value)}
-                />
-              </Field>
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <Field label="公开课标签">
-                  <input
-                    className="form-input"
-                    value={form.trialsEyebrow}
-                    onChange={(e) => update('trialsEyebrow', e.target.value)}
-                  />
-                </Field>
-                <Field label="公开课标题">
-                  <input
-                    className="form-input"
-                    value={form.trialsTitle}
-                    onChange={(e) => update('trialsTitle', e.target.value)}
-                  />
-                </Field>
-                <Field label="公开课链接文案">
-                  <input
-                    className="form-input"
-                    value={form.trialsLinkLabel}
-                    onChange={(e) => update('trialsLinkLabel', e.target.value)}
-                  />
-                </Field>
-              </div>
-              <Field label="无公开课提示">
-                <input
-                  className="form-input"
-                  value={form.trialsEmptyText}
-                  onChange={(e) => update('trialsEmptyText', e.target.value)}
-                />
-              </Field>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <Field label="评价标签">
-                  <input
-                    className="form-input"
-                    value={form.testimonialsEyebrow}
-                    onChange={(e) => update('testimonialsEyebrow', e.target.value)}
-                  />
-                </Field>
-                <Field label="评价标题">
-                  <input
-                    className="form-input"
-                    value={form.testimonialsTitle}
-                    onChange={(e) => update('testimonialsTitle', e.target.value)}
-                  />
-                </Field>
-              </div>
-            </EditorCard>
-
-            <EditorCard
-              title="自由内容模块"
-              description="像搭积木一样追加自定义模块，展示在主页正文区"
-            >
-              <BlockEditor
-                value={form.bodyBlocks}
-                onChange={(bodyBlocks) => update('bodyBlocks', bodyBlocks)}
-                allowed={HOME_ALLOWED}
+            </Field>
+            <Field label="机构介绍">
+              <textarea
+                className="form-input h-20"
+                value={form.bannerSubtitle}
+                onChange={(e) => update('bannerSubtitle', e.target.value)}
               />
-            </EditorCard>
-          </div>
+            </Field>
+            <QiniuGalleryField
+              label="首屏轮播图"
+              hint="可上传或从素材库勾选多张图片"
+              value={form.bannerImagesText}
+              onChange={(value) => update('bannerImagesText', value)}
+              prefix="homepage/banner"
+            />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="主按钮文字">
+                <input
+                  className="form-input"
+                  value={form.ctaText}
+                  onChange={(e) => update('ctaText', e.target.value)}
+                />
+              </Field>
+              <Field label="主按钮链接" hint="如 /register">
+                <input
+                  className="form-input"
+                  value={form.ctaLink}
+                  onChange={(e) => update('ctaLink', e.target.value)}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="次按钮文字">
+                <input
+                  className="form-input"
+                  value={form.secondaryCtaText}
+                  onChange={(e) => update('secondaryCtaText', e.target.value)}
+                />
+              </Field>
+              <Field label="次按钮链接" hint="如 /courses">
+                <input
+                  className="form-input"
+                  value={form.secondaryCtaLink}
+                  onChange={(e) => update('secondaryCtaLink', e.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="首屏数据" hint="每行一项，如「6-8 人小班」">
+              <textarea
+                className="form-input h-20"
+                value={form.statsText}
+                onChange={(e) => update('statsText', e.target.value)}
+              />
+            </Field>
+          </EditorCard>
 
-          <div className="xl:sticky xl:top-4 xl:self-start">
-            <div className="text-muted-foreground mb-2 text-xs font-medium">实时预览</div>
-            <HomePreview form={form} organization={organization} />
-          </div>
+          <EditorCard title="核心优势" description="首页首屏下方的核心优势总结。">
+            <Field label="核心优势总结" hint="每行一项，建议 3 条">
+              <textarea
+                className="form-input h-28"
+                value={form.highlightsText}
+                onChange={(e) => update('highlightsText', e.target.value)}
+              />
+            </Field>
+          </EditorCard>
+
+          <EditorCard title="家长评价" description="展示在首页评价模块。">
+            <Field label="评价内容" hint="每行一条">
+              <textarea
+                className="form-input h-28"
+                value={form.testimonialsText}
+                onChange={(e) => update('testimonialsText', e.target.value)}
+              />
+            </Field>
+          </EditorCard>
+
+          <EditorCard title="联系与上课时间">
+            <Field label="营业 / 上课时间">
+              <input
+                className="form-input"
+                value={form.businessHours}
+                onChange={(e) => update('businessHours', e.target.value)}
+              />
+            </Field>
+          </EditorCard>
+
+          <EditorCard title="补充内容模块" description="展示在首页首屏与固定课程模块之间。">
+            <BlockEditor
+              value={form.bodyBlocks}
+              onChange={(bodyBlocks) => update('bodyBlocks', bodyBlocks)}
+              allowed={HOME_ALLOWED}
+            />
+          </EditorCard>
         </div>
       )}
     </PageFrame>
@@ -447,124 +257,7 @@ function EditorCard({
         <h2 className="text-sm font-semibold">{title}</h2>
         {description ? <p className="text-muted-foreground mt-0.5 text-xs">{description}</p> : null}
       </div>
-      {children}
-    </section>
-  );
-}
-
-function HomePreview({
-  form,
-  organization,
-}: {
-  form: HomeForm;
-  organization: OrganizationSettings;
-}) {
-  const branding = organization.branding;
-  const fullLogoUrl = branding?.fullLogoUrl || branding?.logoUrl;
-  const squareLogoUrl = branding?.squareLogoUrl || fullLogoUrl;
-  const stats = linesToList(form.statsText);
-  const testimonials = linesToList(form.testimonialsText);
-  const bannerImages = linesToList(form.bannerImagesText);
-
-  return (
-    <section
-      className="overflow-hidden rounded-lg border bg-white"
-      style={{
-        backgroundColor: branding?.backgroundColor || undefined,
-        color: branding?.textColor || undefined,
-      }}
-    >
-      {bannerImages.length > 0 ? (
-        <div className="h-44 overflow-hidden border-b">
-          <img src={bannerImages[0]} alt="机构 Banner" className="h-full w-full object-cover" />
-        </div>
-      ) : null}
-      <div className="space-y-6 p-6">
-        <div>
-          <div className="mb-4 flex items-center gap-3">
-            {squareLogoUrl ? (
-              <img
-                src={squareLogoUrl}
-                alt="方形 Logo"
-                className="h-10 w-10 rounded-xl border bg-white object-contain p-1.5"
-              />
-            ) : null}
-            {fullLogoUrl ? (
-              <img src={fullLogoUrl} alt="完整 Logo" className="h-9 max-w-44 object-contain" />
-            ) : (
-              <div className="text-muted-foreground text-sm">{organization.name}</div>
-            )}
-          </div>
-          <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase">
-            {form.eyebrow || '首屏标签'}
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight">
-            {form.bannerTitle || organization.brandName || '机构品牌名称'}
-          </h2>
-          <p className="mt-3 max-w-2xl text-base leading-7">
-            {form.bannerSubtitle || form.headline || '这里展示机构对外主页的首屏标题。'}
-          </p>
-          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6">
-            {form.introduction || '完善机构介绍后，这里会同步展示。'}
-          </p>
-          {form.ctaText ? (
-            <span className="btn btn-primary pointer-events-none mt-4 inline-flex">
-              {form.ctaText}
-            </span>
-          ) : null}
-          {form.secondaryCtaText ? (
-            <span className="btn btn-secondary pointer-events-none mt-4 ml-2 inline-flex">
-              {form.secondaryCtaText}
-            </span>
-          ) : null}
-          {stats.length > 0 && (
-            <div className="mt-5 flex flex-wrap gap-2">
-              {stats.map((item) => (
-                <span key={item} className="rounded-full border bg-white/80 px-3 py-1 text-sm">
-                  {item}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-lg border bg-white/80 p-4">
-          <div className="text-sm font-semibold">机构信息</div>
-          <div className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">电话</span>
-              <span>{organization.phone || '-'}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">地址</span>
-              <span className="text-right">{organization.address || '-'}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">上课时间</span>
-              <span className="text-right">{form.businessHours || '-'}</span>
-            </div>
-          </div>
-          {testimonials.length > 0 && (
-            <>
-              <div className="mt-5 text-sm font-semibold">用户评价</div>
-              <div className="mt-3 space-y-2">
-                {testimonials.map((item) => (
-                  <div key={item} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {form.bodyBlocks.length > 0 && (
-          <div>
-            <div className="text-muted-foreground mb-2 text-xs font-medium">自由内容模块</div>
-            <BlockRenderer blocks={form.bodyBlocks} />
-          </div>
-        )}
-      </div>
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }
