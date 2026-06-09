@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>教师团队 - 列表卡片 Demo</title>
+    <style>
+      :root {
+        --paper: #f6f4f0;
+        --surface: #ffffff;
+        --ink: #211f1c;
+        --ink-soft: #57534e;
+        --muted: #8b857c;
+        --line: #e7e1d8;
+        --brand: #9a6a4b;
+        --brand-soft: #f1e9e1;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .container {
+        width: min(1120px, calc(100vw - 40px));
+        margin: 0 auto;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: rgba(246, 244, 240, 0.92);
+        backdrop-filter: blur(16px);
+      }
+
+      .site-header-bar {
+        display: flex;
+        height: 64px;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border-radius: 12px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 12px;
+      }
+
+      .nav {
+        display: flex;
+        flex: 1;
+        gap: 4px;
+      }
+
+      .nav a {
+        border-radius: 999px;
+        color: var(--muted);
+        padding: 8px 12px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .nav a.active {
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: 0 1px 0 rgba(33, 31, 28, 0.05);
+      }
+
+      .header-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--ink);
+        color: #fff;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .page-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 32px;
+        align-items: end;
+        padding: 44px 0 28px;
+      }
+
+      .eyebrow {
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 10px 0 0;
+        font-size: clamp(34px, 5vw, 54px);
+        line-height: 1.04;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 660px;
+        margin: 14px 0 0;
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.85;
+      }
+
+      .hero-note {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--surface);
+        padding: 18px;
+      }
+
+      .hero-note strong {
+        display: block;
+        font-size: 17px;
+      }
+
+      .hero-note span {
+        display: block;
+        margin-top: 8px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 4px 0 18px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 22px;
+        line-height: 1.25;
+      }
+
+      .section-head .count {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .teacher-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px;
+        padding-bottom: 56px;
+      }
+
+      .teacher-card {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--surface);
+        transition:
+          transform 0.18s ease,
+          border-color 0.18s ease,
+          box-shadow 0.18s ease;
+      }
+
+      .teacher-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(154, 106, 75, 0.45);
+        box-shadow: 0 18px 34px rgba(33, 31, 28, 0.09);
+      }
+
+      /* Avatar block: fixed ratio so every card lines up, chip overlaid to save a row */
+      .card-media {
+        position: relative;
+        aspect-ratio: 4 / 3;
+        overflow: hidden;
+        background: var(--brand-soft);
+      }
+
+      .card-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.35s ease;
+      }
+
+      .teacher-card:hover .card-media img {
+        transform: scale(1.045);
+      }
+
+      .media-chip {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--brand);
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 700;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 2px 8px rgba(33, 31, 28, 0.12);
+      }
+
+      .card-body {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        padding: 16px 16px 14px;
+      }
+
+      .name-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .teacher-name {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        font-size: 19px;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .go {
+        color: var(--muted);
+        font-size: 16px;
+        transition:
+          transform 0.18s ease,
+          color 0.18s ease;
+      }
+
+      .teacher-card:hover .go {
+        transform: translateX(3px);
+        color: var(--brand);
+      }
+
+      .title {
+        margin-top: 4px;
+        overflow: hidden;
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.5;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tagline {
+        display: -webkit-box;
+        min-height: 44px;
+        margin: 11px 0 0;
+        overflow: hidden;
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.7;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      /* Stat strip: a 3-column stacked grid never wraps sideways, so the
+         教学 / 学员 / 续班率 row can no longer break onto multiple lines. */
+      .stat-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: auto;
+        padding-top: 14px;
+      }
+
+      .stat-row .stat {
+        padding-top: 13px;
+        border-top: 1px solid var(--line);
+        text-align: center;
+      }
+
+      .stat-row b {
+        display: block;
+        color: var(--ink);
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .stat-row span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 1040px) {
+        .teacher-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 900px) {
+        .nav {
+          display: none;
+        }
+
+        .page-hero {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .container {
+          width: min(100vw - 28px, 1120px);
+        }
+
+        .teacher-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .card-media {
+          aspect-ratio: 16 / 10;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-bar container">
+        <a class="brand" href="#">
+          <span class="brand-mark">FD</span>
+          <span>美智成长教室</span>
+        </a>
+        <nav class="nav" aria-label="主导航">
+          <a href="#">首页</a>
+          <a href="#">课程</a>
+          <a href="#">试听</a>
+          <a class="active" href="#">老师</a>
+          <a href="#">关于</a>
+        </nav>
+        <a class="header-action" href="#">预约试听</a>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="page-hero">
+        <div>
+          <div class="eyebrow">Teachers</div>
+          <h1>教师团队</h1>
+          <p class="lead">
+            合作课程老师按课程提供方入驻展示。家长可以先了解老师的教学方向、课堂风格和可预约课程，再选择合适的试听场次。
+          </p>
+        </div>
+        <aside class="hero-note">
+          <strong>本周可预约</strong>
+          <span
+            >书法、魔方、英语、阅读等方向开放试听。预约后由老师或教室运营人员确认具体时间。</span
+          >
+        </aside>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>全部老师</h2>
+          <span class="count">共 4 位老师</span>
+        </div>
+
+        <div class="teacher-grid">
+          <a class="teacher-card" href="teacher-editorial-detail.html">
+            <div class="card-media">
+              <img
+                src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=520&q=82"
+                alt="田老师"
+                data-field="avatarUrl"
+              />
+              <span class="media-chip" data-field="specialties[0]">硬笔书法</span>
+            </div>
+            <div class="card-body">
+              <div class="name-row">
+                <h3 class="teacher-name" data-field="name">田老师</h3>
+                <span class="go" aria-hidden="true">→</span>
+              </div>
+              <div class="title" data-field="title">硬笔书法主讲 · 儿童书写习惯训练</div>
+              <p class="tagline" data-field="tagline">
+                擅长大班到三年级硬笔启蒙，用结构观察和作业纠偏建立书写习惯。
+              </p>
+              <div class="stat-row">
+                <div class="stat"><b data-field="teachingYears">8年</b><span>教学</span></div>
+                <div class="stat"><b data-field="studentCount">300+</b><span>学员</span></div>
+                <div class="stat"><b data-field="retentionRate">92%</b><span>续班率</span></div>
+              </div>
+            </div>
+          </a>
+
+          <a class="teacher-card" href="teacher-editorial-detail.html">
+            <div class="card-media">
+              <img
+                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=520&q=82"
+                alt="周老师"
+              />
+              <span class="media-chip">魔方思维</span>
+            </div>
+            <div class="card-body">
+              <div class="name-row">
+                <h3 class="teacher-name">周老师</h3>
+                <span class="go" aria-hidden="true">→</span>
+              </div>
+              <div class="title">魔方思维课老师 · 空间关系训练</div>
+              <p class="tagline">用分步拆解和竞速复盘，让孩子理解公式背后的空间关系。</p>
+              <div class="stat-row">
+                <div class="stat"><b>6年</b><span>教学</span></div>
+                <div class="stat"><b>180+</b><span>学员</span></div>
+                <div class="stat"><b>90%</b><span>续班率</span></div>
+              </div>
+            </div>
+          </a>
+
+          <a class="teacher-card" href="teacher-editorial-detail.html">
+            <div class="card-media">
+              <img
+                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=520&q=82"
+                alt="林老师"
+              />
+              <span class="media-chip">英语启蒙</span>
+            </div>
+            <div class="card-body">
+              <div class="name-row">
+                <h3 class="teacher-name">林老师</h3>
+                <span class="go" aria-hidden="true">→</span>
+              </div>
+              <div class="title">自然拼读与绘本阅读 · 低龄表达启蒙</div>
+              <p class="tagline">从绘本阅读切入自然拼读，让孩子在短句表达里建立语感。</p>
+              <div class="stat-row">
+                <div class="stat"><b>7年</b><span>教学</span></div>
+                <div class="stat"><b>260+</b><span>学员</span></div>
+                <div class="stat"><b>93%</b><span>续班率</span></div>
+              </div>
+            </div>
+          </a>
+
+          <a class="teacher-card" href="teacher-editorial-detail.html">
+            <div class="card-media">
+              <img
+                src="https://images.unsplash.com/photo-1580894732444-8ecded7900cd?auto=format&fit=crop&w=520&q=82"
+                alt="王老师"
+              />
+              <span class="media-chip">创意美术</span>
+            </div>
+            <div class="card-body">
+              <div class="name-row">
+                <h3 class="teacher-name">王老师</h3>
+                <span class="go" aria-hidden="true">→</span>
+              </div>
+              <div class="title">儿童创意美术 · 色彩表达启蒙</div>
+              <p class="tagline">关注色彩表达和手部精细动作，适合低龄儿童美术启蒙。</p>
+              <div class="stat-row">
+                <div class="stat"><b>5年</b><span>教学</span></div>
+                <div class="stat"><b>160+</b><span>学员</span></div>
+                <div class="stat"><b>89%</b><span>续班率</span></div>
+              </div>
+            </div>
+          </a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

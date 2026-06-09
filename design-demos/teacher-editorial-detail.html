@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>田老师 - 教师详情 Demo</title>
+    <style>
+      :root {
+        --paper: #f6f4f0;
+        --surface: #ffffff;
+        --ink: #211f1c;
+        --ink-soft: #57534e;
+        --muted: #8b857c;
+        --line: #e7e1d8;
+        --brand: #9a6a4b;
+        --brand-soft: #f1e9e1;
+        --sage: #4f7169;
+        --sage-soft: #e8efeb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .container {
+        width: min(1120px, calc(100vw - 40px));
+        margin: 0 auto;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: rgba(246, 244, 240, 0.92);
+        backdrop-filter: blur(16px);
+      }
+
+      .site-header-bar {
+        display: flex;
+        height: 64px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border-radius: 12px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 12px;
+      }
+
+      .eyebrow {
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .back-link {
+        display: inline-flex;
+        margin: 24px 0 16px;
+        color: var(--ink-soft);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      /* ---------- Hero ---------- */
+      .profile-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 284px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: var(--surface);
+        box-shadow: 0 1px 0 rgba(33, 31, 28, 0.04);
+      }
+
+      .hero-main {
+        display: grid;
+        grid-template-columns: 188px minmax(0, 1fr);
+        gap: 28px;
+        align-items: stretch;
+        padding: 24px;
+      }
+
+      /* Portrait stretches to the column height so its bottom edge lines up
+         with the bottom of the stat bar — no dead space under the photo. */
+      .portrait {
+        width: 188px;
+        height: 100%;
+        min-height: 248px;
+        border-radius: 22px;
+        object-fit: cover;
+        box-shadow: 0 14px 32px rgba(33, 31, 28, 0.16);
+      }
+
+      .hero-text {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+      }
+
+      .chip {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .chip.sage {
+        background: var(--sage-soft);
+        color: var(--sage);
+      }
+
+      h1 {
+        margin: 12px 0 0;
+        font-size: clamp(34px, 5vw, 50px);
+        line-height: 1.04;
+        letter-spacing: -0.01em;
+      }
+
+      .title {
+        margin-top: 10px;
+        color: var(--ink-soft);
+        font-size: 16px;
+        line-height: 1.55;
+      }
+
+      .hero-quote {
+        max-width: 460px;
+        margin: 18px 0 0;
+        border-left: 3px solid var(--brand);
+        padding-left: 15px;
+        color: var(--ink);
+        font-size: 17px;
+        line-height: 1.72;
+      }
+
+      /* Unified stat bar — refined single container with hairline dividers */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 460px;
+        margin-top: 22px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fbfaf7;
+      }
+
+      .stat {
+        padding: 13px 8px;
+        text-align: center;
+      }
+
+      .stat + .stat {
+        border-left: 1px solid var(--line);
+      }
+
+      .stat b {
+        display: block;
+        font-size: 23px;
+        letter-spacing: -0.01em;
+      }
+
+      .stat span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      /* Booking column */
+      .hero-side {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 16px;
+        border-left: 1px solid var(--line);
+        background: #fbfaf7;
+        padding: 28px 24px;
+        text-align: center;
+      }
+
+      .primary {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--ink);
+        color: #fff;
+        padding: 13px 18px;
+        font-size: 15px;
+        font-weight: 800;
+        transition: background 0.16s ease;
+      }
+
+      .primary:hover {
+        background: #000;
+      }
+
+      .qr-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .qr {
+        width: 116px;
+        height: 116px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background:
+          linear-gradient(90deg, #1b1b1b 7px, transparent 7px) 0 0 / 17px 17px,
+          linear-gradient(#1b1b1b 7px, transparent 7px) 0 0 / 17px 17px,
+          #fff;
+      }
+
+      .qr-cap {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .contact-line {
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .contact-line b {
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      /* ---------- Body layout ---------- */
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 22px;
+        align-items: start;
+        margin-top: 22px;
+        padding-bottom: 64px;
+      }
+
+      .stack {
+        display: grid;
+        min-width: 0;
+        gap: 16px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--surface);
+        padding: 24px;
+      }
+
+      .card-head {
+        margin-bottom: 16px;
+      }
+
+      .card-head h2 {
+        margin: 0;
+        font-size: 21px;
+        line-height: 1.25;
+      }
+
+      .body-text {
+        max-width: 760px;
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.9;
+      }
+
+      .philosophy {
+        border-left: 3px solid var(--brand);
+        padding-left: 16px;
+        color: var(--ink);
+        font-size: 15.5px;
+        line-height: 1.9;
+      }
+
+      /* Credentials — clean icon-row list */
+      .credentials {
+        display: grid;
+      }
+
+      .cred-item {
+        display: grid;
+        grid-template-columns: 46px minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+        padding: 18px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .cred-item:first-child {
+        padding-top: 2px;
+        border-top: 0;
+      }
+
+      .cred-item:last-child {
+        padding-bottom: 0;
+      }
+
+      .cred-icon {
+        display: grid;
+        width: 46px;
+        height: 46px;
+        place-items: center;
+        border-radius: 14px;
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      .cred-icon svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .cred-item h3 {
+        margin: 5px 0 0;
+        font-size: 15px;
+      }
+
+      .cred-item p {
+        max-width: 620px;
+        margin-top: 8px;
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.78;
+      }
+
+      .award-list {
+        margin: 9px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .award-list li {
+        position: relative;
+        margin-top: 7px;
+        padding-left: 16px;
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .award-list li::before {
+        position: absolute;
+        top: 9px;
+        left: 0;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--brand);
+        content: '';
+      }
+
+      /* Galleries */
+      .classroom-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.9fr 0.9fr;
+        gap: 10px;
+      }
+
+      .classroom-grid img,
+      .work-grid img {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        object-fit: cover;
+      }
+
+      .classroom-grid img {
+        height: 158px;
+      }
+
+      .classroom-grid img:first-child {
+        height: 326px;
+        grid-row: span 2;
+      }
+
+      .result-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 264px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .work-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .work-grid img {
+        height: 142px;
+      }
+
+      .review {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fbfaf7;
+        padding: 14px 14px 14px 16px;
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.75;
+      }
+
+      .review + .review {
+        margin-top: 10px;
+      }
+
+      /* Rail */
+      .rail {
+        position: sticky;
+        top: 84px;
+        display: grid;
+        min-width: 0;
+        gap: 16px;
+      }
+
+      .specialties {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .course {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        transition: border-color 0.16s ease;
+      }
+
+      .course:hover {
+        border-color: rgba(154, 106, 75, 0.45);
+      }
+
+      .course + .course {
+        margin-top: 10px;
+      }
+
+      .course strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .course span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .course .price {
+        margin-top: 8px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      @media (max-width: 980px) {
+        .profile-hero {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-side {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .rail {
+          position: static;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .container {
+          width: min(100vw - 28px, 1120px);
+        }
+
+        .hero-main {
+          grid-template-columns: 1fr;
+          padding: 22px;
+        }
+
+        .portrait {
+          width: 100%;
+          height: 300px;
+          min-height: 0;
+        }
+
+        .card {
+          padding: 18px;
+        }
+
+        .result-grid,
+        .classroom-grid,
+        .work-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .classroom-grid img,
+        .classroom-grid img:first-child,
+        .work-grid img {
+          height: 200px;
+          grid-row: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-bar container">
+        <a class="brand" href="#">
+          <span class="brand-mark">FD</span>
+          <span>美智成长教室</span>
+        </a>
+        <span class="eyebrow">教师详情</span>
+      </div>
+    </header>
+
+    <main class="container">
+      <a class="back-link" href="teacher-editorial-list.html">← 返回教师团队</a>
+
+      <!-- ===== Hero：身份 + 预约 ===== -->
+      <section class="profile-hero" data-teacher-id="teacher_001">
+        <div class="hero-main">
+          <img
+            class="portrait"
+            src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=700&q=82"
+            alt="田老师头像"
+            data-field="avatarUrl"
+          />
+          <div class="hero-text">
+            <span class="chip sage" data-field="institution">亦安书画</span>
+            <h1 data-field="name">田老师</h1>
+            <div class="title" data-field="title">硬笔书法主讲 · 儿童书写习惯训练</div>
+            <p class="hero-quote" data-field="tagline">
+              先让孩子看懂字的结构，再让手跟上。每一笔都能解释清楚，孩子才愿意长期练。
+            </p>
+            <div class="stats">
+              <div class="stat"><b data-field="teachingYears">8年</b><span>教学经验</span></div>
+              <div class="stat"><b data-field="studentCount">300+</b><span>累计学员</span></div>
+              <div class="stat"><b data-field="retentionRate">92%</b><span>续班率</span></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="hero-side">
+          <a class="primary" href="#">预约试听</a>
+          <div class="qr-block">
+            <div class="qr" aria-label="老师微信二维码" data-field="wechatQrUrl"></div>
+            <span class="qr-cap">扫码加老师微信</span>
+          </div>
+          <div class="contact-line">电话咨询 <b data-field="phone">138 0000 1234</b></div>
+        </aside>
+      </section>
+
+      <!-- ===== 正文 + 侧栏 ===== -->
+      <section class="layout">
+        <div class="stack">
+          <article class="card">
+            <div class="card-head"><h2>老师简介</h2></div>
+            <p class="body-text" data-field="bio">
+              长期负责小学低年级书写启蒙，关注书写姿势、控笔能力和日常作业中的真实问题。课堂会先帮助孩子观察字形结构，再做短时控笔训练，最后回到作业本里的真实应用，让家长能看到孩子在学校作业中的具体变化。
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h2>教学理念</h2></div>
+            <p class="philosophy" data-field="teachingPhilosophy">
+              字不是一遍遍抄出来的，是孩子看懂结构以后写出来的。课堂会先训练观察，再训练落笔，最后把练习迁移到学校作业里——能解释清楚的笔画，孩子才会主动去写。
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h2>教学经历与资质</h2></div>
+            <div class="credentials">
+              <div class="cred-item">
+                <span class="cred-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M22 10 12 5 2 10l10 5z" />
+                    <path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5" />
+                    <path d="M22 10v6" />
+                  </svg>
+                </span>
+                <div>
+                  <h3>毕业院校 / 专业背景</h3>
+                  <p data-field="education">
+                    师范类书法教育方向毕业，长期参与儿童硬笔课程研发，师从区少儿书法教研组。
+                  </p>
+                </div>
+              </div>
+
+              <div class="cred-item">
+                <span class="cred-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 7v14" />
+                    <path d="M3 5a16 16 0 0 1 9 2 16 16 0 0 1 9-2v13a16 16 0 0 0-9 2 16 16 0 0 0-9-2z" />
+                  </svg>
+                </span>
+                <div>
+                  <h3>教学经验</h3>
+                  <p data-field="teachingExperience">
+                    8 年儿童硬笔教学经验，服务大班至三年级学生，熟悉低龄儿童控笔与作业书写的常见问题。
+                  </p>
+                </div>
+              </div>
+
+              <div class="cred-item">
+                <span class="cred-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+                    <path d="M19 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" />
+                  </svg>
+                </span>
+                <div>
+                  <h3>教学风格</h3>
+                  <p data-field="teachingStyle">
+                    课堂节奏稳定、示范清晰，重视即时反馈与正向鼓励，习惯用一句话点评帮孩子记住要点。
+                  </p>
+                </div>
+              </div>
+
+              <div class="cred-item">
+                <span class="cred-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="9" r="6" />
+                    <path d="M9 14.5 8 22l4-2.5L16 22l-1-7.5" />
+                  </svg>
+                </span>
+                <div>
+                  <h3>荣誉奖项 / 代表经历</h3>
+                  <ul class="award-list" data-field="achievements">
+                    <li>区级少儿书写比赛优秀指导老师</li>
+                    <li>合作研发低年级控笔训练课程</li>
+                    <li>累计公开课 40+ 场</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h2>课堂实拍</h2></div>
+            <div class="classroom-grid" data-field="classPhotoUrls">
+              <img
+                src="https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&w=800&q=82"
+                alt="课堂实拍 1"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=700&q=82"
+                alt="课堂实拍 2"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=700&q=82"
+                alt="课堂实拍 3"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=700&q=82"
+                alt="课堂实拍 4"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=700&q=82"
+                alt="课堂实拍 5"
+              />
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><h2>学员作品与家长反馈</h2></div>
+            <div class="result-grid">
+              <div class="work-grid" data-field="studentWorkUrls">
+                <img
+                  src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=700&q=82"
+                  alt="学员作品 1"
+                />
+                <img
+                  src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=700&q=82"
+                  alt="学员作品 2"
+                />
+                <img
+                  src="https://images.unsplash.com/photo-1456081445129-830eb8d4bfc6?auto=format&fit=crop&w=700&q=82"
+                  alt="学员作品 3"
+                />
+                <img
+                  src="https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=82"
+                  alt="学员作品 4"
+                />
+              </div>
+              <div data-field="parentTestimonials">
+                <div class="review">孩子以前写字容易急，现在会先看结构再下笔。</div>
+                <div class="review">老师反馈很具体，知道回家该练哪几个问题。</div>
+                <div class="review">作业本整洁度明显提升，孩子也更愿意练字。</div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <aside class="rail">
+          <section class="card">
+            <div class="card-head"><h2>擅长方向</h2></div>
+            <div class="specialties" data-field="specialties">
+              <span class="chip">硬笔书法</span>
+              <span class="chip">控笔训练</span>
+              <span class="chip">幼小衔接</span>
+              <span class="chip">作业书写</span>
+            </div>
+          </section>
+
+          <section class="card" data-field="courses">
+            <div class="card-head"><h2>主讲课程</h2></div>
+            <div class="course">
+              <strong>硬笔书法体验课</strong>
+              <span>大班-三年级 · 60 分钟 · 体验试听</span>
+              <div class="price">19.9 元 起（席位保留费）</div>
+            </div>
+            <div class="course">
+              <strong>控笔训练公开课</strong>
+              <span>幼小衔接 · 45 分钟 · 公开课</span>
+              <div class="price">9.9 元 起（席位保留费）</div>
+            </div>
+            <div class="course">
+              <strong>低年级书写提升班</strong>
+              <span>一年级-三年级 · 60 分钟 · 正式班</span>
+              <div class="price">价格到店确认</div>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

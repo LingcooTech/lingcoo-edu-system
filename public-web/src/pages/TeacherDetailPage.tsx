@@ -6,19 +6,12 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
-  MessageCircle,
   School,
-  ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
 
-import {
-  fetchPublicTeacher,
-  type Course,
-  type PublicTeacher,
-  type PublicTeacherDetail,
-} from '@/api/client';
+import { fetchPublicTeacher, type Course, type PublicTeacherDetail } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { money } from '@/lib/utils';
 
@@ -124,12 +117,12 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
 
   return (
     <>
-      <header className="pwcard mt-6 p-5 shadow-sm sm:p-7">
+      <header className="pwcard mt-6 p-5 shadow-sm sm:p-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+          <div className="grid gap-6 sm:grid-cols-[188px_minmax(0,1fr)] sm:items-stretch">
             <TeacherAvatar teacher={teacher} />
 
-            <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-col">
               {institution ? <InstitutionMark institution={institution} className="mb-3" /> : null}
               <h1 className="text-ink text-3xl font-semibold tracking-tight sm:text-4xl">
                 {teacher.name}
@@ -139,16 +132,16 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
               ) : null}
 
               {teacher.tagline ? (
-                <p className="text-ink border-brand mt-4 max-w-2xl border-l-2 pl-4 text-base leading-8 sm:text-lg">
+                <p className="text-ink border-brand mt-4 max-w-md border-l-2 pl-4 text-base leading-8 sm:text-lg">
                   {teacher.tagline}
                 </p>
               ) : null}
 
               {stats.length > 0 ? (
-                <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
+                <div className="border-line divide-line bg-paper/60 mt-5 grid max-w-md grid-cols-3 divide-x overflow-hidden rounded-2xl border">
                   {stats.map((item) => (
-                    <div key={item.label} className="bg-paper/70 rounded-2xl px-3 py-3">
-                      <div className="text-ink text-lg font-semibold">{item.value}</div>
+                    <div key={item.label} className="px-2 py-3 text-center">
+                      <div className="text-ink text-xl font-semibold">{item.value}</div>
                       <div className="text-muted mt-0.5 text-xs">{item.label}</div>
                     </div>
                   ))}
@@ -157,20 +150,19 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
             </div>
           </div>
 
-          <aside className="border-line flex flex-col justify-center gap-3 border-t pt-5 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+          <aside className="border-line flex flex-col justify-center gap-4 border-t pt-5 text-center lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
             <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary w-full">
               预约试听
             </Link>
             {teacher.wechatQrUrl ? (
-              <a
-                href={teacher.wechatQrUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="pwbtn pwbtn-outline w-full"
-              >
-                <MessageCircle className="h-4 w-4" />
-                微信联系
-              </a>
+              <div className="flex flex-col items-center gap-2">
+                <img
+                  src={teacher.wechatQrUrl}
+                  alt={`${teacher.name}老师微信二维码`}
+                  className="border-line h-28 w-28 rounded-2xl border bg-white object-contain"
+                />
+                <span className="text-muted text-xs">扫码加老师微信</span>
+              </div>
             ) : null}
           </aside>
         </div>
@@ -189,8 +181,8 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
 
           {teacher.teachingPhilosophy ? (
             <section className="pwcard p-5 sm:p-6">
-              <SectionHead title="教学方法" />
-              <p className="text-ink-soft mt-4 max-w-3xl text-base leading-8 whitespace-pre-line">
+              <SectionHead title="教学理念" />
+              <p className="text-ink border-brand mt-4 max-w-3xl border-l-2 pl-4 text-base leading-8 whitespace-pre-line">
                 {teacher.teachingPhilosophy}
               </p>
             </section>
@@ -199,7 +191,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
           {profileSections.length > 0 ? (
             <section className="pwcard p-5 sm:p-6">
               <SectionHead title="教学经历与资质" />
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="divide-line mt-4 divide-y">
                 {profileSections.map((section) => (
                   <ProfileSection key={section.key} section={section} />
                 ))}
@@ -227,12 +219,8 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
         </div>
 
         <aside className="grid gap-4 lg:sticky lg:top-24">
-          {detail.courses.length > 0 ? (
-            <CoursesSection id="teacher-courses" courses={detail.courses} />
-          ) : null}
-
           {teacher.specialties.length > 0 ? (
-            <section className="pwcard p-5">
+            <section className="pwcard p-5 sm:p-6">
               <SectionHead title="擅长方向" />
               <div className="mt-4 flex flex-wrap gap-2">
                 {teacher.specialties.map((item) => (
@@ -242,6 +230,10 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
                 ))}
               </div>
             </section>
+          ) : null}
+
+          {detail.courses.length > 0 ? (
+            <CoursesSection id="teacher-courses" courses={detail.courses} />
           ) : null}
         </aside>
       </div>
@@ -260,13 +252,16 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
 }
 
 function TeacherAvatar({ teacher }: { teacher: PublicTeacherDetail['teacher'] }) {
-  const base = 'border-line h-28 w-28 shrink-0 rounded-2xl border object-cover shadow-sm sm:h-36 sm:w-36';
+  // Stretches to the column height on sm+ so the photo's bottom edge lines up
+  // with the bottom of the stat bar in the info column.
+  const base =
+    'border-line h-56 w-full rounded-2xl border object-cover shadow-sm sm:h-full sm:min-h-[248px] sm:w-[188px]';
   if (teacher.avatarUrl) {
     return <img src={teacher.avatarUrl} alt={teacher.name} className={base} />;
   }
   return (
     <div className={`${base} bg-brand-soft text-brand flex items-center justify-center`}>
-      <GraduationCap className="h-10 w-10" />
+      <GraduationCap className="h-12 w-12" />
     </div>
   );
 }
@@ -336,33 +331,26 @@ function ProfileSection({ section }: { section: TeacherProfileSection }) {
   const lines = splitLines(section.text);
 
   return (
-    <article className="border-line/80 bg-paper/40 rounded-2xl border p-4">
-      <div className="flex items-center gap-3">
-        <div className="bg-ink flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white">
-          <Icon className="h-5 w-5" />
-        </div>
-        <h3 className="text-ink text-base font-semibold">{section.label}</h3>
+    <article className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-4 py-5 first:pt-0 last:pb-0">
+      <div className="bg-brand-soft text-brand grid h-11 w-11 place-items-center rounded-xl">
+        <Icon className="h-5 w-5" />
       </div>
+      <div className="min-w-0">
+        <h3 className="text-ink text-base font-semibold">{section.label}</h3>
 
-      {section.tone === 'list' && lines.length > 1 ? (
-        <ul className="text-ink-soft mt-4 space-y-2 text-sm leading-7">
-          {lines.map((line) => (
-            <li key={line} className="flex gap-2">
-              <span className="bg-brand mt-2 h-1.5 w-1.5 shrink-0 rounded-full" />
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p
-          className={[
-            'mt-4 text-sm leading-7 whitespace-pre-line',
-            section.tone === 'quote' ? 'text-ink border-brand border-l-2 pl-4' : 'text-ink-soft',
-          ].join(' ')}
-        >
-          {section.text}
-        </p>
-      )}
+        {section.tone === 'list' && lines.length > 1 ? (
+          <ul className="text-ink-soft mt-2.5 space-y-2 text-sm leading-7">
+            {lines.map((line) => (
+              <li key={line} className="flex gap-2">
+                <span className="bg-brand mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full" />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-ink-soft mt-2 text-sm leading-7 whitespace-pre-line">{section.text}</p>
+        )}
+      </div>
     </article>
   );
 }
@@ -500,105 +488,6 @@ function ResultsSection({
             ))}
           </div>
         ) : null}
-      </div>
-    </section>
-  );
-}
-
-function BookingCard({
-  teacher,
-  courseCount,
-}: {
-  teacher: PublicTeacherDetail['teacher'];
-  courseCount: number;
-}) {
-  return (
-    <div className="pwcard p-5 lg:sticky lg:top-24">
-      <div className="eyebrow">预约</div>
-      <div className="text-ink mt-2 text-lg font-semibold">和 {teacher.name} 老师上课</div>
-      <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary mt-4 w-full">
-        预约试听
-      </Link>
-      {teacher.wechatQrUrl ? (
-        <a
-          href={teacher.wechatQrUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="pwbtn pwbtn-outline mt-2 w-full"
-        >
-          <MessageCircle className="h-4 w-4" />
-          微信联系
-        </a>
-      ) : null}
-      <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
-          免注册预约，老师电话确认时间
-        </div>
-        <div className="flex items-center gap-2">
-          <GraduationCap className="text-brand h-4 w-4 shrink-0" />
-          {teacher.teachingYears ? `${teacher.teachingYears}教学经验` : '专业授课老师'}
-        </div>
-        {courseCount > 0 ? (
-          <div className="flex items-center gap-2">
-            <BookOpen className="text-brand h-4 w-4 shrink-0" />
-            主讲 {courseCount} 门课程
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function MobileBookingBar({ teacher }: { teacher: PublicTeacherDetail['teacher'] }) {
-  return (
-    <div className="border-line bg-surface/95 sticky bottom-0 z-20 border-t backdrop-blur lg:hidden">
-      <div className="container-narrow flex items-center gap-3 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-ink truncate text-base leading-tight font-semibold">
-            {teacher.name}
-            {teacher.title ? ` · ${teacher.title}` : ''}
-          </div>
-          <div className="text-muted truncate text-xs">免注册预约 · 老师电话确认时间</div>
-        </div>
-        <Link to={`/register?teacherId=${teacher.id}`} className="pwbtn pwbtn-primary shrink-0">
-          预约试听
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function OtherTeachersSection({ teachers }: { teachers: PublicTeacher[] }) {
-  return (
-    <section className="mt-10">
-      <h2 className="text-ink text-lg font-semibold">其他老师</h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {teachers.map((teacher) => (
-          <Link
-            key={teacher.id}
-            to={`/teachers/${teacher.id}`}
-            className="pwcard pwcard-hover flex items-center gap-3 p-3 no-underline"
-          >
-            {teacher.avatarUrl ? (
-              <img
-                src={teacher.avatarUrl}
-                alt={teacher.name}
-                className="h-14 w-14 shrink-0 rounded-xl object-cover"
-              />
-            ) : (
-              <div className="bg-brand-soft text-brand flex h-14 w-14 shrink-0 items-center justify-center rounded-xl">
-                <GraduationCap className="h-6 w-6" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="text-ink truncate font-medium">{teacher.name}</div>
-              <div className="text-muted truncate text-xs">
-                {teacher.title || teacher.specialties[0] || '课程老师'}
-              </div>
-            </div>
-          </Link>
-        ))}
       </div>
     </section>
   );
