@@ -2,14 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
+  BarChart3,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
+  Camera,
+  ClipboardList,
   GraduationCap,
   MapPin,
   MessageCircle,
   Phone,
+  RefreshCw,
+  Search,
   Star,
+  Target,
+  UsersRound,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -49,6 +54,53 @@ function HighlightIcon({ icon }: { icon: string }) {
   const Icon = highlightIconMap[icon] ?? Star;
   return <Icon className="h-6 w-6" />;
 }
+
+const growthLoopSteps: Array<{
+  title: string;
+  detail: string;
+  icon: LucideIcon;
+}> = [
+  {
+    title: '了解孩子',
+    detail: '先看年龄、基础、兴趣和可上课时间。',
+    icon: Search,
+  },
+  {
+    title: '共同确定目标',
+    detail: '把家长期待转成清晰的阶段目标。',
+    icon: Target,
+  },
+  {
+    title: '制定成长计划',
+    detail: '匹配课程、频次和阶段练习重点。',
+    icon: ClipboardList,
+  },
+  {
+    title: '小班教学实施',
+    detail: '固定老师跟进课堂状态和学习习惯。',
+    icon: UsersRound,
+  },
+  {
+    title: '课后反馈记录',
+    detail: '沉淀课堂照片、作品和老师反馈。',
+    icon: Camera,
+  },
+  {
+    title: '阶段复盘',
+    detail: '对照目标看变化，也看还需要补哪里。',
+    icon: BarChart3,
+  },
+  {
+    title: '调整目标计划',
+    detail: '根据复盘更新节奏、课程和练习任务。',
+    icon: RefreshCw,
+  },
+  {
+    title: '进入下一阶段',
+    detail: '形成持续迭代的成长闭环。',
+    icon: ArrowRight,
+  },
+];
 
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
@@ -137,7 +189,7 @@ export function HomePage() {
               </Link>
             </div>
             {stats.length > 0 && (
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 hidden gap-3 sm:grid sm:grid-cols-3">
                 {stats.map((item) => (
                   <div
                     key={item}
@@ -167,40 +219,22 @@ export function HomePage() {
               />
             ) : null}
             {heroImages.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  className="text-ink absolute top-1/2 left-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 shadow-sm transition hover:bg-white"
-                  onClick={() => moveHero(-1)}
-                  aria-label="上一张"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  className="text-ink absolute top-1/2 right-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 shadow-sm transition hover:bg-white"
-                  onClick={() => moveHero(1)}
-                  aria-label="下一张"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-                <div className="absolute right-4 bottom-4 left-4 flex justify-center gap-2">
-                  {heroImages.map((image, index) => (
-                    <button
-                      key={image}
-                      type="button"
-                      className={[
-                        'h-1.5 rounded-full transition-all',
-                        index === heroIndex % heroImages.length
-                          ? 'w-7 bg-white'
-                          : 'w-2 bg-white/60',
-                      ].join(' ')}
-                      onClick={() => setHeroIndex(index)}
-                      aria-label={`第 ${index + 1} 张`}
-                    />
-                  ))}
-                </div>
-              </>
+              <div className="absolute right-4 bottom-4 left-4 flex justify-center gap-2">
+                {heroImages.map((image, index) => (
+                  <button
+                    key={image}
+                    type="button"
+                    className={[
+                      'h-1.5 rounded-full transition-all',
+                      index === heroIndex % heroImages.length
+                        ? 'w-7 bg-white'
+                        : 'w-2 bg-white/60',
+                    ].join(' ')}
+                    onClick={() => setHeroIndex(index)}
+                    aria-label={`第 ${index + 1} 张`}
+                  />
+                ))}
+              </div>
             ) : null}
           </div>
         </div>
@@ -424,21 +458,19 @@ export function HomePage() {
       )}
 
       <section className="container-narrow pb-10">
-        <div className="bg-ink grid gap-8 rounded-[2rem] p-6 text-white md:grid-cols-[1fr_1.1fr] md:p-8">
+        <div className="bg-ink grid gap-8 rounded-3xl p-6 text-white md:grid-cols-[0.75fr_1.25fr] md:p-8">
           <div>
-            <div className="text-sm font-semibold text-white/55">班型匹配</div>
-            <h2 className="mt-3 text-2xl leading-tight font-bold">
-              不确定选哪门课？先做一次班型匹配
-            </h2>
+            <div className="text-sm font-semibold text-white/55">成长闭环</div>
+            <h2 className="mt-3 text-2xl leading-tight font-bold">让课程围绕孩子持续迭代</h2>
             <p className="mt-4 text-sm leading-7 text-white/70">
-              告诉我们孩子年龄、基础和可上课时间，老师会先筛选合适课程，再安排试听或到店沟通。
+              我们不只完成报名、上课和续费，而是把目标、计划、课堂、反馈和复盘连成一个可追踪的成长路径。
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 to={profile?.ctaLink || '/register'}
                 className="text-ink inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                预约班型匹配
+                预约成长评估
               </Link>
               {organization?.phone ? (
                 <a
@@ -450,28 +482,44 @@ export function HomePage() {
               ) : null}
             </div>
           </div>
-          <div className="space-y-4 text-sm text-white/80">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {['年龄与基础评估', '课程与试听推荐', '上课时间确认'].map((item, index) => (
-                <div key={item} className="border-t border-white/20 pt-3">
-                  <div className="text-xs font-semibold text-white/45">0{index + 1}</div>
-                  <div className="mt-1 font-semibold text-white">{item}</div>
-                </div>
-              ))}
+          <div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {growthLoopSteps.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.title}
+                    className="border border-white/12 bg-white/[0.06] p-4 text-sm text-white/80"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-white">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="text-xs font-semibold text-white/40">
+                        {String(index + 1).padStart(2, '0')}
+                      </div>
+                    </div>
+                    <div className="mt-4 font-semibold text-white">{item.title}</div>
+                    <p className="mt-2 leading-6 text-white/62">{item.detail}</p>
+                  </div>
+                );
+              })}
             </div>
-            {organization?.address && (
-              <div className="flex items-center gap-2 border-t border-white/15 pt-4">
-                <MapPin className="h-4 w-4" />
-                {organization.address}
-              </div>
-            )}
-            {organization?.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                {organization.phone}
-              </div>
-            )}
-            {profile?.businessHours && <div>{profile.businessHours}</div>}
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/15 pt-4 text-sm text-white/70">
+              {organization?.address && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  {organization.address}
+                </div>
+              )}
+              {organization?.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  {organization.phone}
+                </div>
+              )}
+              {profile?.businessHours && <div>{profile.businessHours}</div>}
+            </div>
           </div>
         </div>
       </section>
@@ -486,25 +534,28 @@ function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
   return (
     <Link
       to={`/teachers/${teacher.id}`}
-      className="group border-line bg-ink relative block h-96 w-72 shrink-0 snap-start overflow-hidden rounded-2xl border text-white shadow-sm md:w-80"
+      className="group border-line bg-ink relative block h-96 w-72 shrink-0 snap-start overflow-hidden rounded-2xl border text-white shadow-sm select-none md:w-80"
+      onContextMenu={(event) => event.preventDefault()}
+      style={{ WebkitTouchCallout: 'none' }}
     >
       {teacher.avatarUrl ? (
         <img
           src={teacher.avatarUrl}
           alt={teacher.name}
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
       ) : (
         <div className="bg-brand-soft absolute inset-0 flex items-center justify-center">
           <GraduationCap className="text-brand h-16 w-16" />
         </div>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10" />
-      <div className="absolute right-0 bottom-0 left-0 p-5 transition duration-300 group-hover:translate-y-4 group-hover:opacity-0">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/12 to-transparent" />
+      <div className="absolute right-0 bottom-0 left-0 hidden p-5 transition duration-300 md:block md:group-hover:translate-y-4 md:group-hover:opacity-0">
         <h3 className="text-2xl leading-tight font-bold">{teacher.name}</h3>
         <p className="mt-2 text-sm text-white/80">{teacher.title || '教师档案'}</p>
       </div>
-      <div className="absolute inset-0 flex translate-y-8 flex-col justify-end bg-black/72 p-5 opacity-0 backdrop-blur-[2px] transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/68 via-black/28 to-transparent p-5 opacity-100 transition duration-300 md:translate-y-8 md:from-black/58 md:via-black/18 md:opacity-0 md:backdrop-blur-[1px] md:group-hover:translate-y-0 md:group-hover:opacity-100">
         <div>
           <h3 className="text-2xl leading-tight font-bold">{teacher.name}</h3>
           <p className="mt-2 text-sm text-white/75">{teacher.title || '教师档案'}</p>

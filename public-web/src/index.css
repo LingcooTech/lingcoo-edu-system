@@ -228,11 +228,24 @@ body {
   }
 
   .home-hero-grid {
-    @apply gap-7 py-8 md:items-start md:py-11;
+    @apply gap-7 py-8 md:py-11;
+    align-items: start;
   }
 
   .home-hero-media {
     @apply aspect-[16/10];
+    border-radius: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .home-hero-grid {
+      align-items: stretch;
+    }
+
+    .home-hero-media {
+      height: 100%;
+      min-height: 20rem;
+    }
   }
 
   /* Hide the scrollbar on horizontally-scrollable rails (filter pills, section nav). */
