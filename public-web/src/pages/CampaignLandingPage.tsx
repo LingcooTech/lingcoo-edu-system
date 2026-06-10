@@ -116,7 +116,7 @@ export function CampaignLandingPage() {
   const heroImageUrl = payload.course?.coverImageUrl || profile.bannerImageUrl;
   const heroChips = payload.course
     ? [payload.course.category, payload.course.ageRange]
-    : profile.highlights.map((item) => item.text);
+    : profile.highlights.map((item) => item.title || item.text);
 
   return (
     <Layout>

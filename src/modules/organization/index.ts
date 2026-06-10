@@ -25,7 +25,9 @@ const publicProfileSchema = z.object({
       z.union([
         z.string().min(1).max(120),
         z.object({
-          text: z.string().min(1).max(120),
+          icon: z.string().max(40).optional(),
+          title: z.string().max(40).optional(),
+          text: z.string().min(1).max(160),
           imageUrl: z.string().max(500).optional(),
         }),
       ]),
@@ -51,6 +53,18 @@ const publicProfileSchema = z.object({
           content: z.string().min(1).max(240),
         }),
       ]),
+    )
+    .max(8)
+    .optional(),
+  studentStories: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(120),
+        studentName: z.string().max(80).optional(),
+        summary: z.string().max(240).optional(),
+        coverImageUrl: z.string().max(500).optional(),
+        content: z.string().max(4000).optional(),
+      }),
     )
     .max(8)
     .optional(),

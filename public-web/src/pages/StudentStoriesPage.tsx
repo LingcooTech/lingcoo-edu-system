@@ -13,45 +13,57 @@ export function StudentStoriesPage() {
       .catch(() => undefined);
   }, []);
 
-  const profile = home?.organization.publicProfile;
-  const testimonials = profile?.testimonials ?? [];
+  const stories = home?.organization.publicProfile.studentStories ?? [];
 
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">成长反馈</div>
-        <h1 className="section-title mt-2">学员成长与家长反馈</h1>
+        <div className="eyebrow">成长故事</div>
+        <h1 className="section-title mt-2">学员成长故事</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          前台不直接展示真实学员隐私档案；这里展示机构可公开的家长评价。
+          记录孩子从试听、练习到形成习惯的真实变化，用故事呈现课程带来的长期影响。
         </p>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {testimonials.length ? (
-            testimonials.map((item) => (
-              <blockquote key={`${item.name}-${item.content}`} className="pwcard p-5">
-                <div className="flex items-center gap-3">
-                  {item.avatarUrl ? (
+        {stories.length ? (
+          <div className="mt-8 grid gap-5">
+            {stories.map((story) => (
+              <article
+                key={`${story.title}-${story.studentName}`}
+                className="pwcard overflow-hidden md:grid md:grid-cols-[320px_minmax(0,1fr)]"
+              >
+                {story.coverImageUrl ? (
+                  <div className="bg-brand-soft aspect-[4/3] overflow-hidden md:aspect-auto md:min-h-72">
                     <img
-                      src={item.avatarUrl}
-                      alt={item.name || '家长头像'}
-                      className="h-10 w-10 rounded-full object-cover"
+                      src={story.coverImageUrl}
+                      alt={story.title}
+                      className="h-full w-full object-cover"
                     />
-                  ) : (
-                    <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold">
-                      {item.name.slice(0, 1) || '家'}
-                    </div>
-                  )}
-                  <div className="text-ink text-sm font-semibold">{item.name || '家长'}</div>
+                  </div>
+                ) : (
+                  <div className="bg-brand-soft hidden md:block" />
+                )}
+                <div className="p-6 md:p-7">
+                  {story.studentName ? (
+                    <div className="text-brand text-xs font-semibold">{story.studentName}</div>
+                  ) : null}
+                  <h2 className="text-ink mt-2 text-2xl leading-tight font-bold">{story.title}</h2>
+                  <p className="text-ink-soft mt-4 text-sm leading-7">
+                    {story.summary || story.content}
+                  </p>
+                  {story.content && story.content !== story.summary ? (
+                    <p className="text-ink-soft mt-5 text-sm leading-7 whitespace-pre-wrap">
+                      {story.content}
+                    </p>
+                  ) : null}
                 </div>
-                <p className="text-ink-soft mt-4 text-sm leading-7">“{item.content}”</p>
-              </blockquote>
-            ))
-          ) : (
-            <div className="pwcard text-muted p-5 text-sm">
-              暂无公开评价。可在后台「品牌设置」里维护用户评价。
-            </div>
-          )}
-        </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="pwcard text-muted mt-8 p-6 text-sm">
+            暂无公开成长故事。可在后台「机构主页」里添加故事标题、封面、摘要和正文。
+          </div>
+        )}
 
         <Link to="/register" className="pwbtn pwbtn-primary mt-8">
           预约一次真实课堂体验

@@ -22,7 +22,14 @@
       <view class="chips">
         <text wx:if="{{payload.course}}" class="chip">{{payload.course.category}}</text>
         <text wx:if="{{payload.course}}" class="chip">{{payload.course.ageRange}}</text>
-        <text wx:if="{{!payload.course}}" wx:for="{{payload.organization.publicProfile.highlights}}" wx:key="text" class="chip">{{item.text}}</text>
+        <text
+          wx:if="{{!payload.course}}"
+          wx:for="{{payload.organization.publicProfile.highlights}}"
+          wx:key="text"
+          class="chip"
+        >
+          {{item.title || item.text}}
+        </text>
       </view>
     </view>
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -11,6 +11,7 @@ import {
   Phone,
   Star,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import {
   loadHome,
@@ -36,9 +37,23 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
     : `${money(course.startingPriceAmount)} 参考`;
 }
 
+const highlightIconMap: Record<string, LucideIcon> = {
+  'map-pin': MapPin,
+  'graduation-cap': GraduationCap,
+  'message-circle': MessageCircle,
+  star: Star,
+  'calendar-days': CalendarDays,
+};
+
+function HighlightIcon({ icon }: { icon: string }) {
+  const Icon = highlightIconMap[icon] ?? Star;
+  return <Icon className="h-6 w-6" />;
+}
+
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
+  const heroTouchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     loadHome()
@@ -54,7 +69,7 @@ export function HomePage() {
   const businessModel = organization?.businessModel;
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
-  const testimonials = profile?.testimonials ?? [];
+  const studentStories = profile?.studentStories ?? [];
   const featuredTeachers = teachers.slice(0, 6);
   const heroImages = useMemo(
     () =>
@@ -84,6 +99,14 @@ export function HomePage() {
   function moveHero(step: number) {
     if (heroImages.length <= 1) return;
     setHeroIndex((current) => (current + step + heroImages.length) % heroImages.length);
+  }
+
+  function onHeroTouchEnd(clientX: number) {
+    if (heroTouchStartX.current === null) return;
+    const deltaX = clientX - heroTouchStartX.current;
+    heroTouchStartX.current = null;
+    if (Math.abs(deltaX) < 40) return;
+    moveHero(deltaX > 0 ? -1 : 1);
   }
 
   return (
@@ -126,7 +149,16 @@ export function HomePage() {
               </div>
             )}
           </div>
-          <div className="hero-media home-hero-media relative">
+          <div
+            className="hero-media home-hero-media relative"
+            onTouchStart={(event) => {
+              heroTouchStartX.current = event.touches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(event) => onHeroTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+            onTouchCancel={() => {
+              heroTouchStartX.current = null;
+            }}
+          >
             {activeHeroImage ? (
               <img
                 src={activeHeroImage}
@@ -177,149 +209,159 @@ export function HomePage() {
       {highlights.length > 0 && (
         <section className="container-narrow pt-5 pb-8">
           <div className="grid gap-3 md:grid-cols-3">
-            {highlights.map((item, index) => (
-              <article
-                key={item.text}
-                className={[
-                  'pwcard relative flex min-h-36 flex-col items-center justify-center overflow-hidden p-6 text-center',
-                  item.imageUrl ? 'text-white' : '',
-                ].join(' ')}
-                style={
-                  item.imageUrl
-                    ? {
-                        backgroundImage: `linear-gradient(rgba(20, 33, 27, 0.28), rgba(20, 33, 27, 0.68)), url(${item.imageUrl})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }
-                    : undefined
-                }
-              >
-                <div
+            {highlights.map((item) => {
+              const title = item.title || item.text;
+              const showDescription = Boolean(item.text && item.text !== title);
+              return (
+                <article
+                  key={`${title}-${item.text}`}
                   className={[
-                    'flex h-12 w-12 items-center justify-center rounded-2xl',
-                    item.imageUrl ? 'bg-white/20 text-white' : 'bg-brand-soft text-brand',
+                    'pwcard relative flex min-h-36 flex-col items-center justify-center overflow-hidden p-6 text-center',
+                    item.imageUrl ? 'text-white' : '',
                   ].join(' ')}
+                  style={
+                    item.imageUrl
+                      ? {
+                          backgroundImage: `linear-gradient(rgba(20, 33, 27, 0.28), rgba(20, 33, 27, 0.68)), url(${item.imageUrl})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        }
+                      : undefined
+                  }
                 >
-                  {index === 0 ? (
-                    <Star className="h-6 w-6" />
-                  ) : index === 1 ? (
-                    <CalendarDays className="h-6 w-6" />
-                  ) : (
-                    <MessageCircle className="h-6 w-6" />
-                  )}
-                </div>
-                <p
-                  className={[
-                    'mt-4 text-base leading-7 font-bold md:text-lg',
-                    item.imageUrl ? 'text-white drop-shadow-sm' : 'text-ink',
-                  ].join(' ')}
-                >
-                  {item.text}
-                </p>
-              </article>
-            ))}
+                  <div
+                    className={[
+                      'flex h-12 w-12 items-center justify-center rounded-2xl',
+                      item.imageUrl ? 'bg-white/20 text-white' : 'bg-brand-soft text-brand',
+                    ].join(' ')}
+                  >
+                    <HighlightIcon icon={item.icon} />
+                  </div>
+                  <h3
+                    className={[
+                      'mt-4 text-base leading-7 font-bold md:text-lg',
+                      item.imageUrl ? 'text-white drop-shadow-sm' : 'text-ink',
+                    ].join(' ')}
+                  >
+                    {title}
+                  </h3>
+                  {showDescription ? (
+                    <p
+                      className={[
+                        'mt-1.5 text-sm leading-6 font-medium',
+                        item.imageUrl ? 'text-white/90 drop-shadow-sm' : 'text-ink-soft',
+                      ].join(' ')}
+                    >
+                      {item.text}
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
       )}
 
-      {/* Featured courses */}
-      <section className="container-narrow py-8">
-        <div className="mb-4 flex items-end justify-between">
-          <div>
-            <h2 className="text-ink mt-1 text-xl font-bold">推荐课程</h2>
+      <section className="bg-[#eee8de] py-10">
+        <div className="container-narrow">
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <h2 className="text-ink mt-1 text-xl font-bold">推荐课程</h2>
+            </div>
+            <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
+              查看全部
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
-            查看全部
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {courses.map((course: Course) => (
-            <Link
-              key={course.id}
-              to={`/courses/${course.slug}`}
-              className="pwcard block overflow-hidden"
-            >
-              {course.coverImageUrl ? (
-                <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
-                  <img
-                    src={course.coverImageUrl}
-                    alt={course.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ) : null}
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-ink text-sm font-semibold">{course.name}</div>
-                    <div className="text-muted mt-1 text-xs">
-                      {course.category} · {course.ageRange}
+          <div className="grid gap-4 md:grid-cols-3">
+            {courses.map((course: Course) => (
+              <Link
+                key={course.id}
+                to={`/courses/${course.slug}`}
+                className="pwcard block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                {course.coverImageUrl ? (
+                  <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+                    <img
+                      src={course.coverImageUrl}
+                      alt={course.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-ink text-sm font-semibold">{course.name}</div>
+                      <div className="text-muted mt-1 text-xs">
+                        {course.category} · {course.ageRange}
+                      </div>
+                    </div>
+                    <div className="text-ink shrink-0 text-sm font-semibold">
+                      {coursePriceLabel(course, businessModel)}
                     </div>
                   </div>
-                  <div className="text-ink shrink-0 text-sm font-semibold">
-                    {coursePriceLabel(course, businessModel)}
-                  </div>
+                  <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">
+                    {course.summary}
+                  </p>
                 </div>
-                <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">
-                  {course.summary}
-                </p>
-              </div>
-            </Link>
-          ))}
-          {courses.length === 0 && <p className="text-muted text-sm">课程即将上线</p>}
-        </div>
-      </section>
-
-      {/* This week's public classes */}
-      <section className="container-narrow pb-10">
-        <div className="mb-4 flex items-end justify-between">
-          <div>
-            <h2 className="text-ink mt-1 text-xl font-bold">本周公开课</h2>
+              </Link>
+            ))}
+            {courses.length === 0 && <p className="text-muted text-sm">课程即将上线</p>}
           </div>
-          <Link to="/trials" className="text-brand inline-flex items-center gap-1 text-sm">
-            全部公开课
-            <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {sessions.map((session: TrialSession) => (
-            <Link
-              key={session.id}
-              to={`/trials/${session.id}`}
-              className="pwcard block overflow-hidden"
-            >
-              {session.coverImageUrl ? (
-                <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
-                  <img
-                    src={session.coverImageUrl}
-                    alt={session.title}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ) : null}
-              <div className="p-4">
-                <div className="text-ink text-sm font-semibold">{session.title}</div>
-                <div className="text-ink-soft mt-2 text-sm">{formatDateTime(session.startsAt)}</div>
-                <div className="text-muted mt-2 text-xs">
-                  已报名 {session.bookedCount}/{session.capacity}
-                </div>
-                {session.reservationFeeAmount > 0 && (
-                  <div className="mt-2 text-xs text-amber-700">
-                    {money(session.reservationFeeAmount)} 试听席位保留费
-                  </div>
-                )}
-              </div>
+
+        <div className="container-narrow mt-10">
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <h2 className="text-ink mt-1 text-xl font-bold">本周公开课</h2>
+            </div>
+            <Link to="/trials" className="text-brand inline-flex items-center gap-1 text-sm">
+              全部公开课
+              <ArrowRight className="h-4 w-4" />
             </Link>
-          ))}
-          {sessions.length === 0 && (
-            <p className="text-muted text-sm">近期暂无公开课，可直接预约心仪课程的试听。</p>
-          )}
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {sessions.map((session: TrialSession) => (
+              <Link
+                key={session.id}
+                to={`/trials/${session.id}`}
+                className="pwcard block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                {session.coverImageUrl ? (
+                  <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+                    <img
+                      src={session.coverImageUrl}
+                      alt={session.title}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null}
+                <div className="p-4">
+                  <div className="text-ink text-sm font-semibold">{session.title}</div>
+                  <div className="text-ink-soft mt-2 text-sm">
+                    {formatDateTime(session.startsAt)}
+                  </div>
+                  <div className="text-muted mt-2 text-xs">
+                    已报名 {session.bookedCount}/{session.capacity}
+                  </div>
+                  {session.reservationFeeAmount > 0 && (
+                    <div className="mt-2 text-xs text-amber-700">
+                      {money(session.reservationFeeAmount)} 试听席位保留费
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+            {sessions.length === 0 && (
+              <p className="text-muted text-sm">近期暂无公开课，可直接预约心仪课程的试听。</p>
+            )}
+          </div>
         </div>
       </section>
 
       {featuredTeachers.length > 0 && (
-        <section className="container-narrow pb-10">
+        <section className="container-narrow py-10">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-ink mt-1 text-xl font-bold">教师团队</h2>
@@ -337,43 +379,88 @@ export function HomePage() {
         </section>
       )}
 
-      {testimonials.length > 0 && (
+      {studentStories.length > 0 && (
         <section className="container-narrow pb-10">
-          <div className="mb-4">
-            <h2 className="section-title mt-1">家长评价</h2>
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="section-title mt-1">成长故事</h2>
+            </div>
+            <Link to="/students" className="text-brand inline-flex items-center gap-1 text-sm">
+              查看全部
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {testimonials.slice(0, 4).map((item) => (
-              <blockquote key={`${item.name}-${item.content}`} className="pwcard p-5">
-                <div className="flex items-center gap-3">
-                  {item.avatarUrl ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {studentStories.slice(0, 3).map((story) => (
+              <Link
+                key={`${story.title}-${story.studentName}`}
+                to="/students"
+                className="pwcard group block overflow-hidden no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                {story.coverImageUrl ? (
+                  <div className="bg-brand-soft aspect-[4/3] overflow-hidden">
                     <img
-                      src={item.avatarUrl}
-                      alt={item.name || '家长头像'}
-                      className="h-10 w-10 rounded-full object-cover"
+                      src={story.coverImageUrl}
+                      alt={story.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
-                  ) : (
-                    <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold">
-                      {item.name?.slice(0, 1) || '家'}
-                    </div>
-                  )}
-                  <div className="text-ink text-sm font-semibold">{item.name || '家长'}</div>
+                  </div>
+                ) : null}
+                <div className="p-5">
+                  {story.studentName ? (
+                    <div className="text-brand text-xs font-semibold">{story.studentName}</div>
+                  ) : null}
+                  <h3 className="text-ink mt-2 line-clamp-2 text-base leading-6 font-bold">
+                    {story.title}
+                  </h3>
+                  <p className="text-ink-soft mt-3 line-clamp-3 text-sm leading-6">
+                    {story.summary || story.content}
+                  </p>
                 </div>
-                <p className="text-ink-soft mt-4 text-sm leading-7">“{item.content}”</p>
-              </blockquote>
+              </Link>
             ))}
           </div>
         </section>
       )}
 
       <section className="container-narrow pb-10">
-        <div className="bg-ink grid gap-4 rounded-[2rem] p-6 text-white md:grid-cols-2 md:p-8">
+        <div className="bg-ink grid gap-8 rounded-[2rem] p-6 text-white md:grid-cols-[1fr_1.1fr] md:p-8">
           <div>
-            <h2 className="mt-2 text-2xl font-bold">到店前先预约，老师会确认适合的班型</h2>
+            <div className="text-sm font-semibold text-white/55">班型匹配</div>
+            <h2 className="mt-3 text-2xl leading-tight font-bold">
+              不确定选哪门课？先做一次班型匹配
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-white/70">
+              告诉我们孩子年龄、基础和可上课时间，老师会先筛选合适课程，再安排试听或到店沟通。
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                to={profile?.ctaLink || '/register'}
+                className="text-ink inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                预约班型匹配
+              </Link>
+              {organization?.phone ? (
+                <a
+                  href={`tel:${organization.phone}`}
+                  className="inline-flex items-center justify-center rounded-full border border-white/25 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  电话咨询
+                </a>
+              ) : null}
+            </div>
           </div>
-          <div className="space-y-3 text-sm text-white/80">
+          <div className="space-y-4 text-sm text-white/80">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {['年龄与基础评估', '课程与试听推荐', '上课时间确认'].map((item, index) => (
+                <div key={item} className="border-t border-white/20 pt-3">
+                  <div className="text-xs font-semibold text-white/45">0{index + 1}</div>
+                  <div className="mt-1 font-semibold text-white">{item}</div>
+                </div>
+              ))}
+            </div>
             {organization?.address && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 border-t border-white/15 pt-4">
                 <MapPin className="h-4 w-4" />
                 {organization.address}
               </div>
@@ -394,39 +481,51 @@ export function HomePage() {
 
 function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
   const specialties = teacher.specialties.slice(0, 2);
+  const tagline = teacher.tagline?.trim() || specialties.join(' / ') || '查看老师档案与授课方向';
 
   return (
     <Link
       to={`/teachers/${teacher.id}`}
-      className="pwcard pwcard-hover block w-72 shrink-0 snap-start overflow-hidden md:w-80"
+      className="group border-line bg-ink relative block h-96 w-72 shrink-0 snap-start overflow-hidden rounded-2xl border text-white shadow-sm md:w-80"
     >
-      <div className="bg-brand-soft flex aspect-[16/10] items-center justify-center overflow-hidden">
-        {teacher.avatarUrl ? (
-          <img src={teacher.avatarUrl} alt={teacher.name} className="h-full w-full object-cover" />
-        ) : (
-          <GraduationCap className="text-brand h-10 w-10" />
-        )}
-      </div>
-      <div className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-ink truncate text-sm font-semibold">{teacher.name}</h3>
-            <p className="text-muted mt-1 truncate text-xs">{teacher.title || '教师档案'}</p>
-          </div>
-          <ArrowRight className="text-muted h-4 w-4 shrink-0" />
+      {teacher.avatarUrl ? (
+        <img
+          src={teacher.avatarUrl}
+          alt={teacher.name}
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div className="bg-brand-soft absolute inset-0 flex items-center justify-center">
+          <GraduationCap className="text-brand h-16 w-16" />
         </div>
-        <p className="text-ink-soft mt-3 line-clamp-2 min-h-11 text-sm leading-6">
-          {teacher.tagline?.trim() || specialties.join(' / ') || '查看老师档案与授课方向'}
-        </p>
-        {specialties.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {specialties.map((item) => (
-              <span key={item} className="chip">
-                {item}
-              </span>
-            ))}
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10" />
+      <div className="absolute right-0 bottom-0 left-0 p-5 transition duration-300 group-hover:translate-y-4 group-hover:opacity-0">
+        <h3 className="text-2xl leading-tight font-bold">{teacher.name}</h3>
+        <p className="mt-2 text-sm text-white/80">{teacher.title || '教师档案'}</p>
+      </div>
+      <div className="absolute inset-0 flex translate-y-8 flex-col justify-end bg-black/72 p-5 opacity-0 backdrop-blur-[2px] transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+        <div>
+          <h3 className="text-2xl leading-tight font-bold">{teacher.name}</h3>
+          <p className="mt-2 text-sm text-white/75">{teacher.title || '教师档案'}</p>
+          <p className="mt-5 line-clamp-4 text-sm leading-7 text-white/85">{tagline}</p>
+          {specialties.length > 0 ? (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {specialties.map((item) => (
+                <span
+                  key={item}
+                  className="inline-flex rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium text-white"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-white">
+            查看老师档案
+            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </div>
-        ) : null}
+        </div>
       </div>
     </Link>
   );

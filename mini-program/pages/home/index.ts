@@ -3,7 +3,7 @@ import {
   type Course,
   type HomePayload,
   type PublicProfileHighlight,
-  type PublicProfileTestimonial,
+  type PublicProfileStudentStory,
   type PublicTeacher,
   type TrialSession,
 } from '../../services/api';
@@ -21,10 +21,12 @@ interface HomeTeacherCard {
 
 type HomeHighlightCard = PublicProfileHighlight & {
   backgroundStyle: string;
+  iconText: string;
+  showDescription: boolean;
 };
 
-type HomeTestimonialCard = PublicProfileTestimonial & {
-  initial: string;
+type HomeStudentStoryCard = PublicProfileStudentStory & {
+  excerpt: string;
 };
 
 interface HomeState {
@@ -39,10 +41,11 @@ interface HomeState {
   ctaLink: string;
   stats: string[];
   highlights: HomeHighlightCard[];
-  testimonials: HomeTestimonialCard[];
+  studentStories: HomeStudentStoryCard[];
   address: string;
   phone: string;
   businessHours: string;
+  matchSteps: string[];
   courses: Array<Course & { priceLabel: string }>;
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   trustVisible: boolean;
@@ -61,10 +64,11 @@ const initialState: HomeState = {
   ctaLink: '/courses',
   stats: [],
   highlights: [],
-  testimonials: [],
+  studentStories: [],
   address: '',
   phone: '',
   businessHours: '',
+  matchSteps: ['年龄与基础评估', '课程与试听推荐', '上课时间确认'],
   courses: [],
   trialSessions: [],
   trustVisible: false,
@@ -85,18 +89,32 @@ function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
 }
 
 function toHighlightCard(item: PublicProfileHighlight): HomeHighlightCard {
+  const title = item.title || item.text;
   return {
     ...item,
     backgroundStyle: item.imageUrl
       ? `background-image: linear-gradient(rgba(31, 43, 36, 0.22), rgba(31, 43, 36, 0.68)), url(${item.imageUrl});`
       : '',
+    iconText: highlightIconText(item.icon),
+    showDescription: Boolean(item.text && item.text !== title),
   };
 }
 
-function toTestimonialCard(item: PublicProfileTestimonial): HomeTestimonialCard {
+function highlightIconText(icon: string) {
+  const labels: Record<string, string> = {
+    'map-pin': '近',
+    'graduation-cap': '师',
+    'message-circle': '评',
+    star: '优',
+    'calendar-days': '课',
+  };
+  return labels[icon] || '优';
+}
+
+function toStudentStoryCard(item: PublicProfileStudentStory): HomeStudentStoryCard {
   return {
     ...item,
-    initial: item.name.slice(0, 1) || '家',
+    excerpt: item.summary || item.content,
   };
 }
 
@@ -124,10 +142,11 @@ function toState(home: HomePayload): HomeState {
     ctaLink: profile.ctaLink || '/courses',
     stats: profile.stats ?? [],
     highlights: (profile.highlights ?? []).map(toHighlightCard),
-    testimonials: (profile.testimonials ?? []).map(toTestimonialCard),
+    studentStories: (profile.studentStories ?? []).slice(0, 3).map(toStudentStoryCard),
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,
+    matchSteps: initialState.matchSteps,
     courses: home.featuredCourses.map((course) => ({
       ...course,
       priceLabel: coursePriceLabel(

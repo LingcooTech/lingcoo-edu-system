@@ -11,7 +11,7 @@ const defaultNavItems = [
   { to: '/courses', label: '课程', end: false },
   { to: '/trials', label: '试听', end: false },
   { to: '/teachers', label: '老师', end: false },
-  { to: '/students', label: '学员', end: false },
+  { to: '/students', label: '成长故事', end: false },
   { to: '/about', label: '关于', end: false },
 ];
 

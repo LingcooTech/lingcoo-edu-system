@@ -1,7 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
-import type { PublicProfile, PublicProfileHighlight, PublicProfileTestimonial } from '@/api/types';
+import type {
+  PublicProfile,
+  PublicProfileHighlight,
+  PublicProfileStudentStory,
+  PublicProfileTestimonial,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
 import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
@@ -19,8 +24,17 @@ interface HomeForm {
   statsText: string;
   highlights: PublicProfileHighlight[];
   testimonials: PublicProfileTestimonial[];
+  studentStories: PublicProfileStudentStory[];
   businessHours: string;
 }
+
+const HIGHLIGHT_ICON_OPTIONS = [
+  { value: 'map-pin', label: '位置' },
+  { value: 'graduation-cap', label: '老师' },
+  { value: 'message-circle', label: '反馈' },
+  { value: 'star', label: '优势' },
+  { value: 'calendar-days', label: '课程' },
+];
 
 function linesToList(value: string): string[] {
   return value
@@ -32,6 +46,8 @@ function linesToList(value: string): string[] {
 function cleanHighlights(items: PublicProfileHighlight[]): PublicProfileHighlight[] {
   return items
     .map((item) => ({
+      icon: item.icon.trim(),
+      title: item.title.trim(),
       text: item.text.trim(),
       imageUrl: item.imageUrl.trim(),
     }))
@@ -46,6 +62,18 @@ function cleanTestimonials(items: PublicProfileTestimonial[]): PublicProfileTest
       content: item.content.trim(),
     }))
     .filter((item) => item.content);
+}
+
+function cleanStudentStories(items: PublicProfileStudentStory[]): PublicProfileStudentStory[] {
+  return items
+    .map((item) => ({
+      title: item.title.trim(),
+      studentName: item.studentName.trim(),
+      summary: item.summary.trim(),
+      coverImageUrl: item.coverImageUrl.trim(),
+      content: item.content.trim(),
+    }))
+    .filter((item) => item.title && (item.summary || item.content));
 }
 
 function profileToForm(profile: PublicProfile): HomeForm {
@@ -66,6 +94,7 @@ function profileToForm(profile: PublicProfile): HomeForm {
     statsText: profile.stats.join('\n'),
     highlights: profile.highlights,
     testimonials: profile.testimonials,
+    studentStories: profile.studentStories,
     businessHours: profile.businessHours,
   };
 }
@@ -102,7 +131,12 @@ export function InstitutionHomePage() {
 
   function addHighlight() {
     setForm((prev) =>
-      prev ? { ...prev, highlights: [...prev.highlights, { text: '', imageUrl: '' }] } : prev,
+      prev
+        ? {
+            ...prev,
+            highlights: [...prev.highlights, { icon: 'star', title: '', text: '', imageUrl: '' }],
+          }
+        : prev,
     );
   }
 
@@ -114,12 +148,12 @@ export function InstitutionHomePage() {
     );
   }
 
-  function updateTestimonial(index: number, patch: Partial<PublicProfileTestimonial>) {
+  function updateStudentStory(index: number, patch: Partial<PublicProfileStudentStory>) {
     setForm((prev) =>
       prev
         ? {
             ...prev,
-            testimonials: prev.testimonials.map((item, itemIndex) =>
+            studentStories: prev.studentStories.map((item, itemIndex) =>
               itemIndex === index ? { ...item, ...patch } : item,
             ),
           }
@@ -127,21 +161,27 @@ export function InstitutionHomePage() {
     );
   }
 
-  function addTestimonial() {
+  function addStudentStory() {
     setForm((prev) =>
       prev
         ? {
             ...prev,
-            testimonials: [...prev.testimonials, { name: '', avatarUrl: '', content: '' }],
+            studentStories: [
+              ...prev.studentStories,
+              { title: '', studentName: '', summary: '', coverImageUrl: '', content: '' },
+            ],
           }
         : prev,
     );
   }
 
-  function removeTestimonial(index: number) {
+  function removeStudentStory(index: number) {
     setForm((prev) =>
       prev
-        ? { ...prev, testimonials: prev.testimonials.filter((_, itemIndex) => itemIndex !== index) }
+        ? {
+            ...prev,
+            studentStories: prev.studentStories.filter((_, itemIndex) => itemIndex !== index),
+          }
         : prev,
     );
   }
@@ -165,6 +205,7 @@ export function InstitutionHomePage() {
           stats: linesToList(form.statsText),
           highlights: cleanHighlights(form.highlights),
           testimonials: cleanTestimonials(form.testimonials),
+          studentStories: cleanStudentStories(form.studentStories),
           businessHours: form.businessHours,
         },
       });
@@ -277,7 +318,29 @@ export function InstitutionHomePage() {
                       删除
                     </button>
                   </div>
-                  <Field label="优势文案">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="图标">
+                      <select
+                        className="form-input"
+                        value={item.icon}
+                        onChange={(event) => updateHighlight(index, { icon: event.target.value })}
+                      >
+                        {HIGHLIGHT_ICON_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="标题" hint="例如：离家近">
+                      <input
+                        className="form-input"
+                        value={item.title}
+                        onChange={(event) => updateHighlight(index, { title: event.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="说明文案">
                     <textarea
                       className="form-input h-20"
                       value={item.text}
@@ -299,46 +362,71 @@ export function InstitutionHomePage() {
             </div>
           </EditorCard>
 
-          <EditorCard title="家长评价" description="展示在首页评价模块。">
+          <EditorCard
+            title="成长故事"
+            description="展示在首页和「成长故事」页面，适合写成学员成长案例。"
+          >
             <div className="space-y-4">
-              {form.testimonials.map((item, index) => (
+              {form.studentStories.map((item, index) => (
                 <div key={index} className="rounded-lg border p-3">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">评价 {index + 1}</div>
+                    <div className="text-sm font-medium">故事 {index + 1}</div>
                     <button
                       type="button"
                       className="btn btn-ghost px-2 py-1 text-red-600"
-                      onClick={() => removeTestimonial(index)}
+                      onClick={() => removeStudentStory(index)}
                     >
                       删除
                     </button>
                   </div>
-                  <Field label="家长称呼">
-                    <input
-                      className="form-input"
-                      value={item.name}
-                      onChange={(event) => updateTestimonial(index, { name: event.target.value })}
-                    />
-                  </Field>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="故事标题">
+                      <input
+                        className="form-input"
+                        value={item.title}
+                        onChange={(event) =>
+                          updateStudentStory(index, { title: event.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label="学员称呼" hint="如：二年级学员 小羽">
+                      <input
+                        className="form-input"
+                        value={item.studentName}
+                        onChange={(event) =>
+                          updateStudentStory(index, { studentName: event.target.value })
+                        }
+                      />
+                    </Field>
+                  </div>
                   <QiniuImageField
-                    label="家长头像"
-                    value={item.avatarUrl}
-                    onChange={(avatarUrl) => updateTestimonial(index, { avatarUrl })}
-                    prefix="homepage/testimonials"
+                    label="故事封面"
+                    value={item.coverImageUrl}
+                    onChange={(coverImageUrl) => updateStudentStory(index, { coverImageUrl })}
+                    prefix="homepage/student-stories"
                   />
-                  <Field label="评价内容">
+                  <Field label="摘要" hint="用于首页卡片，建议 60 字以内">
                     <textarea
                       className="form-input h-24"
+                      value={item.summary}
+                      onChange={(event) =>
+                        updateStudentStory(index, { summary: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="正文" hint="用于成长故事页面，可写完整变化过程">
+                    <textarea
+                      className="form-input h-36"
                       value={item.content}
                       onChange={(event) =>
-                        updateTestimonial(index, { content: event.target.value })
+                        updateStudentStory(index, { content: event.target.value })
                       }
                     />
                   </Field>
                 </div>
               ))}
-              <button type="button" className="btn btn-secondary" onClick={addTestimonial}>
-                添加评价
+              <button type="button" className="btn btn-secondary" onClick={addStudentStory}>
+                添加故事
               </button>
             </div>
           </EditorCard>

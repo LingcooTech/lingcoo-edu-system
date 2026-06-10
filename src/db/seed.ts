@@ -53,17 +53,23 @@ async function seed(): Promise<void> {
               bannerSubtitle: '专注硬笔书法、创意美术与幼小衔接，让孩子在稳定陪伴中建立学习习惯。',
               highlights: [
                 {
-                  text: '小班教学',
+                  icon: 'map-pin',
+                  title: '离家近',
+                  text: '扎根社区，让教育资源到家门口',
                   imageUrl:
                     'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80',
                 },
                 {
-                  text: '课后反馈',
+                  icon: 'graduation-cap',
+                  title: '小班教学',
+                  text: '老师关注每个孩子的课堂状态',
                   imageUrl:
                     'https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=1200&q=80',
                 },
                 {
-                  text: '社区近距离服务',
+                  icon: 'message-circle',
+                  title: '反馈可追踪',
+                  text: '课后反馈清晰，家长持续看到进步',
                   imageUrl:
                     'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80',
                 },
@@ -79,6 +85,26 @@ async function seed(): Promise<void> {
                   name: '小班学员家长',
                   avatarUrl: '',
                   content: '离家近、班级小，孩子每周都愿意来上课。',
+                },
+              ],
+              studentStories: [
+                {
+                  title: '从不敢下笔到主动完成一页练习',
+                  studentName: '二年级学员 小羽',
+                  summary: '通过硬笔书法小班训练，小羽先稳定坐姿和控笔，再逐步建立每日练习节奏。',
+                  coverImageUrl:
+                    'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80',
+                  content:
+                    '刚来试听时，小羽写字容易急，笔画轻重不稳定。老师先从坐姿、握笔和基础控笔开始，每节课保留一段可完成的小目标。四周后，小羽能独立完成一页练习，也愿意把课堂作品带回家给家长看。',
+                },
+                {
+                  title: '把创意美术变成稳定表达',
+                  studentName: '大班学员 安安',
+                  summary: '从随意涂画到能讲出作品主题，孩子在材料探索中慢慢建立表达自信。',
+                  coverImageUrl:
+                    'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=1200&q=80',
+                  content:
+                    '安安一开始喜欢颜色，但很少说作品想表达什么。老师用故事主题和材料任务引导她先观察、再选择、最后描述作品。连续几次课后，她开始主动讲自己的画面，也能听同伴分享并补充想法。',
                 },
               ],
             },

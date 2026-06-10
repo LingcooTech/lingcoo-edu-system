@@ -30,7 +30,7 @@ export const defaultNavigation: PublicNavItem[] = [
   { label: '课程', path: '/courses', visible: true },
   { label: '试听', path: '/trials', visible: true },
   { label: '老师', path: '/teachers', visible: true },
-  { label: '学员', path: '/students', visible: true },
+  { label: '成长故事', path: '/students', visible: true },
   { label: '关于', path: '/about', visible: true },
 ];
 
@@ -111,8 +111,7 @@ function normalizeAboutPage(value: unknown): AboutPageSettings {
     brandCooperation:
       normalizeString(raw.brandCooperation, 5000) || defaultAboutPage.brandCooperation,
     brandCooperationTitle:
-      normalizeString(raw.brandCooperationTitle, 80) ||
-      defaultAboutPage.brandCooperationTitle,
+      normalizeString(raw.brandCooperationTitle, 80) || defaultAboutPage.brandCooperationTitle,
     bodyBlocks: normalizeBlocks(raw.bodyBlocks),
   };
 }

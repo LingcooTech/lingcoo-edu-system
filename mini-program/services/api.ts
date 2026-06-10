@@ -54,6 +54,8 @@ export interface BusinessModelSettings {
 }
 
 export interface PublicProfileHighlight {
+  icon: string;
+  title: string;
   text: string;
   imageUrl: string;
 }
@@ -61,6 +63,14 @@ export interface PublicProfileHighlight {
 export interface PublicProfileTestimonial {
   name: string;
   avatarUrl: string;
+  content: string;
+}
+
+export interface PublicProfileStudentStory {
+  title: string;
+  studentName: string;
+  summary: string;
+  coverImageUrl: string;
   content: string;
 }
 
@@ -83,6 +93,7 @@ export interface Organization {
     secondaryCtaLink: string;
     stats: string[];
     testimonials: PublicProfileTestimonial[];
+    studentStories: PublicProfileStudentStory[];
     businessHours: string;
   };
   businessModel: BusinessModelSettings;

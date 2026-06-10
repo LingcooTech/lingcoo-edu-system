@@ -228,7 +228,7 @@ body {
   }
 
   .home-hero-grid {
-    @apply gap-7 py-8 md:py-11;
+    @apply gap-7 py-8 md:items-start md:py-11;
   }
 
   .home-hero-media {

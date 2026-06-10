@@ -215,11 +215,14 @@ test('exposes the public organization home payload', async () => {
     assert.equal(typeof response.json().organization.publicProfile.eyebrow, 'string');
     assert.equal(typeof response.json().organization.publicProfile.bannerTitle, 'string');
     assert.equal(typeof response.json().organization.publicProfile.bannerSubtitle, 'string');
+    assert.equal(typeof response.json().organization.publicProfile.highlights[0]?.icon, 'string');
+    assert.equal(typeof response.json().organization.publicProfile.highlights[0]?.title, 'string');
     assert.equal(typeof response.json().organization.publicProfile.highlights[0]?.text, 'string');
     assert.equal(
       typeof response.json().organization.publicProfile.testimonials[0]?.content,
       'string',
     );
+    assert.ok(Array.isArray(response.json().organization.publicProfile.studentStories));
     assert.ok(Array.isArray(response.json().featuredCourses));
     assert.ok(Array.isArray(response.json().campuses));
     assert.ok(Array.isArray(response.json().teachers));
