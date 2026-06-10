@@ -217,6 +217,8 @@ test('exposes the public organization home payload', async () => {
     assert.equal(typeof response.json().organization.publicProfile.bannerSubtitle, 'string');
     assert.ok(Array.isArray(response.json().featuredCourses));
     assert.ok(Array.isArray(response.json().campuses));
+    assert.ok(Array.isArray(response.json().teachers));
+    assert.ok(Array.isArray(response.json().classrooms));
   } finally {
     await app.close();
   }

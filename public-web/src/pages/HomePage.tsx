@@ -5,9 +5,11 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
   MapPin,
   MessageCircle,
   Phone,
+  School,
   Star,
 } from 'lucide-react';
 
@@ -16,6 +18,7 @@ import {
   type BusinessModelSettings,
   type Course,
   type HomePayload,
+  type PublicTeacher,
   type TrialSession,
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
@@ -34,6 +37,12 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
     : `${money(course.startingPriceAmount)} 参考`;
 }
 
+function uniqueStrings(values: Array<string | null | undefined>, limit: number) {
+  return Array.from(
+    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))),
+  ).slice(0, limit);
+}
+
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -47,11 +56,42 @@ export function HomePage() {
   const organization = home?.organization;
   const courses = home?.featuredCourses ?? [];
   const sessions = home?.trialSessions ?? [];
+  const teachers = home?.teachers ?? [];
+  const campuses = home?.campuses ?? [];
+  const classrooms = home?.classrooms ?? [];
   const profile = organization?.publicProfile;
   const businessModel = organization?.businessModel;
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
   const testimonials = profile?.testimonials ?? [];
+  const featuredTeachers = teachers.slice(0, 2);
+  const teacherById = useMemo(
+    () => new Map(teachers.map((teacher) => [teacher.id, teacher])),
+    [teachers],
+  );
+  const courseTeacherNames = useMemo(
+    () =>
+      uniqueStrings(
+        courses.map((course) =>
+          course.defaultTeacherId ? teacherById.get(course.defaultTeacherId)?.name : undefined,
+        ),
+        3,
+      ),
+    [courses, teacherById],
+  );
+  const teachingLocations = useMemo(
+    () =>
+      uniqueStrings(
+        [
+          ...courses.map((course) => course.teachingLocationLabel),
+          ...campuses.map((campus) => campus.address || campus.name),
+        ],
+        4,
+      ),
+    [campuses, courses],
+  );
+  const showTeamSection =
+    teachers.length > 0 || campuses.length > 0 || classrooms.length > 0 || teachingLocations.length > 0;
   const heroImages = useMemo(
     () =>
       Array.from(
@@ -247,6 +287,56 @@ export function HomePage() {
         </div>
       </section>
 
+      {showTeamSection && (
+        <section className="container-narrow pb-10">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <div className="eyebrow">Team</div>
+              <h2 className="text-ink mt-1 text-xl font-bold">师资与教学环境</h2>
+            </div>
+            <Link to="/teachers" className="text-brand inline-flex items-center gap-1 text-sm">
+              教师团队
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {featuredTeachers.map((teacher) => (
+              <HomeTeacherCard key={teacher.id} teacher={teacher} />
+            ))}
+            <article className="pwcard p-5">
+              <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-2xl">
+                <School className="h-5 w-5" />
+              </div>
+              <h3 className="text-ink mt-4 text-sm font-semibold">校区与教室</h3>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <b className="text-ink block text-lg">{campuses.length || '-'}</b>
+                  <span className="text-muted">校区</span>
+                </div>
+                <div>
+                  <b className="text-ink block text-lg">{classrooms.length || '-'}</b>
+                  <span className="text-muted">教室</span>
+                </div>
+              </div>
+              {courseTeacherNames.length > 0 ? (
+                <p className="text-ink-soft mt-4 text-sm leading-6">
+                  {courseTeacherNames.join('、')} 等老师参与授课。
+                </p>
+              ) : null}
+              {teachingLocations.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {teachingLocations.map((item) => (
+                    <span key={item} className="chip">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </article>
+          </div>
+        </section>
+      )}
+
       {testimonials.length > 0 && (
         <section className="container-narrow pb-10">
           <div className="mb-4">
@@ -287,5 +377,42 @@ export function HomePage() {
         </div>
       </section>
     </Layout>
+  );
+}
+
+function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
+  const specialties = teacher.specialties.slice(0, 2);
+
+  return (
+    <Link to={`/teachers/${teacher.id}`} className="pwcard pwcard-hover block overflow-hidden">
+      <div className="bg-brand-soft flex aspect-[16/10] items-center justify-center overflow-hidden">
+        {teacher.avatarUrl ? (
+          <img src={teacher.avatarUrl} alt={teacher.name} className="h-full w-full object-cover" />
+        ) : (
+          <GraduationCap className="text-brand h-10 w-10" />
+        )}
+      </div>
+      <div className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-ink truncate text-sm font-semibold">{teacher.name}</h3>
+            <p className="text-muted mt-1 truncate text-xs">{teacher.title || '教师档案'}</p>
+          </div>
+          <ArrowRight className="text-muted h-4 w-4 shrink-0" />
+        </div>
+        <p className="text-ink-soft mt-3 line-clamp-2 min-h-11 text-sm leading-6">
+          {teacher.tagline?.trim() || specialties.join(' / ') || '查看老师档案与授课方向'}
+        </p>
+        {specialties.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {specialties.map((item) => (
+              <span key={item} className="chip">
+                {item}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </Link>
   );
 }

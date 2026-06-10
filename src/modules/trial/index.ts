@@ -119,10 +119,12 @@ export const trialModule: AppModule = {
     app.get('/public/home', async () => {
       const organization = await organizationRepo.requireOrganization(app.db);
 
-      const [courses, trialSessions, campuses] = await Promise.all([
+      const [courses, trialSessions, campuses, teachers, classrooms] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db),
         trialRepo.listOpenTrialSessions(app.db),
         organizationRepo.listCampuses(app.db),
+        teachingRepo.listTeachers(app.db),
+        teachingRepo.listClassrooms(app.db),
       ]);
       const businessModel = readBusinessModel(organization.settings);
       const featuredCourses = await attachPackageSummary(app, courses, {
@@ -143,6 +145,8 @@ export const trialModule: AppModule = {
         featuredCourses,
         trialSessions,
         campuses,
+        teachers: teachers.filter((teacher) => teacher.status !== 'archived'),
+        classrooms: classrooms.filter((classroom) => classroom.status !== 'archived'),
       };
     });
 

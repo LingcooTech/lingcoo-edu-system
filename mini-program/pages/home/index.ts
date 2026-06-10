@@ -1,5 +1,21 @@
-import { loadHome, type Course, type HomePayload, type TrialSession } from '../../services/api';
+import {
+  loadHome,
+  type Course,
+  type HomePayload,
+  type PublicTeacher,
+  type TrialSession,
+} from '../../services/api';
 import { coursePriceLabel, formatDateTime, money, navigateToWebPath } from '../../utils/format';
+
+interface HomeTeacherCard {
+  id: string;
+  name: string;
+  initial: string;
+  title: string;
+  avatarUrl: string;
+  tagline: string;
+  specialtiesText: string;
+}
 
 interface HomeState {
   loading: boolean;
@@ -18,6 +34,12 @@ interface HomeState {
   businessHours: string;
   courses: Array<Course & { priceLabel: string }>;
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
+  trustVisible: boolean;
+  trustTeachers: HomeTeacherCard[];
+  campusCountText: string;
+  classroomCountText: string;
+  courseTeacherNamesText: string;
+  teachingLocations: string[];
 }
 
 const initialState: HomeState = {
@@ -37,7 +59,32 @@ const initialState: HomeState = {
   businessHours: '',
   courses: [],
   trialSessions: [],
+  trustVisible: false,
+  trustTeachers: [],
+  campusCountText: '-',
+  classroomCountText: '-',
+  courseTeacherNamesText: '',
+  teachingLocations: [],
 };
+
+function uniqueStrings(values: Array<string | null | undefined>, limit: number): string[] {
+  return Array.from(
+    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))),
+  ).slice(0, limit);
+}
+
+function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
+  const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
+  return {
+    id: teacher.id,
+    name: teacher.name,
+    initial: teacher.name.slice(0, 1) || '师',
+    title: teacher.title || '教师档案',
+    avatarUrl: teacher.avatarUrl || '',
+    tagline: teacher.tagline?.trim() || specialtiesText || '查看老师档案与授课方向',
+    specialtiesText,
+  };
+}
 
 function toState(home: HomePayload): HomeState {
   const profile = home.organization.publicProfile;
@@ -48,6 +95,24 @@ function toState(home: HomePayload): HomeState {
       ),
     ),
   );
+  const teachers = home.teachers ?? [];
+  const classrooms = home.classrooms ?? [];
+  const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+  const courseTeacherNames = uniqueStrings(
+    home.featuredCourses.map((course) =>
+      course.defaultTeacherId ? teacherById.get(course.defaultTeacherId)?.name : undefined,
+    ),
+    3,
+  );
+  const teachingLocations = uniqueStrings(
+    [
+      ...home.featuredCourses.map((course) => course.teachingLocationLabel),
+      ...home.campuses.map((campus) => campus.address || campus.name),
+    ],
+    4,
+  );
+  const trustTeachers = teachers.slice(0, 2).map(toTeacherCard);
+
   return {
     loading: false,
     organizationName: home.organization.name,
@@ -78,6 +143,18 @@ function toState(home: HomePayload): HomeState {
           ? `${money(session.reservationFeeAmount)} 试听席位保留费`
           : '',
     })),
+    trustVisible: Boolean(
+      trustTeachers.length ||
+        home.campuses.length ||
+        classrooms.length ||
+        courseTeacherNames.length ||
+        teachingLocations.length,
+    ),
+    trustTeachers,
+    campusCountText: home.campuses.length ? String(home.campuses.length) : '-',
+    classroomCountText: classrooms.length ? String(classrooms.length) : '-',
+    courseTeacherNamesText: courseTeacherNames.join('、'),
+    teachingLocations,
   };
 }
 

@@ -109,6 +109,14 @@ export interface HomePayload {
     name: string;
     address: string | null;
   }>;
+  teachers: PublicTeacher[];
+  classrooms: Array<{
+    id: string;
+    campusId: string;
+    name: string;
+    capacity: number;
+    status: string;
+  }>;
   featuredCourses: Course[];
   trialSessions: TrialSession[];
 }

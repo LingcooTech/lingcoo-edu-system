@@ -71,6 +71,53 @@
       <view wx:else class="empty">近期暂无公开课，可直接预约心仪课程的试听。</view>
     </view>
 
+    <view wx:if="{{trustVisible}}" class="section">
+      <view class="row-between section-head">
+        <view>
+          <view class="eyebrow">Team</view>
+          <view class="section-title">师资与教学环境</view>
+        </view>
+        <button class="text-button" bindtap="goTeachers">教师团队</button>
+      </view>
+
+      <view wx:if="{{trustTeachers.length}}" class="trust-teachers">
+        <navigator
+          wx:for="{{trustTeachers}}"
+          wx:key="id"
+          class="card trust-teacher-card"
+          url="/pages/teacher-detail/index?id={{item.id}}"
+        >
+          <image wx:if="{{item.avatarUrl}}" class="trust-teacher-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="trust-teacher-avatar trust-teacher-avatar-fallback">{{item.initial}}</view>
+          <view class="trust-teacher-body">
+            <view class="course-name">{{item.name}}</view>
+            <view class="muted trust-teacher-title">{{item.title}}</view>
+            <view class="body-text trust-teacher-tagline">{{item.tagline}}</view>
+            <view wx:if="{{item.specialtiesText}}" class="trust-chip">{{item.specialtiesText}}</view>
+          </view>
+        </navigator>
+      </view>
+
+      <view class="card trust-environment-card">
+        <view class="row-between trust-stat-row">
+          <view>
+            <view class="trust-stat-value">{{campusCountText}}</view>
+            <view class="muted">校区</view>
+          </view>
+          <view>
+            <view class="trust-stat-value">{{classroomCountText}}</view>
+            <view class="muted">教室</view>
+          </view>
+        </view>
+        <view wx:if="{{courseTeacherNamesText}}" class="body-text trust-note">
+          {{courseTeacherNamesText}} 等老师参与授课。
+        </view>
+        <view wx:if="{{teachingLocations.length}}" class="trust-location-list">
+          <view wx:for="{{teachingLocations}}" wx:key="*this" class="trust-chip">{{item}}</view>
+        </view>
+      </view>
+    </view>
+
     <view wx:if="{{testimonials.length}}" class="section testimonials">
       <view class="eyebrow">Testimonials</view>
       <view class="section-title">家长评价</view>
