@@ -1,6 +1,5 @@
 import { loadHome, type Course, type HomePayload, type TrialSession } from '../../services/api';
 import { coursePriceLabel, formatDateTime, money, navigateToWebPath } from '../../utils/format';
-import { parseBlocks, type Block } from '../../utils/blocks';
 
 interface HomeState {
   loading: boolean;
@@ -19,7 +18,6 @@ interface HomeState {
   businessHours: string;
   courses: Array<Course & { priceLabel: string }>;
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
-  bodyBlocks: Block[];
 }
 
 const initialState: HomeState = {
@@ -39,7 +37,6 @@ const initialState: HomeState = {
   businessHours: '',
   courses: [],
   trialSessions: [],
-  bodyBlocks: [],
 };
 
 function toState(home: HomePayload): HomeState {
@@ -81,7 +78,6 @@ function toState(home: HomePayload): HomeState {
           ? `${money(session.reservationFeeAmount)} 试听席位保留费`
           : '',
     })),
-    bodyBlocks: parseBlocks(profile.bodyBlocks),
   };
 }
 

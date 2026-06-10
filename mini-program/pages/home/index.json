@@ -1,6 +1,3 @@
 {
-  "navigationBarTitleText": "成长教室",
-  "usingComponents": {
-    "block-renderer": "../../components/block-renderer/index"
-  }
+  "navigationBarTitleText": "成长教室"
 }

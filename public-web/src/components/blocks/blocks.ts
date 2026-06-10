@@ -1,7 +1,7 @@
 /**
  * Public-web mirror of the content-block model. Renders module content authored
- * in the admin (institution home bodyBlocks, teacher bio, course detail, campaign
- * body) so the public site matches the admin live preview.
+ * in the admin (about page bodyBlocks, teacher bio, course detail, campaign body)
+ * so the public site matches the admin live preview.
  *
  * This is the read/parse half only — no editor-side exports. Structurally
  * identical to admin-ui/src/components/editor/blocks.ts (the repo has no shared

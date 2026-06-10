@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 /**
- * Server-side content-block model + sanitizer for the institution home page's
- * `publicProfile.bodyBlocks`. Mirrors the frontend block model
- * (admin-ui/src/components/editor/blocks.ts) but runs in Node with no React.
+ * Server-side content-block model + sanitizer for admin-authored rich content.
+ * Mirrors the frontend block model (admin-ui/src/components/editor/blocks.ts)
+ * but runs in Node with no React.
  *
  * `normalizeBlocks` validates/coerces untrusted input (admin-authored JSON) into
  * a bounded, well-typed Block[] before it is persisted to the settings store,

@@ -286,7 +286,7 @@ function sanitizeBlocks(value: unknown[]): Block[] {
 
 /**
  * Parse stored content into Block[], tolerant of three shapes:
- *  1. an actual Block[] (e.g. publicProfile.bodyBlocks from the API),
+ *  1. an actual Block[] (e.g. publicSite.aboutPage.bodyBlocks from the API),
  *  2. a serialized BlockDoc / Block[] JSON string (course/teacher/campaign text columns),
  *  3. legacy plain text (existing course.content) -> wrapped as one paragraph block.
  * This makes the editor backward-compatible with zero data migration.

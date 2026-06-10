@@ -422,9 +422,7 @@ export interface PublicProfile {
   secondaryCtaLink: string;
   stats: string[];
   testimonials: string[];
-  gallery: string[];
   businessHours: string;
-  bodyBlocks: Block[];
 }
 
 export interface OrganizationBranding {

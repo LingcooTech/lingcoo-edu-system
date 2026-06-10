@@ -15,7 +15,6 @@ export function StudentStoriesPage() {
 
   const profile = home?.organization.publicProfile;
   const testimonials = profile?.testimonials ?? [];
-  const gallery = profile?.gallery ?? [];
 
   return (
     <Layout>
@@ -23,18 +22,8 @@ export function StudentStoriesPage() {
         <div className="eyebrow">Students</div>
         <h1 className="section-title mt-2">学员成长与家长反馈</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          前台不直接展示真实学员隐私档案；这里展示机构可公开的家长评价、课堂环境和作品图片。
+          前台不直接展示真实学员隐私档案；这里展示机构可公开的家长评价。
         </p>
-
-        {gallery.length > 0 && (
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {gallery.map((url) => (
-              <div key={url} className="hero-media aspect-square">
-                <img src={url} alt="课堂环境或学员作品" className="h-full w-full object-cover" />
-              </div>
-            ))}
-          </div>
-        )}
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {testimonials.length ? (

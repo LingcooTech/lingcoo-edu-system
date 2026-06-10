@@ -18,8 +18,6 @@ import {
   type HomePayload,
   type TrialSession,
 } from '@/api/client';
-import { BlockRenderer } from '@/components/blocks/BlockRenderer';
-import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
 import { formatDateTime, money } from '@/lib/utils';
 
@@ -54,7 +52,6 @@ export function HomePage() {
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
   const testimonials = profile?.testimonials ?? [];
-  const bodyBlocks = useMemo(() => parseBlocks(profile?.bodyBlocks), [profile]);
   const heroImages = useMemo(
     () =>
       Array.from(
@@ -184,36 +181,6 @@ export function HomePage() {
         </section>
       )}
 
-      {bodyBlocks.length > 0 && (
-        <section className="container-narrow py-8">
-          <BlockRenderer blocks={bodyBlocks} />
-        </section>
-      )}
-
-      <section className="container-narrow py-8">
-        <div className="bg-ink grid gap-4 rounded-[2rem] p-6 text-white md:grid-cols-2 md:p-8">
-          <div>
-            <div className="text-sm font-semibold text-white/60">Visit</div>
-            <h2 className="mt-2 text-2xl font-bold">到店前先预约，老师会确认适合的班型</h2>
-          </div>
-          <div className="space-y-3 text-sm text-white/80">
-            {organization?.address && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                {organization.address}
-              </div>
-            )}
-            {organization?.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                {organization.phone}
-              </div>
-            )}
-            {profile?.businessHours && <div>{profile.businessHours}</div>}
-          </div>
-        </div>
-      </section>
-
       {/* Featured courses */}
       <section className="container-narrow py-8">
         <div className="mb-4 flex items-end justify-between">
@@ -295,6 +262,30 @@ export function HomePage() {
           </div>
         </section>
       )}
+
+      <section className="container-narrow pb-10">
+        <div className="bg-ink grid gap-4 rounded-[2rem] p-6 text-white md:grid-cols-2 md:p-8">
+          <div>
+            <div className="text-sm font-semibold text-white/60">Visit</div>
+            <h2 className="mt-2 text-2xl font-bold">到店前先预约，老师会确认适合的班型</h2>
+          </div>
+          <div className="space-y-3 text-sm text-white/80">
+            {organization?.address && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                {organization.address}
+              </div>
+            )}
+            {organization?.phone && (
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                {organization.phone}
+              </div>
+            )}
+            {profile?.businessHours && <div>{profile.businessHours}</div>}
+          </div>
+        </div>
+      </section>
     </Layout>
   );
 }

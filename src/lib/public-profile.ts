@@ -1,5 +1,3 @@
-import { normalizeBlocks, type Block } from './content-blocks.js';
-
 export interface PublicProfile {
   eyebrow: string;
   highlights: string[];
@@ -13,9 +11,7 @@ export interface PublicProfile {
   secondaryCtaLink: string;
   stats: string[];
   testimonials: string[];
-  gallery: string[];
   businessHours: string;
-  bodyBlocks: Block[];
 }
 
 export const defaultPublicProfile: PublicProfile = {
@@ -41,9 +37,7 @@ export const defaultPublicProfile: PublicProfile = {
     '老师反馈很及时，孩子写字习惯比之前稳定很多。',
     '离家近、班级小，孩子每周都愿意来上课。',
   ],
-  gallery: [],
   businessHours: '周二至周日 10:00-20:00',
-  bodyBlocks: [],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,17 +84,11 @@ export function readPublicProfile(settings: unknown): PublicProfile {
     secondaryCtaLink: normalizeString(raw.secondaryCtaLink) || defaultPublicProfile.secondaryCtaLink,
     stats: normalizeStringList(raw.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeStringList(raw.testimonials, defaultPublicProfile.testimonials, 8),
-    gallery: normalizeStringList(raw.gallery, defaultPublicProfile.gallery, 12),
     businessHours: normalizeString(raw.businessHours) || defaultPublicProfile.businessHours,
-    bodyBlocks: normalizeBlocks(raw.bodyBlocks),
   };
 }
 
-// Accepts bodyBlocks as untrusted `unknown` (the zod layer passes it through);
-// normalizeBlocks does the structural validation.
-type PublicProfileInput = Partial<Omit<PublicProfile, 'bodyBlocks'>> & { bodyBlocks?: unknown };
-
-export function normalizePublicProfile(input: PublicProfileInput) {
+export function normalizePublicProfile(input: Partial<PublicProfile>) {
   const bannerImages = normalizeStringList(
     input.bannerImages,
     normalizeString(input.bannerImageUrl)
@@ -124,9 +112,7 @@ export function normalizePublicProfile(input: PublicProfileInput) {
       normalizeString(input.secondaryCtaLink) || defaultPublicProfile.secondaryCtaLink,
     stats: normalizeStringList(input.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeStringList(input.testimonials, defaultPublicProfile.testimonials, 8),
-    gallery: normalizeStringList(input.gallery, defaultPublicProfile.gallery, 12),
     businessHours: normalizeString(input.businessHours) || defaultPublicProfile.businessHours,
-    bodyBlocks: normalizeBlocks(input.bodyBlocks),
   };
 }
 

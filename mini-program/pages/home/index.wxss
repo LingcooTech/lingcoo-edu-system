@@ -75,7 +75,6 @@
   font-weight: 800;
 }
 
-.block-card,
 .contact-card {
   padding: 28rpx;
 }

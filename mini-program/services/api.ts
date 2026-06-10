@@ -70,9 +70,7 @@ export interface Organization {
     secondaryCtaLink: string;
     stats: string[];
     testimonials: string[];
-    gallery: string[];
     businessHours: string;
-    bodyBlocks?: Block[];
   };
   businessModel: BusinessModelSettings;
   publicSite?: {

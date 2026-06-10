@@ -65,9 +65,7 @@ export interface HomePayload {
       secondaryCtaLink: string;
       stats: string[];
       testimonials: string[];
-      gallery: string[];
       businessHours: string;
-      bodyBlocks?: Block[];
     };
     publicSite: {
       navigation: Array<{

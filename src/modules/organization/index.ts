@@ -31,9 +31,7 @@ const publicProfileSchema = z.object({
   secondaryCtaLink: z.string().max(160).optional(),
   stats: z.array(z.string().min(1).max(80)).max(6).optional(),
   testimonials: z.array(z.string().min(1).max(240)).max(8).optional(),
-  gallery: z.array(z.string().min(1).max(500)).max(12).optional(),
   businessHours: z.string().max(120).optional(),
-  bodyBlocks: z.array(z.unknown()).max(200).optional(),
 });
 
 const brandingSchema = z

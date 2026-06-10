@@ -1,9 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
-import type { OrganizationSettings, PublicProfile } from '@/api/types';
-import { BlockEditor } from '@/components/editor/BlockEditor';
-import { HOME_ALLOWED, type Block } from '@/components/editor/blocks';
+import type { PublicProfile } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
 import { QiniuGalleryField } from '@/components/shared/QiniuImageField';
@@ -22,7 +20,6 @@ interface HomeForm {
   highlightsText: string;
   testimonialsText: string;
   businessHours: string;
-  bodyBlocks: Block[];
 }
 
 function linesToList(value: string): string[] {
@@ -51,20 +48,17 @@ function profileToForm(profile: PublicProfile): HomeForm {
     highlightsText: profile.highlights.join('\n'),
     testimonialsText: profile.testimonials.join('\n'),
     businessHours: profile.businessHours,
-    bodyBlocks: profile.bodyBlocks ?? [],
   };
 }
 
 export function InstitutionHomePage() {
   const toast = useToast();
-  const [organization, setOrganization] = useState<OrganizationSettings | null>(null);
   const [form, setForm] = useState<HomeForm | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchOrganization()
       .then((org) => {
-        setOrganization(org);
         setForm(profileToForm(org.publicProfile));
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : '加载失败'));
@@ -75,7 +69,7 @@ export function InstitutionHomePage() {
   }
 
   async function save() {
-    if (!form || !organization) return;
+    if (!form) return;
     const bannerImages = linesToList(form.bannerImagesText);
     setSaving(true);
     try {
@@ -93,12 +87,9 @@ export function InstitutionHomePage() {
           stats: linesToList(form.statsText),
           highlights: linesToList(form.highlightsText),
           testimonials: linesToList(form.testimonialsText),
-          gallery: organization.publicProfile.gallery,
           businessHours: form.businessHours,
-          bodyBlocks: form.bodyBlocks,
         },
       });
-      setOrganization(updated);
       setForm(profileToForm(updated.publicProfile));
       toast.success('机构主页已保存');
     } catch (err) {
@@ -116,13 +107,13 @@ export function InstitutionHomePage() {
           type="button"
           className="btn btn-primary"
           onClick={save}
-          disabled={!form || !organization || saving}
+          disabled={!form || saving}
         >
           {saving ? '保存中...' : '保存主页'}
         </button>
       }
     >
-      {!form || !organization ? (
+      {!form ? (
         <p className="text-muted-foreground text-sm">加载中...</p>
       ) : (
         <div className="max-w-5xl space-y-5">
@@ -227,14 +218,6 @@ export function InstitutionHomePage() {
                 onChange={(e) => update('businessHours', e.target.value)}
               />
             </Field>
-          </EditorCard>
-
-          <EditorCard title="补充内容模块" description="展示在首页首屏与固定课程模块之间。">
-            <BlockEditor
-              value={form.bodyBlocks}
-              onChange={(bodyBlocks) => update('bodyBlocks', bodyBlocks)}
-              allowed={HOME_ALLOWED}
-            />
           </EditorCard>
         </div>
       )}

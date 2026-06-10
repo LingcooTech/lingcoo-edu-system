@@ -36,18 +36,6 @@
       </view>
     </view>
 
-    <view wx:if="{{bodyBlocks.length}}" class="section card block-card">
-      <block-renderer blocks="{{bodyBlocks}}" />
-    </view>
-
-    <view class="section card contact-card">
-      <view class="eyebrow">Visit</view>
-      <view class="section-title contact-title">到店前先预约，老师会确认适合的班型</view>
-      <view wx:if="{{address}}" class="contact-row">地址：{{address}}</view>
-      <view wx:if="{{phone}}" class="contact-row">电话：{{phone}}</view>
-      <view wx:if="{{businessHours}}" class="contact-row">{{businessHours}}</view>
-    </view>
-
     <view class="section">
       <view class="row-between section-head">
         <view>
@@ -87,6 +75,14 @@
       <view class="eyebrow">Testimonials</view>
       <view class="section-title">家长评价</view>
       <view wx:for="{{testimonials}}" wx:key="*this" class="card quote-card">“{{item}}”</view>
+    </view>
+
+    <view class="section card contact-card">
+      <view class="eyebrow">Visit</view>
+      <view class="section-title contact-title">到店前先预约，老师会确认适合的班型</view>
+      <view wx:if="{{address}}" class="contact-row">地址：{{address}}</view>
+      <view wx:if="{{phone}}" class="contact-row">电话：{{phone}}</view>
+      <view wx:if="{{businessHours}}" class="contact-row">{{businessHours}}</view>
     </view>
 
     <view class="section quick-nav">
