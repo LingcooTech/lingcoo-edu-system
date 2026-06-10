@@ -228,8 +228,7 @@ body {
   }
 
   .home-hero-grid {
-    @apply gap-7 py-8 md:py-11;
-    align-items: start;
+    @apply gap-7 py-8 md:items-start md:py-11;
   }
 
   .home-hero-media {
@@ -238,13 +237,8 @@ body {
   }
 
   @media (min-width: 768px) {
-    .home-hero-grid {
-      align-items: stretch;
-    }
-
     .home-hero-media {
-      height: 100%;
-      min-height: 20rem;
+      height: var(--home-hero-media-height);
     }
   }
 

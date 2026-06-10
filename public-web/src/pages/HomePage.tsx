@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   BarChart3,
   CalendarDays,
   Camera,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   GraduationCap,
   MapPin,
@@ -57,47 +59,38 @@ function HighlightIcon({ icon }: { icon: string }) {
 
 const growthLoopSteps: Array<{
   title: string;
-  detail: string;
   icon: LucideIcon;
 }> = [
   {
     title: '了解孩子',
-    detail: '先看年龄、基础、兴趣和可上课时间。',
     icon: Search,
   },
   {
     title: '共同确定目标',
-    detail: '把家长期待转成清晰的阶段目标。',
     icon: Target,
   },
   {
     title: '制定成长计划',
-    detail: '匹配课程、频次和阶段练习重点。',
     icon: ClipboardList,
   },
   {
     title: '小班教学实施',
-    detail: '固定老师跟进课堂状态和学习习惯。',
     icon: UsersRound,
   },
   {
     title: '课后反馈记录',
-    detail: '沉淀课堂照片、作品和老师反馈。',
     icon: Camera,
   },
   {
     title: '阶段复盘',
-    detail: '对照目标看变化，也看还需要补哪里。',
     icon: BarChart3,
   },
   {
     title: '调整目标计划',
-    detail: '根据复盘更新节奏、课程和练习任务。',
     icon: RefreshCw,
   },
   {
     title: '进入下一阶段',
-    detail: '形成持续迭代的成长闭环。',
     icon: ArrowRight,
   },
 ];
@@ -105,7 +98,9 @@ const growthLoopSteps: Array<{
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [heroContentHeight, setHeroContentHeight] = useState<number | null>(null);
   const heroTouchStartX = useRef<number | null>(null);
+  const heroContentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     loadHome()
@@ -135,6 +130,30 @@ export function HomePage() {
     [profile],
   );
   const activeHeroImage = heroImages[heroIndex % Math.max(heroImages.length, 1)];
+  const heroGridStyle = heroContentHeight
+    ? ({ '--home-hero-media-height': `${heroContentHeight}px` } as CSSProperties)
+    : undefined;
+
+  useLayoutEffect(() => {
+    const element = heroContentRef.current;
+    if (!element) return undefined;
+
+    const updateHeight = () => {
+      const nextHeight = Math.ceil(element.getBoundingClientRect().height);
+      setHeroContentHeight((current) => (current === nextHeight ? current : nextHeight));
+    };
+
+    updateHeight();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateHeight);
+    observer?.observe(element);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
 
   useEffect(() => {
     setHeroIndex(0);
@@ -164,8 +183,8 @@ export function HomePage() {
   return (
     <Layout>
       <section className="border-line bg-surface border-b">
-        <div className="container-narrow hero-grid home-hero-grid">
-          <div>
+        <div className="container-narrow hero-grid home-hero-grid" style={heroGridStyle}>
+          <div ref={heroContentRef}>
             <div className="eyebrow">{profile?.eyebrow || '儿童成长教室'}</div>
             <h1 className="text-ink mt-3 text-4xl leading-tight font-bold md:text-5xl">
               {profile?.bannerTitle || organization?.brandName || '儿童成长教室'}
@@ -219,22 +238,40 @@ export function HomePage() {
               />
             ) : null}
             {heroImages.length > 1 ? (
-              <div className="absolute right-4 bottom-4 left-4 flex justify-center gap-2">
-                {heroImages.map((image, index) => (
-                  <button
-                    key={image}
-                    type="button"
-                    className={[
-                      'h-1.5 rounded-full transition-all',
-                      index === heroIndex % heroImages.length
-                        ? 'w-7 bg-white'
-                        : 'w-2 bg-white/60',
-                    ].join(' ')}
-                    onClick={() => setHeroIndex(index)}
-                    aria-label={`第 ${index + 1} 张`}
-                  />
-                ))}
-              </div>
+              <>
+                <button
+                  type="button"
+                  className="text-ink absolute top-1/2 left-3 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 shadow-sm transition hover:bg-white md:flex"
+                  onClick={() => moveHero(-1)}
+                  aria-label="上一张"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  className="text-ink absolute top-1/2 right-3 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 shadow-sm transition hover:bg-white md:flex"
+                  onClick={() => moveHero(1)}
+                  aria-label="下一张"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                <div className="absolute right-4 bottom-4 left-4 flex justify-center gap-2">
+                  {heroImages.map((image, index) => (
+                    <button
+                      key={image}
+                      type="button"
+                      className={[
+                        'h-1.5 rounded-full transition-all',
+                        index === heroIndex % heroImages.length
+                          ? 'w-7 bg-white'
+                          : 'w-2 bg-white/60',
+                      ].join(' ')}
+                      onClick={() => setHeroIndex(index)}
+                      aria-label={`第 ${index + 1} 张`}
+                    />
+                  ))}
+                </div>
+              </>
             ) : null}
           </div>
         </div>
@@ -405,7 +442,7 @@ export function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+          <div className="no-scrollbar flex snap-x gap-4 overflow-x-auto pb-2">
             {featuredTeachers.map((teacher) => (
               <HomeTeacherCard key={teacher.id} teacher={teacher} />
             ))}
@@ -458,14 +495,16 @@ export function HomePage() {
       )}
 
       <section className="container-narrow pb-10">
-        <div className="bg-ink grid gap-8 rounded-3xl p-6 text-white md:grid-cols-[0.75fr_1.25fr] md:p-8">
+        <div className="bg-ink grid gap-6 rounded-3xl p-5 text-white md:grid-cols-[0.8fr_1.2fr] md:p-7">
           <div>
             <div className="text-sm font-semibold text-white/55">成长闭环</div>
-            <h2 className="mt-3 text-2xl leading-tight font-bold">让课程围绕孩子持续迭代</h2>
-            <p className="mt-4 text-sm leading-7 text-white/70">
-              我们不只完成报名、上课和续费，而是把目标、计划、课堂、反馈和复盘连成一个可追踪的成长路径。
+            <h2 className="mt-2 text-xl leading-tight font-bold md:text-2xl">
+              让课程围绕孩子持续迭代
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-white/70">
+              目标、计划、课堂、反馈、复盘、调整，形成可追踪的成长路径。
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 to={profile?.ctaLink || '/register'}
                 className="text-ink inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-md"
@@ -483,24 +522,20 @@ export function HomePage() {
             </div>
           </div>
           <div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-4">
               {growthLoopSteps.map((item, index) => {
                 const Icon = item.icon;
                 return (
-                  <div
-                    key={item.title}
-                    className="border border-white/12 bg-white/[0.06] p-4 text-sm text-white/80"
-                  >
+                  <div key={item.title} className="border-t border-white/18 pt-3 text-sm">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-white">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/12 text-white">
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="text-xs font-semibold text-white/40">
                         {String(index + 1).padStart(2, '0')}
                       </div>
                     </div>
-                    <div className="mt-4 font-semibold text-white">{item.title}</div>
-                    <p className="mt-2 leading-6 text-white/62">{item.detail}</p>
+                    <div className="mt-3 font-semibold text-white">{item.title}</div>
                   </div>
                 );
               })}

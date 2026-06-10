@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { AccountPage } from '@/pages/AccountPage';
 import { AboutPage } from '@/pages/AboutPage';
@@ -31,6 +31,16 @@ function LoginRoute() {
   return <Navigate to="/" replace />;
 }
 
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname, location.search]);
+
+  return null;
+}
+
 export function App() {
   // Persist QR/UTM attribution on first load so it survives navigation through
   // the funnel (course list → detail → register).
@@ -41,6 +51,7 @@ export function App() {
   return (
     <BrowserRouter>
       <SessionProvider>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/courses" element={<CourseListPage />} />
