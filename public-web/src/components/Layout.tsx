@@ -260,8 +260,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="site-footer-brandline">
             <Brand organization={organization} />
             <p className="site-footer-note">
-              {organization?.publicProfile.bannerSubtitle ??
-                '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
+              {organization?.publicProfile.bannerTitle ?? '在社区里，给孩子一个稳定成长的课堂'}
             </p>
           </div>
           <div className="site-footer-org">

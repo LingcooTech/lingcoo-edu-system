@@ -89,34 +89,44 @@ export function HomePage() {
   return (
     <Layout>
       <section className="border-line bg-surface border-b">
-        <div className="container-narrow hero-grid">
+        <div className="container-narrow hero-grid home-hero-grid">
           <div>
             <div className="eyebrow">{profile?.eyebrow || '儿童成长教室'}</div>
-            <h1 className="text-ink mt-4 text-4xl leading-tight font-bold tracking-tight md:text-5xl">
+            <h1 className="text-ink mt-3 text-4xl leading-tight font-bold md:text-5xl">
               {profile?.bannerTitle || organization?.brandName || '儿童成长教室'}
             </h1>
-            <p className="text-ink-soft mt-5 max-w-2xl text-base leading-8">
+            <p className="text-ink-soft mt-4 max-w-2xl text-base leading-8">
               {profile?.bannerSubtitle || '扫码或填表预约试听，老师会尽快联系确认上课时间。'}
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link to={profile?.ctaLink || '/register'} className="pwbtn pwbtn-primary">
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                to={profile?.ctaLink || '/register'}
+                className="pwbtn pwbtn-primary transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+              >
                 {profile?.ctaText || '预约试听'}
               </Link>
-              <Link to={profile?.secondaryCtaLink || '/courses'} className="pwbtn pwbtn-outline">
+              <Link
+                to={profile?.secondaryCtaLink || '/courses'}
+                className="pwbtn pwbtn-outline group hover:border-brand/50 hover:bg-surface hover:text-brand transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+              >
                 {profile?.secondaryCtaText || '浏览课程'}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </div>
             {stats.length > 0 && (
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {stats.map((item) => (
-                  <div key={item} className="bg-paper rounded-2xl px-4 py-3 text-sm font-semibold">
+                  <div
+                    key={item}
+                    className="border-line text-ink rounded-2xl border bg-[#e7e1d8] px-4 py-3 text-center text-sm font-bold shadow-sm"
+                  >
                     {item}
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <div className="hero-media relative">
+          <div className="hero-media home-hero-media relative">
             {activeHeroImage ? (
               <img
                 src={activeHeroImage}
@@ -165,14 +175,14 @@ export function HomePage() {
       </section>
 
       {highlights.length > 0 && (
-        <section className="container-narrow py-8">
+        <section className="container-narrow pt-5 pb-8">
           <div className="grid gap-3 md:grid-cols-3">
             {highlights.map((item, index) => (
               <article
                 key={item.text}
                 className={[
-                  'pwcard relative overflow-hidden p-5',
-                  item.imageUrl ? 'min-h-40 text-white' : '',
+                  'pwcard relative flex min-h-36 flex-col items-center justify-center overflow-hidden p-6 text-center',
+                  item.imageUrl ? 'text-white' : '',
                 ].join(' ')}
                 style={
                   item.imageUrl
@@ -186,22 +196,22 @@ export function HomePage() {
               >
                 <div
                   className={[
-                    'flex h-10 w-10 items-center justify-center rounded-2xl',
+                    'flex h-12 w-12 items-center justify-center rounded-2xl',
                     item.imageUrl ? 'bg-white/20 text-white' : 'bg-brand-soft text-brand',
                   ].join(' ')}
                 >
                   {index === 0 ? (
-                    <Star className="h-5 w-5" />
+                    <Star className="h-6 w-6" />
                   ) : index === 1 ? (
-                    <CalendarDays className="h-5 w-5" />
+                    <CalendarDays className="h-6 w-6" />
                   ) : (
-                    <MessageCircle className="h-5 w-5" />
+                    <MessageCircle className="h-6 w-6" />
                   )}
                 </div>
                 <p
                   className={[
-                    'mt-4 text-sm leading-6',
-                    item.imageUrl ? 'font-medium text-white' : 'text-ink-soft',
+                    'mt-4 text-base leading-7 font-bold md:text-lg',
+                    item.imageUrl ? 'text-white drop-shadow-sm' : 'text-ink',
                   ].join(' ')}
                 >
                   {item.text}
