@@ -13,7 +13,16 @@
 }
 
 .course-card {
+  overflow: hidden;
   padding: 28rpx;
+}
+
+.course-cover {
+  display: block;
+  width: calc(100% + 56rpx);
+  height: 300rpx;
+  margin: -28rpx -28rpx 24rpx;
+  background: #e9f4ef;
 }
 
 .course-name {

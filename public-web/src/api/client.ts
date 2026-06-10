@@ -19,6 +19,7 @@ export interface Course {
   paymentReceiverName?: string | null;
   trialDescription?: string;
   reservationNotice?: string;
+  coverImageUrl?: string | null;
   onlineSalesEnabled?: boolean;
   packageCount?: number;
   startingPriceAmount?: number | null;
@@ -36,6 +37,7 @@ export interface TrialSession {
   bookedCount: number;
   reservationFeeAmount: number;
   reservationNotice: string;
+  coverImageUrl?: string | null;
 }
 
 export interface BusinessModelSettings {
@@ -43,6 +45,17 @@ export interface BusinessModelSettings {
   manualPackageGrantEnabled: boolean;
   packagePriceDisplayEnabled: boolean;
   seatReservationFeeEnabled: boolean;
+}
+
+export interface PublicProfileHighlight {
+  text: string;
+  imageUrl: string;
+}
+
+export interface PublicProfileTestimonial {
+  name: string;
+  avatarUrl: string;
+  content: string;
 }
 
 export interface HomePayload {
@@ -54,7 +67,7 @@ export interface HomePayload {
     address: string | null;
     publicProfile: {
       eyebrow: string;
-      highlights: string[];
+      highlights: PublicProfileHighlight[];
       bannerImages: string[];
       bannerImageUrl: string;
       bannerTitle: string;
@@ -64,7 +77,7 @@ export interface HomePayload {
       secondaryCtaText: string;
       secondaryCtaLink: string;
       stats: string[];
-      testimonials: string[];
+      testimonials: PublicProfileTestimonial[];
       businessHours: string;
     };
     publicSite: {
@@ -105,13 +118,6 @@ export interface HomePayload {
     address: string | null;
   }>;
   teachers: PublicTeacher[];
-  classrooms: Array<{
-    id: string;
-    campusId: string;
-    name: string;
-    capacity: number;
-    status: string;
-  }>;
   featuredCourses: Course[];
   trialSessions: TrialSession[];
 }
@@ -254,7 +260,13 @@ export interface RefundRequest {
   orderNo: string;
   accountId?: string | null;
   amount: number;
-  reason: 'schedule_conflict' | 'course_not_fit' | 'duplicate_payment' | 'service_issue' | 'other' | string;
+  reason:
+    | 'schedule_conflict'
+    | 'course_not_fit'
+    | 'duplicate_payment'
+    | 'service_issue'
+    | 'other'
+    | string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
   buyerNote?: string | null;
   adminNote?: string | null;
@@ -287,7 +299,12 @@ export async function fetchParentOrders() {
 export async function applyOrderRefund(
   orderNo: string,
   input: {
-    reason: 'schedule_conflict' | 'course_not_fit' | 'duplicate_payment' | 'service_issue' | 'other';
+    reason:
+      | 'schedule_conflict'
+      | 'course_not_fit'
+      | 'duplicate_payment'
+      | 'service_issue'
+      | 'other';
     buyerNote?: string;
   },
 ) {
@@ -696,9 +713,7 @@ export async function mockPayOrder(orderNo: string) {
 
 export async function fetchOrderStatus(orderNo: string) {
   return (
-    await publicApi<{ item: ParentOrder }>(
-      `/public/orders/${encodeURIComponent(orderNo)}/status`,
-    )
+    await publicApi<{ item: ParentOrder }>(`/public/orders/${encodeURIComponent(orderNo)}/status`)
   ).item;
 }
 

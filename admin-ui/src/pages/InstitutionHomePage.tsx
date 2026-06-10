@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
-import type { PublicProfile } from '@/api/types';
+import type { PublicProfile, PublicProfileHighlight, PublicProfileTestimonial } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
-import { QiniuGalleryField } from '@/components/shared/QiniuImageField';
+import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
 
 interface HomeForm {
@@ -17,8 +17,8 @@ interface HomeForm {
   secondaryCtaText: string;
   secondaryCtaLink: string;
   statsText: string;
-  highlightsText: string;
-  testimonialsText: string;
+  highlights: PublicProfileHighlight[];
+  testimonials: PublicProfileTestimonial[];
   businessHours: string;
 }
 
@@ -27,6 +27,25 @@ function linesToList(value: string): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function cleanHighlights(items: PublicProfileHighlight[]): PublicProfileHighlight[] {
+  return items
+    .map((item) => ({
+      text: item.text.trim(),
+      imageUrl: item.imageUrl.trim(),
+    }))
+    .filter((item) => item.text);
+}
+
+function cleanTestimonials(items: PublicProfileTestimonial[]): PublicProfileTestimonial[] {
+  return items
+    .map((item) => ({
+      name: item.name.trim(),
+      avatarUrl: item.avatarUrl.trim(),
+      content: item.content.trim(),
+    }))
+    .filter((item) => item.content);
 }
 
 function profileToForm(profile: PublicProfile): HomeForm {
@@ -45,8 +64,8 @@ function profileToForm(profile: PublicProfile): HomeForm {
     secondaryCtaText: profile.secondaryCtaText,
     secondaryCtaLink: profile.secondaryCtaLink,
     statsText: profile.stats.join('\n'),
-    highlightsText: profile.highlights.join('\n'),
-    testimonialsText: profile.testimonials.join('\n'),
+    highlights: profile.highlights,
+    testimonials: profile.testimonials,
     businessHours: profile.businessHours,
   };
 }
@@ -68,6 +87,65 @@ export function InstitutionHomePage() {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
+  function updateHighlight(index: number, patch: Partial<PublicProfileHighlight>) {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            highlights: prev.highlights.map((item, itemIndex) =>
+              itemIndex === index ? { ...item, ...patch } : item,
+            ),
+          }
+        : prev,
+    );
+  }
+
+  function addHighlight() {
+    setForm((prev) =>
+      prev ? { ...prev, highlights: [...prev.highlights, { text: '', imageUrl: '' }] } : prev,
+    );
+  }
+
+  function removeHighlight(index: number) {
+    setForm((prev) =>
+      prev
+        ? { ...prev, highlights: prev.highlights.filter((_, itemIndex) => itemIndex !== index) }
+        : prev,
+    );
+  }
+
+  function updateTestimonial(index: number, patch: Partial<PublicProfileTestimonial>) {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            testimonials: prev.testimonials.map((item, itemIndex) =>
+              itemIndex === index ? { ...item, ...patch } : item,
+            ),
+          }
+        : prev,
+    );
+  }
+
+  function addTestimonial() {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            testimonials: [...prev.testimonials, { name: '', avatarUrl: '', content: '' }],
+          }
+        : prev,
+    );
+  }
+
+  function removeTestimonial(index: number) {
+    setForm((prev) =>
+      prev
+        ? { ...prev, testimonials: prev.testimonials.filter((_, itemIndex) => itemIndex !== index) }
+        : prev,
+    );
+  }
+
   async function save() {
     if (!form) return;
     const bannerImages = linesToList(form.bannerImagesText);
@@ -85,8 +163,8 @@ export function InstitutionHomePage() {
           secondaryCtaText: form.secondaryCtaText,
           secondaryCtaLink: form.secondaryCtaLink,
           stats: linesToList(form.statsText),
-          highlights: linesToList(form.highlightsText),
-          testimonials: linesToList(form.testimonialsText),
+          highlights: cleanHighlights(form.highlights),
+          testimonials: cleanTestimonials(form.testimonials),
           businessHours: form.businessHours,
         },
       });
@@ -103,12 +181,7 @@ export function InstitutionHomePage() {
     <PageFrame
       section="institutionHome"
       actions={
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={save}
-          disabled={!form || saving}
-        >
+        <button type="button" className="btn btn-primary" onClick={save} disabled={!form || saving}>
           {saving ? '保存中...' : '保存主页'}
         </button>
       }
@@ -191,23 +264,83 @@ export function InstitutionHomePage() {
           </EditorCard>
 
           <EditorCard title="核心优势" description="首页首屏下方的核心优势总结。">
-            <Field label="核心优势总结" hint="每行一项，建议 3 条">
-              <textarea
-                className="form-input h-28"
-                value={form.highlightsText}
-                onChange={(e) => update('highlightsText', e.target.value)}
-              />
-            </Field>
+            <div className="space-y-4">
+              {form.highlights.map((item, index) => (
+                <div key={index} className="rounded-lg border p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium">优势 {index + 1}</div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => removeHighlight(index)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <Field label="优势文案">
+                    <textarea
+                      className="form-input h-20"
+                      value={item.text}
+                      onChange={(event) => updateHighlight(index, { text: event.target.value })}
+                    />
+                  </Field>
+                  <QiniuImageField
+                    label="背景图片"
+                    hint="可选；前台优势卡片会用作背景图"
+                    value={item.imageUrl}
+                    onChange={(imageUrl) => updateHighlight(index, { imageUrl })}
+                    prefix="homepage/highlights"
+                  />
+                </div>
+              ))}
+              <button type="button" className="btn btn-secondary" onClick={addHighlight}>
+                添加优势
+              </button>
+            </div>
           </EditorCard>
 
           <EditorCard title="家长评价" description="展示在首页评价模块。">
-            <Field label="评价内容" hint="每行一条">
-              <textarea
-                className="form-input h-28"
-                value={form.testimonialsText}
-                onChange={(e) => update('testimonialsText', e.target.value)}
-              />
-            </Field>
+            <div className="space-y-4">
+              {form.testimonials.map((item, index) => (
+                <div key={index} className="rounded-lg border p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium">评价 {index + 1}</div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => removeTestimonial(index)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <Field label="家长称呼">
+                    <input
+                      className="form-input"
+                      value={item.name}
+                      onChange={(event) => updateTestimonial(index, { name: event.target.value })}
+                    />
+                  </Field>
+                  <QiniuImageField
+                    label="家长头像"
+                    value={item.avatarUrl}
+                    onChange={(avatarUrl) => updateTestimonial(index, { avatarUrl })}
+                    prefix="homepage/testimonials"
+                  />
+                  <Field label="评价内容">
+                    <textarea
+                      className="form-input h-24"
+                      value={item.content}
+                      onChange={(event) =>
+                        updateTestimonial(index, { content: event.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+              ))}
+              <button type="button" className="btn btn-secondary" onClick={addTestimonial}>
+                添加评价
+              </button>
+            </div>
           </EditorCard>
 
           <EditorCard title="联系与上课时间">

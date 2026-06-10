@@ -26,6 +26,7 @@ export interface Course {
   paymentReceiverName?: string | null;
   trialDescription?: string;
   reservationNotice?: string;
+  coverImageUrl?: string | null;
   onlineSalesEnabled?: boolean;
   status: string;
   summary: string;
@@ -199,6 +200,7 @@ export interface TrialSession {
   bookedCount: number;
   reservationFeeAmount: number;
   reservationNotice: string;
+  coverImageUrl?: string | null;
   status: string;
 }
 
@@ -315,7 +317,13 @@ export interface RefundRequest {
   orderNo: string;
   accountId?: string | null;
   amount: number;
-  reason: 'schedule_conflict' | 'course_not_fit' | 'duplicate_payment' | 'service_issue' | 'other' | string;
+  reason:
+    | 'schedule_conflict'
+    | 'course_not_fit'
+    | 'duplicate_payment'
+    | 'service_issue'
+    | 'other'
+    | string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
   buyerNote?: string | null;
   adminNote?: string | null;
@@ -409,9 +417,20 @@ export interface PaymentProviderOverview {
   items: PaymentProviderItem[];
 }
 
+export interface PublicProfileHighlight {
+  text: string;
+  imageUrl: string;
+}
+
+export interface PublicProfileTestimonial {
+  name: string;
+  avatarUrl: string;
+  content: string;
+}
+
 export interface PublicProfile {
   eyebrow: string;
-  highlights: string[];
+  highlights: PublicProfileHighlight[];
   bannerImages: string[];
   bannerImageUrl: string;
   bannerTitle: string;
@@ -421,7 +440,7 @@ export interface PublicProfile {
   secondaryCtaText: string;
   secondaryCtaLink: string;
   stats: string[];
-  testimonials: string[];
+  testimonials: PublicProfileTestimonial[];
   businessHours: string;
 }
 

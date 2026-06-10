@@ -59,7 +59,11 @@
 .highlight-card {
   display: flex;
   gap: 18rpx;
+  align-items: flex-start;
+  min-height: 148rpx;
   padding: 24rpx;
+  background-position: center;
+  background-size: cover;
 }
 
 .highlight-index {
@@ -73,6 +77,20 @@
   background: #e9f4ef;
   color: #1f6f5b;
   font-weight: 800;
+}
+
+.highlight-card-image {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.highlight-card-image .highlight-index {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.highlight-card-image .highlight-text {
+  color: #fff;
+  font-weight: 700;
 }
 
 .contact-card {
@@ -115,7 +133,6 @@
 
 .course-list,
 .trial-list,
-.trust-teachers,
 .testimonials {
   display: grid;
   gap: 18rpx;
@@ -124,7 +141,16 @@
 .course-card,
 .trial-card,
 .quote-card {
+  overflow: hidden;
   padding: 26rpx;
+}
+
+.course-cover {
+  display: block;
+  width: calc(100% + 52rpx);
+  height: 260rpx;
+  margin: -26rpx -26rpx 22rpx;
+  background: #e9f4ef;
 }
 
 .course-name {
@@ -157,10 +183,19 @@
   margin-top: 12rpx;
 }
 
+.trust-teacher-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
 .trust-teacher-card {
-  display: flex;
-  gap: 20rpx;
+  display: inline-flex;
+  width: 540rpx;
+  margin-right: 18rpx;
+  gap: 18rpx;
   padding: 22rpx;
+  vertical-align: top;
+  white-space: normal;
 }
 
 .trust-teacher-avatar {
@@ -194,32 +229,6 @@
   margin-top: 10rpx;
 }
 
-.trust-environment-card {
-  margin-top: 18rpx;
-  padding: 26rpx;
-}
-
-.trust-stat-row {
-  align-items: flex-start;
-}
-
-.trust-stat-value {
-  color: #1f2b24;
-  font-size: 40rpx;
-  font-weight: 800;
-}
-
-.trust-note {
-  margin-top: 18rpx;
-}
-
-.trust-location-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 18rpx;
-}
-
 .trust-chip {
   display: inline-flex;
   max-width: 100%;
@@ -235,6 +244,39 @@
 
 .quote-card {
   color: #4f5a53;
+}
+
+.quote-author {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.quote-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  flex: 0 0 72rpx;
+  border-radius: 999rpx;
+  background: #e9f4ef;
+}
+
+.quote-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1f6f5b;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.quote-name {
+  color: #1f2b24;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.quote-content {
+  margin-top: 18rpx;
   font-size: 26rpx;
   line-height: 1.7;
 }

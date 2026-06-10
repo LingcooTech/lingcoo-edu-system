@@ -16,6 +16,7 @@
       </view>
       <view class="title course-title">{{course.name}}</view>
       <view class="body-text summary">{{course.summary}}</view>
+      <image wx:if="{{course.coverImageUrl}}" class="course-cover" src="{{course.coverImageUrl}}" mode="aspectFill" />
       <view class="meta-row">
         <text>{{course.durationMinutes}} 分钟/节</text>
         <text>{{packages.length ? packages.length + (onlinePackageSalesAllowed ? ' 个课时包' : ' 个参考方案') : '暂未上架课时包'}}</text>

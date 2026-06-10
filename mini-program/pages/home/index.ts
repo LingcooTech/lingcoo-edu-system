@@ -2,6 +2,8 @@ import {
   loadHome,
   type Course,
   type HomePayload,
+  type PublicProfileHighlight,
+  type PublicProfileTestimonial,
   type PublicTeacher,
   type TrialSession,
 } from '../../services/api';
@@ -17,18 +19,27 @@ interface HomeTeacherCard {
   specialtiesText: string;
 }
 
+type HomeHighlightCard = PublicProfileHighlight & {
+  backgroundStyle: string;
+};
+
+type HomeTestimonialCard = PublicProfileTestimonial & {
+  initial: string;
+};
+
 interface HomeState {
   loading: boolean;
   organizationName: string;
   brandName: string;
+  eyebrow: string;
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImages: string[];
   ctaText: string;
   ctaLink: string;
   stats: string[];
-  highlights: string[];
-  testimonials: string[];
+  highlights: HomeHighlightCard[];
+  testimonials: HomeTestimonialCard[];
   address: string;
   phone: string;
   businessHours: string;
@@ -36,16 +47,13 @@ interface HomeState {
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   trustVisible: boolean;
   trustTeachers: HomeTeacherCard[];
-  campusCountText: string;
-  classroomCountText: string;
-  courseTeacherNamesText: string;
-  teachingLocations: string[];
 }
 
 const initialState: HomeState = {
   loading: true,
   organizationName: '',
   brandName: '',
+  eyebrow: '',
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
@@ -61,17 +69,7 @@ const initialState: HomeState = {
   trialSessions: [],
   trustVisible: false,
   trustTeachers: [],
-  campusCountText: '-',
-  classroomCountText: '-',
-  courseTeacherNamesText: '',
-  teachingLocations: [],
 };
-
-function uniqueStrings(values: Array<string | null | undefined>, limit: number): string[] {
-  return Array.from(
-    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))),
-  ).slice(0, limit);
-}
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
@@ -86,6 +84,22 @@ function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   };
 }
 
+function toHighlightCard(item: PublicProfileHighlight): HomeHighlightCard {
+  return {
+    ...item,
+    backgroundStyle: item.imageUrl
+      ? `background-image: linear-gradient(rgba(31, 43, 36, 0.22), rgba(31, 43, 36, 0.68)), url(${item.imageUrl});`
+      : '',
+  };
+}
+
+function toTestimonialCard(item: PublicProfileTestimonial): HomeTestimonialCard {
+  return {
+    ...item,
+    initial: item.name.slice(0, 1) || '家',
+  };
+}
+
 function toState(home: HomePayload): HomeState {
   const profile = home.organization.publicProfile;
   const bannerImages = Array.from(
@@ -96,35 +110,21 @@ function toState(home: HomePayload): HomeState {
     ),
   );
   const teachers = home.teachers ?? [];
-  const classrooms = home.classrooms ?? [];
-  const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
-  const courseTeacherNames = uniqueStrings(
-    home.featuredCourses.map((course) =>
-      course.defaultTeacherId ? teacherById.get(course.defaultTeacherId)?.name : undefined,
-    ),
-    3,
-  );
-  const teachingLocations = uniqueStrings(
-    [
-      ...home.featuredCourses.map((course) => course.teachingLocationLabel),
-      ...home.campuses.map((campus) => campus.address || campus.name),
-    ],
-    4,
-  );
-  const trustTeachers = teachers.slice(0, 2).map(toTeacherCard);
+  const trustTeachers = teachers.slice(0, 6).map(toTeacherCard);
 
   return {
     loading: false,
     organizationName: home.organization.name,
     brandName: home.organization.brandName,
+    eyebrow: profile.eyebrow || '儿童成长教室',
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
     ctaText: profile.ctaText || '预约试听',
     ctaLink: profile.ctaLink || '/courses',
     stats: profile.stats ?? [],
-    highlights: profile.highlights ?? [],
-    testimonials: profile.testimonials ?? [],
+    highlights: (profile.highlights ?? []).map(toHighlightCard),
+    testimonials: (profile.testimonials ?? []).map(toTestimonialCard),
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,
@@ -143,18 +143,8 @@ function toState(home: HomePayload): HomeState {
           ? `${money(session.reservationFeeAmount)} 试听席位保留费`
           : '',
     })),
-    trustVisible: Boolean(
-      trustTeachers.length ||
-        home.campuses.length ||
-        classrooms.length ||
-        courseTeacherNames.length ||
-        teachingLocations.length,
-    ),
+    trustVisible: trustTeachers.length > 0,
     trustTeachers,
-    campusCountText: home.campuses.length ? String(home.campuses.length) : '-',
-    classroomCountText: classrooms.length ? String(classrooms.length) : '-',
-    courseTeacherNamesText: courseTeacherNames.join('、'),
-    teachingLocations,
   };
 }
 

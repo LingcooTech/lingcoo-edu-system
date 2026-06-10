@@ -50,7 +50,7 @@ export function TeachersPage() {
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">Teachers</div>
+        <div className="eyebrow">教师团队</div>
         <h1 className="section-title mt-2">教师团队</h1>
         <p className="text-ink-soft mt-2 text-sm">{subtitle}</p>
 
@@ -127,7 +127,9 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
   const stats = teacherStats(teacher).slice(0, 3);
   const direction = teacher.specialties[0];
   // Static class strings so Tailwind's JIT picks them up.
-  const statColsClass = ['grid-cols-1', 'grid-cols-2', 'grid-cols-3'][Math.max(stats.length - 1, 0)];
+  const statColsClass = ['grid-cols-1', 'grid-cols-2', 'grid-cols-3'][
+    Math.max(stats.length - 1, 0)
+  ];
 
   return (
     <Link

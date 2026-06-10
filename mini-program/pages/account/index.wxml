@@ -2,7 +2,7 @@
   <view class="card account-card">
     <view class="row-between account-heading">
       <view>
-        <view class="eyebrow">Account</view>
+        <view class="eyebrow">家长中心</view>
         <view class="title account-title">家长中心</view>
       </view>
       <button wx:if="{{account}}" class="text-button" bindtap="onLogout">退出</button>

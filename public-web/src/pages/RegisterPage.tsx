@@ -93,7 +93,7 @@ export function RegisterPage() {
   return (
     <Layout>
       <section className="container-narrow py-8">
-        <div className="eyebrow">Booking</div>
+        <div className="eyebrow">预约试听</div>
         <h1 className="text-ink mt-1 text-2xl font-bold">预约试听 / 留资</h1>
         <p className="text-ink-soft mt-2 text-sm leading-6">
           填写下方信息即可，无需注册。老师会尽快联系您确认上课时间。

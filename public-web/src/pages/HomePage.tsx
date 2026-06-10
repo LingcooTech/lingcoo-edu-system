@@ -9,7 +9,6 @@ import {
   MapPin,
   MessageCircle,
   Phone,
-  School,
   Star,
 } from 'lucide-react';
 
@@ -37,12 +36,6 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
     : `${money(course.startingPriceAmount)} 参考`;
 }
 
-function uniqueStrings(values: Array<string | null | undefined>, limit: number) {
-  return Array.from(
-    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))),
-  ).slice(0, limit);
-}
-
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -57,41 +50,12 @@ export function HomePage() {
   const courses = home?.featuredCourses ?? [];
   const sessions = home?.trialSessions ?? [];
   const teachers = home?.teachers ?? [];
-  const campuses = home?.campuses ?? [];
-  const classrooms = home?.classrooms ?? [];
   const profile = organization?.publicProfile;
   const businessModel = organization?.businessModel;
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
   const testimonials = profile?.testimonials ?? [];
-  const featuredTeachers = teachers.slice(0, 2);
-  const teacherById = useMemo(
-    () => new Map(teachers.map((teacher) => [teacher.id, teacher])),
-    [teachers],
-  );
-  const courseTeacherNames = useMemo(
-    () =>
-      uniqueStrings(
-        courses.map((course) =>
-          course.defaultTeacherId ? teacherById.get(course.defaultTeacherId)?.name : undefined,
-        ),
-        3,
-      ),
-    [courses, teacherById],
-  );
-  const teachingLocations = useMemo(
-    () =>
-      uniqueStrings(
-        [
-          ...courses.map((course) => course.teachingLocationLabel),
-          ...campuses.map((campus) => campus.address || campus.name),
-        ],
-        4,
-      ),
-    [campuses, courses],
-  );
-  const showTeamSection =
-    teachers.length > 0 || campuses.length > 0 || classrooms.length > 0 || teachingLocations.length > 0;
+  const featuredTeachers = teachers.slice(0, 6);
   const heroImages = useMemo(
     () =>
       Array.from(
@@ -204,8 +168,28 @@ export function HomePage() {
         <section className="container-narrow py-8">
           <div className="grid gap-3 md:grid-cols-3">
             {highlights.map((item, index) => (
-              <article key={item} className="pwcard p-5">
-                <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-2xl">
+              <article
+                key={item.text}
+                className={[
+                  'pwcard relative overflow-hidden p-5',
+                  item.imageUrl ? 'min-h-40 text-white' : '',
+                ].join(' ')}
+                style={
+                  item.imageUrl
+                    ? {
+                        backgroundImage: `linear-gradient(rgba(20, 33, 27, 0.28), rgba(20, 33, 27, 0.68)), url(${item.imageUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }
+                    : undefined
+                }
+              >
+                <div
+                  className={[
+                    'flex h-10 w-10 items-center justify-center rounded-2xl',
+                    item.imageUrl ? 'bg-white/20 text-white' : 'bg-brand-soft text-brand',
+                  ].join(' ')}
+                >
                   {index === 0 ? (
                     <Star className="h-5 w-5" />
                   ) : index === 1 ? (
@@ -214,7 +198,14 @@ export function HomePage() {
                     <MessageCircle className="h-5 w-5" />
                   )}
                 </div>
-                <p className="text-ink-soft mt-4 text-sm leading-6">{item}</p>
+                <p
+                  className={[
+                    'mt-4 text-sm leading-6',
+                    item.imageUrl ? 'font-medium text-white' : 'text-ink-soft',
+                  ].join(' ')}
+                >
+                  {item.text}
+                </p>
               </article>
             ))}
           </div>
@@ -225,7 +216,6 @@ export function HomePage() {
       <section className="container-narrow py-8">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <div className="eyebrow">Courses</div>
             <h2 className="text-ink mt-1 text-xl font-bold">推荐课程</h2>
           </div>
           <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
@@ -235,19 +225,36 @@ export function HomePage() {
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {courses.map((course: Course) => (
-            <Link key={course.id} to={`/courses/${course.slug}`} className="pwcard block p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-ink text-sm font-semibold">{course.name}</div>
-                  <div className="text-muted mt-1 text-xs">
-                    {course.category} · {course.ageRange}
+            <Link
+              key={course.id}
+              to={`/courses/${course.slug}`}
+              className="pwcard block overflow-hidden"
+            >
+              {course.coverImageUrl ? (
+                <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+                  <img
+                    src={course.coverImageUrl}
+                    alt={course.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-ink text-sm font-semibold">{course.name}</div>
+                    <div className="text-muted mt-1 text-xs">
+                      {course.category} · {course.ageRange}
+                    </div>
+                  </div>
+                  <div className="text-ink shrink-0 text-sm font-semibold">
+                    {coursePriceLabel(course, businessModel)}
                   </div>
                 </div>
-                <div className="text-ink shrink-0 text-sm font-semibold">
-                  {coursePriceLabel(course, businessModel)}
-                </div>
+                <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">
+                  {course.summary}
+                </p>
               </div>
-              <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">{course.summary}</p>
             </Link>
           ))}
           {courses.length === 0 && <p className="text-muted text-sm">课程即将上线</p>}
@@ -258,7 +265,6 @@ export function HomePage() {
       <section className="container-narrow pb-10">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <div className="eyebrow">Trial</div>
             <h2 className="text-ink mt-1 text-xl font-bold">本周公开课</h2>
           </div>
           <Link to="/trials" className="text-brand inline-flex items-center gap-1 text-sm">
@@ -268,17 +274,32 @@ export function HomePage() {
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {sessions.map((session: TrialSession) => (
-            <Link key={session.id} to={`/trials/${session.id}`} className="pwcard block p-4">
-              <div className="text-ink text-sm font-semibold">{session.title}</div>
-              <div className="text-ink-soft mt-2 text-sm">{formatDateTime(session.startsAt)}</div>
-              <div className="text-muted mt-2 text-xs">
-                已报名 {session.bookedCount}/{session.capacity}
-              </div>
-              {session.reservationFeeAmount > 0 && (
-                <div className="mt-2 text-xs text-amber-700">
-                  {money(session.reservationFeeAmount)} 试听席位保留费
+            <Link
+              key={session.id}
+              to={`/trials/${session.id}`}
+              className="pwcard block overflow-hidden"
+            >
+              {session.coverImageUrl ? (
+                <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+                  <img
+                    src={session.coverImageUrl}
+                    alt={session.title}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-              )}
+              ) : null}
+              <div className="p-4">
+                <div className="text-ink text-sm font-semibold">{session.title}</div>
+                <div className="text-ink-soft mt-2 text-sm">{formatDateTime(session.startsAt)}</div>
+                <div className="text-muted mt-2 text-xs">
+                  已报名 {session.bookedCount}/{session.capacity}
+                </div>
+                {session.reservationFeeAmount > 0 && (
+                  <div className="mt-2 text-xs text-amber-700">
+                    {money(session.reservationFeeAmount)} 试听席位保留费
+                  </div>
+                )}
+              </div>
             </Link>
           ))}
           {sessions.length === 0 && (
@@ -287,52 +308,21 @@ export function HomePage() {
         </div>
       </section>
 
-      {showTeamSection && (
+      {featuredTeachers.length > 0 && (
         <section className="container-narrow pb-10">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <div className="eyebrow">Team</div>
-              <h2 className="text-ink mt-1 text-xl font-bold">师资与教学环境</h2>
+              <h2 className="text-ink mt-1 text-xl font-bold">教师团队</h2>
             </div>
             <Link to="/teachers" className="text-brand inline-flex items-center gap-1 text-sm">
-              教师团队
+              查看全部
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
             {featuredTeachers.map((teacher) => (
               <HomeTeacherCard key={teacher.id} teacher={teacher} />
             ))}
-            <article className="pwcard p-5">
-              <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-2xl">
-                <School className="h-5 w-5" />
-              </div>
-              <h3 className="text-ink mt-4 text-sm font-semibold">校区与教室</h3>
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <b className="text-ink block text-lg">{campuses.length || '-'}</b>
-                  <span className="text-muted">校区</span>
-                </div>
-                <div>
-                  <b className="text-ink block text-lg">{classrooms.length || '-'}</b>
-                  <span className="text-muted">教室</span>
-                </div>
-              </div>
-              {courseTeacherNames.length > 0 ? (
-                <p className="text-ink-soft mt-4 text-sm leading-6">
-                  {courseTeacherNames.join('、')} 等老师参与授课。
-                </p>
-              ) : null}
-              {teachingLocations.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {teachingLocations.map((item) => (
-                    <span key={item} className="chip">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </article>
           </div>
         </section>
       )}
@@ -340,13 +330,26 @@ export function HomePage() {
       {testimonials.length > 0 && (
         <section className="container-narrow pb-10">
           <div className="mb-4">
-            <div className="eyebrow">Testimonials</div>
             <h2 className="section-title mt-1">家长评价</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {testimonials.slice(0, 4).map((item) => (
-              <blockquote key={item} className="pwcard text-ink-soft p-5 text-sm leading-7">
-                “{item}”
+              <blockquote key={`${item.name}-${item.content}`} className="pwcard p-5">
+                <div className="flex items-center gap-3">
+                  {item.avatarUrl ? (
+                    <img
+                      src={item.avatarUrl}
+                      alt={item.name || '家长头像'}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="bg-brand-soft text-brand flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold">
+                      {item.name?.slice(0, 1) || '家'}
+                    </div>
+                  )}
+                  <div className="text-ink text-sm font-semibold">{item.name || '家长'}</div>
+                </div>
+                <p className="text-ink-soft mt-4 text-sm leading-7">“{item.content}”</p>
               </blockquote>
             ))}
           </div>
@@ -356,7 +359,6 @@ export function HomePage() {
       <section className="container-narrow pb-10">
         <div className="bg-ink grid gap-4 rounded-[2rem] p-6 text-white md:grid-cols-2 md:p-8">
           <div>
-            <div className="text-sm font-semibold text-white/60">Visit</div>
             <h2 className="mt-2 text-2xl font-bold">到店前先预约，老师会确认适合的班型</h2>
           </div>
           <div className="space-y-3 text-sm text-white/80">
@@ -384,7 +386,10 @@ function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
   const specialties = teacher.specialties.slice(0, 2);
 
   return (
-    <Link to={`/teachers/${teacher.id}`} className="pwcard pwcard-hover block overflow-hidden">
+    <Link
+      to={`/teachers/${teacher.id}`}
+      className="pwcard pwcard-hover block w-72 shrink-0 snap-start overflow-hidden md:w-80"
+    >
       <div className="bg-brand-soft flex aspect-[16/10] items-center justify-center overflow-hidden">
         {teacher.avatarUrl ? (
           <img src={teacher.avatarUrl} alt={teacher.name} className="h-full w-full object-cover" />

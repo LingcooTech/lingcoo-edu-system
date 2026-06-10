@@ -28,6 +28,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
+import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime, money } from '@/lib/utils';
@@ -52,6 +53,7 @@ interface TrialForm {
   capacity: string;
   reservationFeeYuan: string;
   reservationNotice: string;
+  coverImageUrl: string;
   status: 'open' | 'closed' | 'cancelled';
 }
 
@@ -105,6 +107,7 @@ function defaultForm(campuses: Campus[], courses: Course[]): TrialForm {
     capacity: '8',
     reservationFeeYuan: '0',
     reservationNotice: '',
+    coverImageUrl: '',
     status: 'open',
   };
 }
@@ -396,6 +399,7 @@ export function TrialsPage() {
       capacity: String(session.capacity),
       reservationFeeYuan: String((session.reservationFeeAmount ?? 0) / 100),
       reservationNotice: session.reservationNotice ?? '',
+      coverImageUrl: session.coverImageUrl ?? '',
       status: session.status as TrialForm['status'],
     });
     setOpen(true);
@@ -416,6 +420,7 @@ export function TrialsPage() {
         capacity: Number(form.capacity) || 8,
         reservationFeeAmount: Math.round((Number(form.reservationFeeYuan) || 0) * 100),
         reservationNotice: form.reservationNotice,
+        coverImageUrl: form.coverImageUrl.trim() || null,
       };
       if (editing) {
         const { trialSession } = await apiPatch<{ trialSession: TrialSession }>(
@@ -681,6 +686,13 @@ export function TrialsPage() {
             />
           </Field>
         </FieldRow>
+        <QiniuImageField
+          label="试听封面"
+          hint="展示在首页公开课卡片和试听详情页"
+          value={form.coverImageUrl}
+          onChange={(coverImageUrl) => setForm({ ...form, coverImageUrl })}
+          prefix="trials/cover"
+        />
       </Drawer>
 
       <Drawer

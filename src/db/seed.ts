@@ -16,7 +16,11 @@ async function findOne<T>(rows: Promise<T[]>): Promise<T | undefined> {
 
 async function seed(): Promise<void> {
   let admin = await findOne(
-    db.select().from(schema.accounts).where(eq(schema.accounts.email, 'admin@fd-edu.local')).limit(1),
+    db
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.email, 'admin@fd-edu.local'))
+      .limit(1),
   );
   if (!admin) {
     admin = await findOne(
@@ -47,8 +51,36 @@ async function seed(): Promise<void> {
               eyebrow: '社区小班成长教室',
               bannerTitle: '社区里的儿童成长课堂',
               bannerSubtitle: '专注硬笔书法、创意美术与幼小衔接，让孩子在稳定陪伴中建立学习习惯。',
-              highlights: ['小班教学', '课后反馈', '社区近距离服务'],
+              highlights: [
+                {
+                  text: '小班教学',
+                  imageUrl:
+                    'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80',
+                },
+                {
+                  text: '课后反馈',
+                  imageUrl:
+                    'https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=1200&q=80',
+                },
+                {
+                  text: '社区近距离服务',
+                  imageUrl:
+                    'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80',
+                },
+              ],
               stats: ['6-8 人小班', '课后反馈', '社区近距离服务'],
+              testimonials: [
+                {
+                  name: '一年级家长',
+                  avatarUrl: '',
+                  content: '老师反馈很及时，孩子写字习惯比之前稳定很多。',
+                },
+                {
+                  name: '小班学员家长',
+                  avatarUrl: '',
+                  content: '离家近、班级小，孩子每周都愿意来上课。',
+                },
+              ],
             },
             branding: {
               primaryColor: '#1f6f5b',
@@ -101,6 +133,8 @@ async function seed(): Promise<void> {
       durationMinutes: 90,
       status: 'published' as const,
       summary: '改善坐姿、握笔、控笔和基础笔画。',
+      coverImageUrl:
+        'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80',
     },
     {
       slug: 'creative-art',
@@ -110,6 +144,8 @@ async function seed(): Promise<void> {
       durationMinutes: 90,
       status: 'published' as const,
       summary: '围绕色彩、构图和手工材料展开的创意表达课。',
+      coverImageUrl:
+        'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=1200&q=80',
     },
   ];
   const courseIds: Record<string, string> = {};
@@ -180,6 +216,8 @@ async function seed(): Promise<void> {
       endsAt: new Date('2026-06-06T11:30:00+08:00'),
       capacity: 8,
       bookedCount: 2,
+      coverImageUrl:
+        'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&q=80',
       status: 'open',
     });
   }
@@ -201,11 +239,7 @@ async function seed(): Promise<void> {
   }
 
   let classroom = await findOne(
-    db
-      .select()
-      .from(schema.classrooms)
-      .where(eq(schema.classrooms.name, '成长教室 A'))
-      .limit(1),
+    db.select().from(schema.classrooms).where(eq(schema.classrooms.name, '成长教室 A')).limit(1),
   );
   if (!classroom) {
     classroom = await findOne(
@@ -217,11 +251,7 @@ async function seed(): Promise<void> {
   }
 
   let guardian = await findOne(
-    db
-      .select()
-      .from(schema.guardians)
-      .where(eq(schema.guardians.phone, '13900000000'))
-      .limit(1),
+    db.select().from(schema.guardians).where(eq(schema.guardians.phone, '13900000000')).limit(1),
   );
   if (!guardian) {
     guardian = await findOne(
@@ -291,11 +321,7 @@ async function seed(): Promise<void> {
   }
 
   const order = await findOne(
-    db
-      .select()
-      .from(schema.orders)
-      .where(eq(schema.orders.orderNo, 'EDU202605280001'))
-      .limit(1),
+    db.select().from(schema.orders).where(eq(schema.orders.orderNo, 'EDU202605280001')).limit(1),
   );
   if (!order) {
     await db.insert(schema.orders).values({

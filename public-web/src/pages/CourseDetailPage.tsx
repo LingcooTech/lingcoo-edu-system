@@ -115,6 +115,16 @@ export function CourseDetailPage() {
             <h1 className="text-ink mt-3 text-3xl font-bold tracking-tight">{course.name}</h1>
             <p className="text-ink-soft mt-3 max-w-2xl text-base leading-7">{course.summary}</p>
 
+            {course.coverImageUrl ? (
+              <div className="bg-brand-soft mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
+                <img
+                  src={course.coverImageUrl}
+                  alt={course.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : null}
+
             <div className="text-ink-soft mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <span className="inline-flex items-center gap-1.5">
                 <Layers className="text-brand h-4 w-4" />

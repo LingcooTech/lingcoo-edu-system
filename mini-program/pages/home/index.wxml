@@ -3,7 +3,7 @@
 
   <block wx:else>
     <view class="hero card">
-      <view class="eyebrow">社区小班成长教室</view>
+      <view class="eyebrow">{{eyebrow}}</view>
       <view class="title hero-title">{{bannerTitle}}</view>
       <view class="body-text hero-subtitle">{{bannerSubtitle}}</view>
       <swiper
@@ -30,16 +30,20 @@
     </view>
 
     <view wx:if="{{highlights.length}}" class="section highlights">
-      <view wx:for="{{highlights}}" wx:key="*this" class="card highlight-card">
+      <view
+        wx:for="{{highlights}}"
+        wx:key="text"
+        class="card highlight-card {{item.imageUrl ? 'highlight-card-image' : ''}}"
+        style="{{item.backgroundStyle}}"
+      >
         <view class="highlight-index">{{index + 1}}</view>
-        <view class="body-text">{{item}}</view>
+        <view class="body-text highlight-text">{{item.text}}</view>
       </view>
     </view>
 
     <view class="section">
       <view class="row-between section-head">
         <view>
-          <view class="eyebrow">Courses</view>
           <view class="section-title">推荐课程</view>
         </view>
         <button class="text-button" bindtap="goCourses">全部</button>
@@ -47,6 +51,7 @@
 
       <view wx:if="{{courses.length}}" class="course-list">
         <navigator wx:for="{{courses}}" wx:key="id" class="card course-card" url="/pages/course-detail/index?slug={{item.slug}}">
+          <image wx:if="{{item.coverImageUrl}}" class="course-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
           <view class="row-between">
             <view class="course-name">{{item.name}}</view>
             <view class="course-price">{{item.priceLabel}}</view>
@@ -59,10 +64,10 @@
     </view>
 
     <view class="section">
-      <view class="eyebrow">Trial</view>
       <view class="section-title">本周公开课</view>
       <view wx:if="{{trialSessions.length}}" class="trial-list">
         <navigator wx:for="{{trialSessions}}" wx:key="id" class="card trial-card" url="/pages/trial-detail/index?id={{item.id}}">
+          <image wx:if="{{item.coverImageUrl}}" class="course-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
           <view class="course-name">{{item.title}}</view>
           <view class="muted trial-meta">{{item.startsAtLabel}} · 已报名 {{item.bookedCount}}/{{item.capacity}}</view>
           <view wx:if="{{item.reservationFeeLabel}}" class="trial-fee">{{item.reservationFeeLabel}}</view>
@@ -74,13 +79,12 @@
     <view wx:if="{{trustVisible}}" class="section">
       <view class="row-between section-head">
         <view>
-          <view class="eyebrow">Team</view>
-          <view class="section-title">师资与教学环境</view>
+          <view class="section-title">教师团队</view>
         </view>
-        <button class="text-button" bindtap="goTeachers">教师团队</button>
+        <button class="text-button" bindtap="goTeachers">全部</button>
       </view>
 
-      <view wx:if="{{trustTeachers.length}}" class="trust-teachers">
+      <scroll-view wx:if="{{trustTeachers.length}}" class="trust-teacher-scroll" scroll-x enable-flex>
         <navigator
           wx:for="{{trustTeachers}}"
           wx:key="id"
@@ -96,36 +100,22 @@
             <view wx:if="{{item.specialtiesText}}" class="trust-chip">{{item.specialtiesText}}</view>
           </view>
         </navigator>
-      </view>
-
-      <view class="card trust-environment-card">
-        <view class="row-between trust-stat-row">
-          <view>
-            <view class="trust-stat-value">{{campusCountText}}</view>
-            <view class="muted">校区</view>
-          </view>
-          <view>
-            <view class="trust-stat-value">{{classroomCountText}}</view>
-            <view class="muted">教室</view>
-          </view>
-        </view>
-        <view wx:if="{{courseTeacherNamesText}}" class="body-text trust-note">
-          {{courseTeacherNamesText}} 等老师参与授课。
-        </view>
-        <view wx:if="{{teachingLocations.length}}" class="trust-location-list">
-          <view wx:for="{{teachingLocations}}" wx:key="*this" class="trust-chip">{{item}}</view>
-        </view>
-      </view>
+      </scroll-view>
     </view>
 
     <view wx:if="{{testimonials.length}}" class="section testimonials">
-      <view class="eyebrow">Testimonials</view>
       <view class="section-title">家长评价</view>
-      <view wx:for="{{testimonials}}" wx:key="*this" class="card quote-card">“{{item}}”</view>
+      <view wx:for="{{testimonials}}" wx:key="content" class="card quote-card">
+        <view class="quote-author">
+          <image wx:if="{{item.avatarUrl}}" class="quote-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="quote-avatar quote-avatar-fallback">{{item.initial}}</view>
+          <view class="quote-name">{{item.name || '家长'}}</view>
+        </view>
+        <view class="quote-content">“{{item.content}}”</view>
+      </view>
     </view>
 
     <view class="section card contact-card">
-      <view class="eyebrow">Visit</view>
       <view class="section-title contact-title">到店前先预约，老师会确认适合的班型</view>
       <view wx:if="{{address}}" class="contact-row">地址：{{address}}</view>
       <view wx:if="{{phone}}" class="contact-row">电话：{{phone}}</view>

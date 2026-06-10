@@ -62,7 +62,7 @@ export function CourseListPage() {
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">Courses</div>
+        <div className="eyebrow">课程</div>
         <h1 className="section-title mt-2">全部课程</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
           按年龄与方向开设的小班课程，先预约试听，老师会电话确认适合的班型与时间。
@@ -110,24 +110,35 @@ export function CourseListPage() {
               <Link
                 key={course.id}
                 to={`/courses/${course.slug}`}
-                className="pwcard pwcard-hover flex flex-col p-5 no-underline"
+                className="pwcard pwcard-hover flex flex-col overflow-hidden no-underline"
               >
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="chip">{course.category}</span>
-                  <span className="chip">{course.ageRange}</span>
-                </div>
-                <h2 className="text-ink mt-3 text-base font-semibold">{course.name}</h2>
-                <p className="text-ink-soft mt-2 line-clamp-2 flex-1 text-sm leading-6">
-                  {course.summary}
-                </p>
-                <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
-                  <span className="text-muted inline-flex items-center gap-1.5 text-xs">
-                    <Clock className="h-3.5 w-3.5" />
-                    {coursePlanLabel(course, businessModel)} · {course.durationMinutes} 分钟
-                  </span>
-                  <span className="text-ink text-sm font-semibold">
-                    {coursePriceLabel(course, businessModel)}
-                  </span>
+                {course.coverImageUrl ? (
+                  <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+                    <img
+                      src={course.coverImageUrl}
+                      alt={course.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null}
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="chip">{course.category}</span>
+                    <span className="chip">{course.ageRange}</span>
+                  </div>
+                  <h2 className="text-ink mt-3 text-base font-semibold">{course.name}</h2>
+                  <p className="text-ink-soft mt-2 line-clamp-2 flex-1 text-sm leading-6">
+                    {course.summary}
+                  </p>
+                  <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
+                    <span className="text-muted inline-flex items-center gap-1.5 text-xs">
+                      <Clock className="h-3.5 w-3.5" />
+                      {coursePlanLabel(course, businessModel)} · {course.durationMinutes} 分钟
+                    </span>
+                    <span className="text-ink text-sm font-semibold">
+                      {coursePriceLabel(course, businessModel)}
+                    </span>
+                  </div>
                 </div>
               </Link>
             ))}
@@ -140,17 +151,20 @@ export function CourseListPage() {
 
 function CourseCardSkeleton() {
   return (
-    <div className="pwcard p-5">
-      <div className="flex gap-1.5">
-        <div className="skeleton h-5 w-14" />
-        <div className="skeleton h-5 w-16" />
-      </div>
-      <div className="skeleton mt-3 h-5 w-2/3" />
-      <div className="skeleton mt-3 h-3.5 w-full" />
-      <div className="skeleton mt-2 h-3.5 w-4/5" />
-      <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
-        <div className="skeleton h-3.5 w-32" />
-        <div className="skeleton h-4 w-12" />
+    <div className="pwcard overflow-hidden">
+      <div className="skeleton aspect-[16/9]" />
+      <div className="p-5">
+        <div className="flex gap-1.5">
+          <div className="skeleton h-5 w-14" />
+          <div className="skeleton h-5 w-16" />
+        </div>
+        <div className="skeleton mt-3 h-5 w-2/3" />
+        <div className="skeleton mt-3 h-3.5 w-full" />
+        <div className="skeleton mt-2 h-3.5 w-4/5" />
+        <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
+          <div className="skeleton h-3.5 w-32" />
+          <div className="skeleton h-4 w-12" />
+        </div>
       </div>
     </div>
   );

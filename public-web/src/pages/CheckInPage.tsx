@@ -95,7 +95,7 @@ export function CheckInPage() {
     <Layout>
       <section className="container-narrow grid gap-6 py-8 lg:grid-cols-[1fr_420px]">
         <article className="pwcard p-6 md:p-8">
-          <div className="eyebrow">Class Check-in</div>
+          <div className="eyebrow">课次签到</div>
           <h1 className="text-ink mt-2 text-3xl font-bold">{payload.session.topic}</h1>
           <p className="text-ink-soft mt-3 text-sm leading-7">
             {payload.class.name} · {payload.course.name}

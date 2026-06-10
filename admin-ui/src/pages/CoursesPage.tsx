@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
+import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
@@ -35,6 +36,7 @@ interface CourseForm {
   paymentReceiverName: string;
   trialDescription: string;
   reservationNotice: string;
+  coverImageUrl: string;
   onlineSalesEnabled: boolean;
   summary: string;
   contentBlocks: Block[];
@@ -55,6 +57,7 @@ const emptyCourseForm: CourseForm = {
   paymentReceiverName: '',
   trialDescription: '',
   reservationNotice: '',
+  coverImageUrl: '',
   onlineSalesEnabled: true,
   summary: '',
   contentBlocks: [],
@@ -76,6 +79,7 @@ function courseToForm(course: Course): CourseForm {
     paymentReceiverName: course.paymentReceiverName ?? '',
     trialDescription: course.trialDescription ?? '',
     reservationNotice: course.reservationNotice ?? '',
+    coverImageUrl: course.coverImageUrl ?? '',
     onlineSalesEnabled: course.onlineSalesEnabled ?? true,
     summary: course.summary ?? '',
     contentBlocks: parseBlocks(course.content),
@@ -98,6 +102,7 @@ function courseFormToPayload(form: CourseForm) {
     paymentReceiverName: form.paymentReceiverName.trim() || null,
     trialDescription: form.trialDescription,
     reservationNotice: form.reservationNotice,
+    coverImageUrl: form.coverImageUrl.trim() || null,
     onlineSalesEnabled: form.onlineSalesEnabled,
     summary: form.summary,
     content: serializeBlocks(form.contentBlocks),
@@ -411,6 +416,13 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
             onChange={(e) => setForm({ ...form, summary: e.target.value })}
           />
         </Field>
+        <QiniuImageField
+          label="课程封面"
+          hint="展示在首页课程卡片和课程详情页"
+          value={form.coverImageUrl}
+          onChange={(coverImageUrl) => setForm({ ...form, coverImageUrl })}
+          prefix="courses/cover"
+        />
         <Field label="试听说明">
           <textarea
             className="form-input h-20"

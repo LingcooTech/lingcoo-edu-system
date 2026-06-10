@@ -13,11 +13,16 @@
       <view class="body-text hero-subtitle">
         {{payload.course ? payload.course.name + ' · ' + payload.course.summary : payload.organization.publicProfile.bannerSubtitle}}
       </view>
-      <image wx:if="{{payload.organization.publicProfile.bannerImageUrl}}" class="hero-image" src="{{payload.organization.publicProfile.bannerImageUrl}}" mode="aspectFill" />
+      <image
+        wx:if="{{heroImageUrl}}"
+        class="hero-image"
+        src="{{heroImageUrl}}"
+        mode="aspectFill"
+      />
       <view class="chips">
         <text wx:if="{{payload.course}}" class="chip">{{payload.course.category}}</text>
         <text wx:if="{{payload.course}}" class="chip">{{payload.course.ageRange}}</text>
-        <text wx:if="{{!payload.course}}" wx:for="{{payload.organization.publicProfile.highlights}}" wx:key="*this" class="chip">{{item}}</text>
+        <text wx:if="{{!payload.course}}" wx:for="{{payload.organization.publicProfile.highlights}}" wx:key="text" class="chip">{{item.text}}</text>
       </view>
     </view>
 
@@ -29,10 +34,13 @@
       <view class="section-title">可预约试听</view>
       <radio-group wx:if="{{trialSessions.length}}" class="trial-list" bindchange="onTrialChange">
         <label wx:for="{{trialSessions}}" wx:key="id" class="trial-option">
-          <view>
-            <view class="trial-title">{{item.title}}</view>
-            <view class="muted trial-meta">{{item.startsAtLabel}} · {{item.bookedCount}}/{{item.capacity}}</view>
-            <view wx:if="{{item.reservationFeeLabel}}" class="trial-fee">{{item.reservationFeeLabel}}</view>
+          <view class="trial-option-main">
+            <image wx:if="{{item.coverImageUrl}}" class="trial-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+            <view class="trial-copy">
+              <view class="trial-title">{{item.title}}</view>
+              <view class="muted trial-meta">{{item.startsAtLabel}} · {{item.bookedCount}}/{{item.capacity}}</view>
+              <view wx:if="{{item.reservationFeeLabel}}" class="trial-fee">{{item.reservationFeeLabel}}</view>
+            </view>
           </view>
           <radio value="{{item.id}}" checked="{{trialSessionId == item.id}}" color="#1f6f5b" />
         </label>

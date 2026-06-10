@@ -113,6 +113,10 @@ export function CampaignLandingPage() {
   const selectedRequiresReservationFee = Boolean(
     selectedSession?.reservationFeeAmount && selectedSession.reservationFeeAmount > 0,
   );
+  const heroImageUrl = payload.course?.coverImageUrl || profile.bannerImageUrl;
+  const heroChips = payload.course
+    ? [payload.course.category, payload.course.ageRange]
+    : profile.highlights.map((item) => item.text);
 
   return (
     <Layout>
@@ -129,10 +133,7 @@ export function CampaignLandingPage() {
                 : profile.bannerSubtitle}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
-              {(payload.course
-                ? [payload.course.category, payload.course.ageRange]
-                : profile.highlights
-              ).map((item) => (
+              {heroChips.map((item) => (
                 <span key={item} className="chip">
                   {item}
                 </span>
@@ -140,11 +141,13 @@ export function CampaignLandingPage() {
             </div>
           </div>
           <div className="hero-media">
-            <img
-              src={profile.bannerImageUrl}
-              alt={payload.campaign.name}
-              className="h-full w-full object-cover"
-            />
+            {heroImageUrl ? (
+              <img
+                src={heroImageUrl}
+                alt={payload.campaign.name}
+                className="h-full w-full object-cover"
+              />
+            ) : null}
           </div>
         </div>
       </section>
@@ -165,14 +168,25 @@ export function CampaignLandingPage() {
                     key={session.id}
                     className="border-line flex cursor-pointer items-center justify-between rounded-2xl border p-4"
                   >
-                    <span>
-                      <span className="text-ink block text-sm font-semibold">{session.title}</span>
-                      <span className="text-muted mt-1 block text-xs">
-                        {formatDateTime(session.startsAt)} · {session.bookedCount}/
-                        {session.capacity}
-                        {session.reservationFeeAmount > 0
-                          ? ` · ${money(session.reservationFeeAmount)}席位保留费`
-                          : ''}
+                    <span className="flex min-w-0 items-center gap-3">
+                      {session.coverImageUrl ? (
+                        <img
+                          src={session.coverImageUrl}
+                          alt={session.title}
+                          className="h-14 w-20 shrink-0 rounded-xl object-cover"
+                        />
+                      ) : null}
+                      <span className="min-w-0">
+                        <span className="text-ink block text-sm font-semibold">
+                          {session.title}
+                        </span>
+                        <span className="text-muted mt-1 block text-xs">
+                          {formatDateTime(session.startsAt)} · {session.bookedCount}/
+                          {session.capacity}
+                          {session.reservationFeeAmount > 0
+                            ? ` · ${money(session.reservationFeeAmount)}席位保留费`
+                            : ''}
+                        </span>
                       </span>
                     </span>
                     <input

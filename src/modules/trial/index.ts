@@ -28,6 +28,7 @@ const trialSessionSchema = z.object({
   capacity: z.number().int().positive(),
   reservationFeeAmount: z.number().int().nonnegative().default(0),
   reservationNotice: z.string().default(''),
+  coverImageUrl: z.string().max(500).nullable().optional(),
   status: z.enum(['open', 'closed', 'cancelled']).default('open'),
 });
 
@@ -119,12 +120,11 @@ export const trialModule: AppModule = {
     app.get('/public/home', async () => {
       const organization = await organizationRepo.requireOrganization(app.db);
 
-      const [courses, trialSessions, campuses, teachers, classrooms] = await Promise.all([
+      const [courses, trialSessions, campuses, teachers] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db),
         trialRepo.listOpenTrialSessions(app.db),
         organizationRepo.listCampuses(app.db),
         teachingRepo.listTeachers(app.db),
-        teachingRepo.listClassrooms(app.db),
       ]);
       const businessModel = readBusinessModel(organization.settings);
       const featuredCourses = await attachPackageSummary(app, courses, {
@@ -146,7 +146,6 @@ export const trialModule: AppModule = {
         trialSessions,
         campuses,
         teachers: teachers.filter((teacher) => teacher.status !== 'archived'),
-        classrooms: classrooms.filter((classroom) => classroom.status !== 'archived'),
       };
     });
 
@@ -424,6 +423,7 @@ export const trialModule: AppModule = {
         capacity: body.capacity,
         reservationFeeAmount: body.reservationFeeAmount,
         reservationNotice: body.reservationNotice,
+        coverImageUrl: body.coverImageUrl ?? null,
         status: body.status,
         bookedCount: 0,
       });

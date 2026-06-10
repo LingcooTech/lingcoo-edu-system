@@ -22,6 +22,7 @@ const courseSchema = z.object({
   paymentReceiverName: z.string().max(160).nullable().optional(),
   trialDescription: z.string().default(''),
   reservationNotice: z.string().default(''),
+  coverImageUrl: z.string().max(500).nullable().optional(),
   onlineSalesEnabled: z.boolean().default(true),
   summary: z.string().default(''),
   content: z.string().default(''),

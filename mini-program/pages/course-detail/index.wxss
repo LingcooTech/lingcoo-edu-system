@@ -33,6 +33,15 @@
   margin-top: 14rpx;
 }
 
+.course-cover {
+  display: block;
+  width: 100%;
+  height: 360rpx;
+  margin-top: 24rpx;
+  border-radius: 22rpx;
+  background: #e9f4ef;
+}
+
 .meta-row {
   display: flex;
   flex-wrap: wrap;

@@ -17,6 +17,7 @@ export interface Course {
   paymentReceiverName?: string | null;
   trialDescription?: string;
   reservationNotice?: string;
+  coverImageUrl?: string | null;
   onlineSalesEnabled?: boolean;
   packageCount?: number;
   startingPriceAmount?: number | null;
@@ -42,6 +43,7 @@ export interface TrialSession {
   bookedCount: number;
   reservationFeeAmount: number;
   reservationNotice: string;
+  coverImageUrl?: string | null;
 }
 
 export interface BusinessModelSettings {
@@ -49,6 +51,17 @@ export interface BusinessModelSettings {
   manualPackageGrantEnabled: boolean;
   packagePriceDisplayEnabled: boolean;
   seatReservationFeeEnabled: boolean;
+}
+
+export interface PublicProfileHighlight {
+  text: string;
+  imageUrl: string;
+}
+
+export interface PublicProfileTestimonial {
+  name: string;
+  avatarUrl: string;
+  content: string;
 }
 
 export interface Organization {
@@ -59,7 +72,7 @@ export interface Organization {
   address: string | null;
   publicProfile: {
     eyebrow: string;
-    highlights: string[];
+    highlights: PublicProfileHighlight[];
     bannerImages: string[];
     bannerImageUrl: string;
     bannerTitle: string;
@@ -69,7 +82,7 @@ export interface Organization {
     secondaryCtaText: string;
     secondaryCtaLink: string;
     stats: string[];
-    testimonials: string[];
+    testimonials: PublicProfileTestimonial[];
     businessHours: string;
   };
   businessModel: BusinessModelSettings;
@@ -110,13 +123,6 @@ export interface HomePayload {
     address: string | null;
   }>;
   teachers: PublicTeacher[];
-  classrooms: Array<{
-    id: string;
-    campusId: string;
-    name: string;
-    capacity: number;
-    status: string;
-  }>;
   featuredCourses: Course[];
   trialSessions: TrialSession[];
 }

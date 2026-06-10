@@ -43,6 +43,27 @@
   padding: 22rpx;
 }
 
+.trial-option-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.trial-cover {
+  width: 148rpx;
+  height: 104rpx;
+  flex: 0 0 148rpx;
+  border-radius: 16rpx;
+  background: #e9f4ef;
+}
+
+.trial-copy {
+  min-width: 0;
+  flex: 1;
+}
+
 .trial-title {
   color: #1f2b24;
   font-size: 27rpx;

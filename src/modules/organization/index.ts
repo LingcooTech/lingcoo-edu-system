@@ -20,7 +20,18 @@ import type { AppModule } from '../types.js';
 
 const publicProfileSchema = z.object({
   eyebrow: z.string().max(80).optional(),
-  highlights: z.array(z.string().min(1).max(120)).max(6).optional(),
+  highlights: z
+    .array(
+      z.union([
+        z.string().min(1).max(120),
+        z.object({
+          text: z.string().min(1).max(120),
+          imageUrl: z.string().max(500).optional(),
+        }),
+      ]),
+    )
+    .max(6)
+    .optional(),
   bannerImages: z.array(z.string().min(1).max(500)).max(12).optional(),
   bannerImageUrl: z.string().max(500).optional(),
   bannerTitle: z.string().max(120).optional(),
@@ -30,7 +41,19 @@ const publicProfileSchema = z.object({
   secondaryCtaText: z.string().max(40).optional(),
   secondaryCtaLink: z.string().max(160).optional(),
   stats: z.array(z.string().min(1).max(80)).max(6).optional(),
-  testimonials: z.array(z.string().min(1).max(240)).max(8).optional(),
+  testimonials: z
+    .array(
+      z.union([
+        z.string().min(1).max(240),
+        z.object({
+          name: z.string().max(80).optional(),
+          avatarUrl: z.string().max(500).optional(),
+          content: z.string().min(1).max(240),
+        }),
+      ]),
+    )
+    .max(8)
+    .optional(),
   businessHours: z.string().max(120).optional(),
 });
 

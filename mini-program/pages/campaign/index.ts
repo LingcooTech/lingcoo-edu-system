@@ -15,6 +15,7 @@ interface CampaignState {
   code: string;
   payload: CampaignLandingPayload | null;
   contentBlocks: Block[];
+  heroImageUrl: string;
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   trialSessionId: string;
   selectedRequiresReservationFee: boolean;
@@ -27,6 +28,7 @@ const initialState: CampaignState = {
   code: '',
   payload: null,
   contentBlocks: [],
+  heroImageUrl: '',
   trialSessions: [],
   trialSessionId: '',
   selectedRequiresReservationFee: false,
@@ -88,6 +90,8 @@ Page({
         loading: false,
         payload,
         contentBlocks: parseBlocks(payload.campaign.content),
+        heroImageUrl:
+          payload.course?.coverImageUrl || payload.organization.publicProfile.bannerImageUrl,
         trialSessions,
         trialSessionId,
         selectedRequiresReservationFee: requiresReservationFee(

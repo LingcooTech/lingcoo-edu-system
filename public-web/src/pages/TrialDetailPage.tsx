@@ -143,6 +143,7 @@ export function TrialDetailPage() {
   const requiresReservationFee =
     detail.organization.businessModel.seatReservationFeeEnabled &&
     detail.trialSession.reservationFeeAmount > 0;
+  const coverImageUrl = detail.trialSession.coverImageUrl || detail.course.coverImageUrl;
 
   return (
     <Layout>
@@ -154,7 +155,7 @@ export function TrialDetailPage() {
 
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
           <article className="pwcard p-6 md:p-8">
-            <div className="eyebrow">Trial Booking</div>
+            <div className="eyebrow">试听预约</div>
             <h1 className="text-ink mt-2 text-3xl font-bold tracking-tight">
               {detail.trialSession.title}
             </h1>
@@ -164,6 +165,15 @@ export function TrialDetailPage() {
             >
               {detail.course.name}
             </Link>
+            {coverImageUrl ? (
+              <div className="bg-brand-soft mt-5 aspect-[16/9] overflow-hidden rounded-2xl">
+                <img
+                  src={coverImageUrl}
+                  alt={detail.trialSession.title}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : null}
             <p className="text-ink-soft mt-3 text-sm leading-7">{detail.course.summary}</p>
 
             <div className="text-ink-soft mt-6 grid gap-3 text-sm sm:grid-cols-3">

@@ -8,9 +8,15 @@
 
   <block wx:else>
     <view class="header card">
-      <view class="eyebrow">Trial</view>
+      <view class="eyebrow">试听预约</view>
       <view class="title trial-title">{{detail.trialSession.title}}</view>
       <view class="body-text summary">{{detail.course.summary}}</view>
+      <image
+        wx:if="{{detail.trialSession.coverImageUrl || detail.course.coverImageUrl}}"
+        class="trial-cover"
+        src="{{detail.trialSession.coverImageUrl || detail.course.coverImageUrl}}"
+        mode="aspectFill"
+      />
       <view class="meta-grid">
         <view class="meta-card">
           <view class="meta-label">开始时间</view>
