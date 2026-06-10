@@ -68,6 +68,28 @@ const publicProfileSchema = z.object({
     )
     .max(8)
     .optional(),
+  growthLoop: z
+    .object({
+      eyebrow: z.string().max(60).optional(),
+      title: z.string().max(120).optional(),
+      summary: z.string().max(240).optional(),
+      primaryCtaText: z.string().max(40).optional(),
+      primaryCtaLink: z.string().max(160).optional(),
+      secondaryCtaText: z.string().max(40).optional(),
+      secondaryCtaLink: z.string().max(160).optional(),
+      backgroundColor: z.string().max(40).optional(),
+      backgroundImageUrl: z.string().max(500).optional(),
+      steps: z
+        .array(
+          z.object({
+            icon: z.string().max(40).optional(),
+            title: z.string().min(1).max(60),
+          }),
+        )
+        .max(8)
+        .optional(),
+    })
+    .optional(),
   businessHours: z.string().max(120).optional(),
 });
 

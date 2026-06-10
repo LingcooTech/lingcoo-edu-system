@@ -3,6 +3,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { fetchOrganization, saveOrganization } from '@/api/client';
 import type {
   PublicProfile,
+  PublicProfileGrowthLoop,
+  PublicProfileGrowthLoopStep,
   PublicProfileHighlight,
   PublicProfileStudentStory,
   PublicProfileTestimonial,
@@ -25,6 +27,7 @@ interface HomeForm {
   highlights: PublicProfileHighlight[];
   testimonials: PublicProfileTestimonial[];
   studentStories: PublicProfileStudentStory[];
+  growthLoop: PublicProfileGrowthLoop;
   businessHours: string;
 }
 
@@ -34,6 +37,18 @@ const HIGHLIGHT_ICON_OPTIONS = [
   { value: 'message-circle', label: '反馈' },
   { value: 'star', label: '优势' },
   { value: 'calendar-days', label: '课程' },
+];
+
+const GROWTH_LOOP_ICON_OPTIONS = [
+  { value: 'search', label: '了解' },
+  { value: 'target', label: '目标' },
+  { value: 'clipboard-list', label: '计划' },
+  { value: 'users-round', label: '小班' },
+  { value: 'camera', label: '反馈' },
+  { value: 'bar-chart-3', label: '复盘' },
+  { value: 'refresh-cw', label: '调整' },
+  { value: 'arrow-right', label: '下一阶段' },
+  { value: 'star', label: '优势' },
 ];
 
 function linesToList(value: string): string[] {
@@ -76,6 +91,31 @@ function cleanStudentStories(items: PublicProfileStudentStory[]): PublicProfileS
     .filter((item) => item.title && (item.summary || item.content));
 }
 
+function cleanGrowthLoopSteps(items: PublicProfileGrowthLoopStep[]): PublicProfileGrowthLoopStep[] {
+  return items
+    .map((item) => ({
+      icon: item.icon.trim(),
+      title: item.title.trim(),
+    }))
+    .filter((item) => item.title)
+    .slice(0, 8);
+}
+
+function cleanGrowthLoop(item: PublicProfileGrowthLoop): PublicProfileGrowthLoop {
+  return {
+    eyebrow: item.eyebrow.trim(),
+    title: item.title.trim(),
+    summary: item.summary.trim(),
+    primaryCtaText: item.primaryCtaText.trim(),
+    primaryCtaLink: item.primaryCtaLink.trim(),
+    secondaryCtaText: item.secondaryCtaText.trim(),
+    secondaryCtaLink: item.secondaryCtaLink.trim(),
+    backgroundColor: item.backgroundColor.trim(),
+    backgroundImageUrl: item.backgroundImageUrl.trim(),
+    steps: cleanGrowthLoopSteps(item.steps),
+  };
+}
+
 function profileToForm(profile: PublicProfile): HomeForm {
   return {
     eyebrow: profile.eyebrow,
@@ -95,6 +135,7 @@ function profileToForm(profile: PublicProfile): HomeForm {
     highlights: profile.highlights,
     testimonials: profile.testimonials,
     studentStories: profile.studentStories,
+    growthLoop: profile.growthLoop,
     businessHours: profile.businessHours,
   };
 }
@@ -186,6 +227,54 @@ export function InstitutionHomePage() {
     );
   }
 
+  function updateGrowthLoop(patch: Partial<PublicProfileGrowthLoop>) {
+    setForm((prev) => (prev ? { ...prev, growthLoop: { ...prev.growthLoop, ...patch } } : prev));
+  }
+
+  function updateGrowthLoopStep(index: number, patch: Partial<PublicProfileGrowthLoopStep>) {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            growthLoop: {
+              ...prev.growthLoop,
+              steps: prev.growthLoop.steps.map((item, itemIndex) =>
+                itemIndex === index ? { ...item, ...patch } : item,
+              ),
+            },
+          }
+        : prev,
+    );
+  }
+
+  function addGrowthLoopStep() {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            growthLoop: {
+              ...prev.growthLoop,
+              steps: [...prev.growthLoop.steps, { icon: 'star', title: '' }],
+            },
+          }
+        : prev,
+    );
+  }
+
+  function removeGrowthLoopStep(index: number) {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            growthLoop: {
+              ...prev.growthLoop,
+              steps: prev.growthLoop.steps.filter((_, itemIndex) => itemIndex !== index),
+            },
+          }
+        : prev,
+    );
+  }
+
   async function save() {
     if (!form) return;
     const bannerImages = linesToList(form.bannerImagesText);
@@ -206,6 +295,7 @@ export function InstitutionHomePage() {
           highlights: cleanHighlights(form.highlights),
           testimonials: cleanTestimonials(form.testimonials),
           studentStories: cleanStudentStories(form.studentStories),
+          growthLoop: cleanGrowthLoop(form.growthLoop),
           businessHours: form.businessHours,
         },
       });
@@ -427,6 +517,129 @@ export function InstitutionHomePage() {
               ))}
               <button type="button" className="btn btn-secondary" onClick={addStudentStory}>
                 添加故事
+              </button>
+            </div>
+          </EditorCard>
+
+          <EditorCard
+            title="成长闭环"
+            description="首页底部的成长路径模块，可设置文案、步骤、按钮和背景。"
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="模块标签">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.eyebrow}
+                  onChange={(event) => updateGrowthLoop({ eyebrow: event.target.value })}
+                />
+              </Field>
+              <Field label="模块标题">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.title}
+                  onChange={(event) => updateGrowthLoop({ title: event.target.value })}
+                />
+              </Field>
+            </div>
+            <Field label="模块说明">
+              <textarea
+                className="form-input h-20"
+                value={form.growthLoop.summary}
+                onChange={(event) => updateGrowthLoop({ summary: event.target.value })}
+              />
+            </Field>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="主按钮文字">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.primaryCtaText}
+                  onChange={(event) => updateGrowthLoop({ primaryCtaText: event.target.value })}
+                />
+              </Field>
+              <Field label="主按钮链接" hint="如 /register">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.primaryCtaLink}
+                  onChange={(event) => updateGrowthLoop({ primaryCtaLink: event.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="次按钮文字">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.secondaryCtaText}
+                  onChange={(event) => updateGrowthLoop({ secondaryCtaText: event.target.value })}
+                />
+              </Field>
+              <Field label="次按钮链接" hint="如 tel:15269284351">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.secondaryCtaLink}
+                  onChange={(event) => updateGrowthLoop({ secondaryCtaLink: event.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="背景色" hint="如 #211f1c">
+                <input
+                  className="form-input"
+                  value={form.growthLoop.backgroundColor}
+                  onChange={(event) => updateGrowthLoop({ backgroundColor: event.target.value })}
+                />
+              </Field>
+              <QiniuImageField
+                label="背景图片"
+                hint="可选；前台会叠加深色遮罩保证文字可读"
+                value={form.growthLoop.backgroundImageUrl}
+                onChange={(backgroundImageUrl) => updateGrowthLoop({ backgroundImageUrl })}
+                prefix="homepage/growth-loop"
+              />
+            </div>
+            <div className="space-y-3">
+              <div className="text-sm font-medium">成长步骤</div>
+              {form.growthLoop.steps.map((item, index) => (
+                <div
+                  key={index}
+                  className="grid gap-3 rounded-lg border p-3 md:grid-cols-[10rem_1fr_auto]"
+                >
+                  <Field label="图标">
+                    <select
+                      className="form-input"
+                      value={item.icon}
+                      onChange={(event) =>
+                        updateGrowthLoopStep(index, { icon: event.target.value })
+                      }
+                    >
+                      {GROWTH_LOOP_ICON_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="步骤标题">
+                    <input
+                      className="form-input"
+                      value={item.title}
+                      onChange={(event) =>
+                        updateGrowthLoopStep(index, { title: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => removeGrowthLoopStep(index)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="btn btn-secondary" onClick={addGrowthLoopStep}>
+                添加步骤
               </button>
             </div>
           </EditorCard>

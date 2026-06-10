@@ -19,6 +19,24 @@ export interface PublicProfileStudentStory {
   content: string;
 }
 
+export interface PublicProfileGrowthLoopStep {
+  icon: string;
+  title: string;
+}
+
+export interface PublicProfileGrowthLoop {
+  eyebrow: string;
+  title: string;
+  summary: string;
+  primaryCtaText: string;
+  primaryCtaLink: string;
+  secondaryCtaText: string;
+  secondaryCtaLink: string;
+  backgroundColor: string;
+  backgroundImageUrl: string;
+  steps: PublicProfileGrowthLoopStep[];
+}
+
 export interface PublicProfile {
   eyebrow: string;
   highlights: PublicProfileHighlight[];
@@ -33,16 +51,29 @@ export interface PublicProfile {
   stats: string[];
   testimonials: PublicProfileTestimonial[];
   studentStories: PublicProfileStudentStory[];
+  growthLoop: PublicProfileGrowthLoop;
   businessHours: string;
 }
 
 type PublicProfileInput = Partial<
-  Omit<PublicProfile, 'highlights' | 'testimonials' | 'studentStories'>
+  Omit<PublicProfile, 'highlights' | 'testimonials' | 'studentStories' | 'growthLoop'>
 > & {
   highlights?: unknown;
   testimonials?: unknown;
   studentStories?: unknown;
+  growthLoop?: unknown;
 };
+
+const defaultGrowthLoopSteps: PublicProfileGrowthLoopStep[] = [
+  { icon: 'search', title: '了解孩子' },
+  { icon: 'target', title: '共同确定目标' },
+  { icon: 'clipboard-list', title: '制定成长计划' },
+  { icon: 'users-round', title: '小班教学实施' },
+  { icon: 'camera', title: '课后反馈记录' },
+  { icon: 'bar-chart-3', title: '阶段复盘' },
+  { icon: 'refresh-cw', title: '调整目标计划' },
+  { icon: 'arrow-right', title: '进入下一阶段' },
+];
 
 export const defaultPublicProfile: PublicProfile = {
   eyebrow: '社区小班成长教室',
@@ -83,6 +114,18 @@ export const defaultPublicProfile: PublicProfile = {
     { name: '小班学员家长', avatarUrl: '', content: '离家近、班级小，孩子每周都愿意来上课。' },
   ],
   studentStories: [],
+  growthLoop: {
+    eyebrow: '成长闭环',
+    title: '让课程围绕孩子持续迭代',
+    summary: '目标、计划、课堂、反馈、复盘、调整，形成可追踪的成长路径。',
+    primaryCtaText: '预约成长评估',
+    primaryCtaLink: '/register',
+    secondaryCtaText: '电话咨询',
+    secondaryCtaLink: '',
+    backgroundColor: '#211f1c',
+    backgroundImageUrl: '',
+    steps: defaultGrowthLoopSteps,
+  },
   businessHours: '周二至周日 10:00-20:00',
 };
 
@@ -218,6 +261,53 @@ function normalizeStudentStories(
   return items.length > 0 ? items : fallback;
 }
 
+function normalizeGrowthLoopSteps(value: unknown, fallback: PublicProfileGrowthLoopStep[]) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+
+  const items = value
+    .map((item, index) => {
+      if (typeof item === 'string') {
+        const title = normalizeString(item);
+        return title ? { icon: fallback[index]?.icon || 'star', title: title.slice(0, 60) } : null;
+      }
+      if (!isRecord(item)) return null;
+      const title = normalizeString(item.title);
+      if (!title) return null;
+      return {
+        icon: normalizeString(item.icon) || fallback[index]?.icon || 'star',
+        title: title.slice(0, 60),
+      };
+    })
+    .filter((item): item is PublicProfileGrowthLoopStep => Boolean(item))
+    .slice(0, 8);
+
+  return items.length > 0 ? items : fallback;
+}
+
+function normalizeGrowthLoop(
+  value: unknown,
+  fallback: PublicProfileGrowthLoop,
+): PublicProfileGrowthLoop {
+  if (!isRecord(value)) {
+    return fallback;
+  }
+
+  return {
+    eyebrow: normalizeString(value.eyebrow) || fallback.eyebrow,
+    title: normalizeString(value.title) || fallback.title,
+    summary: normalizeString(value.summary) || fallback.summary,
+    primaryCtaText: normalizeString(value.primaryCtaText) || fallback.primaryCtaText,
+    primaryCtaLink: normalizeString(value.primaryCtaLink) || fallback.primaryCtaLink,
+    secondaryCtaText: normalizeString(value.secondaryCtaText) || fallback.secondaryCtaText,
+    secondaryCtaLink: normalizeString(value.secondaryCtaLink) || fallback.secondaryCtaLink,
+    backgroundColor: normalizeString(value.backgroundColor) || fallback.backgroundColor,
+    backgroundImageUrl: normalizeString(value.backgroundImageUrl),
+    steps: normalizeGrowthLoopSteps(value.steps, fallback.steps),
+  };
+}
+
 export function readPublicProfile(settings: unknown): PublicProfile {
   const raw = isRecord(settings) && isRecord(settings.publicProfile) ? settings.publicProfile : {};
   const bannerImages = normalizeStringList(
@@ -244,6 +334,7 @@ export function readPublicProfile(settings: unknown): PublicProfile {
     stats: normalizeStringList(raw.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeTestimonials(raw.testimonials, defaultPublicProfile.testimonials, 8),
     studentStories: normalizeStudentStories(raw.studentStories, [], 8),
+    growthLoop: normalizeGrowthLoop(raw.growthLoop, defaultPublicProfile.growthLoop),
     businessHours: normalizeString(raw.businessHours) || defaultPublicProfile.businessHours,
   };
 }
@@ -273,6 +364,7 @@ export function normalizePublicProfile(input: PublicProfileInput) {
     stats: normalizeStringList(input.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeTestimonials(input.testimonials, defaultPublicProfile.testimonials, 8),
     studentStories: normalizeStudentStories(input.studentStories, [], 8),
+    growthLoop: normalizeGrowthLoop(input.growthLoop, defaultPublicProfile.growthLoop),
     businessHours: normalizeString(input.businessHours) || defaultPublicProfile.businessHours,
   };
 }

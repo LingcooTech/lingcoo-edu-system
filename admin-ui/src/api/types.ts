@@ -438,6 +438,24 @@ export interface PublicProfileStudentStory {
   content: string;
 }
 
+export interface PublicProfileGrowthLoopStep {
+  icon: string;
+  title: string;
+}
+
+export interface PublicProfileGrowthLoop {
+  eyebrow: string;
+  title: string;
+  summary: string;
+  primaryCtaText: string;
+  primaryCtaLink: string;
+  secondaryCtaText: string;
+  secondaryCtaLink: string;
+  backgroundColor: string;
+  backgroundImageUrl: string;
+  steps: PublicProfileGrowthLoopStep[];
+}
+
 export interface PublicProfile {
   eyebrow: string;
   highlights: PublicProfileHighlight[];
@@ -452,6 +470,7 @@ export interface PublicProfile {
   stats: string[];
   testimonials: PublicProfileTestimonial[];
   studentStories: PublicProfileStudentStory[];
+  growthLoop: PublicProfileGrowthLoop;
   businessHours: string;
 }
 

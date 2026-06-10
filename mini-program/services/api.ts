@@ -74,6 +74,24 @@ export interface PublicProfileStudentStory {
   content: string;
 }
 
+export interface PublicProfileGrowthLoopStep {
+  icon: string;
+  title: string;
+}
+
+export interface PublicProfileGrowthLoop {
+  eyebrow: string;
+  title: string;
+  summary: string;
+  primaryCtaText: string;
+  primaryCtaLink: string;
+  secondaryCtaText: string;
+  secondaryCtaLink: string;
+  backgroundColor: string;
+  backgroundImageUrl: string;
+  steps: PublicProfileGrowthLoopStep[];
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -94,6 +112,7 @@ export interface Organization {
     stats: string[];
     testimonials: PublicProfileTestimonial[];
     studentStories: PublicProfileStudentStory[];
+    growthLoop: PublicProfileGrowthLoop;
     businessHours: string;
   };
   businessModel: BusinessModelSettings;

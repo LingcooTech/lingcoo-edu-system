@@ -223,6 +223,8 @@ test('exposes the public organization home payload', async () => {
       'string',
     );
     assert.ok(Array.isArray(response.json().organization.publicProfile.studentStories));
+    assert.equal(typeof response.json().organization.publicProfile.growthLoop.title, 'string');
+    assert.ok(Array.isArray(response.json().organization.publicProfile.growthLoop.steps));
     assert.ok(Array.isArray(response.json().featuredCourses));
     assert.ok(Array.isArray(response.json().campuses));
     assert.ok(Array.isArray(response.json().teachers));

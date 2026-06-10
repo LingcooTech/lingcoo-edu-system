@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -11,7 +19,6 @@ import {
   GraduationCap,
   MapPin,
   MessageCircle,
-  Phone,
   RefreshCw,
   Search,
   Star,
@@ -45,55 +52,25 @@ function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings)
 }
 
 const highlightIconMap: Record<string, LucideIcon> = {
+  'arrow-right': ArrowRight,
+  'bar-chart-3': BarChart3,
+  camera: Camera,
+  'clipboard-list': ClipboardList,
   'map-pin': MapPin,
   'graduation-cap': GraduationCap,
   'message-circle': MessageCircle,
+  'refresh-cw': RefreshCw,
+  search: Search,
   star: Star,
+  target: Target,
   'calendar-days': CalendarDays,
+  'users-round': UsersRound,
 };
 
 function HighlightIcon({ icon }: { icon: string }) {
   const Icon = highlightIconMap[icon] ?? Star;
   return <Icon className="h-6 w-6" />;
 }
-
-const growthLoopSteps: Array<{
-  title: string;
-  icon: LucideIcon;
-}> = [
-  {
-    title: '了解孩子',
-    icon: Search,
-  },
-  {
-    title: '共同确定目标',
-    icon: Target,
-  },
-  {
-    title: '制定成长计划',
-    icon: ClipboardList,
-  },
-  {
-    title: '小班教学实施',
-    icon: UsersRound,
-  },
-  {
-    title: '课后反馈记录',
-    icon: Camera,
-  },
-  {
-    title: '阶段复盘',
-    icon: BarChart3,
-  },
-  {
-    title: '调整目标计划',
-    icon: RefreshCw,
-  },
-  {
-    title: '进入下一阶段',
-    icon: ArrowRight,
-  },
-];
 
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
@@ -117,6 +94,7 @@ export function HomePage() {
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
   const studentStories = profile?.studentStories ?? [];
+  const growthLoop = profile?.growthLoop;
   const featuredTeachers = teachers.slice(0, 6);
   const heroImages = useMemo(
     () =>
@@ -132,6 +110,16 @@ export function HomePage() {
   const activeHeroImage = heroImages[heroIndex % Math.max(heroImages.length, 1)];
   const heroGridStyle = heroContentHeight
     ? ({ '--home-hero-media-height': `${heroContentHeight}px` } as CSSProperties)
+    : undefined;
+  const growthLoopStyle = growthLoop
+    ? {
+        backgroundColor: growthLoop.backgroundColor || '#211f1c',
+        backgroundImage: growthLoop.backgroundImageUrl
+          ? `linear-gradient(rgba(20, 18, 15, 0.76), rgba(20, 18, 15, 0.82)), url(${growthLoop.backgroundImageUrl})`
+          : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
     : undefined;
 
   useLayoutEffect(() => {
@@ -494,71 +482,85 @@ export function HomePage() {
         </section>
       )}
 
-      <section className="container-narrow pb-10">
-        <div className="bg-ink grid gap-6 rounded-3xl p-5 text-white md:grid-cols-[0.8fr_1.2fr] md:p-7">
-          <div>
-            <div className="text-sm font-semibold text-white/55">成长闭环</div>
-            <h2 className="mt-2 text-xl leading-tight font-bold md:text-2xl">
-              让课程围绕孩子持续迭代
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-white/70">
-              目标、计划、课堂、反馈、复盘、调整，形成可追踪的成长路径。
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                to={profile?.ctaLink || '/register'}
-                className="text-ink inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                预约成长评估
-              </Link>
-              {organization?.phone ? (
-                <a
-                  href={`tel:${organization.phone}`}
-                  className="inline-flex items-center justify-center rounded-full border border-white/25 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  电话咨询
-                </a>
-              ) : null}
+      {growthLoop && (
+        <section className="container-narrow pb-10">
+          <div
+            className="bg-ink grid gap-6 rounded-3xl p-5 text-white md:grid-cols-[0.8fr_1.2fr] md:p-7"
+            style={growthLoopStyle}
+          >
+            <div>
+              <div className="text-sm font-semibold text-white/55">{growthLoop.eyebrow}</div>
+              <h2 className="mt-2 text-xl leading-tight font-bold md:text-2xl">
+                {growthLoop.title}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/70">{growthLoop.summary}</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                {growthLoop.primaryCtaText ? (
+                  <SmartActionLink
+                    to={growthLoop.primaryCtaLink || '/register'}
+                    className="text-ink inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    {growthLoop.primaryCtaText}
+                  </SmartActionLink>
+                ) : null}
+                {growthLoop.secondaryCtaText && growthLoop.secondaryCtaLink ? (
+                  <SmartActionLink
+                    to={growthLoop.secondaryCtaLink}
+                    className="inline-flex items-center justify-center rounded-full border border-white/25 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    {growthLoop.secondaryCtaText}
+                  </SmartActionLink>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-4">
-              {growthLoopSteps.map((item, index) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.title} className="border-t border-white/18 pt-3 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/12 text-white">
-                        <Icon className="h-4 w-4" />
+            <div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-4">
+                {growthLoop.steps.map((item, index) => {
+                  const Icon = highlightIconMap[item.icon] ?? Star;
+                  return (
+                    <div key={item.title} className="border-t border-white/18 pt-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/12 text-white">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="text-xs font-semibold text-white/40">
+                          {String(index + 1).padStart(2, '0')}
+                        </div>
                       </div>
-                      <div className="text-xs font-semibold text-white/40">
-                        {String(index + 1).padStart(2, '0')}
-                      </div>
+                      <div className="mt-3 font-semibold text-white">{item.title}</div>
                     </div>
-                    <div className="mt-3 font-semibold text-white">{item.title}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/15 pt-4 text-sm text-white/70">
-              {organization?.address && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  {organization.address}
-                </div>
-              )}
-              {organization?.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  {organization.phone}
-                </div>
-              )}
-              {profile?.businessHours && <div>{profile.businessHours}</div>}
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </Layout>
+  );
+}
+
+function SmartActionLink({
+  to,
+  className,
+  children,
+}: {
+  to: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (/^(https?:|tel:|mailto:)/i.test(to)) {
+    return (
+      <a href={to} className={className}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link to={to || '/'} className={className}>
+      {children}
+    </Link>
   );
 }
 

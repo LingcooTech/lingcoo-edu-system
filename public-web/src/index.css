@@ -234,11 +234,14 @@ body {
   .home-hero-media {
     @apply aspect-[16/10];
     border-radius: 1rem;
+    justify-self: center;
+    width: 100%;
   }
 
   @media (min-width: 768px) {
     .home-hero-media {
       height: var(--home-hero-media-height);
+      width: calc(100% - 2rem);
     }
   }
 
