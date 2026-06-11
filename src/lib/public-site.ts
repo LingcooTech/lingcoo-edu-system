@@ -30,7 +30,7 @@ export const defaultNavigation: PublicNavItem[] = [
   { label: '课程', path: '/courses', visible: true },
   { label: '试听', path: '/trials', visible: true },
   { label: '老师', path: '/teachers', visible: true },
-  { label: '成长故事', path: '/students', visible: true },
+  { label: '成长故事', path: '/stories', visible: true },
   { label: '关于', path: '/about', visible: true },
 ];
 
@@ -59,6 +59,10 @@ function normalizePath(value: unknown) {
   const raw = normalizeString(value, 160);
   if (!raw) {
     return '';
+  }
+
+  if (raw === '/students') {
+    return '/stories';
   }
 
   if (/^https?:\/\//i.test(raw)) {

@@ -30,6 +30,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   loadHome,
   type BusinessModelSettings,
+  type ContentItem,
   type Course,
   type HomePayload,
   type PublicTeacher,
@@ -93,7 +94,7 @@ export function HomePage() {
   const businessModel = organization?.businessModel;
   const highlights = profile?.highlights ?? [];
   const stats = profile?.stats ?? [];
-  const studentStories = profile?.studentStories ?? [];
+  const contentItems = home?.contentItems ?? [];
   const growthLoop = profile?.growthLoop;
   const featuredTeachers = teachers.slice(0, 6);
   const heroImages = useMemo(
@@ -438,42 +439,42 @@ export function HomePage() {
         </section>
       )}
 
-      {studentStories.length > 0 && (
+      {contentItems.length > 0 && (
         <section className="container-narrow pb-10">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <h2 className="section-title mt-1">成长故事</h2>
+              <h2 className="section-title mt-1">{profile?.contentMarketingTitle || '成长故事'}</h2>
             </div>
-            <Link to="/students" className="text-brand inline-flex items-center gap-1 text-sm">
+            <Link to="/stories" className="text-brand inline-flex items-center gap-1 text-sm">
               查看全部
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            {studentStories.slice(0, 3).map((story) => (
+            {contentItems.slice(0, 3).map((story: ContentItem) => (
               <Link
-                key={`${story.title}-${story.studentName}`}
-                to="/students"
+                key={story.id}
+                to={`/stories/${story.slug}`}
                 className="pwcard group block overflow-hidden no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                {story.coverImageUrl ? (
+                {story.coverUrl ? (
                   <div className="bg-brand-soft aspect-[4/3] overflow-hidden">
                     <img
-                      src={story.coverImageUrl}
+                      src={story.coverUrl}
                       alt={story.title}
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
                   </div>
                 ) : null}
                 <div className="p-5">
-                  {story.studentName ? (
-                    <div className="text-brand text-xs font-semibold">{story.studentName}</div>
+                  {story.authorName ? (
+                    <div className="text-brand text-xs font-semibold">{story.authorName}</div>
                   ) : null}
                   <h3 className="text-ink mt-2 line-clamp-2 text-base leading-6 font-bold">
                     {story.title}
                   </h3>
                   <p className="text-ink-soft mt-3 line-clamp-3 text-sm leading-6">
-                    {story.summary || story.content}
+                    {story.excerpt || story.content}
                   </p>
                 </div>
               </Link>

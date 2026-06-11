@@ -219,6 +219,57 @@ body {
     @apply text-ink text-2xl font-bold tracking-tight md:text-3xl;
   }
 
+  .story-content {
+    @apply text-ink-soft text-base leading-8;
+  }
+
+  .story-content p {
+    @apply my-5;
+  }
+
+  .story-content h1,
+  .story-content h2,
+  .story-content h3 {
+    @apply text-ink mt-9 mb-4 leading-tight font-bold;
+  }
+
+  .story-content h1 {
+    @apply text-3xl;
+  }
+
+  .story-content h2 {
+    @apply text-2xl;
+  }
+
+  .story-content h3 {
+    @apply text-xl;
+  }
+
+  .story-content img {
+    @apply border-line my-6 max-w-full rounded-2xl border;
+  }
+
+  .story-content blockquote {
+    @apply border-brand/40 bg-brand-soft/50 text-ink-soft my-6 border-l-4 px-5 py-3;
+  }
+
+  .story-content ul,
+  .story-content ol {
+    @apply my-5 pl-6;
+  }
+
+  .story-content ul {
+    @apply list-disc;
+  }
+
+  .story-content ol {
+    @apply list-decimal;
+  }
+
+  .story-content a {
+    @apply text-brand font-semibold underline underline-offset-4;
+  }
+
   .hero-grid {
     @apply grid gap-8 py-10 md:grid-cols-[1.05fr_0.95fr] md:items-center md:py-16;
   }

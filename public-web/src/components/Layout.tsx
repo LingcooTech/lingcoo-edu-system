@@ -11,7 +11,7 @@ const defaultNavItems = [
   { to: '/courses', label: '课程', end: false },
   { to: '/trials', label: '试听', end: false },
   { to: '/teachers', label: '老师', end: false },
-  { to: '/students', label: '成长故事', end: false },
+  { to: '/stories', label: '成长故事', end: false },
   { to: '/about', label: '关于', end: false },
 ];
 
@@ -30,7 +30,7 @@ function navItemsFor(organization?: HomePayload['organization']) {
   return configured
     .filter((item) => item.visible)
     .map((item) => ({
-      to: item.path,
+      to: item.path === '/students' ? '/stories' : item.path,
       label: item.label,
       end: item.path === '/',
     }));

@@ -1,9 +1,9 @@
 import {
   loadHome,
+  type ContentItem,
   type Course,
   type HomePayload,
   type PublicProfileHighlight,
-  type PublicProfileStudentStory,
   type PublicTeacher,
   type TrialSession,
 } from '../../services/api';
@@ -25,9 +25,12 @@ type HomeHighlightCard = PublicProfileHighlight & {
   showDescription: boolean;
 };
 
-type HomeStudentStoryCard = PublicProfileStudentStory & {
+interface HomeStudentStoryCard {
+  title: string;
+  studentName: string;
+  coverImageUrl: string;
   excerpt: string;
-};
+}
 
 interface HomeState {
   loading: boolean;
@@ -41,6 +44,7 @@ interface HomeState {
   ctaLink: string;
   stats: string[];
   highlights: HomeHighlightCard[];
+  contentMarketingTitle: string;
   studentStories: HomeStudentStoryCard[];
   address: string;
   phone: string;
@@ -64,6 +68,7 @@ const initialState: HomeState = {
   ctaLink: '/courses',
   stats: [],
   highlights: [],
+  contentMarketingTitle: '成长故事',
   studentStories: [],
   address: '',
   phone: '',
@@ -111,10 +116,12 @@ function highlightIconText(icon: string) {
   return labels[icon] || '优';
 }
 
-function toStudentStoryCard(item: PublicProfileStudentStory): HomeStudentStoryCard {
+function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
   return {
-    ...item,
-    excerpt: item.summary || item.content,
+    title: item.title,
+    studentName: item.authorName ?? '',
+    coverImageUrl: item.coverUrl ?? '',
+    excerpt: item.excerpt || item.content,
   };
 }
 
@@ -142,7 +149,8 @@ function toState(home: HomePayload): HomeState {
     ctaLink: profile.ctaLink || '/courses',
     stats: profile.stats ?? [],
     highlights: (profile.highlights ?? []).map(toHighlightCard),
-    studentStories: (profile.studentStories ?? []).slice(0, 3).map(toStudentStoryCard),
+    contentMarketingTitle: profile.contentMarketingTitle || '成长故事',
+    studentStories: (home.contentItems ?? []).slice(0, 3).map(toStudentStoryCard),
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,

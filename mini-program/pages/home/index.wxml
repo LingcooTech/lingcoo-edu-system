@@ -110,7 +110,7 @@
     </view>
 
     <view wx:if="{{studentStories.length}}" class="section stories">
-      <view class="section-title">成长故事</view>
+      <view class="section-title">{{contentMarketingTitle}}</view>
       <view wx:for="{{studentStories}}" wx:key="title" class="card story-card">
         <image wx:if="{{item.coverImageUrl}}" class="story-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
         <view wx:if="{{item.studentName}}" class="story-meta">{{item.studentName}}</view>

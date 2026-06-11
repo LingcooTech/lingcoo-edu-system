@@ -33,6 +33,35 @@ export interface Course {
   content?: string;
 }
 
+export type ContentSourceType = 'manual' | 'wordpress' | 'notion' | 'wechat';
+export type ContentStatus = 'draft' | 'published' | 'archived';
+
+export interface ContentItem {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string;
+  coverUrl: string | null;
+  authorName: string | null;
+  sourceType: ContentSourceType;
+  sourceId: string | null;
+  sourceUrl: string | null;
+  status: ContentStatus;
+  publishedAt: string | null;
+  importedAt: string | null;
+  meta: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentListResponse {
+  items: ContentItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface CoursePackage {
   id: string;
   courseId?: string | null;
@@ -470,6 +499,7 @@ export interface PublicProfile {
   stats: string[];
   testimonials: PublicProfileTestimonial[];
   studentStories: PublicProfileStudentStory[];
+  contentMarketingTitle: string;
   growthLoop: PublicProfileGrowthLoop;
   businessHours: string;
 }
@@ -539,6 +569,52 @@ export interface SystemSettingOverview {
   source: 'database' | 'env' | 'none';
   values: Record<string, string | number | boolean>;
   secrets: Record<string, { configured: boolean }>;
+}
+
+export interface ContentImportSettingsOverview {
+  configured: boolean;
+  source: 'database' | 'none';
+  values: {
+    wordpress: {
+      siteUrl: string;
+      username: string;
+    };
+    notion: Record<string, never>;
+  };
+  secrets: {
+    wordpress: {
+      appPassword: { configured: boolean };
+    };
+    notion: {
+      apiToken: { configured: boolean };
+    };
+  };
+}
+
+export interface ContentImportSettingsInput {
+  wordpress?: {
+    siteUrl?: string;
+    username?: string;
+    appPassword?: string;
+  };
+  notion?: {
+    apiToken?: string;
+  };
+}
+
+export interface ContentImportWordPressTestResult {
+  ok: true;
+  provider: 'wordpress';
+  siteUrl: string;
+  mode: 'authenticated' | 'public';
+  account: string | null;
+}
+
+export interface ContentImportNotionTestResult {
+  ok: true;
+  provider: 'notion';
+  workspace: string | null;
+  userName: string | null;
 }
 
 export interface WechatPaymentSettingsInput {

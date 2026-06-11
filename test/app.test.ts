@@ -226,9 +226,150 @@ test('exposes the public organization home payload', async () => {
     assert.equal(typeof response.json().organization.publicProfile.growthLoop.title, 'string');
     assert.ok(Array.isArray(response.json().organization.publicProfile.growthLoop.steps));
     assert.ok(Array.isArray(response.json().featuredCourses));
+    assert.ok(Array.isArray(response.json().contentItems));
     assert.ok(Array.isArray(response.json().campuses));
     assert.ok(Array.isArray(response.json().teachers));
   } finally {
+    await app.close();
+  }
+});
+
+test('manages and exposes published content marketing items', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+  const token = await app.jwt.sign({ sub: randomUUID(), role: 'admin' }, { expiresIn: '1h' });
+
+  try {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/content',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        title: `成长故事 ${suffix}`,
+        slug: `story-${suffix}`,
+        excerpt: '一次稳定的成长记录',
+        content: '<p>孩子从试听到持续练习，逐步建立了课堂习惯。</p>',
+        authorName: '一年级学员',
+        status: 'published',
+        sourceType: 'manual',
+      },
+    });
+    assert.equal(create.statusCode, 201, create.body);
+    assert.equal(create.json().status, 'published');
+    assert.equal(typeof create.json().publishedAt, 'string');
+
+    const adminList = await app.inject({
+      method: 'GET',
+      url: `/v1/admin/content?search=${suffix}&status=published`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(adminList.statusCode, 200, adminList.body);
+    assert.equal(adminList.json().items[0].slug, `story-${suffix}`);
+
+    const publicList = await app.inject({
+      method: 'GET',
+      url: `/public/stories?search=${suffix}`,
+    });
+    assert.equal(publicList.statusCode, 200, publicList.body);
+    assert.equal(publicList.json().items[0].slug, `story-${suffix}`);
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/public/stories/story-${suffix}`,
+    });
+    assert.equal(detail.statusCode, 200, detail.body);
+    assert.equal(detail.json().title, `成长故事 ${suffix}`);
+
+    const draft = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/content',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        title: `草稿 ${suffix}`,
+        slug: `draft-${suffix}`,
+        content: '暂不公开',
+        status: 'draft',
+        sourceType: 'manual',
+      },
+    });
+    assert.equal(draft.statusCode, 201, draft.body);
+
+    const hidden = await app.inject({
+      method: 'GET',
+      url: `/public/stories/draft-${suffix}`,
+    });
+    assert.equal(hidden.statusCode, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test('stores content import settings without exposing secrets', async () => {
+  const app = await buildApp(testEnv);
+  const token = await app.jwt.sign({ sub: randomUUID(), role: 'admin' }, { expiresIn: '1h' });
+  const settingKey = 'system.content.import';
+  const [originalSetting] = await app.db
+    .select()
+    .from(schema.settings)
+    .where(eq(schema.settings.key, settingKey))
+    .limit(1);
+
+  try {
+    await app.db.delete(schema.settings).where(eq(schema.settings.key, settingKey));
+
+    const initial = await app.inject({
+      method: 'GET',
+      url: '/v1/system-settings/content-import',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(initial.statusCode, 200, initial.body);
+    assert.equal(initial.json().configured, false);
+    assert.equal(initial.json().source, 'none');
+
+    const saved = await app.inject({
+      method: 'PUT',
+      url: '/v1/system-settings/content-import',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        wordpress: {
+          siteUrl: 'https://example.com/',
+          username: 'editor',
+          appPassword: 'wp-secret',
+        },
+        notion: {
+          apiToken: 'notion-secret',
+        },
+      },
+    });
+    assert.equal(saved.statusCode, 200, saved.body);
+    assert.equal(saved.json().configured, true);
+    assert.equal(saved.json().source, 'database');
+    assert.equal(saved.json().values.wordpress.siteUrl, 'https://example.com');
+    assert.equal(saved.json().values.wordpress.username, 'editor');
+    assert.equal(saved.json().secrets.wordpress.appPassword.configured, true);
+    assert.equal(saved.json().secrets.notion.apiToken.configured, true);
+    assert.equal(saved.body.includes('wp-secret'), false);
+    assert.equal(saved.body.includes('notion-secret'), false);
+
+    const cleared = await app.inject({
+      method: 'DELETE',
+      url: '/v1/system-settings/content-import',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(cleared.statusCode, 200, cleared.body);
+
+    const afterClear = await app.inject({
+      method: 'GET',
+      url: '/v1/system-settings/content-import',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(afterClear.statusCode, 200, afterClear.body);
+    assert.equal(afterClear.json().configured, false);
+  } finally {
+    await app.db.delete(schema.settings).where(eq(schema.settings.key, settingKey));
+    if (originalSetting) {
+      await app.db.insert(schema.settings).values(originalSetting);
+    }
     await app.close();
   }
 });

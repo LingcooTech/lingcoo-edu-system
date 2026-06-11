@@ -9,6 +9,7 @@ import { BusinessModelPage } from '@/pages/BusinessModelPage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
+import { ContentMarketingPage } from '@/pages/ContentMarketingPage';
 import { CourseContractsPage } from '@/pages/CourseContractsPage';
 import { CourseResourcesPage } from '@/pages/CourseResourcesPage';
 import { CoursesPage } from '@/pages/CoursesPage';
@@ -97,6 +98,7 @@ const router = createBrowserRouter(
         { path: 'resources/packages', element: <PackagesPage /> },
         // 招生转化
         { path: 'admissions/marketing', element: <MarketingPage /> },
+        { path: 'admissions/content', element: <ContentMarketingPage /> },
         { path: 'admissions/leads', element: <LeadsPage /> },
         { path: 'admissions/trials', element: <TrialsPage /> },
         // 教务管理
@@ -118,6 +120,7 @@ const router = createBrowserRouter(
         { path: 'leads', element: <LeadsPage /> },
         { path: 'trials', element: <TrialsPage /> },
         { path: 'marketing', element: <MarketingPage /> },
+        { path: 'content', element: <ContentMarketingPage /> },
         { path: 'courses', element: <CoursesPage /> },
         { path: 'packages', element: <PackagesPage /> },
         { path: 'students', element: <StudentsPage /> },

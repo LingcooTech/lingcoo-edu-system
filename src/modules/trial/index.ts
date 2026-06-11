@@ -4,6 +4,7 @@ import type { FastifyRequest } from 'fastify';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as contentRepo from '../../db/repositories/content.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as crmRepo from '../../db/repositories/crm.js';
 import * as financeRepo from '../../db/repositories/finance.js';
@@ -120,11 +121,12 @@ export const trialModule: AppModule = {
     app.get('/public/home', async () => {
       const organization = await organizationRepo.requireOrganization(app.db);
 
-      const [courses, trialSessions, campuses, teachers] = await Promise.all([
+      const [courses, trialSessions, campuses, teachers, contentItems] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db),
         trialRepo.listOpenTrialSessions(app.db),
         organizationRepo.listCampuses(app.db),
         teachingRepo.listTeachers(app.db),
+        contentRepo.listPublishedContent(app.db, { limit: 3, offset: 0 }),
       ]);
       const businessModel = readBusinessModel(organization.settings);
       const featuredCourses = await attachPackageSummary(app, courses, {
@@ -144,6 +146,7 @@ export const trialModule: AppModule = {
         },
         featuredCourses,
         trialSessions,
+        contentItems: contentItems.items,
         campuses,
         teachers: teachers.filter((teacher) => teacher.status !== 'archived'),
       };

@@ -16,7 +16,7 @@ const DEFAULT_SITE: PublicSiteSettings = {
     { label: '课程', path: '/courses', visible: true },
     { label: '试听', path: '/trials', visible: true },
     { label: '老师', path: '/teachers', visible: true },
-    { label: '学员', path: '/students', visible: true },
+    { label: '成长故事', path: '/stories', visible: true },
     { label: '关于', path: '/about', visible: true },
   ],
   aboutPage: {
@@ -148,9 +148,7 @@ export function InstitutionAboutPage() {
                 <input
                   className="form-input"
                   value={form.aboutPage.brandCooperationTitle}
-                  onChange={(event) =>
-                    updateAbout({ brandCooperationTitle: event.target.value })
-                  }
+                  onChange={(event) => updateAbout({ brandCooperationTitle: event.target.value })}
                 />
               </Field>
               <Field label="品牌合作">

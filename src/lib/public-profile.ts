@@ -51,6 +51,7 @@ export interface PublicProfile {
   stats: string[];
   testimonials: PublicProfileTestimonial[];
   studentStories: PublicProfileStudentStory[];
+  contentMarketingTitle: string;
   growthLoop: PublicProfileGrowthLoop;
   businessHours: string;
 }
@@ -61,6 +62,7 @@ type PublicProfileInput = Partial<
   highlights?: unknown;
   testimonials?: unknown;
   studentStories?: unknown;
+  contentMarketingTitle?: unknown;
   growthLoop?: unknown;
 };
 
@@ -114,6 +116,7 @@ export const defaultPublicProfile: PublicProfile = {
     { name: '小班学员家长', avatarUrl: '', content: '离家近、班级小，孩子每周都愿意来上课。' },
   ],
   studentStories: [],
+  contentMarketingTitle: '成长故事',
   growthLoop: {
     eyebrow: '成长闭环',
     title: '让课程围绕孩子持续迭代',
@@ -334,6 +337,8 @@ export function readPublicProfile(settings: unknown): PublicProfile {
     stats: normalizeStringList(raw.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeTestimonials(raw.testimonials, defaultPublicProfile.testimonials, 8),
     studentStories: normalizeStudentStories(raw.studentStories, [], 8),
+    contentMarketingTitle:
+      normalizeString(raw.contentMarketingTitle) || defaultPublicProfile.contentMarketingTitle,
     growthLoop: normalizeGrowthLoop(raw.growthLoop, defaultPublicProfile.growthLoop),
     businessHours: normalizeString(raw.businessHours) || defaultPublicProfile.businessHours,
   };
@@ -364,6 +369,8 @@ export function normalizePublicProfile(input: PublicProfileInput) {
     stats: normalizeStringList(input.stats, defaultPublicProfile.stats, 6),
     testimonials: normalizeTestimonials(input.testimonials, defaultPublicProfile.testimonials, 8),
     studentStories: normalizeStudentStories(input.studentStories, [], 8),
+    contentMarketingTitle:
+      normalizeString(input.contentMarketingTitle) || defaultPublicProfile.contentMarketingTitle,
     growthLoop: normalizeGrowthLoop(input.growthLoop, defaultPublicProfile.growthLoop),
     businessHours: normalizeString(input.businessHours) || defaultPublicProfile.businessHours,
   };

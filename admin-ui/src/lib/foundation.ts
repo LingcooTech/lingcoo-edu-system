@@ -59,6 +59,7 @@ export const adminSections = [
     icon: Megaphone,
     items: [
       { key: 'marketing', label: '营销活动', path: '/admissions/marketing', icon: Megaphone },
+      { key: 'contentMarketing', label: '内容营销', path: '/admissions/content', icon: FileText },
       { key: 'leads', label: '线索跟进', path: '/admissions/leads', icon: Users },
       { key: 'trials', label: '试听转化', path: '/admissions/trials', icon: CalendarCheck },
     ],
@@ -129,6 +130,10 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   marketing: {
     eyebrow: 'Admissions',
     title: '营销活动',
+  },
+  contentMarketing: {
+    eyebrow: 'Admissions',
+    title: '内容营销',
   },
   leads: {
     eyebrow: 'Admissions',

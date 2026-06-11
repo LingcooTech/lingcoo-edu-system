@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { ContentImportSettingsService } from '../../lib/content-import-settings.js';
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
 import { SmtpSettingsService } from '../../lib/smtp-settings.js';
 import type { AppModule } from '../types.js';
@@ -26,6 +27,31 @@ const qiniuSettingsSchema = z.object({
   publicBaseUrl: z.string().optional(),
   uploadHost: z.string().optional(),
   defaultPrefix: z.string().optional(),
+});
+
+const contentImportSettingsSchema = z.object({
+  wordpress: z
+    .object({
+      siteUrl: z.string().optional(),
+      username: z.string().optional(),
+      appPassword: z.string().optional(),
+    })
+    .optional(),
+  notion: z
+    .object({
+      apiToken: z.string().optional(),
+    })
+    .optional(),
+});
+
+const contentImportWordPressTestSchema = z.object({
+  siteUrl: z.string().optional(),
+  username: z.string().optional(),
+  appPassword: z.string().optional(),
+});
+
+const contentImportNotionTestSchema = z.object({
+  apiToken: z.string().optional(),
 });
 
 export const systemModule: AppModule = {
@@ -76,14 +102,60 @@ export const systemModule: AppModule = {
       return new QiniuSettingsService(app.db, app.appEnv).upsertSettings(payload, updatedBy);
     });
 
-    app.post('/v1/system-settings/qiniu/test', { preHandler: app.requireAdmin }, async (request) => {
-      const payload = qiniuSettingsSchema.parse(request.body ?? {});
-      return new QiniuSettingsService(app.db, app.appEnv).testConnection(payload);
-    });
+    app.post(
+      '/v1/system-settings/qiniu/test',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const payload = qiniuSettingsSchema.parse(request.body ?? {});
+        return new QiniuSettingsService(app.db, app.appEnv).testConnection(payload);
+      },
+    );
 
     app.delete('/v1/system-settings/qiniu', { preHandler: app.requireAdmin }, async () => {
       await new QiniuSettingsService(app.db, app.appEnv).clearSettings();
       return { ok: true };
     });
+
+    app.get('/v1/system-settings/content-import', { preHandler: app.requireAdmin }, async () => {
+      return new ContentImportSettingsService(app.db, app.appEnv).getOverview();
+    });
+
+    app.put(
+      '/v1/system-settings/content-import',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const payload = contentImportSettingsSchema.parse(request.body);
+        const updatedBy = request.account!.id;
+        return new ContentImportSettingsService(app.db, app.appEnv).upsertSettings(
+          payload,
+          updatedBy,
+        );
+      },
+    );
+
+    app.delete('/v1/system-settings/content-import', { preHandler: app.requireAdmin }, async () => {
+      await new ContentImportSettingsService(app.db, app.appEnv).clearSettings();
+      return { ok: true };
+    });
+
+    app.post(
+      '/v1/system-settings/content-import/wordpress/test',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const payload = contentImportWordPressTestSchema.parse(request.body ?? {});
+        return new ContentImportSettingsService(app.db, app.appEnv).testWordPressConnection(
+          payload,
+        );
+      },
+    );
+
+    app.post(
+      '/v1/system-settings/content-import/notion/test',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const payload = contentImportNotionTestSchema.parse(request.body ?? {});
+        return new ContentImportSettingsService(app.db, app.appEnv).testNotionConnection(payload);
+      },
+    );
   },
 };

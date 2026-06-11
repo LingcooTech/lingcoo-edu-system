@@ -87,6 +87,7 @@ async function seed(): Promise<void> {
                   content: '离家近、班级小，孩子每周都愿意来上课。',
                 },
               ],
+              contentMarketingTitle: '成长故事',
               studentStories: [
                 {
                   title: '从不敢下笔到主动完成一页练习',
@@ -141,6 +142,45 @@ async function seed(): Promise<void> {
         })
         .returning(),
     );
+  }
+
+  for (const story of [
+    {
+      slug: 'xiao-yu-calligraphy-growth',
+      title: '从不敢下笔到主动完成一页练习',
+      authorName: '二年级学员 小羽',
+      excerpt: '通过硬笔书法小班训练，小羽先稳定坐姿和控笔，再逐步建立每日练习节奏。',
+      coverUrl:
+        'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80',
+      content:
+        '刚来试听时，小羽写字容易急，笔画轻重不稳定。\n\n老师先从坐姿、握笔和基础控笔开始，每节课保留一段可完成的小目标。四周后，小羽能独立完成一页练习，也愿意把课堂作品带回家给家长看。',
+    },
+    {
+      slug: 'anan-creative-art-expression',
+      title: '把创意美术变成稳定表达',
+      authorName: '大班学员 安安',
+      excerpt: '从随意涂画到能讲出作品主题，孩子在材料探索中慢慢建立表达自信。',
+      coverUrl:
+        'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=1200&q=80',
+      content:
+        '安安一开始喜欢颜色，但很少说作品想表达什么。\n\n老师用故事主题和材料任务引导她先观察、再选择、最后描述作品。连续几次课后，她开始主动讲自己的画面，也能听同伴分享并补充想法。',
+    },
+  ]) {
+    const existing = await findOne(
+      db
+        .select()
+        .from(schema.contentItems)
+        .where(eq(schema.contentItems.slug, story.slug))
+        .limit(1),
+    );
+    if (!existing) {
+      await db.insert(schema.contentItems).values({
+        ...story,
+        sourceType: 'manual',
+        status: 'published',
+        publishedAt: new Date(),
+      });
+    }
   }
 
   let campus = await findOne(

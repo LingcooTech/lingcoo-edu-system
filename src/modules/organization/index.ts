@@ -68,6 +68,7 @@ const publicProfileSchema = z.object({
     )
     .max(8)
     .optional(),
+  contentMarketingTitle: z.string().max(80).optional(),
   growthLoop: z
     .object({
       eyebrow: z.string().max(60).optional(),

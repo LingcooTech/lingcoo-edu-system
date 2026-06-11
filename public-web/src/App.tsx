@@ -12,7 +12,8 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { HomePage } from '@/pages/HomePage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { RegisterSuccessPage } from '@/pages/RegisterSuccessPage';
-import { StudentStoriesPage } from '@/pages/StudentStoriesPage';
+import { StoriesPage } from '@/pages/StudentStoriesPage';
+import { StoryDetailPage } from '@/pages/StoryDetailPage';
 import { TeacherDetailPage } from '@/pages/TeacherDetailPage';
 import { TeachersPage } from '@/pages/TeachersPage';
 import { TrialDetailPage } from '@/pages/TrialDetailPage';
@@ -64,7 +65,9 @@ export function App() {
           <Route path="/register/success" element={<RegisterSuccessPage />} />
           <Route path="/teachers" element={<TeachersPage />} />
           <Route path="/teachers/:teacherId" element={<TeacherDetailPage />} />
-          <Route path="/students" element={<StudentStoriesPage />} />
+          <Route path="/stories" element={<StoriesPage />} />
+          <Route path="/stories/:slug" element={<StoryDetailPage />} />
+          <Route path="/students" element={<Navigate to="/stories" replace />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

@@ -4,21 +4,27 @@ import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 import {
+  clearContentImportSettings,
   clearQiniuSettings,
   clearSmtpSettings,
+  fetchContentImportSettings,
   fetchOrganization,
   fetchPaymentSettings,
   fetchQiniuSettings,
   fetchSmtpSettings,
   saveAlipaySettings,
+  saveContentImportSettings,
   saveOrganization,
   saveQiniuSettings,
   saveSmtpSettings,
   saveWechatSettings,
+  testNotionImportSettings,
   testQiniuSettings,
   testSmtpSettings,
+  testWordPressImportSettings,
 } from '@/api/client';
 import type {
+  ContentImportSettingsOverview,
   PaymentProviderItem,
   PublicNavItem,
   PublicSiteSettings,
@@ -43,6 +49,7 @@ const brandTabs = [
 const integrationTabs = [
   { key: 'payment', label: '支付配置' },
   { key: 'smtp', label: 'SMTP 邮件' },
+  { key: 'contentImport', label: '内容导入' },
   { key: 'qiniu', label: '七牛云' },
 ] as const;
 
@@ -55,7 +62,7 @@ const DEFAULT_SITE: PublicSiteSettings = {
     { label: '课程', path: '/courses', visible: true },
     { label: '试听', path: '/trials', visible: true },
     { label: '老师', path: '/teachers', visible: true },
-    { label: '学员', path: '/students', visible: true },
+    { label: '成长故事', path: '/stories', visible: true },
     { label: '关于', path: '/about', visible: true },
   ],
   aboutPage: {
@@ -136,6 +143,8 @@ export function SettingsPage() {
   const [paymentItems, setPaymentItems] = useState<PaymentProviderItem[]>([]);
   const [smtpOverview, setSmtpOverview] = useState<SystemSettingOverview | null>(null);
   const [qiniuOverview, setQiniuOverview] = useState<SystemSettingOverview | null>(null);
+  const [contentImportOverview, setContentImportOverview] =
+    useState<ContentImportSettingsOverview | null>(null);
   const [publicSite, setPublicSite] = useState<PublicSiteSettings>(DEFAULT_SITE);
 
   const [org, setOrg] = useState({
@@ -190,6 +199,12 @@ export function SettingsPage() {
     publicBaseUrl: '',
     uploadHost: '',
     defaultPrefix: '',
+  });
+  const [contentImport, setContentImport] = useState({
+    wordpressSiteUrl: '',
+    wordpressUsername: '',
+    wordpressAppPassword: '',
+    notionApiToken: '',
   });
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -253,6 +268,15 @@ export function SettingsPage() {
     }));
   }
 
+  function hydrateContentImport(overview: ContentImportSettingsOverview) {
+    setContentImportOverview(overview);
+    setContentImport((prev) => ({
+      ...prev,
+      wordpressSiteUrl: overview.values.wordpress.siteUrl,
+      wordpressUsername: overview.values.wordpress.username,
+    }));
+  }
+
   async function reloadPayment() {
     const data = await fetchPaymentSettings();
     hydratePayment(data.items);
@@ -266,14 +290,19 @@ export function SettingsPage() {
     hydrateQiniu(await fetchQiniuSettings());
   }
 
+  async function reloadContentImport() {
+    hydrateContentImport(await fetchContentImportSettings());
+  }
+
   useEffect(() => {
     Promise.all([
       fetchOrganization(),
       fetchPaymentSettings(),
       fetchSmtpSettings(),
+      fetchContentImportSettings(),
       fetchQiniuSettings(),
     ])
-      .then(([organization, payment, smtpData, qiniuData]) => {
+      .then(([organization, payment, smtpData, contentImportData, qiniuData]) => {
         setOrg({
           name: organization.name,
           brandName: organization.brandName,
@@ -296,6 +325,7 @@ export function SettingsPage() {
         setPublicSite(normalizeSite(organization.publicSite));
         hydratePayment(payment.items);
         hydrateSmtp(smtpData);
+        hydrateContentImport(contentImportData);
         hydrateQiniu(qiniuData);
       })
       .catch((err: Error) => setMessage(err.message))
@@ -499,6 +529,89 @@ export function SettingsPage() {
       await reloadSmtp();
       setSmtp((prev) => ({ ...prev, password: '' }));
       setMessage('SMTP 配置已清除');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '清除失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  function contentImportPayload() {
+    return {
+      wordpress: {
+        siteUrl: contentImport.wordpressSiteUrl,
+        username: contentImport.wordpressUsername,
+        ...(contentImport.wordpressAppPassword
+          ? { appPassword: contentImport.wordpressAppPassword }
+          : {}),
+      },
+      notion: {
+        ...(contentImport.notionApiToken ? { apiToken: contentImport.notionApiToken } : {}),
+      },
+    };
+  }
+
+  async function submitContentImport(event: FormEvent) {
+    event.preventDefault();
+    setSaving('content-import');
+    setMessage('');
+    try {
+      await saveContentImportSettings(contentImportPayload());
+      setContentImport((prev) => ({
+        ...prev,
+        wordpressAppPassword: '',
+        notionApiToken: '',
+      }));
+      await reloadContentImport();
+      setMessage('内容导入配置已保存');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function testWordPressImport() {
+    setSaving('content-import-wordpress-test');
+    setMessage('');
+    try {
+      const result = await testWordPressImportSettings(contentImportPayload().wordpress);
+      setMessage(
+        `WordPress 连接测试通过（${result.mode === 'authenticated' ? '已认证' : '公开读取'}）`,
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '测试失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function testNotionImport() {
+    setSaving('content-import-notion-test');
+    setMessage('');
+    try {
+      await testNotionImportSettings(contentImportPayload().notion);
+      setMessage('Notion 连接测试通过');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '测试失败');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function clearContentImport() {
+    setSaving('content-import-clear');
+    setMessage('');
+    try {
+      await clearContentImportSettings();
+      setContentImport({
+        wordpressSiteUrl: '',
+        wordpressUsername: '',
+        wordpressAppPassword: '',
+        notionApiToken: '',
+      });
+      await reloadContentImport();
+      setMessage('内容导入配置已清除');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '清除失败');
     } finally {
@@ -1032,6 +1145,125 @@ export function SettingsPage() {
                       className={outlineButtonClass}
                       disabled={saving === 'smtp-clear'}
                       onClick={clearSmtp}
+                    >
+                      清除配置
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {activeTab === 'contentImport' && (
+                <form className="resource-card mt-4 p-5" onSubmit={submitContentImport}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">内容导入</span>
+                      <StatusBadge configured={Boolean(contentImportOverview?.configured)} />
+                    </div>
+                    <SourceLabel source={contentImportOverview?.source} />
+                  </div>
+                  <div className="mt-4 grid gap-5 lg:grid-cols-2">
+                    <section className="rounded-lg border p-4">
+                      <div className="text-sm font-semibold">WordPress</div>
+                      <div className="mt-3 grid gap-3">
+                        <label className="block">
+                          <span className="text-sm font-medium">站点地址</span>
+                          <input
+                            className={inputClass}
+                            placeholder="https://your-site.com"
+                            value={contentImport.wordpressSiteUrl}
+                            onChange={(e) =>
+                              setContentImport({
+                                ...contentImport,
+                                wordpressSiteUrl: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-sm font-medium">用户名</span>
+                          <input
+                            className={inputClass}
+                            value={contentImport.wordpressUsername}
+                            onChange={(e) =>
+                              setContentImport({
+                                ...contentImport,
+                                wordpressUsername: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-sm font-medium">应用密码</span>
+                          <input
+                            className={inputClass}
+                            type="password"
+                            placeholder={
+                              contentImportOverview?.secrets.wordpress.appPassword.configured
+                                ? '已配置（留空不变）'
+                                : ''
+                            }
+                            value={contentImport.wordpressAppPassword}
+                            onChange={(e) =>
+                              setContentImport({
+                                ...contentImport,
+                                wordpressAppPassword: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className={outlineButtonClass}
+                          disabled={saving === 'content-import-wordpress-test'}
+                          onClick={testWordPressImport}
+                        >
+                          测试 WordPress
+                        </button>
+                      </div>
+                    </section>
+
+                    <section className="rounded-lg border p-4">
+                      <div className="text-sm font-semibold">Notion</div>
+                      <div className="mt-3 grid gap-3">
+                        <label className="block">
+                          <span className="text-sm font-medium">Integration Token</span>
+                          <input
+                            className={inputClass}
+                            type="password"
+                            placeholder={
+                              contentImportOverview?.secrets.notion.apiToken.configured
+                                ? '已配置（留空不变）'
+                                : ''
+                            }
+                            value={contentImport.notionApiToken}
+                            onChange={(e) =>
+                              setContentImport({
+                                ...contentImport,
+                                notionApiToken: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className={outlineButtonClass}
+                          disabled={saving === 'content-import-notion-test'}
+                          onClick={testNotionImport}
+                        >
+                          测试 Notion
+                        </button>
+                      </div>
+                    </section>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button className={buttonClass} disabled={saving === 'content-import'}>
+                      {saving === 'content-import' ? '保存中...' : '保存内容导入配置'}
+                    </button>
+                    <button
+                      type="button"
+                      className={outlineButtonClass}
+                      disabled={saving === 'content-import-clear'}
+                      onClick={clearContentImport}
                     >
                       清除配置
                     </button>

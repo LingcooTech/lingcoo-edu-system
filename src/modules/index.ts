@@ -1,6 +1,7 @@
 import { attendanceModule } from './attendance/index.js';
 import { authModule } from './auth/index.js';
 import { catalogModule } from './catalog/index.js';
+import { contentModule } from './content/index.js';
 import { courseContractsModule } from './course-contracts/index.js';
 import { crmModule } from './crm/index.js';
 import { financeModule } from './finance/index.js';
@@ -22,6 +23,7 @@ export const appModules: AppModule[] = [
   systemModule,
   authModule,
   organizationModule,
+  contentModule,
   catalogModule,
   trialModule,
   crmModule,

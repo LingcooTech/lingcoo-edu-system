@@ -1,5 +1,13 @@
 import type {
   AlipayPaymentSettingsInput,
+  ContentImportNotionTestResult,
+  ContentImportSettingsInput,
+  ContentImportSettingsOverview,
+  ContentImportWordPressTestResult,
+  ContentItem,
+  ContentListResponse,
+  ContentSourceType,
+  ContentStatus,
   OrganizationSettings,
   PaymentProviderOverview,
   QiniuImageListResponse,
@@ -65,6 +73,17 @@ export function apiDelete<T>(path: string): Promise<T> {
   return api<T>(path, { method: 'DELETE' });
 }
 
+function buildQueryString<T extends object>(params: T) {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') {
+      qs.set(key, String(value));
+    }
+  }
+  const query = qs.toString();
+  return query ? `?${query}` : '';
+}
+
 export type AccountRole = 'admin' | 'teacher' | 'parent';
 
 export interface AuthAccount {
@@ -105,6 +124,82 @@ export async function saveOrganization(input: Partial<OrganizationSettings>) {
       body: JSON.stringify(input),
     })
   ).organization;
+}
+
+export interface ContentListParams {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  status?: ContentStatus;
+  sourceType?: ContentSourceType;
+}
+
+export interface ContentUpsertInput {
+  title: string;
+  slug?: string;
+  excerpt?: string;
+  content: string;
+  coverUrl?: string;
+  authorName?: string;
+  status: ContentStatus;
+  sourceType: ContentSourceType;
+  sourceId?: string;
+  sourceUrl?: string;
+  publishedAt?: string;
+  meta?: Record<string, unknown>;
+}
+
+export async function listContent(params: ContentListParams = {}) {
+  return api<ContentListResponse>(`/v1/admin/content${buildQueryString(params)}`);
+}
+
+export async function getContent(contentId: string) {
+  return api<ContentItem>(`/v1/admin/content/${encodeURIComponent(contentId)}`);
+}
+
+export async function createContent(input: ContentUpsertInput) {
+  return api<ContentItem>('/v1/admin/content', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateContent(contentId: string, input: ContentUpsertInput) {
+  return api<ContentItem>(`/v1/admin/content/${encodeURIComponent(contentId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function importWordPressContent(input: {
+  siteUrl?: string;
+  postUrl: string;
+  username?: string;
+  appPassword?: string;
+  status?: 'draft' | 'published';
+}) {
+  return api<ContentItem>('/v1/admin/content/import/wordpress', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function importNotionContent(input: {
+  apiToken?: string;
+  pageUrl: string;
+  status?: 'draft' | 'published';
+}) {
+  return api<ContentItem>('/v1/admin/content/import/notion', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function importWechatContent(input: { url: string; status?: 'draft' | 'published' }) {
+  return api<ContentItem>('/v1/admin/content/import/wechat', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function saveWechatSettings(input: WechatPaymentSettingsInput) {
@@ -163,6 +258,42 @@ export async function testQiniuSettings(input: QiniuSettingsInput) {
 
 export async function clearQiniuSettings() {
   return api<{ ok: boolean }>('/v1/system-settings/qiniu', { method: 'DELETE' });
+}
+
+export async function fetchContentImportSettings() {
+  return api<ContentImportSettingsOverview>('/v1/system-settings/content-import');
+}
+
+export async function saveContentImportSettings(input: ContentImportSettingsInput) {
+  return api<ContentImportSettingsOverview>('/v1/system-settings/content-import', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function clearContentImportSettings() {
+  return api<{ ok: boolean }>('/v1/system-settings/content-import', { method: 'DELETE' });
+}
+
+export async function testWordPressImportSettings(input: {
+  siteUrl?: string;
+  username?: string;
+  appPassword?: string;
+}) {
+  return api<ContentImportWordPressTestResult>(
+    '/v1/system-settings/content-import/wordpress/test',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function testNotionImportSettings(input: { apiToken?: string }) {
+  return api<ContentImportNotionTestResult>('/v1/system-settings/content-import/notion/test', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function fetchQiniuImages(

@@ -46,6 +46,28 @@ export interface TrialSession {
   coverImageUrl?: string | null;
 }
 
+export type ContentSourceType = 'manual' | 'wordpress' | 'notion' | 'wechat';
+export type ContentStatus = 'draft' | 'published' | 'archived';
+
+export interface ContentItem {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string;
+  coverUrl: string | null;
+  authorName: string | null;
+  sourceType: ContentSourceType;
+  sourceId: string | null;
+  sourceUrl: string | null;
+  status: ContentStatus;
+  publishedAt: string | null;
+  importedAt: string | null;
+  meta: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BusinessModelSettings {
   onlinePackageSalesEnabled: boolean;
   manualPackageGrantEnabled: boolean;
@@ -112,6 +134,7 @@ export interface Organization {
     stats: string[];
     testimonials: PublicProfileTestimonial[];
     studentStories: PublicProfileStudentStory[];
+    contentMarketingTitle: string;
     growthLoop: PublicProfileGrowthLoop;
     businessHours: string;
   };
@@ -155,6 +178,7 @@ export interface HomePayload {
   teachers: PublicTeacher[];
   featuredCourses: Course[];
   trialSessions: TrialSession[];
+  contentItems: ContentItem[];
 }
 
 export interface CourseDetail {

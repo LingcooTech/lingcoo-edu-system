@@ -6,7 +6,6 @@ import type {
   PublicProfileGrowthLoop,
   PublicProfileGrowthLoopStep,
   PublicProfileHighlight,
-  PublicProfileStudentStory,
   PublicProfileTestimonial,
 } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
@@ -26,7 +25,7 @@ interface HomeForm {
   statsText: string;
   highlights: PublicProfileHighlight[];
   testimonials: PublicProfileTestimonial[];
-  studentStories: PublicProfileStudentStory[];
+  contentMarketingTitle: string;
   growthLoop: PublicProfileGrowthLoop;
   businessHours: string;
 }
@@ -79,18 +78,6 @@ function cleanTestimonials(items: PublicProfileTestimonial[]): PublicProfileTest
     .filter((item) => item.content);
 }
 
-function cleanStudentStories(items: PublicProfileStudentStory[]): PublicProfileStudentStory[] {
-  return items
-    .map((item) => ({
-      title: item.title.trim(),
-      studentName: item.studentName.trim(),
-      summary: item.summary.trim(),
-      coverImageUrl: item.coverImageUrl.trim(),
-      content: item.content.trim(),
-    }))
-    .filter((item) => item.title && (item.summary || item.content));
-}
-
 function cleanGrowthLoopSteps(items: PublicProfileGrowthLoopStep[]): PublicProfileGrowthLoopStep[] {
   return items
     .map((item) => ({
@@ -134,7 +121,7 @@ function profileToForm(profile: PublicProfile): HomeForm {
     statsText: profile.stats.join('\n'),
     highlights: profile.highlights,
     testimonials: profile.testimonials,
-    studentStories: profile.studentStories,
+    contentMarketingTitle: profile.contentMarketingTitle,
     growthLoop: profile.growthLoop,
     businessHours: profile.businessHours,
   };
@@ -185,44 +172,6 @@ export function InstitutionHomePage() {
     setForm((prev) =>
       prev
         ? { ...prev, highlights: prev.highlights.filter((_, itemIndex) => itemIndex !== index) }
-        : prev,
-    );
-  }
-
-  function updateStudentStory(index: number, patch: Partial<PublicProfileStudentStory>) {
-    setForm((prev) =>
-      prev
-        ? {
-            ...prev,
-            studentStories: prev.studentStories.map((item, itemIndex) =>
-              itemIndex === index ? { ...item, ...patch } : item,
-            ),
-          }
-        : prev,
-    );
-  }
-
-  function addStudentStory() {
-    setForm((prev) =>
-      prev
-        ? {
-            ...prev,
-            studentStories: [
-              ...prev.studentStories,
-              { title: '', studentName: '', summary: '', coverImageUrl: '', content: '' },
-            ],
-          }
-        : prev,
-    );
-  }
-
-  function removeStudentStory(index: number) {
-    setForm((prev) =>
-      prev
-        ? {
-            ...prev,
-            studentStories: prev.studentStories.filter((_, itemIndex) => itemIndex !== index),
-          }
         : prev,
     );
   }
@@ -294,7 +243,8 @@ export function InstitutionHomePage() {
           stats: linesToList(form.statsText),
           highlights: cleanHighlights(form.highlights),
           testimonials: cleanTestimonials(form.testimonials),
-          studentStories: cleanStudentStories(form.studentStories),
+          studentStories: [],
+          contentMarketingTitle: form.contentMarketingTitle,
           growthLoop: cleanGrowthLoop(form.growthLoop),
           businessHours: form.businessHours,
         },
@@ -453,72 +403,16 @@ export function InstitutionHomePage() {
           </EditorCard>
 
           <EditorCard
-            title="成长故事"
-            description="展示在首页和「成长故事」页面，适合写成学员成长案例。"
+            title="内容营销模块"
+            description="首页读取「招生转化 / 内容营销」中已发布内容，这里只维护模块标题。"
           >
-            <div className="space-y-4">
-              {form.studentStories.map((item, index) => (
-                <div key={index} className="rounded-lg border p-3">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">故事 {index + 1}</div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost px-2 py-1 text-red-600"
-                      onClick={() => removeStudentStory(index)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Field label="故事标题">
-                      <input
-                        className="form-input"
-                        value={item.title}
-                        onChange={(event) =>
-                          updateStudentStory(index, { title: event.target.value })
-                        }
-                      />
-                    </Field>
-                    <Field label="学员称呼" hint="如：二年级学员 小羽">
-                      <input
-                        className="form-input"
-                        value={item.studentName}
-                        onChange={(event) =>
-                          updateStudentStory(index, { studentName: event.target.value })
-                        }
-                      />
-                    </Field>
-                  </div>
-                  <QiniuImageField
-                    label="故事封面"
-                    value={item.coverImageUrl}
-                    onChange={(coverImageUrl) => updateStudentStory(index, { coverImageUrl })}
-                    prefix="homepage/student-stories"
-                  />
-                  <Field label="摘要" hint="用于首页卡片，建议 60 字以内">
-                    <textarea
-                      className="form-input h-24"
-                      value={item.summary}
-                      onChange={(event) =>
-                        updateStudentStory(index, { summary: event.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="正文" hint="用于成长故事页面，可写完整变化过程">
-                    <textarea
-                      className="form-input h-36"
-                      value={item.content}
-                      onChange={(event) =>
-                        updateStudentStory(index, { content: event.target.value })
-                      }
-                    />
-                  </Field>
-                </div>
-              ))}
-              <button type="button" className="btn btn-secondary" onClick={addStudentStory}>
-                添加故事
-              </button>
-            </div>
+            <Field label="模块标题" hint="例如：成长故事、课堂观察、学员变化记录">
+              <input
+                className="form-input"
+                value={form.contentMarketingTitle}
+                onChange={(event) => update('contentMarketingTitle', event.target.value)}
+              />
+            </Field>
           </EditorCard>
 
           <EditorCard
