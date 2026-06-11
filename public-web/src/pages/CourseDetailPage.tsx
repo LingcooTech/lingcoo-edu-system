@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import {
-  Building2,
-  ChevronLeft,
-  Clock,
-  Layers,
-  MapPin,
-  ShieldCheck,
-  UserRound,
-} from 'lucide-react';
+import { Building2, ChevronLeft, Clock, MapPin, ShieldCheck, UserRound } from 'lucide-react';
 
 import {
   fetchCourse,
@@ -127,10 +119,6 @@ export function CourseDetailPage() {
 
             <div className="text-ink-soft mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <span className="inline-flex items-center gap-1.5">
-                <Layers className="text-brand h-4 w-4" />
-                {packages.length > 0 ? `${packages.length} 个课时包` : '暂未上架课时包'}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
                 <Clock className="text-brand h-4 w-4" />
                 单节 {course.durationMinutes} 分钟
               </span>
@@ -163,26 +151,80 @@ export function CourseDetailPage() {
               </div>
             )}
 
+            {(course.trialDescription || course.reservationNotice) && (
+              <section className="mt-10 space-y-3">
+                {course.trialDescription && (
+                  <div className="pwcard p-5">
+                    <h2 className="text-ink text-base font-semibold">试听说明</h2>
+                    <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
+                      {course.trialDescription}
+                    </p>
+                  </div>
+                )}
+                {course.reservationNotice && (
+                  <div className="pwcard p-5">
+                    <h2 className="text-ink text-base font-semibold">预约规则</h2>
+                    <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
+                      {course.reservationNotice}
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+          </article>
+
+          <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            <div className="pwcard p-5">
+              <div className="eyebrow">预约</div>
+              <div className="text-ink mt-2 text-2xl font-bold">{price.big}</div>
+              <div className="text-muted mt-1 text-xs">{price.sub}</div>
+              <Link to={registerHref} className="pwbtn pwbtn-primary mt-5 w-full">
+                预约试听 / 留资
+              </Link>
+              {onlinePackageSalesAllowed && packages.length > 0 && (
+                <a href="#packages" className="pwbtn pwbtn-outline mt-2 w-full">
+                  查看课时包
+                </a>
+              )}
+              <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
+                  免注册预约，老师电话确认上课时间
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="text-brand h-4 w-4 shrink-0" />
+                  单节 {course.durationMinutes} 分钟
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="text-brand h-4 w-4 shrink-0" />
+                  {course.teachingLocationLabel || '到店确认'}
+                </div>
+              </div>
+            </div>
+
             {packages.length > 0 && (
-              <section id="packages" className="mt-10 scroll-mt-24">
-                <h2 className="text-ink text-lg font-semibold">
+              <section id="packages" className="pwcard scroll-mt-24 p-5">
+                <h2 className="text-ink text-base font-semibold">
                   {onlinePackageSalesAllowed ? '课时包' : '正式课程参考方案'}
                 </h2>
-                <div className="mt-4 grid gap-3">
+                <div className="mt-4 space-y-4">
                   {packages.map((pkg) => (
-                    <div key={pkg.id} className="pwcard p-5">
+                    <div
+                      key={pkg.id}
+                      className="border-line border-t pt-4 first:border-t-0 first:pt-0"
+                    >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-ink text-sm font-semibold">{pkg.name}</div>
                           <div className="text-muted mt-1 text-xs">{pkg.lessonCount} 课时</div>
                         </div>
-                        <div className="text-ink text-lg font-semibold">
+                        <div className="text-ink shrink-0 text-base font-semibold">
                           {money(pkg.priceAmount)}
                         </div>
                       </div>
-                      {pkg.description && (
+                      {pkg.description ? (
                         <p className="text-ink-soft mt-2 text-sm leading-6">{pkg.description}</p>
-                      )}
+                      ) : null}
                       {onlinePackageSalesAllowed ? (
                         <button
                           type="button"
@@ -211,58 +253,6 @@ export function CourseDetailPage() {
                 </div>
               </section>
             )}
-
-            {(course.trialDescription || course.reservationNotice) && (
-              <section className="mt-10 space-y-3">
-                {course.trialDescription && (
-                  <div className="pwcard p-5">
-                    <h2 className="text-ink text-base font-semibold">试听说明</h2>
-                    <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
-                      {course.trialDescription}
-                    </p>
-                  </div>
-                )}
-                {course.reservationNotice && (
-                  <div className="pwcard p-5">
-                    <h2 className="text-ink text-base font-semibold">预约规则</h2>
-                    <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
-                      {course.reservationNotice}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
-          </article>
-
-          {/* Desktop sticky booking panel: lead-first, no login required. */}
-          <aside className="hidden lg:block">
-            <div className="pwcard p-5 lg:sticky lg:top-24">
-              <div className="eyebrow">预约</div>
-              <div className="text-ink mt-2 text-2xl font-bold">{price.big}</div>
-              <div className="text-muted mt-1 text-xs">{price.sub}</div>
-              <Link to={registerHref} className="pwbtn pwbtn-primary mt-5 w-full">
-                预约试听 / 留资
-              </Link>
-              {onlinePackageSalesAllowed && packages.length > 0 && (
-                <a href="#packages" className="pwbtn pwbtn-outline mt-2 w-full">
-                  查看课时包
-                </a>
-              )}
-              <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
-                  免注册预约，老师电话确认上课时间
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="text-brand h-4 w-4 shrink-0" />
-                  单节 {course.durationMinutes} 分钟
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="text-brand h-4 w-4 shrink-0" />
-                  {course.teachingLocationLabel || '到店确认'}
-                </div>
-              </div>
-            </div>
           </aside>
         </div>
       </div>
@@ -274,9 +264,15 @@ export function CourseDetailPage() {
             <div className="text-ink text-base leading-tight font-semibold">{price.big}</div>
             <div className="text-muted truncate text-xs">免注册 · 老师电话确认时间</div>
           </div>
-          <Link to={registerHref} className="pwbtn pwbtn-primary shrink-0">
-            预约试听
-          </Link>
+          {onlinePackageSalesAllowed && packages.length > 0 ? (
+            <a href="#packages" className="pwbtn pwbtn-primary shrink-0">
+              查看课时包
+            </a>
+          ) : (
+            <Link to={registerHref} className="pwbtn pwbtn-primary shrink-0">
+              预约试听
+            </Link>
+          )}
         </div>
       </div>
 

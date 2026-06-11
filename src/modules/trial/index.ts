@@ -69,6 +69,33 @@ function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
 }
 
+function normalizeImageCaptionItems(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      const record = item as Record<string, unknown>;
+      const imageUrl = typeof record.imageUrl === 'string' ? record.imageUrl.trim() : '';
+      const caption = typeof record.caption === 'string' ? record.caption.trim() : '';
+      return imageUrl ? { imageUrl, caption } : null;
+    })
+    .filter((item): item is { imageUrl: string; caption: string } => item !== null)
+    .slice(0, 20);
+}
+
+function toPublicInstitution(institution: typeof schema.institutions.$inferSelect) {
+  return {
+    id: institution.id,
+    name: institution.name,
+    logoUrl: institution.logoUrl,
+    intro: institution.intro,
+    qualificationItems: normalizeImageCaptionItems(institution.qualificationItems),
+    outcomeItems: normalizeImageCaptionItems(institution.outcomeItems),
+    contact: institution.contact,
+    sortOrder: institution.sortOrder,
+  };
+}
+
 function unprocessable(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 422 });
 }
@@ -209,14 +236,36 @@ export const trialModule: AppModule = {
       return {
         institutions: institutions
           .filter((institution) => institution.status !== 'archived')
-          .map((institution) => ({
-            id: institution.id,
-            name: institution.name,
-            logoUrl: institution.logoUrl,
-            intro: institution.intro,
-            contact: institution.contact,
-            sortOrder: institution.sortOrder,
-          })),
+          .map(toPublicInstitution),
+      };
+    });
+
+    app.get('/public/institutions/:institutionId', async (request) => {
+      const { institutionId } = request.params as { institutionId: string };
+      const institution = await teachingRepo.findInstitution(app.db, institutionId);
+      if (!institution || institution.status === 'archived') {
+        throw notFound('Institution not found');
+      }
+
+      const [teachers, courses, organization] = await Promise.all([
+        teachingRepo.listTeachers(app.db),
+        catalogRepo.listPublishedCourses(app.db),
+        organizationRepo.requireOrganization(app.db),
+      ]);
+      const businessModel = readBusinessModel(organization.settings);
+      const institutionCourses = await attachPackageSummary(
+        app,
+        courses.filter((course) => course.providerInstitutionId === institution.id),
+        { showPackagePrice: businessModel.packagePriceDisplayEnabled },
+      );
+
+      return {
+        institution: toPublicInstitution(institution),
+        teachers: teachers.filter(
+          (teacher) => teacher.institutionId === institution.id && teacher.status !== 'archived',
+        ),
+        courses: institutionCourses,
+        businessModel,
       };
     });
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Institution } from '@/api/types';
+import type { Institution, InstitutionMediaItem } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -17,6 +17,8 @@ interface InstitutionForm {
   name: string;
   logoUrl: string;
   intro: string;
+  qualificationItems: InstitutionMediaItem[];
+  outcomeItems: InstitutionMediaItem[];
   contact: string;
   status: 'active' | 'archived';
 }
@@ -25,6 +27,8 @@ const emptyForm: InstitutionForm = {
   name: '',
   logoUrl: '',
   intro: '',
+  qualificationItems: [],
+  outcomeItems: [],
   contact: '',
   status: 'active',
 };
@@ -34,9 +38,22 @@ function institutionToForm(institution: Institution): InstitutionForm {
     name: institution.name,
     logoUrl: institution.logoUrl ?? '',
     intro: institution.intro ?? '',
+    qualificationItems: normalizeMediaItems(institution.qualificationItems),
+    outcomeItems: normalizeMediaItems(institution.outcomeItems),
     contact: institution.contact ?? '',
     status: institution.status as InstitutionForm['status'],
   };
+}
+
+function normalizeMediaItems(items?: InstitutionMediaItem[] | null) {
+  return Array.isArray(items)
+    ? items
+        .map((item) => ({
+          imageUrl: item.imageUrl?.trim() ?? '',
+          caption: item.caption?.trim() ?? '',
+        }))
+        .filter((item) => item.imageUrl)
+    : [];
 }
 
 export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = {}) {
@@ -72,6 +89,8 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
         name: form.name.trim(),
         logoUrl: form.logoUrl.trim(),
         intro: form.intro.trim(),
+        qualificationItems: normalizeMediaItems(form.qualificationItems),
+        outcomeItems: normalizeMediaItems(form.outcomeItems),
         contact: form.contact.trim(),
         status: form.status,
       };
@@ -267,6 +286,18 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
             onChange={(event) => setForm({ ...form, intro: event.target.value })}
           />
         </Field>
+        <InstitutionMediaEditor
+          label="资质证明"
+          value={form.qualificationItems}
+          onChange={(qualificationItems) => setForm({ ...form, qualificationItems })}
+          prefix="institutions/qualifications"
+        />
+        <InstitutionMediaEditor
+          label="教学成果"
+          value={form.outcomeItems}
+          onChange={(outcomeItems) => setForm({ ...form, outcomeItems })}
+          prefix="institutions/outcomes"
+        />
         <Field label="联系方式" hint="电话、微信或地址等">
           <input
             className="form-input"
@@ -305,5 +336,82 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
     </div>
   ) : (
     page
+  );
+}
+
+function InstitutionMediaEditor({
+  label,
+  value,
+  onChange,
+  prefix,
+}: {
+  label: string;
+  value: InstitutionMediaItem[];
+  onChange: (items: InstitutionMediaItem[]) => void;
+  prefix: string;
+}) {
+  function patch(index: number, patchValue: Partial<InstitutionMediaItem>) {
+    onChange(
+      value.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patchValue } : item)),
+    );
+  }
+
+  return (
+    <div className="mb-3.5">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <span className="form-label">{label}</span>
+          <span className="form-hint">图片 + caption，用于前台机构详情页</span>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => onChange([...value, { imageUrl: '', caption: '' }])}
+        >
+          <Plus className="h-4 w-4" />
+          添加
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {value.map((item, index) => (
+          <div key={index} className="rounded-lg border p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-sm font-medium">
+                {label} {index + 1}
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost px-2 py-1 text-red-600"
+                onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
+              >
+                删除
+              </button>
+            </div>
+            <QiniuImageField
+              label="图片"
+              value={item.imageUrl}
+              onChange={(imageUrl) => patch(index, { imageUrl })}
+              prefix={prefix}
+              previewAlt={`${label}图片`}
+            />
+            <Field label="caption 说明">
+              <input
+                className="form-input"
+                value={item.caption}
+                onChange={(event) => patch(index, { caption: event.target.value })}
+                placeholder="例如：办学许可证、课堂作品展、阶段测评成果等"
+              />
+            </Field>
+          </div>
+        ))}
+
+        {value.length === 0 ? (
+          <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+            暂未添加{label}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

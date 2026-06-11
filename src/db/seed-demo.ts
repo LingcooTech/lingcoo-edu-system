@@ -488,6 +488,8 @@ async function seedDemo(): Promise<void> {
     name: string;
     intro: string;
     contact: string;
+    qualificationItems?: Array<{ imageUrl: string; caption: string }>;
+    outcomeItems?: Array<{ imageUrl: string; caption: string }>;
     sortOrder: number;
   }) {
     const existing = await findOne(
@@ -500,7 +502,14 @@ async function seedDemo(): Promise<void> {
     if (existing) {
       const [updated] = await db
         .update(schema.institutions)
-        .set({ sortOrder: values.sortOrder, updatedAt: new Date() })
+        .set({
+          intro: values.intro,
+          contact: values.contact,
+          qualificationItems: values.qualificationItems ?? [],
+          outcomeItems: values.outcomeItems ?? [],
+          sortOrder: values.sortOrder,
+          updatedAt: new Date(),
+        })
         .where(eq(schema.institutions.id, existing.id))
         .returning();
       return updated ?? existing;
@@ -515,12 +524,40 @@ async function seedDemo(): Promise<void> {
     name: '未来书院',
     intro: '专注 6-12 岁中文书写与表达训练，小班教学、固定老师跟进。',
     contact: '微信 future-academy · 电话 0571-8888 0001',
+    qualificationItems: [
+      {
+        imageUrl:
+          'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=80',
+        caption: '社区儿童书写训练课程合作证明',
+      },
+    ],
+    outcomeItems: [
+      {
+        imageUrl:
+          'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80',
+        caption: '阶段作品展示与书写习惯记录',
+      },
+    ],
     sortOrder: 10,
   });
   const artStudio = await ensureInstitution({
     name: '童心美育',
     intro: '以创意美术启发孩子观察力与想象力的社区美育机构。',
     contact: '微信 tongxin-art · 电话 0571-8888 0002',
+    qualificationItems: [
+      {
+        imageUrl:
+          'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80',
+        caption: '美育课程空间与活动合作资料',
+      },
+    ],
+    outcomeItems: [
+      {
+        imageUrl:
+          'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=1200&q=80',
+        caption: '儿童创意作品阶段展',
+      },
+    ],
     sortOrder: 20,
   });
 

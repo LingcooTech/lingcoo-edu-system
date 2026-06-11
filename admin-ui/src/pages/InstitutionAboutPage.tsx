@@ -24,9 +24,9 @@ const DEFAULT_SITE: PublicSiteSettings = {
     title: '关于我们',
     subtitle: '',
     heroImageUrl: '',
-    operatorIntroTitle: '运营方介绍',
+    operatorIntroTitle: '美智成长空间预约平台',
     operatorIntro: '',
-    brandCooperationTitle: '品牌合作',
+    brandCooperationTitle: '教学机构介绍',
     brandCooperation: '',
     bodyBlocks: [],
   },
@@ -130,28 +130,34 @@ export function InstitutionAboutPage() {
                 prefix="about/hero"
                 previewAlt="关于我们首图"
               />
-              <Field label="运营方区块标题">
+              <Field label="平台区块标题">
                 <input
                   className="form-input"
                   value={form.aboutPage.operatorIntroTitle}
                   onChange={(event) => updateAbout({ operatorIntroTitle: event.target.value })}
                 />
               </Field>
-              <Field label="运营方介绍">
+              <Field
+                label="平台介绍"
+                hint="介绍美智成长空间预约平台的服务范围、预约流程和联系方式说明"
+              >
                 <textarea
                   className="form-input h-32"
                   value={form.aboutPage.operatorIntro}
                   onChange={(event) => updateAbout({ operatorIntro: event.target.value })}
                 />
               </Field>
-              <Field label="品牌合作区块标题">
+              <Field label="教学机构区块标题">
                 <input
                   className="form-input"
                   value={form.aboutPage.brandCooperationTitle}
                   onChange={(event) => updateAbout({ brandCooperationTitle: event.target.value })}
                 />
               </Field>
-              <Field label="品牌合作">
+              <Field
+                label="教学机构介绍"
+                hint="介绍课程交付方、教学理念、师资或校区联系方式；机构资源中的介绍与联系方式也会在前台展示"
+              >
                 <textarea
                   className="form-input h-32"
                   value={form.aboutPage.brandCooperation}

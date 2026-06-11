@@ -38,10 +38,17 @@ const teacherSchema = z.object({
 
 const teacherUpdateSchema = teacherSchema.partial();
 
+const institutionImageCaptionSchema = z.object({
+  imageUrl: z.string().trim().max(500).default(''),
+  caption: z.string().trim().max(200).default(''),
+});
+
 const institutionSchema = z.object({
   name: z.string().min(1).max(160),
   logoUrl: z.string().max(500).optional(),
   intro: z.string().default(''),
+  qualificationItems: z.array(institutionImageCaptionSchema).max(20).default([]),
+  outcomeItems: z.array(institutionImageCaptionSchema).max(20).default([]),
   contact: z.string().max(200).optional(),
   sortOrder: z.number().int().min(0).optional(),
   status: z.enum(['active', 'archived']).default('active'),

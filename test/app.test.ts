@@ -374,6 +374,47 @@ test('stores content import settings without exposing secrets', async () => {
   }
 });
 
+test('exposes public institution detail with media items', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+
+  try {
+    const [institution] = await app.db
+      .insert(schema.institutions)
+      .values({
+        name: `机构详情 ${suffix}`,
+        intro: '机构详情介绍',
+        contact: '电话 0571-0000',
+        qualificationItems: [
+          { imageUrl: 'https://cdn.example.com/license.jpg', caption: '办学资质' },
+        ],
+        outcomeItems: [{ imageUrl: 'https://cdn.example.com/outcome.jpg', caption: '阶段成果展' }],
+        sortOrder: 999,
+        status: 'active',
+      })
+      .returning();
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/public/institutions/${institution.id}`,
+    });
+    assert.equal(detail.statusCode, 200, detail.body);
+    assert.equal(detail.json().institution.name, `机构详情 ${suffix}`);
+    assert.equal(detail.json().institution.qualificationItems[0].caption, '办学资质');
+    assert.equal(
+      detail.json().institution.outcomeItems[0].imageUrl,
+      'https://cdn.example.com/outcome.jpg',
+    );
+    assert.ok(Array.isArray(detail.json().teachers));
+    assert.ok(Array.isArray(detail.json().courses));
+  } finally {
+    await app.db
+      .delete(schema.institutions)
+      .where(eq(schema.institutions.name, `机构详情 ${suffix}`));
+    await app.close();
+  }
+});
+
 test('exposes configured WeChat Mini Program subscribe templates', async () => {
   const app = await buildApp({
     ...testEnv,

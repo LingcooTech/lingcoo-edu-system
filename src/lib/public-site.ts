@@ -37,13 +37,14 @@ export const defaultNavigation: PublicNavItem[] = [
 export const defaultAboutPage: AboutPageSettings = {
   eyebrow: 'About',
   title: '关于我们',
-  subtitle: '介绍运营方、品牌合作与长期服务能力。',
+  subtitle: '了解预约平台、教学机构和到店咨询方式。',
   heroImageUrl: '',
-  operatorIntroTitle: '运营方介绍',
+  operatorIntroTitle: '美智成长空间预约平台',
   operatorIntro:
-    '这里可以介绍机构运营方背景、团队经验、服务理念，以及为什么选择在本地社区长期经营。',
-  brandCooperationTitle: '品牌合作',
-  brandCooperation: '这里可以展示品牌合作、课程联合研发、校区资源共建、活动共创等合作信息。',
+    '美智成长空间负责线上课程展示、试听预约、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排，并把预约信息准确同步给教学机构。',
+  brandCooperationTitle: '教学机构介绍',
+  brandCooperation:
+    '教学机构负责课程研发、师资安排、课堂交付与课后反馈。家长可结合课程详情、教师团队和成长故事，判断课程是否适合孩子当前阶段。',
   bodyBlocks: [],
 };
 

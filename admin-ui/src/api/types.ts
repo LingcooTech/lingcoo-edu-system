@@ -108,9 +108,16 @@ export interface Institution {
   name: string;
   logoUrl?: string | null;
   intro?: string | null;
+  qualificationItems?: InstitutionMediaItem[];
+  outcomeItems?: InstitutionMediaItem[];
   contact?: string | null;
   sortOrder: number;
   status: string;
+}
+
+export interface InstitutionMediaItem {
+  imageUrl: string;
+  caption: string;
 }
 
 export interface Guardian {

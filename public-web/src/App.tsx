@@ -10,6 +10,7 @@ import { CourseDetailPage } from '@/pages/CourseDetailPage';
 import { CourseListPage } from '@/pages/CourseListPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { HomePage } from '@/pages/HomePage';
+import { InstitutionDetailPage } from '@/pages/InstitutionDetailPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { RegisterSuccessPage } from '@/pages/RegisterSuccessPage';
 import { StoriesPage } from '@/pages/StudentStoriesPage';
@@ -65,6 +66,7 @@ export function App() {
           <Route path="/register/success" element={<RegisterSuccessPage />} />
           <Route path="/teachers" element={<TeachersPage />} />
           <Route path="/teachers/:teacherId" element={<TeacherDetailPage />} />
+          <Route path="/institutions/:institutionId" element={<InstitutionDetailPage />} />
           <Route path="/stories" element={<StoriesPage />} />
           <Route path="/stories/:slug" element={<StoryDetailPage />} />
           <Route path="/students" element={<Navigate to="/stories" replace />} />

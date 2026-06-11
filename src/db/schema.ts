@@ -411,6 +411,12 @@ export const institutions = pgTable(
     name: varchar('name', { length: 160 }).notNull(),
     logoUrl: varchar('logo_url', { length: 500 }),
     intro: text('intro').notNull().default(''),
+    qualificationItems: jsonb('qualification_items')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    outcomeItems: jsonb('outcome_items')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     contact: varchar('contact', { length: 200 }),
     sortOrder: integer('sort_order').notNull().default(0),
     status: teachingResourceStatusEnum('status').notNull().default('active'),

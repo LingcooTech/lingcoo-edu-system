@@ -112,10 +112,6 @@ export function StoriesPage() {
             暂无公开内容。可在后台「招生转化 / 内容营销」中新建或导入内容并发布。
           </div>
         )}
-
-        <Link to="/register" className="pwbtn pwbtn-primary mt-8">
-          预约一次真实课堂体验
-        </Link>
       </section>
     </Layout>
   );

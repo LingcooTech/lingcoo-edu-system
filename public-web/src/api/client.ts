@@ -694,8 +694,22 @@ export interface PublicInstitution {
   name: string;
   logoUrl?: string | null;
   intro?: string | null;
+  qualificationItems?: InstitutionMediaItem[];
+  outcomeItems?: InstitutionMediaItem[];
   contact?: string | null;
   sortOrder?: number;
+}
+
+export interface InstitutionMediaItem {
+  imageUrl: string;
+  caption: string;
+}
+
+export interface PublicInstitutionDetail {
+  institution: PublicInstitution;
+  teachers: PublicTeacher[];
+  courses: Course[];
+  businessModel: BusinessModelSettings;
 }
 
 export interface PublicTeacherDetail {
@@ -711,6 +725,12 @@ export async function fetchPublicTeachers() {
 export async function fetchPublicInstitutions() {
   return (await publicApi<{ institutions: PublicInstitution[] }>('/public/institutions'))
     .institutions;
+}
+
+export async function fetchPublicInstitution(institutionId: string) {
+  return publicApi<PublicInstitutionDetail>(
+    `/public/institutions/${encodeURIComponent(institutionId)}`,
+  );
 }
 
 export async function fetchPublicTeacher(teacherId: string) {
