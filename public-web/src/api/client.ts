@@ -180,6 +180,8 @@ export interface HomePayload {
       fullLogoUrl?: string;
       squareLogoUrl?: string;
       logoUrl?: string;
+      darkLogoUrl?: string;
+      faviconUrl?: string;
       primaryColor?: string;
       secondaryColor?: string;
       backgroundColor?: string;

@@ -117,7 +117,7 @@
       </button>
     </form>
 
-    <view class="sticky-cta">
+    <view class="sticky-cta app-bottom-bar">
       <view class="sticky-note">免注册 · 老师电话确认时间</view>
       <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听 / 留资</button>
     </view>

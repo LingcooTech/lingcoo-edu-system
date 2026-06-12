@@ -79,6 +79,9 @@ const importWechatContentSchema = z.object({
   status: z.enum(['draft', 'published']).default('draft'),
 });
 
+const NOTION_BLOCK_API_VERSION = '2022-06-28';
+const NOTION_MARKDOWN_API_VERSION = '2026-03-11';
+
 function normalizeString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -144,6 +147,134 @@ function htmlEscape(value: string) {
     .replace(/'/g, '&#39;');
 }
 
+function markdownInlineToHtml(value: string) {
+  return htmlEscape(value)
+    .replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, (_match, alt, url) => {
+      const safeAlt = htmlEscape(decodeHtmlEntities(String(alt)));
+      return `<img src="${url}" alt="${safeAlt}" />`;
+    })
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_match, label, url) => {
+      const safeLabel = String(label);
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>`;
+    })
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function markdownToHtml(markdown: string) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const output: string[] = [];
+  const paragraph: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+  let listItems: string[] = [];
+  let inCodeBlock = false;
+  const codeLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    output.push(`<p>${markdownInlineToHtml(paragraph.join(' '))}</p>`);
+    paragraph.length = 0;
+  };
+
+  const flushList = () => {
+    if (!listType || listItems.length === 0) return;
+    output.push(
+      `<${listType}>${listItems.map((item) => `<li>${item}</li>`).join('')}</${listType}>`,
+    );
+    listType = null;
+    listItems = [];
+  };
+
+  const flushCode = () => {
+    if (codeLines.length === 0) return;
+    output.push(`<pre><code>${htmlEscape(codeLines.join('\n'))}</code></pre>`);
+    codeLines.length = 0;
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        inCodeBlock = false;
+        flushCode();
+      } else {
+        flushParagraph();
+        flushList();
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const imageOnly = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)$/);
+    if (imageOnly) {
+      flushParagraph();
+      flushList();
+      output.push(
+        `<figure><img src="${imageOnly[2]}" alt="${htmlEscape(
+          decodeHtmlEntities(imageOnly[1]),
+        )}" /></figure>`,
+      );
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = heading[1].length;
+      output.push(`<h${level}>${markdownInlineToHtml(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const quote = trimmed.match(/^>\s?(.*)$/);
+    if (quote) {
+      flushParagraph();
+      flushList();
+      output.push(`<blockquote>${markdownInlineToHtml(quote[1])}</blockquote>`);
+      continue;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      flushParagraph();
+      if (listType && listType !== 'ul') flushList();
+      listType = 'ul';
+      listItems.push(markdownInlineToHtml(bullet[1]));
+      continue;
+    }
+
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (numbered) {
+      flushParagraph();
+      if (listType && listType !== 'ol') flushList();
+      listType = 'ol';
+      listItems.push(markdownInlineToHtml(numbered[1]));
+      continue;
+    }
+
+    paragraph.push(trimmed);
+  }
+
+  if (inCodeBlock) flushCode();
+  flushParagraph();
+  flushList();
+
+  return output.join('\n');
+}
+
 function decodeHtmlEntities(value: string) {
   return value
     .replace(/&nbsp;/gi, ' ')
@@ -202,15 +333,46 @@ function normalizeNotionId(value: string) {
   ].join('-');
 }
 
+function findNotionId(value: string) {
+  const uuidMatch = value.match(
+    /([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})/,
+  );
+  if (uuidMatch) return normalizeNotionId(uuidMatch[1]);
+
+  const compactMatch = value.match(/([a-fA-F0-9]{32})/);
+  return compactMatch ? normalizeNotionId(compactMatch[1]) : '';
+}
+
 function extractNotionPageId(input: { pageUrl?: string; pageId?: string }) {
   const explicitId = normalizeString(input.pageId);
-  if (explicitId) return normalizeNotionId(explicitId);
+  if (explicitId) return findNotionId(explicitId) || normalizeNotionId(explicitId);
 
   const pageUrl = normalizeString(input.pageUrl);
   if (!pageUrl) return '';
 
-  const matched = pageUrl.match(/([a-fA-F0-9]{32})/);
-  return matched ? normalizeNotionId(matched[1]) : pageUrl;
+  try {
+    const url = new URL(pageUrl);
+    const queryId =
+      url.searchParams.get('p') ||
+      url.searchParams.get('page_id') ||
+      url.searchParams.get('pageId');
+    if (queryId) {
+      const normalized = findNotionId(queryId);
+      if (normalized) return normalized;
+    }
+  } catch {
+    // Fall through to scanning the raw value.
+  }
+
+  return findNotionId(pageUrl);
+}
+
+function formatNotionError(response: Response, data: unknown) {
+  const dataRecord = isRecord(data) ? data : {};
+  const code = normalizeString(dataRecord.code);
+  const message = normalizeString(dataRecord.message);
+  const suffix = message ? `：${message}${code ? ` (${code})` : ''}` : '';
+  return `${response.status} ${response.statusText}${suffix}`;
 }
 
 type NotionRichText = {
@@ -579,19 +741,59 @@ class ContentService {
     );
   }
 
-  private async requestNotion(path: string, apiToken: string, init?: RequestInit) {
+  private async requestNotion(
+    path: string,
+    apiToken: string,
+    init?: RequestInit,
+    version = NOTION_BLOCK_API_VERSION,
+  ) {
+    const headers = new Headers(init?.headers);
+    headers.set('Authorization', `Bearer ${apiToken}`);
+    headers.set('Notion-Version', version);
+    headers.set('Content-Type', 'application/json');
+
     const response = await fetch(`https://api.notion.com/v1${path}`, {
       ...init,
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-        ...(init?.headers ?? {}),
-      },
+      headers,
       signal: AbortSignal.timeout(20_000),
     });
-    const data = (await response.json()) as unknown;
+    const data = (await response.json().catch(() => null)) as unknown;
     return { response, data };
+  }
+
+  private async fetchNotionMarkdown(pageId: string, apiToken: string) {
+    const { response, data } = await this.requestNotion(
+      `/pages/${pageId}/markdown`,
+      apiToken,
+      undefined,
+      NOTION_MARKDOWN_API_VERSION,
+    );
+
+    if (!response.ok) {
+      return {
+        ok: false as const,
+        message: formatNotionError(response, data),
+      };
+    }
+
+    const dataRecord = isRecord(data) ? data : {};
+    if (typeof dataRecord.markdown !== 'string') {
+      return {
+        ok: false as const,
+        message: 'Notion markdown 接口没有返回正文内容',
+      };
+    }
+
+    const unknownBlockIds = Array.isArray(dataRecord.unknown_block_ids)
+      ? dataRecord.unknown_block_ids.map(normalizeString).filter((id) => id.length > 0)
+      : [];
+
+    return {
+      ok: true as const,
+      html: markdownToHtml(dataRecord.markdown),
+      truncated: dataRecord.truncated === true,
+      unknownBlockIds,
+    };
   }
 
   private async fetchNotionBlockTree(blockId: string, apiToken: string): Promise<NotionBlock[]> {
@@ -608,7 +810,7 @@ class ContentService {
         apiToken,
       );
       if (!response.ok) {
-        throw httpError(502, `读取 Notion 内容失败：${response.status} ${response.statusText}`);
+        throw httpError(502, `读取 Notion 内容失败：${formatNotionError(response, data)}`);
       }
 
       const dataRecord = isRecord(data) ? data : {};
@@ -635,7 +837,7 @@ class ContentService {
 
     const { response, data } = await this.requestNotion(`/pages/${pageId}`, apiToken);
     if (!response.ok) {
-      throw httpError(502, `Notion 导入失败：${response.status} ${response.statusText}`);
+      throw httpError(502, `Notion 导入失败：${formatNotionError(response, data)}`);
     }
 
     const dataRecord = isRecord(data) ? data : {};
@@ -648,8 +850,29 @@ class ContentService {
         ? (titleProperty.title as NotionRichText[])
         : undefined;
     const title = stripHtml(renderNotionRichText(titleRichText)) || 'Untitled';
-    const blocks = await this.fetchNotionBlockTree(pageId, apiToken);
-    const contentHtml = renderNotionBlocks(blocks);
+    const markdownResult = await this.fetchNotionMarkdown(pageId, apiToken);
+    let contentHtml: string;
+    let importApi: 'markdown' | 'blocks';
+    let markdownMeta: Record<string, unknown> | null = null;
+
+    if (markdownResult.ok) {
+      contentHtml = markdownResult.html;
+      importApi = 'markdown';
+      markdownMeta = {
+        apiVersion: NOTION_MARKDOWN_API_VERSION,
+        truncated: markdownResult.truncated,
+        unknownBlockIds: markdownResult.unknownBlockIds,
+      };
+    } else {
+      const blocks = await this.fetchNotionBlockTree(pageId, apiToken);
+      contentHtml = renderNotionBlocks(blocks);
+      importApi = 'blocks';
+      markdownMeta = {
+        apiVersion: NOTION_MARKDOWN_API_VERSION,
+        fallbackReason: markdownResult.message,
+      };
+    }
+
     const excerpt = buildExcerpt(contentHtml, title);
     const coverUrl =
       normalizeOptionalUrl(readPath(dataRecord, ['cover', 'external', 'url'])) ||
@@ -674,6 +897,9 @@ class ContentService {
           notion: {
             pageId,
             lastEditedTime: lastEditedTime || null,
+            importApi,
+            blockApiVersion: NOTION_BLOCK_API_VERSION,
+            markdown: markdownMeta,
           },
         },
       },

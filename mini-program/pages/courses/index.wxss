@@ -14,14 +14,14 @@
 
 .course-card {
   overflow: hidden;
-  padding: 28rpx;
+  padding: 24rpx;
 }
 
 .course-cover {
   display: block;
-  width: calc(100% + 56rpx);
-  height: 300rpx;
-  margin: -28rpx -28rpx 24rpx;
+  width: calc(100% + 48rpx);
+  height: 260rpx;
+  margin: -24rpx -24rpx 22rpx;
   background: #e9f4ef;
 }
 

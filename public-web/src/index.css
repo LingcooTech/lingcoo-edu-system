@@ -84,11 +84,13 @@ body {
   }
 
   .site-header {
-    @apply bg-paper/90 border-line sticky top-0 z-30 border-b backdrop-blur transition-shadow;
+    @apply bg-surface/90 sticky top-0 z-30 border-b border-transparent backdrop-blur-xl transition-all;
+    backdrop-filter: saturate(180%) blur(18px);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
   }
 
   .site-header.is-scrolled {
-    @apply shadow-sm;
+    @apply border-line shadow-sm;
   }
 
   .site-header-bar {
@@ -105,6 +107,10 @@ body {
 
   .app-brand-name {
     @apply max-w-36 truncate text-sm font-semibold sm:max-w-48;
+  }
+
+  .site-brand-logo {
+    @apply h-8 max-w-36 object-contain sm:max-w-48;
   }
 
   .site-nav {
@@ -124,7 +130,7 @@ body {
   }
 
   .site-icon-btn {
-    @apply border-line bg-surface text-ink hover:bg-brand-soft inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors;
+    @apply text-ink hover:bg-paper inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent bg-transparent transition-colors;
   }
 
   .site-phone {
@@ -132,7 +138,7 @@ body {
   }
 
   .site-account-trigger {
-    @apply border-line bg-surface text-ink hover:bg-brand-soft inline-flex items-center gap-2 rounded-full border py-0.5 pr-2.5 pl-1 text-sm font-medium transition-colors;
+    @apply text-ink hover:bg-paper inline-flex h-10 items-center gap-2 rounded-full border border-transparent bg-transparent py-0.5 pr-2.5 pl-1 text-sm font-medium transition-colors;
   }
 
   .site-avatar {
@@ -155,24 +161,49 @@ body {
     @apply flex-1;
   }
 
+  .site-login-trigger {
+    @apply bg-ink hover:bg-ink/90 inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold text-white transition-colors;
+  }
+
   .site-drawer {
     @apply fixed inset-0 z-50 lg:hidden;
   }
 
   .site-drawer-backdrop {
-    @apply absolute inset-0 bg-slate-950/35;
+    @apply absolute inset-0 bg-slate-950/40 backdrop-blur-sm;
   }
 
   .site-drawer-panel {
-    @apply bg-paper absolute inset-y-0 left-0 w-[min(86vw,320px)] border-r p-5 shadow-xl;
+    @apply bg-surface border-line absolute inset-y-0 left-0 flex w-[min(88vw,330px)] flex-col overflow-hidden rounded-r-3xl border-r shadow-2xl;
+    animation: site-drawer-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .site-drawer-head {
+    @apply border-line flex shrink-0 items-center justify-between border-b px-5 pt-[calc(env(safe-area-inset-top)+1rem)] pb-4;
+  }
+
+  .site-drawer-body {
+    @apply flex-1 overflow-y-auto px-3 py-3;
+  }
+
+  .site-drawer-nav {
+    @apply grid gap-1;
+  }
+
+  .site-drawer-group-label {
+    @apply text-muted px-3 pt-1 pb-2 text-[11px] font-semibold tracking-[0.12em] uppercase;
   }
 
   .site-drawer-link {
-    @apply text-ink hover:bg-surface rounded-2xl px-4 py-3 text-base font-semibold no-underline;
+    @apply text-ink hover:bg-paper flex h-12 items-center rounded-2xl px-3.5 text-[15px] font-semibold no-underline transition-colors;
   }
 
   .site-drawer-link.is-active {
-    @apply bg-surface shadow-sm;
+    @apply bg-brand-soft text-brand;
+  }
+
+  .site-drawer-footer {
+    @apply border-line grid shrink-0 gap-2 border-t px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)];
   }
 
   .site-footer {
@@ -287,6 +318,167 @@ body {
     border-radius: 1rem;
     justify-self: center;
     width: 100%;
+  }
+
+  .mobile-rail {
+    @apply grid gap-4;
+  }
+
+  .mobile-rail-card {
+    @apply min-w-0;
+  }
+
+  .mobile-page-head {
+    @apply max-w-2xl;
+  }
+
+  .mobile-detail-cta {
+    @apply border-line bg-surface mt-5 rounded-2xl border p-4 shadow-sm lg:hidden;
+  }
+
+  .mobile-detail-cta-price {
+    @apply text-ink text-2xl leading-tight font-bold;
+  }
+
+  .mobile-form-card {
+    @apply bg-surface border-line rounded-2xl border p-5 shadow-sm;
+  }
+
+  @keyframes site-drawer-in {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @media (max-width: 767px) {
+    .container-narrow {
+      @apply px-4;
+    }
+
+    .site-header-bar {
+      @apply h-[52px] gap-2 px-3.5;
+    }
+
+    .app-brand {
+      @apply gap-2;
+    }
+
+    .app-brand-mark {
+      @apply h-7 w-7 rounded-lg text-[11px];
+    }
+
+    .app-brand-name {
+      @apply max-w-[44vw] text-[13px];
+    }
+
+    .site-brand-logo {
+      @apply h-7 max-w-[46vw];
+    }
+
+    .site-actions {
+      @apply gap-0.5;
+    }
+
+    .site-icon-btn,
+    .site-account-trigger {
+      @apply h-10 w-10 rounded-xl;
+    }
+
+    .site-avatar {
+      @apply h-8 w-8;
+    }
+
+    .site-account-trigger {
+      @apply justify-center p-0;
+    }
+
+    .site-account-trigger .text-muted {
+      @apply hidden;
+    }
+
+    .site-login-trigger {
+      @apply h-10 w-10 rounded-xl p-0;
+    }
+
+    .site-login-trigger span {
+      @apply sr-only;
+    }
+
+    .pwbtn {
+      @apply min-h-11 py-2.5;
+    }
+
+    .pwcard {
+      @apply rounded-xl;
+    }
+
+    .section-title {
+      @apply text-[1.45rem] leading-tight;
+    }
+
+    .eyebrow {
+      @apply text-[11px] tracking-[0.1em];
+    }
+
+    .mobile-page-head {
+      @apply bg-surface/70 rounded-2xl p-4 shadow-sm ring-1 ring-black/5;
+    }
+
+    .mobile-page-head .section-title {
+      @apply mt-1.5;
+    }
+
+    .mobile-page-head p {
+      @apply leading-6;
+    }
+
+    .mobile-rail {
+      @apply -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2;
+      scrollbar-width: none;
+    }
+
+    .mobile-rail::-webkit-scrollbar {
+      display: none;
+    }
+
+    .mobile-rail-card {
+      @apply w-[78vw] shrink-0 snap-start;
+    }
+
+    .mobile-rail-card-sm {
+      @apply w-[68vw];
+    }
+
+    .mobile-compact-grid {
+      @apply grid grid-cols-2 gap-3;
+    }
+
+    .story-content {
+      @apply text-[16px] leading-8;
+    }
+
+    .story-content p {
+      @apply my-4;
+    }
+
+    .story-content h1 {
+      @apply text-2xl;
+    }
+
+    .story-content h2 {
+      @apply text-xl;
+    }
+
+    .story-content h3 {
+      @apply text-lg;
+    }
+
+    .story-content img {
+      @apply my-5 rounded-xl;
+    }
   }
 
   @media (min-width: 768px) {

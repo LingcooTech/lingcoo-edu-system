@@ -55,11 +55,11 @@ export function StoriesPage() {
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">{pageCopy.eyebrow}</div>
-        <h1 className="section-title mt-2">{pageCopy.title}</h1>
-        <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          {pageCopy.subtitle}
-        </p>
+        <div className="mobile-page-head">
+          <div className="eyebrow">{pageCopy.eyebrow}</div>
+          <h1 className="section-title mt-2">{pageCopy.title}</h1>
+          <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+        </div>
 
         <div className="border-line bg-surface mt-7 flex max-w-xl items-center gap-2 rounded-full border px-4 py-2">
           <Search className="text-muted h-4 w-4" />
@@ -73,18 +73,21 @@ export function StoriesPage() {
         </div>
 
         {loading ? (
-          <div className="mt-8 grid gap-5">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="pwcard p-5">
-                <div className="skeleton h-4 w-1/3" />
-                <div className="skeleton mt-4 h-7 w-2/3" />
-                <div className="skeleton mt-4 h-4 w-full" />
-                <div className="skeleton mt-2 h-4 w-4/5" />
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="pwcard overflow-hidden">
+                <div className="skeleton aspect-[16/9] rounded-none" />
+                <div className="p-4">
+                  <div className="skeleton h-3.5 w-1/3" />
+                  <div className="skeleton mt-3 h-5 w-2/3" />
+                  <div className="skeleton mt-3 h-3.5 w-full" />
+                  <div className="skeleton mt-2 h-3.5 w-4/5" />
+                </div>
               </div>
             ))}
           </div>
         ) : stories.length ? (
-          <div className="mt-8 grid gap-5 md:grid-cols-2">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {stories.map((story) => (
               <Link
                 key={story.id}
@@ -92,7 +95,7 @@ export function StoriesPage() {
                 className="pwcard pwcard-hover group flex flex-col overflow-hidden no-underline"
               >
                 {story.coverUrl ? (
-                  <div className="bg-brand-soft aspect-[16/10] overflow-hidden">
+                  <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
                       src={story.coverUrl}
                       alt={story.title}
@@ -100,17 +103,17 @@ export function StoriesPage() {
                     />
                   </div>
                 ) : null}
-                <div className="flex flex-1 flex-col p-5">
+                <div className="flex flex-1 flex-col p-4">
                   {story.authorName ? (
                     <div className="text-brand text-xs font-semibold">{story.authorName}</div>
                   ) : null}
-                  <h2 className="text-ink mt-2 line-clamp-2 text-xl leading-tight font-bold">
+                  <h2 className="text-ink mt-2 line-clamp-2 text-base leading-6 font-bold">
                     {story.title}
                   </h2>
-                  <p className="text-ink-soft mt-4 line-clamp-3 flex-1 text-sm leading-7">
+                  <p className="text-ink-soft mt-2 line-clamp-2 flex-1 text-sm leading-6">
                     {story.excerpt || story.content}
                   </p>
-                  <span className="text-brand mt-5 text-sm font-semibold">阅读全文</span>
+                  <span className="text-brand mt-4 text-sm font-semibold">阅读全文</span>
                 </div>
               </Link>
             ))}

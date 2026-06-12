@@ -106,15 +106,44 @@ export function CourseDetailPage() {
 
         <div className="mt-4 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <article className="min-w-0">
-            <div className="flex flex-wrap gap-2">
-              <span className="chip">{course.category}</span>
-              <span className="chip">{course.ageRange}</span>
+            {course.coverImageUrl ? (
+              <div className="bg-brand-soft mb-4 aspect-[16/10] overflow-hidden rounded-2xl shadow-sm md:hidden">
+                <img
+                  src={course.coverImageUrl}
+                  alt={course.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : null}
+
+            <div className="bg-surface rounded-2xl p-4 shadow-sm ring-1 ring-black/5 md:bg-transparent md:p-0 md:shadow-none md:ring-0">
+              <div className="flex flex-wrap gap-2">
+                <span className="chip">{course.category}</span>
+                <span className="chip">{course.ageRange}</span>
+              </div>
+              <h1 className="text-ink mt-3 text-2xl leading-tight font-bold tracking-tight md:text-3xl">
+                {course.name}
+              </h1>
+              <p className="text-ink-soft mt-3 max-w-2xl text-base leading-7">{course.summary}</p>
+
+              <div className="mobile-detail-cta">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="mobile-detail-cta-price">{price.big}</div>
+                    <div className="text-muted mt-1 text-xs">{price.sub}</div>
+                  </div>
+                  <div className="text-muted text-right text-xs">
+                    {course.durationMinutes} 分钟/节
+                  </div>
+                </div>
+                <Link to={registerHref} className="pwbtn pwbtn-primary mt-4 w-full">
+                  预约试听 / 留资
+                </Link>
+              </div>
             </div>
-            <h1 className="text-ink mt-3 text-3xl font-bold tracking-tight">{course.name}</h1>
-            <p className="text-ink-soft mt-3 max-w-2xl text-base leading-7">{course.summary}</p>
 
             {course.coverImageUrl ? (
-              <div className="bg-brand-soft mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
+              <div className="bg-brand-soft mt-6 hidden aspect-[16/9] overflow-hidden rounded-2xl md:block">
                 <img
                   src={course.coverImageUrl}
                   alt={course.name}
@@ -130,7 +159,7 @@ export function CourseDetailPage() {
               </span>
             </div>
 
-            <section className="pwcard mt-6 grid gap-3 p-5 text-sm sm:grid-cols-2">
+            <section className="pwcard mt-6 grid gap-3 p-4 text-sm sm:grid-cols-2 sm:p-5">
               <div className="text-ink-soft flex items-center gap-2">
                 <Building2 className="text-brand h-4 w-4 shrink-0" />
                 <span>课程提供方：{providerInstitution?.name ?? '平台自有 / 待确认'}</span>
@@ -180,18 +209,13 @@ export function CourseDetailPage() {
           </article>
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            <div className="pwcard p-5">
+            <div className="pwcard hidden p-5 lg:block">
               <div className="eyebrow">预约</div>
               <div className="text-ink mt-2 text-2xl font-bold">{price.big}</div>
               <div className="text-muted mt-1 text-xs">{price.sub}</div>
               <Link to={registerHref} className="pwbtn pwbtn-primary mt-5 w-full">
                 预约试听 / 留资
               </Link>
-              {onlinePackageSalesAllowed && packages.length > 0 && (
-                <a href="#packages" className="pwbtn pwbtn-outline mt-2 w-full">
-                  查看课时包
-                </a>
-              )}
               <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
@@ -209,7 +233,7 @@ export function CourseDetailPage() {
             </div>
 
             {packages.length > 0 && (
-              <section id="packages" className="pwcard scroll-mt-24 p-5">
+              <section id="packages" className="pwcard scroll-mt-24 p-4 sm:p-5">
                 <h2 className="text-ink text-base font-semibold">
                   {onlinePackageSalesAllowed ? '课时包' : '正式课程参考方案'}
                 </h2>
@@ -217,7 +241,7 @@ export function CourseDetailPage() {
                   {packages.map((pkg) => (
                     <div
                       key={pkg.id}
-                      className="border-line border-t pt-4 first:border-t-0 first:pt-0"
+                      className="border-line rounded-2xl border p-4 first:border-t first:pt-4 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:px-0 lg:first:border-t-0 lg:first:pt-0"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -260,25 +284,6 @@ export function CourseDetailPage() {
               </section>
             )}
           </aside>
-        </div>
-      </div>
-
-      {/* Mobile / tablet sticky CTA. */}
-      <div className="border-line bg-surface/95 sticky bottom-0 z-20 border-t backdrop-blur lg:hidden">
-        <div className="container-narrow flex items-center gap-3 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-ink text-base leading-tight font-semibold">{price.big}</div>
-            <div className="text-muted truncate text-xs">免注册 · 老师电话确认时间</div>
-          </div>
-          {onlinePackageSalesAllowed && packages.length > 0 ? (
-            <a href="#packages" className="pwbtn pwbtn-primary shrink-0">
-              查看课时包
-            </a>
-          ) : (
-            <Link to={registerHref} className="pwbtn pwbtn-primary shrink-0">
-              预约试听
-            </Link>
-          )}
         </div>
       </div>
 

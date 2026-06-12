@@ -79,23 +79,23 @@ export function CourseListPage() {
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">{pageCopy.eyebrow}</div>
-        <h1 className="section-title mt-2">{pageCopy.title}</h1>
-        <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          {pageCopy.subtitle}
-        </p>
-        {!loading && courses.length > 0 && (
-          <p className="text-muted mt-3 text-xs">
-            共 {courses.length} 门课程
-            {category !== 'all' ? ` · 当前「${category}」${visible.length} 门` : ''}
-          </p>
-        )}
+        <div className="mobile-page-head">
+          <div className="eyebrow">{pageCopy.eyebrow}</div>
+          <h1 className="section-title mt-2">{pageCopy.title}</h1>
+          <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+          {!loading && courses.length > 0 && (
+            <p className="text-muted mt-3 text-xs">
+              共 {courses.length} 门课程
+              {category !== 'all' ? ` · 当前「${category}」${visible.length} 门` : ''}
+            </p>
+          )}
+        </div>
 
         {categories.length > 0 && (
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="no-scrollbar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
             <button
               type="button"
-              className={filterClass(category === 'all')}
+              className={`${filterClass(category === 'all')} shrink-0`}
               onClick={() => setCategory('all')}
             >
               全部
@@ -104,7 +104,7 @@ export function CourseListPage() {
               <button
                 key={item}
                 type="button"
-                className={filterClass(category === item)}
+                className={`${filterClass(category === item)} shrink-0`}
                 onClick={() => setCategory(item)}
               >
                 {item}
@@ -138,7 +138,7 @@ export function CourseListPage() {
                     />
                   </div>
                 ) : null}
-                <div className="flex flex-1 flex-col p-5">
+                <div className="flex flex-1 flex-col p-4 sm:p-5">
                   <div className="flex flex-wrap gap-1.5">
                     <span className="chip">{course.category}</span>
                     <span className="chip">{course.ageRange}</span>
@@ -147,7 +147,7 @@ export function CourseListPage() {
                   <p className="text-ink-soft mt-2 line-clamp-2 flex-1 text-sm leading-6">
                     {course.summary}
                   </p>
-                  <div className="border-line mt-4 flex items-center justify-between border-t pt-3">
+                  <div className="border-line mt-4 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-muted inline-flex items-center gap-1.5 text-xs">
                       <Clock className="h-3.5 w-3.5" />
                       {coursePlanLabel(course, businessModel)} · {course.durationMinutes} 分钟

@@ -34,6 +34,7 @@ import type {
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
 import { QiniuImageField, QiniuMediaLibrary } from '@/components/shared/QiniuImageField';
+import { updateDocumentFavicon } from '@/lib/favicon';
 
 const SOURCE_LABEL: Record<string, string> = {
   database: '后台配置',
@@ -424,6 +425,7 @@ export function SettingsPage() {
         bodyFont: updated.branding.bodyFont ?? '',
         radius: updated.branding.radius ?? '',
       }));
+      updateDocumentFavicon(updated.branding.faviconUrl);
       setMessage('品牌 VI 已保存');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '保存失败');

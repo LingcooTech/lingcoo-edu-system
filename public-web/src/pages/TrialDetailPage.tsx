@@ -161,7 +161,7 @@ export function TrialDetailPage() {
         </Link>
 
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
-          <article className="pwcard p-6 md:p-8">
+          <article className="pwcard p-5 md:p-8">
             <div className="eyebrow">试听预约</div>
             <h1 className="text-ink mt-2 text-3xl font-bold tracking-tight">
               {detail.trialSession.title}
@@ -183,7 +183,7 @@ export function TrialDetailPage() {
             ) : null}
             <p className="text-ink-soft mt-3 text-sm leading-7">{detail.course.summary}</p>
 
-            <div className="text-ink-soft mt-6 grid gap-3 text-sm sm:grid-cols-3">
+            <div className="text-ink-soft mt-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
               <div className="bg-paper rounded-2xl p-4">
                 <CalendarDays className="text-brand mb-2 h-5 w-5" />
                 {formatDateTime(detail.trialSession.startsAt)}
@@ -226,7 +226,7 @@ export function TrialDetailPage() {
             )}
           </article>
 
-          <div className="pwcard h-fit space-y-3 p-5 lg:sticky lg:top-24">
+          <div className="mobile-form-card h-fit space-y-3 lg:sticky lg:top-24">
             {!checkoutTarget ? (
               <form className="space-y-3" onSubmit={submit}>
                 <div>

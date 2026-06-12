@@ -1,6 +1,6 @@
 .hero {
   overflow: hidden;
-  padding: 34rpx;
+  padding: 30rpx;
 }
 
 .hero-title {
@@ -13,15 +13,15 @@
 
 .hero-swiper {
   width: 100%;
-  height: 360rpx;
+  height: 330rpx;
   margin-top: 26rpx;
   overflow: hidden;
-  border-radius: 22rpx;
+  border-radius: 20rpx;
 }
 
 .hero-image {
   width: 100%;
-  height: 360rpx;
+  height: 330rpx;
 }
 
 .hero-actions {
@@ -136,9 +136,9 @@
 }
 
 .learning-band {
-  margin-right: -28rpx;
-  margin-left: -28rpx;
-  padding: 34rpx 28rpx;
+  margin-right: -24rpx;
+  margin-left: -24rpx;
+  padding: 34rpx 24rpx;
   background: #eee8de;
 }
 
@@ -148,23 +148,22 @@
 
 .course-list,
 .trial-list,
-.stories {
-  display: grid;
-  gap: 18rpx;
+.story-scroll {
+  margin-top: 18rpx;
 }
 
 .course-card,
 .trial-card,
 .story-card {
   overflow: hidden;
-  padding: 26rpx;
+  padding: 22rpx;
 }
 
 .course-cover {
   display: block;
-  width: calc(100% + 52rpx);
-  height: 260rpx;
-  margin: -26rpx -26rpx 22rpx;
+  width: calc(100% + 44rpx);
+  height: 230rpx;
+  margin: -22rpx -22rpx 20rpx;
   background: #e9f4ef;
 }
 
@@ -291,9 +290,9 @@
 
 .story-cover {
   display: block;
-  width: calc(100% + 52rpx);
-  height: 300rpx;
-  margin: -26rpx -26rpx 22rpx;
+  width: calc(100% + 44rpx);
+  height: 230rpx;
+  margin: -22rpx -22rpx 20rpx;
   background: #e9f4ef;
 }
 
@@ -318,7 +317,7 @@
 .contact-card {
   border-radius: 28rpx;
   background: #1f2b24;
-  padding: 34rpx;
+  padding: 30rpx;
   color: #fff;
   box-shadow: 0 18rpx 48rpx rgba(31, 43, 36, 0.18);
 }
@@ -331,9 +330,9 @@
 
 .contact-title {
   margin-top: 14rpx;
-  font-size: 40rpx;
+  font-size: 34rpx;
   font-weight: 900;
-  line-height: 1.25;
+  line-height: 1.28;
 }
 
 .contact-copy {
@@ -345,7 +344,8 @@
 
 .contact-steps {
   display: grid;
-  gap: 18rpx;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx 18rpx;
   margin-top: 28rpx;
 }
 
@@ -353,7 +353,7 @@
   border-top: 1rpx solid rgba(255, 255, 255, 0.18);
   padding-top: 16rpx;
   color: #fff;
-  font-size: 26rpx;
+  font-size: 24rpx;
   font-weight: 800;
 }
 

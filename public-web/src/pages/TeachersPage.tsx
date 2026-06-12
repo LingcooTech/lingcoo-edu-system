@@ -67,9 +67,11 @@ export function TeachersPage() {
           </div>
         ) : (
           <>
-            <div className="eyebrow">{pageCopy.eyebrow}</div>
-            <h1 className="section-title mt-2">{pageCopy.title}</h1>
-            <p className="text-ink-soft mt-2 text-sm">{pageCopy.subtitle}</p>
+            <div className="mobile-page-head">
+              <div className="eyebrow">{pageCopy.eyebrow}</div>
+              <h1 className="section-title mt-2">{pageCopy.title}</h1>
+              <p className="text-ink-soft mt-2 text-sm">{pageCopy.subtitle}</p>
+            </div>
           </>
         )}
         {!loading && teachers.length > 0 ? (
@@ -90,7 +92,7 @@ export function TeachersPage() {
         ) : null}
 
         {loading ? (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mobile-compact-grid mt-8 sm:grid sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
               <TeacherCardSkeleton key={index} />
             ))}
@@ -98,7 +100,7 @@ export function TeachersPage() {
         ) : teachers.length === 0 ? (
           <TeachersEmptyState />
         ) : (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mobile-compact-grid mt-8 sm:grid sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
             {visibleTeachers.map((teacher) => (
               <TeacherCard key={teacher.id} teacher={teacher} />
             ))}
@@ -158,7 +160,7 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
       to={`/teachers/${teacher.id}`}
       className="pwcard pwcard-hover group flex flex-col overflow-hidden no-underline"
     >
-      <div className="bg-brand-soft relative aspect-[4/3] overflow-hidden">
+      <div className="bg-brand-soft relative aspect-square overflow-hidden sm:aspect-[4/3]">
         {teacher.avatarUrl ? (
           <img
             src={teacher.avatarUrl}
@@ -177,19 +179,19 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-3 sm:p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-ink truncate text-lg font-semibold">{teacher.name}</h2>
+          <h2 className="text-ink truncate text-base font-semibold sm:text-lg">{teacher.name}</h2>
           <ArrowRight className="text-muted group-hover:text-brand h-4 w-4 shrink-0 transition group-hover:translate-x-0.5" />
         </div>
-        <div className="text-muted mt-1 truncate text-sm">{teacher.title || ' '}</div>
+        <div className="text-muted mt-1 truncate text-xs sm:text-sm">{teacher.title || ' '}</div>
 
-        <p className="text-ink-soft mt-3 line-clamp-2 min-h-12 text-sm leading-6">
+        <p className="text-ink-soft mt-3 hidden min-h-12 text-sm leading-6 sm:line-clamp-2">
           {teacher.tagline?.trim() || '个人简介待补充'}
         </p>
 
         {stats.length ? (
-          <div className={`border-line mt-auto grid ${statColsClass} border-t pt-3.5`}>
+          <div className={`border-line mt-auto hidden ${statColsClass} border-t pt-3.5 sm:grid`}>
             {stats.map((item) => (
               <div key={item.label} className="text-center">
                 <b className="text-ink block text-base font-semibold">{item.value}</b>
@@ -200,7 +202,7 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
             ))}
           </div>
         ) : (
-          <div className="border-line text-muted mt-auto border-t pt-3.5 text-center text-xs">
+          <div className="border-line text-muted mt-auto hidden border-t pt-3.5 text-center text-xs sm:block">
             查看教师档案
           </div>
         )}

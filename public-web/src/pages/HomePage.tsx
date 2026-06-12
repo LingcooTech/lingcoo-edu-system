@@ -389,12 +389,12 @@ export function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="mobile-rail md:grid md:grid-cols-3">
             {courses.map((course: Course) => (
               <Link
                 key={course.id}
                 to={`/courses/${course.slug}`}
-                className="pwcard block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="pwcard mobile-rail-card mobile-rail-card-sm block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 {course.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
@@ -437,12 +437,12 @@ export function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="mobile-rail md:grid md:grid-cols-3">
             {sessions.map((session: TrialSession) => (
               <Link
                 key={session.id}
                 to={`/trials/${session.id}`}
-                className="pwcard block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="pwcard mobile-rail-card mobile-rail-card-sm block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 {session.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
@@ -508,12 +508,12 @@ export function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="mobile-rail md:grid md:grid-cols-3">
             {contentItems.slice(0, 3).map((story: ContentItem) => (
               <Link
                 key={story.id}
                 to={`/stories/${story.slug}`}
-                className="pwcard group block overflow-hidden no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="pwcard mobile-rail-card mobile-rail-card-sm group block overflow-hidden no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 {story.coverUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">

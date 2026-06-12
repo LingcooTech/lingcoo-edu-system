@@ -34,11 +34,11 @@ export function TrialListPage() {
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">{pageCopy.eyebrow}</div>
-        <h1 className="section-title mt-2">{pageCopy.title}</h1>
-        <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          {pageCopy.subtitle}
-        </p>
+        <div className="mobile-page-head">
+          <div className="eyebrow">{pageCopy.eyebrow}</div>
+          <h1 className="section-title mt-2">{pageCopy.title}</h1>
+          <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+        </div>
 
         {loading ? (
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -80,7 +80,7 @@ function TrialCard({ session }: { session: TrialSession }) {
           />
         </div>
       ) : null}
-      <div className="flex flex-1 flex-col p-5">
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
         <div className="text-ink-soft inline-flex items-center gap-1.5 text-sm">
           <CalendarDays className="text-brand h-4 w-4 shrink-0" />
           {formatDateTime(session.startsAt)}
@@ -92,7 +92,7 @@ function TrialCard({ session }: { session: TrialSession }) {
           </span>
         )}
 
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-4 sm:pt-5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted">
               已报名 {session.bookedCount}/{session.capacity}

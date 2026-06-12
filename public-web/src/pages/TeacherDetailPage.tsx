@@ -46,7 +46,7 @@ export function TeacherDetailPage() {
 
   return (
     <Layout>
-      <section className="container-narrow py-10">
+      <section className="container-narrow py-6 sm:py-10">
         <Link to="/teachers" className="text-muted hover:text-ink inline-flex items-center text-sm">
           <ChevronLeft className="h-4 w-4" />
           返回教师团队
@@ -126,7 +126,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
 
   return (
     <>
-      <header className="pwcard mt-6 p-5 shadow-sm sm:p-6">
+      <header className="pwcard mt-5 overflow-hidden p-4 shadow-sm sm:mt-6 sm:p-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
           <div className="grid gap-6 sm:grid-cols-[188px_minmax(0,1fr)] sm:items-stretch">
             <TeacherAvatar teacher={teacher} />
@@ -177,7 +177,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
                   <img
                     src={teacher.wechatQrUrl}
                     alt={`${teacher.name}老师微信二维码`}
-                    className="border-line h-24 w-24 shrink-0 rounded-xl border bg-white p-1 object-contain shadow-sm sm:h-28 sm:w-28"
+                    className="border-line h-24 w-24 shrink-0 rounded-xl border bg-white object-contain p-1 shadow-sm sm:h-28 sm:w-28"
                   />
                   <div className="min-w-0 text-left lg:text-center">
                     <div className="text-ink-soft text-xs font-medium">扫码加老师微信</div>
@@ -190,7 +190,7 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
         </div>
       </header>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className="mt-6 grid gap-5 sm:mt-8 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0 space-y-6">
           {hasIntro ? (
             <section className="pwcard p-5 sm:p-6">
@@ -501,7 +501,7 @@ function ResultsSection({
               >
                 <span
                   aria-hidden
-                  className="text-brand/30 absolute top-1 left-3 text-4xl leading-none font-serif"
+                  className="text-brand/30 absolute top-1 left-3 font-serif text-4xl leading-none"
                 >
                   &ldquo;
                 </span>

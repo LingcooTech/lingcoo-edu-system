@@ -1,7 +1,9 @@
 <view class="page">
-  <view class="eyebrow">课程</view>
-  <view class="title page-title">课程列表</view>
-  <view class="body-text intro">选择感兴趣的课程，查看详情并预约试听。</view>
+  <view class="page-head">
+    <view class="eyebrow">课程</view>
+    <view class="title page-title">课程列表</view>
+    <view class="body-text intro">选择感兴趣的课程，查看详情并预约试听。</view>
+  </view>
 
   <view wx:if="{{loading}}" class="loading">加载中...</view>
   <view wx:elif="{{courses.length}}" class="course-list">

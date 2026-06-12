@@ -5,6 +5,7 @@ import { ChevronDown, LogOut, Menu, Shield, UserRound, X } from 'lucide-react';
 
 import { loadHome, type HomePayload } from '@/api/client';
 import { useSession } from '@/features/session';
+import { updateDocumentFavicon } from '@/lib/favicon';
 
 const defaultNavItems = [
   { to: '/', label: '首页', end: true },
@@ -64,7 +65,7 @@ function Brand({
   return (
     <Link to="/" className="app-brand">
       {logoUrl ? (
-        <img src={logoUrl} alt={brandName} className="h-8 max-w-36 object-contain" />
+        <img src={logoUrl} alt={brandName} className="site-brand-logo" />
       ) : (
         <>
           <span className="app-brand-mark">FD</span>
@@ -121,6 +122,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const accountMenuLabel = account?.role === 'teacher' ? '老师工作台' : '个人中心';
 
   useEffect(() => {
+    if (homeLoaded) {
+      updateDocumentFavicon(organization?.branding.faviconUrl);
+    }
+  }, [homeLoaded, organization?.branding.faviconUrl]);
+
+  useEffect(() => {
     setDrawerOpen(false);
     setAccountOpen(false);
   }, [location.pathname, location.search]);
@@ -148,9 +155,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 ))}
               </div>
             ) : (
-              navItems.map((item) => (
-                <HeaderNavItem key={`${item.to}-${item.label}`} item={item} />
-              ))
+              navItems.map((item) => <HeaderNavItem key={`${item.to}-${item.label}`} item={item} />)
             )}
           </nav>
 
@@ -204,10 +209,12 @@ export function Layout({ children }: { children: ReactNode }) {
             ) : (
               <button
                 type="button"
-                className="pwbtn pwbtn-primary px-4 py-2"
+                className="site-login-trigger"
                 onClick={() => openAuth('login')}
+                aria-label="登录或注册"
               >
-                登录 / 注册
+                <UserRound className="h-4 w-4" />
+                <span>登录 / 注册</span>
               </button>
             )}
           </div>
@@ -222,8 +229,13 @@ export function Layout({ children }: { children: ReactNode }) {
             className="site-drawer-backdrop"
             onClick={() => setDrawerOpen(false)}
           />
-          <aside className="site-drawer-panel">
-            <div className="flex items-center justify-between">
+          <aside
+            className="site-drawer-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="导航菜单"
+          >
+            <div className="site-drawer-head">
               <Brand organization={organization} loading={!homeLoaded} />
               <button
                 type="button"
@@ -234,39 +246,44 @@ export function Layout({ children }: { children: ReactNode }) {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <nav className="mt-8 grid gap-2">
-              {navItems.map((item) => (
-                <DrawerNavItem key={`${item.to}-${item.label}`} item={item} />
-              ))}
-            </nav>
-            <Link to={primaryCtaLink} className="pwbtn pwbtn-primary mt-8 w-full">
-              {primaryCtaText}
-            </Link>
-            {account ? (
-              <div className="mt-3 grid gap-2">
-                <Link to={accountMenuPath} className="pwbtn pwbtn-outline w-full">
-                  {accountMenuLabel}
-                </Link>
+            <div className="site-drawer-body">
+              <nav className="site-drawer-nav" aria-label="移动端导航">
+                <span className="site-drawer-group-label">浏览</span>
+                {navItems.map((item) => (
+                  <DrawerNavItem key={`${item.to}-${item.label}`} item={item} />
+                ))}
+              </nav>
+            </div>
+            <div className="site-drawer-footer">
+              <Link to={primaryCtaLink} className="pwbtn pwbtn-primary w-full">
+                {primaryCtaText}
+              </Link>
+              {account ? (
+                <div className="grid gap-2">
+                  <Link to={accountMenuPath} className="pwbtn pwbtn-outline w-full">
+                    {accountMenuLabel}
+                  </Link>
+                  <button
+                    type="button"
+                    className="pwbtn pwbtn-outline w-full"
+                    onClick={() => void logout()}
+                  >
+                    退出登录
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
                   className="pwbtn pwbtn-outline w-full"
-                  onClick={() => void logout()}
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    openAuth('login');
+                  }}
                 >
-                  退出登录
+                  登录 / 注册
                 </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="pwbtn pwbtn-outline mt-3 w-full"
-                onClick={() => {
-                  setDrawerOpen(false);
-                  openAuth('login');
-                }}
-              >
-                登录 / 注册
-              </button>
-            )}
+              )}
+            </div>
           </aside>
         </div>
       ) : null}

@@ -32,6 +32,11 @@ interface HomeStudentStoryCard {
   excerpt: string;
 }
 
+interface GrowthLoopStepCard {
+  title: string;
+  indexLabel: string;
+}
+
 interface HomeState {
   loading: boolean;
   organizationName: string;
@@ -49,7 +54,12 @@ interface HomeState {
   address: string;
   phone: string;
   businessHours: string;
-  matchSteps: string[];
+  growthLoopEyebrow: string;
+  growthLoopTitle: string;
+  growthLoopSummary: string;
+  growthLoopPrimaryCtaText: string;
+  growthLoopPrimaryCtaLink: string;
+  growthLoopSteps: GrowthLoopStepCard[];
   courses: Array<Course & { priceLabel: string }>;
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   trustVisible: boolean;
@@ -73,7 +83,12 @@ const initialState: HomeState = {
   address: '',
   phone: '',
   businessHours: '',
-  matchSteps: ['年龄与基础评估', '课程与试听推荐', '上课时间确认'],
+  growthLoopEyebrow: '成长闭环',
+  growthLoopTitle: '',
+  growthLoopSummary: '',
+  growthLoopPrimaryCtaText: '预约成长评估',
+  growthLoopPrimaryCtaLink: '/register',
+  growthLoopSteps: [],
   courses: [],
   trialSessions: [],
   trustVisible: false,
@@ -154,7 +169,15 @@ function toState(home: HomePayload): HomeState {
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,
-    matchSteps: initialState.matchSteps,
+    growthLoopEyebrow: profile.growthLoop?.eyebrow || '成长闭环',
+    growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
+    growthLoopSummary: profile.growthLoop?.summary || '',
+    growthLoopPrimaryCtaText: profile.growthLoop?.primaryCtaText || '预约成长评估',
+    growthLoopPrimaryCtaLink: profile.growthLoop?.primaryCtaLink || '/register',
+    growthLoopSteps: (profile.growthLoop?.steps ?? []).map((step, index) => ({
+      title: step.title,
+      indexLabel: String(index + 1).padStart(2, '0'),
+    })),
     courses: home.featuredCourses.map((course) => ({
       ...course,
       priceLabel: coursePriceLabel(
@@ -215,5 +238,9 @@ Page({
 
   goAccount() {
     wx.navigateTo({ url: '/pages/account/index' });
+  },
+
+  onGrowthPrimaryCta() {
+    navigateToWebPath(this.data.growthLoopPrimaryCtaLink || this.data.ctaLink);
   },
 });

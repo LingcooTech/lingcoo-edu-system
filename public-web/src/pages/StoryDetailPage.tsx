@@ -51,7 +51,7 @@ export function StoryDetailPage() {
 
   return (
     <Layout>
-      <section className="container-narrow py-8">
+      <section className="container-narrow py-6 sm:py-8">
         <Link
           to="/stories"
           className="text-brand inline-flex items-center gap-1 text-sm font-semibold"
@@ -67,22 +67,22 @@ export function StoryDetailPage() {
             <div className="skeleton mt-6 h-56 w-full" />
           </div>
         ) : story ? (
-          <article className="mt-6">
+          <article className="mt-5 sm:mt-6">
             {story.coverUrl ? (
               <div className="pwcard overflow-hidden">
                 <img
                   src={story.coverUrl}
                   alt={story.title}
-                  className="aspect-[21/9] w-full object-cover"
+                  className="aspect-[16/10] w-full object-cover sm:aspect-[21/9]"
                 />
               </div>
             ) : null}
 
-            <header className="mx-auto mt-8 max-w-3xl">
+            <header className="mobile-page-head mx-auto mt-5 max-w-3xl sm:mt-8">
               {story.authorName ? (
                 <div className="text-brand text-sm font-semibold">{story.authorName}</div>
               ) : null}
-              <h1 className="text-ink mt-3 text-3xl leading-tight font-bold md:text-4xl">
+              <h1 className="text-ink mt-3 text-2xl leading-tight font-bold md:text-4xl">
                 {story.title}
               </h1>
               <div className="text-muted mt-4 flex flex-wrap items-center gap-2 text-sm">
@@ -96,7 +96,7 @@ export function StoryDetailPage() {
               ) : null}
             </header>
 
-            <div className="story-content mx-auto mt-8 max-w-3xl">
+            <div className="story-content mx-auto mt-6 max-w-3xl sm:mt-8">
               {looksLikeHtml(story.content) ? (
                 <div dangerouslySetInnerHTML={{ __html: story.content }} />
               ) : (

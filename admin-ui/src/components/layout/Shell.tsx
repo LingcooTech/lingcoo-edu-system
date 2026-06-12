@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { fetchOrganization, type AuthAccount } from '@/api/client';
 import type { OrganizationSettings } from '@/api/types';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { updateDocumentFavicon } from '@/lib/favicon';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -26,6 +27,12 @@ export function Shell({ account }: { account: AuthAccount }) {
       .then(setOrganization)
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (organization) {
+      updateDocumentFavicon(organization.branding.faviconUrl);
+    }
+  }, [organization]);
 
   useEffect(() => {
     try {
