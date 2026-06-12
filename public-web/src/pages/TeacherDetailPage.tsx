@@ -15,6 +15,7 @@ import {
 
 import { fetchPublicTeacher, type Course, type PublicTeacherDetail } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { money } from '@/lib/utils';
 
 export function TeacherDetailPage() {
@@ -36,6 +37,12 @@ export function TeacherDetailPage() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [teacherId]);
+
+  useSeo({
+    title: detail?.teacher.name || '教师详情',
+    description: detail?.teacher.tagline || detail?.teacher.bio,
+    brandName: detail?.institution?.name,
+  });
 
   return (
     <Layout>

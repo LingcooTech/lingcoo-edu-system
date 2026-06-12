@@ -5,22 +5,28 @@ import { ArrowRight, GraduationCap } from 'lucide-react';
 import {
   fetchPublicInstitutions,
   fetchPublicTeachers,
+  loadHome,
+  type HomePayload,
   type PublicInstitution,
   type PublicTeacher,
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { getPageCopy } from '@/lib/page-copy';
+import { useSeo } from '@/lib/seo';
 
 export function TeachersPage() {
+  const [home, setHome] = useState<HomePayload | null>(null);
   const [teachers, setTeachers] = useState<PublicTeacher[]>([]);
   const [institutions, setInstitutions] = useState<PublicInstitution[]>([]);
   const [activeInstitutionId, setActiveInstitutionId] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.allSettled([fetchPublicTeachers(), fetchPublicInstitutions()])
-      .then(([teacherResult, institutionResult]) => {
+    Promise.allSettled([fetchPublicTeachers(), fetchPublicInstitutions(), loadHome()])
+      .then(([teacherResult, institutionResult, homeResult]) => {
         setTeachers(teacherResult.status === 'fulfilled' ? teacherResult.value : []);
         setInstitutions(institutionResult.status === 'fulfilled' ? institutionResult.value : []);
+        setHome(homeResult.status === 'fulfilled' ? homeResult.value : null);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -42,17 +48,33 @@ export function TeachersPage() {
     ? teachers.filter((teacher) => teacher.institutionId === selectedInstitutionId)
     : teachers;
 
-  const subtitle =
-    teachers.length > 0
-      ? `${visibleTeachers.length} 位老师，点击查看完整教师档案`
-      : '认识我们的老师，找到适合孩子的那一位。';
+  const pageCopy = getPageCopy(home, 'teachers');
+
+  useSeo({
+    title: pageCopy.title,
+    description: pageCopy.subtitle,
+    brandName: home?.organization.brandName,
+  });
 
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">教师团队</div>
-        <h1 className="section-title mt-2">教师团队</h1>
-        <p className="text-ink-soft mt-2 text-sm">{subtitle}</p>
+        {loading && !home ? (
+          <div className="max-w-2xl">
+            <div className="skeleton h-3 w-20" />
+            <div className="skeleton mt-3 h-8 w-36" />
+            <div className="skeleton mt-3 h-4 w-72 max-w-full" />
+          </div>
+        ) : (
+          <>
+            <div className="eyebrow">{pageCopy.eyebrow}</div>
+            <h1 className="section-title mt-2">{pageCopy.title}</h1>
+            <p className="text-ink-soft mt-2 text-sm">{pageCopy.subtitle}</p>
+          </>
+        )}
+        {!loading && teachers.length > 0 ? (
+          <p className="text-muted mt-3 text-xs">共 {visibleTeachers.length} 位老师</p>
+        ) : null}
 
         {!loading && institutionTabs.length > 0 ? (
           <div className="no-scrollbar -mx-1 mt-6 flex gap-2 overflow-x-auto px-1 pb-1">

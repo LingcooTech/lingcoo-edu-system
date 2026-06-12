@@ -2,28 +2,42 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarClock, CalendarDays } from 'lucide-react';
 
-import { fetchTrialSessions, type TrialSession } from '@/api/client';
+import { fetchTrialSessions, loadHome, type HomePayload, type TrialSession } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { getPageCopy } from '@/lib/page-copy';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
 export function TrialListPage() {
+  const [home, setHome] = useState<HomePayload | null>(null);
   const [sessions, setSessions] = useState<TrialSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTrialSessions()
-      .then(setSessions)
+    Promise.all([fetchTrialSessions(), loadHome().catch(() => null)])
+      .then(([sessionList, homePayload]) => {
+        setSessions(sessionList);
+        setHome(homePayload);
+      })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, []);
 
+  const pageCopy = getPageCopy(home, 'trials');
+
+  useSeo({
+    title: pageCopy.title,
+    description: pageCopy.subtitle,
+    brandName: home?.organization.brandName,
+  });
+
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">试听预约</div>
-        <h1 className="section-title mt-2">公开课 / 试听课</h1>
+        <div className="eyebrow">{pageCopy.eyebrow}</div>
+        <h1 className="section-title mt-2">{pageCopy.title}</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          选择一节公开课，扫码或填表即可预约名额，老师会在课前与你确认。
+          {pageCopy.subtitle}
         </p>
 
         {loading ? (

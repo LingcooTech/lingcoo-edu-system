@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ChevronDown, LogOut, Menu, Phone, Shield, UserRound, X } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, Shield, UserRound, X } from 'lucide-react';
 
 import { loadHome, type HomePayload } from '@/api/client';
 import { useSession } from '@/features/session';
@@ -40,12 +40,26 @@ function isExternalUrl(value: string) {
   return /^https?:\/\//i.test(value);
 }
 
-function Brand({ organization }: { organization?: HomePayload['organization'] }) {
+function Brand({
+  organization,
+  loading = false,
+}: {
+  organization?: HomePayload['organization'];
+  loading?: boolean;
+}) {
   const logoUrl =
     organization?.branding.fullLogoUrl ||
     organization?.branding.logoUrl ||
     organization?.branding.squareLogoUrl;
   const brandName = organization?.brandName ?? '成长教室';
+
+  if (loading) {
+    return (
+      <Link to="/" className="app-brand" aria-label="首页">
+        <span className="skeleton block h-8 w-36 rounded-xl" />
+      </Link>
+    );
+  }
 
   return (
     <Link to="/" className="app-brand">
@@ -63,6 +77,7 @@ function Brand({ organization }: { organization?: HomePayload['organization'] })
 
 export function Layout({ children }: { children: ReactNode }) {
   const [home, setHome] = useState<HomePayload | null>(null);
+  const [homeLoaded, setHomeLoaded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -73,7 +88,8 @@ export function Layout({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadHome()
       .then(setHome)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setHomeLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -98,7 +114,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [accountOpen]);
 
   const organization = home?.organization;
-  const navItems = navItemsFor(organization);
+  const navItems = homeLoaded ? navItemsFor(organization) : [];
   const primaryCtaText = organization?.publicProfile.ctaText || '预约试听';
   const primaryCtaLink = organization?.publicProfile.ctaLink || '/register';
   const accountMenuPath = account?.role === 'teacher' ? '/teacher' : '/account';
@@ -122,21 +138,23 @@ export function Layout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <Brand organization={organization} />
+          <Brand organization={organization} loading={!homeLoaded} />
 
           <nav className="site-nav" aria-label="主导航">
-            {navItems.map((item) => (
-              <HeaderNavItem key={`${item.to}-${item.label}`} item={item} />
-            ))}
+            {!homeLoaded ? (
+              <div className="flex gap-2">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <span key={index} className="skeleton block h-8 w-16 rounded-full" />
+                ))}
+              </div>
+            ) : (
+              navItems.map((item) => (
+                <HeaderNavItem key={`${item.to}-${item.label}`} item={item} />
+              ))
+            )}
           </nav>
 
           <div className="site-actions">
-            {organization?.phone ? (
-              <a className="site-phone" href={`tel:${organization.phone}`}>
-                <Phone className="h-4 w-4" />
-                <span>{organization.phone}</span>
-              </a>
-            ) : null}
             {account ? (
               <div className="relative" ref={accountRef}>
                 <button
@@ -206,7 +224,7 @@ export function Layout({ children }: { children: ReactNode }) {
           />
           <aside className="site-drawer-panel">
             <div className="flex items-center justify-between">
-              <Brand organization={organization} />
+              <Brand organization={organization} loading={!homeLoaded} />
               <button
                 type="button"
                 className="site-icon-btn"
@@ -258,43 +276,62 @@ export function Layout({ children }: { children: ReactNode }) {
       <footer className="site-footer">
         <div className="site-footer-simple">
           <div className="site-footer-brandline">
-            <Brand organization={organization} />
-            <p className="site-footer-note">
-              {organization?.publicProfile.bannerTitle ?? '在社区里，给孩子一个稳定成长的课堂'}
-            </p>
+            <Brand organization={organization} loading={!homeLoaded} />
+            {homeLoaded ? (
+              <p className="site-footer-note">
+                {organization?.publicProfile.bannerTitle ?? '在社区里，给孩子一个稳定成长的课堂'}
+              </p>
+            ) : (
+              <div className="skeleton mt-3 h-4 w-72 max-w-full" />
+            )}
           </div>
           <div className="site-footer-org">
-            <div className="site-footer-org-name">
-              {organization?.address ?? organization?.brandName ?? '成长教室'}
-            </div>
-            <div className="site-footer-org-meta">
-              {organization?.phone ? (
-                <a href={`tel:${organization.phone}`}>{organization.phone}</a>
-              ) : null}
-              {organization?.publicProfile.businessHours ? (
-                <span>{organization.publicProfile.businessHours}</span>
-              ) : null}
-            </div>
+            {homeLoaded ? (
+              <>
+                <div className="site-footer-org-name">
+                  {organization?.address ?? organization?.brandName ?? '成长教室'}
+                </div>
+                <div className="site-footer-org-meta">
+                  {organization?.phone ? (
+                    <a href={`tel:${organization.phone}`}>{organization.phone}</a>
+                  ) : null}
+                  {organization?.publicProfile.businessHours ? (
+                    <span>{organization.publicProfile.businessHours}</span>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <div className="ml-auto max-w-full space-y-2 lg:w-80">
+                <div className="skeleton h-4 w-full" />
+                <div className="skeleton h-4 w-2/3 lg:ml-auto" />
+              </div>
+            )}
           </div>
         </div>
         <div className="site-footer-bottom">
-          <span>
-            © {new Date().getFullYear()} {organization?.brandName ?? '成长教室'}
-          </span>
-          {organization?.publicSite?.icpNumber ? (
-            organization.publicSite.icpUrl ? (
-              <a
-                className="site-footer-icp"
-                href={organization.publicSite.icpUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {organization.publicSite.icpNumber}
-              </a>
-            ) : (
-              <span className="site-footer-icp">{organization.publicSite.icpNumber}</span>
-            )
-          ) : null}
+          {homeLoaded ? (
+            <>
+              <span>
+                © {new Date().getFullYear()} {organization?.brandName ?? '成长教室'}
+              </span>
+              {organization?.publicSite?.icpNumber ? (
+                organization.publicSite.icpUrl ? (
+                  <a
+                    className="site-footer-icp"
+                    href={organization.publicSite.icpUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {organization.publicSite.icpNumber}
+                  </a>
+                ) : (
+                  <span className="site-footer-icp">{organization.publicSite.icpNumber}</span>
+                )
+              ) : null}
+            </>
+          ) : (
+            <span className="skeleton inline-block h-3.5 w-44" />
+          )}
         </div>
       </footer>
     </div>

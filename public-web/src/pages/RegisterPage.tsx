@@ -11,6 +11,7 @@ import {
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { getAttribution } from '@/lib/attribution';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
 const initialForm = {
@@ -30,6 +31,11 @@ export function RegisterPage() {
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useSeo({
+    title: '预约试听',
+    description: '填写孩子和联系方式，预约一次真实课堂体验。',
+  });
 
   useEffect(() => {
     Promise.all([fetchCourses(), fetchTrialSessions()])

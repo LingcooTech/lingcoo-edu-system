@@ -20,6 +20,7 @@ import type { AppModule } from '../types.js';
 
 const publicProfileSchema = z.object({
   eyebrow: z.string().max(80).optional(),
+  highlightsTitle: z.string().max(80).optional(),
   highlights: z
     .array(
       z.union([
@@ -123,6 +124,38 @@ const publicSiteSchema = z
         }),
       )
       .max(12)
+      .optional(),
+    pages: z
+      .object({
+        courses: z
+          .object({
+            eyebrow: z.string().max(80).optional(),
+            title: z.string().max(120).optional(),
+            subtitle: z.string().max(240).optional(),
+          })
+          .optional(),
+        trials: z
+          .object({
+            eyebrow: z.string().max(80).optional(),
+            title: z.string().max(120).optional(),
+            subtitle: z.string().max(240).optional(),
+          })
+          .optional(),
+        teachers: z
+          .object({
+            eyebrow: z.string().max(80).optional(),
+            title: z.string().max(120).optional(),
+            subtitle: z.string().max(240).optional(),
+          })
+          .optional(),
+        stories: z
+          .object({
+            eyebrow: z.string().max(80).optional(),
+            title: z.string().max(120).optional(),
+            subtitle: z.string().max(240).optional(),
+          })
+          .optional(),
+      })
       .optional(),
     aboutPage: z
       .object({

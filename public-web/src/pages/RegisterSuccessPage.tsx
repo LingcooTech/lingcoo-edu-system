@@ -2,8 +2,14 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 
 export function RegisterSuccessPage() {
+  useSeo({
+    title: '预约成功',
+    description: '预约信息已提交，老师会尽快联系确认上课时间。',
+  });
+
   return (
     <Layout>
       <section className="container-narrow py-12">

@@ -39,6 +39,7 @@ export interface PublicProfileGrowthLoop {
 
 export interface PublicProfile {
   eyebrow: string;
+  highlightsTitle: string;
   highlights: PublicProfileHighlight[];
   bannerImages: string[];
   bannerImageUrl: string;
@@ -79,6 +80,7 @@ const defaultGrowthLoopSteps: PublicProfileGrowthLoopStep[] = [
 
 export const defaultPublicProfile: PublicProfile = {
   eyebrow: '社区小班成长教室',
+  highlightsTitle: '为什么选择我们',
   highlights: [
     {
       icon: 'map-pin',
@@ -323,6 +325,7 @@ export function readPublicProfile(settings: unknown): PublicProfile {
 
   return {
     eyebrow: normalizeString(raw.eyebrow) || defaultPublicProfile.eyebrow,
+    highlightsTitle: normalizeString(raw.highlightsTitle) || defaultPublicProfile.highlightsTitle,
     highlights: normalizeHighlights(raw.highlights, defaultPublicProfile.highlights, 6),
     bannerImages,
     bannerImageUrl: bannerImages[0] || defaultPublicProfile.bannerImageUrl,
@@ -355,6 +358,8 @@ export function normalizePublicProfile(input: PublicProfileInput) {
 
   return {
     eyebrow: normalizeString(input.eyebrow) || defaultPublicProfile.eyebrow,
+    highlightsTitle:
+      normalizeString(input.highlightsTitle) || defaultPublicProfile.highlightsTitle,
     highlights: normalizeHighlights(input.highlights, defaultPublicProfile.highlights, 6),
     bannerImages,
     bannerImageUrl: bannerImages[0] || defaultPublicProfile.bannerImageUrl,

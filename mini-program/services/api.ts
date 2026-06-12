@@ -122,6 +122,7 @@ export interface Organization {
   address: string | null;
   publicProfile: {
     eyebrow: string;
+    highlightsTitle: string;
     highlights: PublicProfileHighlight[];
     bannerImages: string[];
     bannerImageUrl: string;
@@ -145,11 +146,20 @@ export interface Organization {
       path: string;
       visible: boolean;
     }>;
+    pages: {
+      courses: { eyebrow: string; title: string; subtitle: string };
+      trials: { eyebrow: string; title: string; subtitle: string };
+      teachers: { eyebrow: string; title: string; subtitle: string };
+      stories: { eyebrow: string; title: string; subtitle: string };
+    };
     aboutPage: {
+      eyebrow: string;
       title: string;
       subtitle: string;
       heroImageUrl: string;
+      operatorIntroTitle: string;
       operatorIntro: string;
+      brandCooperationTitle: string;
       brandCooperation: string;
       bodyBlocks?: Block[];
     };

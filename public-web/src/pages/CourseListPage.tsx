@@ -2,8 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, Clock } from 'lucide-react';
 
-import { fetchCourses, loadHome, type BusinessModelSettings, type Course } from '@/api/client';
+import {
+  fetchCourses,
+  loadHome,
+  type BusinessModelSettings,
+  type Course,
+  type HomePayload,
+} from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { getPageCopy } from '@/lib/page-copy';
+import { useSeo } from '@/lib/seo';
 import { money } from '@/lib/utils';
 
 function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings) {
@@ -38,6 +46,7 @@ function filterClass(active: boolean) {
 }
 
 export function CourseListPage() {
+  const [home, setHome] = useState<HomePayload | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [businessModel, setBusinessModel] = useState<BusinessModelSettings | undefined>();
   const [loading, setLoading] = useState(true);
@@ -47,6 +56,7 @@ export function CourseListPage() {
     Promise.all([fetchCourses(), loadHome().catch(() => null)])
       .then(([courseList, home]) => {
         setCourses(courseList);
+        setHome(home);
         setBusinessModel(home?.organization.businessModel);
       })
       .catch(() => setCourses([]))
@@ -58,14 +68,21 @@ export function CourseListPage() {
     () => (category === 'all' ? courses : courses.filter((c) => c.category === category)),
     [courses, category],
   );
+  const pageCopy = getPageCopy(home, 'courses');
+
+  useSeo({
+    title: pageCopy.title,
+    description: pageCopy.subtitle,
+    brandName: home?.organization.brandName,
+  });
 
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">课程</div>
-        <h1 className="section-title mt-2">全部课程</h1>
+        <div className="eyebrow">{pageCopy.eyebrow}</div>
+        <h1 className="section-title mt-2">{pageCopy.title}</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          按年龄与方向开设的小班课程，先预约试听，老师会电话确认适合的班型与时间。
+          {pageCopy.subtitle}
         </p>
         {!loading && courses.length > 0 && (
           <p className="text-muted mt-3 text-xs">

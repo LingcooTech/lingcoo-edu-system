@@ -50,6 +50,7 @@ import {
 import { Layout } from '@/components/Layout';
 import { Modal } from '@/components/Modal';
 import { useSession } from '@/features/session';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
@@ -153,6 +154,10 @@ function parseImageUrls(value: string) {
 export function AccountPage() {
   const navigate = useNavigate();
   const { account, loading, openAuth, logout } = useSession();
+
+  useSeo({
+    title: account?.role === 'teacher' ? '老师工作台' : '个人中心',
+  });
 
   // Accounts provisioned with a default password must rotate it first.
   useEffect(() => {

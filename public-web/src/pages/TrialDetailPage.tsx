@@ -12,6 +12,7 @@ import {
 import { CheckoutModal, type CheckoutTarget } from '@/components/CheckoutModal';
 import { Layout } from '@/components/Layout';
 import { getAttribution } from '@/lib/attribution';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
 const initialForm = {
@@ -62,6 +63,12 @@ export function TrialDetailPage() {
       .catch(() => setDetail(null))
       .finally(() => setLoading(false));
   }, [trialId]);
+
+  useSeo({
+    title: detail?.trialSession.title || '试听预约',
+    description: detail?.course.summary,
+    brandName: detail?.organization.brandName,
+  });
 
   async function submit(event: FormEvent) {
     event.preventDefault();

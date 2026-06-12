@@ -14,6 +14,7 @@ import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
 import { CheckoutModal, type CheckoutTarget } from '@/components/CheckoutModal';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { money } from '@/lib/utils';
 
 function priceHeadline(
@@ -40,6 +41,11 @@ export function CourseDetailPage() {
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
 
   const contentBlocks = useMemo(() => parseBlocks(course?.content), [course]);
+
+  useSeo({
+    title: course?.name || '课程详情',
+    description: course?.summary,
+  });
 
   useEffect(() => {
     setStatus('loading');

@@ -10,6 +10,7 @@ import {
   type PublicTeacher,
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { money } from '@/lib/utils';
 
 function coursePriceLabel(course: Course, detail?: PublicInstitutionDetail) {
@@ -38,6 +39,11 @@ export function InstitutionDetailPage() {
       .catch(() => setDetail(null))
       .finally(() => setLoading(false));
   }, [institutionId]);
+
+  useSeo({
+    title: detail?.institution.name || '教学机构',
+    description: detail?.institution.intro,
+  });
 
   if (loading) {
     return (

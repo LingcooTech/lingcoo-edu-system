@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { publicApi } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -13,6 +14,10 @@ export function ForgotPasswordPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  useSeo({
+    title: '重置密码',
+  });
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();

@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { fetchStory, type ContentItem } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime } from '@/lib/utils';
 
 function looksLikeHtml(value: string) {
@@ -42,6 +43,11 @@ export function StoryDetailPage() {
   }, [slug]);
 
   const paragraphs = useMemo(() => textParagraphs(story?.content ?? ''), [story?.content]);
+
+  useSeo({
+    title: story?.title || '成长故事',
+    description: story?.excerpt || story?.content.slice(0, 140),
+  });
 
   return (
     <Layout>

@@ -1,9 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
-import type { OrganizationSettings, PublicSiteSettings } from '@/api/types';
+import type { PublicSiteSettings } from '@/api/types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
-import { BlockRenderer } from '@/components/editor/BlockRenderer';
 import { HOME_ALLOWED } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { Field } from '@/components/shared/FormField';
@@ -19,12 +18,34 @@ const DEFAULT_SITE: PublicSiteSettings = {
     { label: '成长故事', path: '/stories', visible: true },
     { label: '关于', path: '/about', visible: true },
   ],
+  pages: {
+    courses: {
+      eyebrow: '课程',
+      title: '全部课程',
+      subtitle: '按年龄与方向开设的小班课程，先预约试听，老师会电话确认适合的班型与时间。',
+    },
+    trials: {
+      eyebrow: '试听预约',
+      title: '公开课 / 试听课',
+      subtitle: '选择一节公开课，扫码或填表即可预约名额，老师会在课前与你确认。',
+    },
+    teachers: {
+      eyebrow: '教师团队',
+      title: '教师团队',
+      subtitle: '认识我们的老师，找到适合孩子的那一位。',
+    },
+    stories: {
+      eyebrow: '成长故事',
+      title: '成长故事',
+      subtitle: '记录孩子从试听、练习到形成习惯的真实变化，用故事呈现课程带来的长期影响。',
+    },
+  },
   aboutPage: {
     eyebrow: 'About',
     title: '关于我们',
     subtitle: '',
     heroImageUrl: '',
-    operatorIntroTitle: '美智成长空间预约平台',
+    operatorIntroTitle: '',
     operatorIntro: '',
     brandCooperationTitle: '教学机构介绍',
     brandCooperation: '',
@@ -37,9 +58,14 @@ const DEFAULT_SITE: PublicSiteSettings = {
 function normalizeSite(value?: PublicSiteSettings): PublicSiteSettings {
   return {
     navigation: value?.navigation?.length ? value.navigation : DEFAULT_SITE.navigation,
+    pages: {
+      ...DEFAULT_SITE.pages,
+      ...value?.pages,
+    },
     aboutPage: {
       ...DEFAULT_SITE.aboutPage,
       ...value?.aboutPage,
+      bodyBlocks: value?.aboutPage?.bodyBlocks ?? DEFAULT_SITE.aboutPage.bodyBlocks,
     },
     icpNumber: value?.icpNumber ?? DEFAULT_SITE.icpNumber,
     icpUrl: value?.icpUrl ?? DEFAULT_SITE.icpUrl,
@@ -48,14 +74,12 @@ function normalizeSite(value?: PublicSiteSettings): PublicSiteSettings {
 
 export function InstitutionAboutPage() {
   const toast = useToast();
-  const [organization, setOrganization] = useState<OrganizationSettings | null>(null);
   const [form, setForm] = useState<PublicSiteSettings | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchOrganization()
       .then((org) => {
-        setOrganization(org);
         setForm(normalizeSite(org.publicSite));
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : '加载失败'));
@@ -77,7 +101,6 @@ export function InstitutionAboutPage() {
         aboutPage: form.aboutPage,
       };
       const updated = await saveOrganization({ publicSite });
-      setOrganization(updated);
       setForm(normalizeSite(updated.publicSite));
       toast.success('关于页已保存');
     } catch (err) {
@@ -96,92 +119,82 @@ export function InstitutionAboutPage() {
         </button>
       }
     >
-      {!form || !organization ? (
+      {!form ? (
         <p className="text-muted-foreground text-sm">加载中...</p>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <div className="space-y-5">
-            <EditorCard title="关于我们页面">
-              <Field label="页面标签">
-                <input
-                  className="form-input"
-                  value={form.aboutPage.eyebrow}
-                  onChange={(event) => updateAbout({ eyebrow: event.target.value })}
-                />
-              </Field>
-              <Field label="页面标题">
-                <input
-                  className="form-input"
-                  value={form.aboutPage.title}
-                  onChange={(event) => updateAbout({ title: event.target.value })}
-                />
-              </Field>
-              <Field label="页面副标题">
-                <textarea
-                  className="form-input h-20"
-                  value={form.aboutPage.subtitle}
-                  onChange={(event) => updateAbout({ subtitle: event.target.value })}
-                />
-              </Field>
-              <QiniuImageField
-                label="首图 URL"
-                value={form.aboutPage.heroImageUrl}
-                onChange={(heroImageUrl) => updateAbout({ heroImageUrl })}
-                prefix="about/hero"
-                previewAlt="关于我们首图"
+        <div className="max-w-4xl space-y-5">
+          <EditorCard title="关于我们页面">
+            <Field label="页面标签">
+              <input
+                className="form-input"
+                value={form.aboutPage.eyebrow}
+                onChange={(event) => updateAbout({ eyebrow: event.target.value })}
               />
-              <Field label="平台区块标题">
-                <input
-                  className="form-input"
-                  value={form.aboutPage.operatorIntroTitle}
-                  onChange={(event) => updateAbout({ operatorIntroTitle: event.target.value })}
-                />
-              </Field>
-              <Field
-                label="平台介绍"
-                hint="介绍美智成长空间预约平台的服务范围、预约流程和联系方式说明"
-              >
-                <textarea
-                  className="form-input h-32"
-                  value={form.aboutPage.operatorIntro}
-                  onChange={(event) => updateAbout({ operatorIntro: event.target.value })}
-                />
-              </Field>
-              <Field label="教学机构区块标题">
-                <input
-                  className="form-input"
-                  value={form.aboutPage.brandCooperationTitle}
-                  onChange={(event) => updateAbout({ brandCooperationTitle: event.target.value })}
-                />
-              </Field>
-              <Field
-                label="教学机构介绍"
-                hint="介绍课程交付方、教学理念、师资或校区联系方式；机构资源中的介绍与联系方式也会在前台展示"
-              >
-                <textarea
-                  className="form-input h-32"
-                  value={form.aboutPage.brandCooperation}
-                  onChange={(event) => updateAbout({ brandCooperation: event.target.value })}
-                />
-              </Field>
-            </EditorCard>
-
-            <EditorCard
-              title="关于页自由内容模块"
-              description="用于补充团队、资质、合作案例、媒体报道等内容"
+            </Field>
+            <Field label="页面标题">
+              <input
+                className="form-input"
+                value={form.aboutPage.title}
+                onChange={(event) => updateAbout({ title: event.target.value })}
+              />
+            </Field>
+            <Field label="页面副标题">
+              <textarea
+                className="form-input h-20"
+                value={form.aboutPage.subtitle}
+                onChange={(event) => updateAbout({ subtitle: event.target.value })}
+              />
+            </Field>
+            <QiniuImageField
+              label="首图 URL"
+              value={form.aboutPage.heroImageUrl}
+              onChange={(heroImageUrl) => updateAbout({ heroImageUrl })}
+              prefix="about/hero"
+              previewAlt="关于我们首图"
+            />
+            <Field label="平台区块标题" hint="留空时前台使用品牌名 + 预约平台">
+              <input
+                className="form-input"
+                value={form.aboutPage.operatorIntroTitle}
+                onChange={(event) => updateAbout({ operatorIntroTitle: event.target.value })}
+              />
+            </Field>
+            <Field label="平台介绍" hint="介绍预约平台的服务范围、预约流程和联系方式说明">
+              <textarea
+                className="form-input h-32"
+                value={form.aboutPage.operatorIntro}
+                onChange={(event) => updateAbout({ operatorIntro: event.target.value })}
+              />
+            </Field>
+            <Field label="教学机构区块标题">
+              <input
+                className="form-input"
+                value={form.aboutPage.brandCooperationTitle}
+                onChange={(event) => updateAbout({ brandCooperationTitle: event.target.value })}
+              />
+            </Field>
+            <Field
+              label="教学机构介绍"
+              hint="介绍课程交付方、教学理念、师资或校区联系方式；机构资源中的介绍与联系方式也会在前台展示"
             >
-              <BlockEditor
-                value={form.aboutPage.bodyBlocks}
-                onChange={(bodyBlocks) => updateAbout({ bodyBlocks })}
-                allowed={HOME_ALLOWED}
+              <textarea
+                className="form-input h-32"
+                value={form.aboutPage.brandCooperation}
+                onChange={(event) => updateAbout({ brandCooperation: event.target.value })}
               />
-            </EditorCard>
-          </div>
+            </Field>
+          </EditorCard>
 
-          <div className="xl:sticky xl:top-4 xl:self-start">
-            <div className="text-muted-foreground mb-2 text-xs font-medium">实时预览</div>
-            <AboutPreview organization={organization} site={form} />
-          </div>
+          <EditorCard
+            title="关于页自由内容模块"
+            description="用于补充团队、资质、合作案例、媒体报道等内容"
+          >
+            <BlockEditor
+              value={form.aboutPage.bodyBlocks}
+              onChange={(bodyBlocks) => updateAbout({ bodyBlocks })}
+              allowed={HOME_ALLOWED}
+            />
+          </EditorCard>
         </div>
       )}
     </PageFrame>
@@ -205,74 +218,5 @@ function EditorCard({
       </div>
       {children}
     </section>
-  );
-}
-
-function AboutPreview({
-  organization,
-  site,
-}: {
-  organization: OrganizationSettings;
-  site: PublicSiteSettings;
-}) {
-  const fullLogoUrl = organization.branding.fullLogoUrl || organization.branding.logoUrl;
-
-  return (
-    <section className="overflow-hidden rounded-lg border bg-white">
-      {site.aboutPage.heroImageUrl ? (
-        <div className="h-44 overflow-hidden border-b">
-          <img
-            src={site.aboutPage.heroImageUrl}
-            alt={site.aboutPage.title}
-            className="h-full w-full object-cover"
-          />
-        </div>
-      ) : null}
-      <div className="space-y-6 p-6">
-        <div>
-          {fullLogoUrl ? (
-            <img
-              src={fullLogoUrl}
-              alt={organization.brandName}
-              className="mb-4 h-9 max-w-44 object-contain"
-            />
-          ) : null}
-          <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase">
-            {site.aboutPage.eyebrow}
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight">{site.aboutPage.title}</h2>
-          <p className="text-muted-foreground mt-3 text-sm leading-7">{site.aboutPage.subtitle}</p>
-        </div>
-
-        <div className="grid gap-4">
-          <PreviewSection
-            title={site.aboutPage.operatorIntroTitle}
-            content={site.aboutPage.operatorIntro}
-          />
-          <PreviewSection
-            title={site.aboutPage.brandCooperationTitle}
-            content={site.aboutPage.brandCooperation}
-          />
-        </div>
-
-        {site.aboutPage.bodyBlocks.length > 0 ? (
-          <div>
-            <div className="text-muted-foreground mb-2 text-xs font-medium">自由内容模块</div>
-            <BlockRenderer blocks={site.aboutPage.bodyBlocks} />
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function PreviewSection({ title, content }: { title: string; content: string }) {
-  if (!content.trim()) return null;
-
-  return (
-    <div className="rounded-lg border bg-slate-50 p-4">
-      <div className="text-sm font-semibold">{title}</div>
-      <p className="text-muted-foreground mt-2 text-sm leading-7 whitespace-pre-line">{content}</p>
-    </div>
   );
 }

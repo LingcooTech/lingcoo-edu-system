@@ -15,6 +15,7 @@ import { useToast } from '@/components/shared/Toast';
 
 interface HomeForm {
   eyebrow: string;
+  highlightsTitle: string;
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImagesText: string;
@@ -106,6 +107,7 @@ function cleanGrowthLoop(item: PublicProfileGrowthLoop): PublicProfileGrowthLoop
 function profileToForm(profile: PublicProfile): HomeForm {
   return {
     eyebrow: profile.eyebrow,
+    highlightsTitle: profile.highlightsTitle,
     bannerTitle: profile.bannerTitle,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImagesText: (profile.bannerImages?.length
@@ -232,6 +234,7 @@ export function InstitutionHomePage() {
       const updated = await saveOrganization({
         publicProfile: {
           eyebrow: form.eyebrow,
+          highlightsTitle: form.highlightsTitle,
           bannerImages,
           bannerImageUrl: bannerImages[0] ?? '',
           bannerTitle: form.bannerTitle,
@@ -345,6 +348,13 @@ export function InstitutionHomePage() {
           </EditorCard>
 
           <EditorCard title="核心优势" description="首页首屏下方的核心优势总结。">
+            <Field label="优势模块标题" hint="移动端显示在优势卡片上方，例如：为什么选择我们">
+              <input
+                className="form-input"
+                value={form.highlightsTitle}
+                onChange={(event) => update('highlightsTitle', event.target.value)}
+              />
+            </Field>
             <div className="space-y-4">
               {form.highlights.map((item, index) => (
                 <div key={index} className="rounded-lg border p-3">

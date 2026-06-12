@@ -494,6 +494,7 @@ export interface PublicProfileGrowthLoop {
 
 export interface PublicProfile {
   eyebrow: string;
+  highlightsTitle: string;
   highlights: PublicProfileHighlight[];
   bannerImages: string[];
   bannerImageUrl: string;
@@ -533,6 +534,19 @@ export interface PublicNavItem {
   visible: boolean;
 }
 
+export interface PublicPageCopy {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}
+
+export interface PublicSitePageCopies {
+  courses: PublicPageCopy;
+  trials: PublicPageCopy;
+  teachers: PublicPageCopy;
+  stories: PublicPageCopy;
+}
+
 export interface AboutPageSettings {
   eyebrow: string;
   title: string;
@@ -547,6 +561,7 @@ export interface AboutPageSettings {
 
 export interface PublicSiteSettings {
   navigation: PublicNavItem[];
+  pages: PublicSitePageCopies;
   aboutPage: AboutPageSettings;
   icpNumber: string;
   icpUrl: string;

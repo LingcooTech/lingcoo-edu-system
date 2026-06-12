@@ -115,6 +115,19 @@ export interface PublicProfileGrowthLoop {
   steps: PublicProfileGrowthLoopStep[];
 }
 
+export interface PublicPageCopy {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}
+
+export interface PublicSitePageCopies {
+  courses: PublicPageCopy;
+  trials: PublicPageCopy;
+  teachers: PublicPageCopy;
+  stories: PublicPageCopy;
+}
+
 export interface HomePayload {
   organization: {
     id: string;
@@ -124,6 +137,7 @@ export interface HomePayload {
     address: string | null;
     publicProfile: {
       eyebrow: string;
+      highlightsTitle: string;
       highlights: PublicProfileHighlight[];
       bannerImages: string[];
       bannerImageUrl: string;
@@ -146,6 +160,7 @@ export interface HomePayload {
         path: string;
         visible: boolean;
       }>;
+      pages: PublicSitePageCopies;
       aboutPage: {
         eyebrow: string;
         title: string;

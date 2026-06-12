@@ -37,6 +37,7 @@ import {
   type TrialSession,
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
 function coursePriceLabel(course: Course, businessModel?: BusinessModelSettings) {
@@ -73,8 +74,46 @@ function HighlightIcon({ icon }: { icon: string }) {
   return <Icon className="h-6 w-6" />;
 }
 
+function HomeLoadingState() {
+  return (
+    <>
+      <section className="border-line bg-surface border-b">
+        <div className="container-narrow hero-grid home-hero-grid">
+          <div>
+            <div className="skeleton h-4 w-36" />
+            <div className="skeleton mt-5 h-12 w-4/5 md:h-16" />
+            <div className="skeleton mt-4 h-12 w-full max-w-2xl" />
+            <div className="mt-5 flex flex-wrap gap-3">
+              <div className="skeleton h-12 w-28 rounded-full" />
+              <div className="skeleton h-12 w-32 rounded-full" />
+            </div>
+            <div className="mt-5 hidden gap-3 sm:grid sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="skeleton h-14 rounded-2xl" />
+              ))}
+            </div>
+          </div>
+          <div className="hero-media home-hero-media">
+            <div className="skeleton h-full w-full rounded-none" />
+          </div>
+        </div>
+      </section>
+
+      <section className="container-narrow pt-5 pb-8">
+        <div className="skeleton mb-3 h-6 w-36 md:hidden" />
+        <div className="grid gap-3 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="skeleton min-h-36 rounded-2xl" />
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
 export function HomePage() {
   const [home, setHome] = useState<HomePayload | null>(null);
+  const [loading, setLoading] = useState(true);
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroContentHeight, setHeroContentHeight] = useState<number | null>(null);
   const heroTouchStartX = useRef<number | null>(null);
@@ -83,7 +122,8 @@ export function HomePage() {
   useEffect(() => {
     loadHome()
       .then(setHome)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
   }, []);
 
   const organization = home?.organization;
@@ -97,6 +137,7 @@ export function HomePage() {
   const contentItems = home?.contentItems ?? [];
   const growthLoop = profile?.growthLoop;
   const featuredTeachers = teachers.slice(0, 6);
+  const highlightsTitle = profile?.highlightsTitle || '为什么选择我们';
   const heroImages = useMemo(
     () =>
       Array.from(
@@ -123,6 +164,12 @@ export function HomePage() {
       }
     : undefined;
 
+  useSeo({
+    title: profile?.bannerTitle || organization?.brandName || '首页',
+    description: profile?.bannerSubtitle,
+    brandName: organization?.brandName,
+  });
+
   useLayoutEffect(() => {
     const element = heroContentRef.current;
     if (!element) return undefined;
@@ -142,7 +189,7 @@ export function HomePage() {
       observer?.disconnect();
       window.removeEventListener('resize', updateHeight);
     };
-  }, []);
+  }, [loading, profile?.bannerSubtitle, profile?.bannerTitle, stats.length]);
 
   useEffect(() => {
     setHeroIndex(0);
@@ -167,6 +214,14 @@ export function HomePage() {
     heroTouchStartX.current = null;
     if (Math.abs(deltaX) < 40) return;
     moveHero(deltaX > 0 ? -1 : 1);
+  }
+
+  if (loading && !home) {
+    return (
+      <Layout>
+        <HomeLoadingState />
+      </Layout>
+    );
   }
 
   return (
@@ -268,6 +323,7 @@ export function HomePage() {
 
       {highlights.length > 0 && (
         <section className="container-narrow pt-5 pb-8">
+          <h2 className="text-ink mb-3 text-xl font-bold md:hidden">{highlightsTitle}</h2>
           <div className="grid gap-3 md:grid-cols-3">
             {highlights.map((item) => {
               const title = item.title || item.text;
@@ -443,7 +499,9 @@ export function HomePage() {
         <section className="container-narrow pb-10">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <h2 className="section-title mt-1">{profile?.contentMarketingTitle || '成长故事'}</h2>
+              <h2 className="text-ink mt-1 text-xl font-bold">
+                {profile?.contentMarketingTitle || '成长故事'}
+              </h2>
             </div>
             <Link to="/stories" className="text-brand inline-flex items-center gap-1 text-sm">
               查看全部
@@ -458,7 +516,7 @@ export function HomePage() {
                 className="pwcard group block overflow-hidden no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 {story.coverUrl ? (
-                  <div className="bg-brand-soft aspect-[4/3] overflow-hidden">
+                  <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
                       src={story.coverUrl}
                       alt={story.title}
@@ -466,14 +524,14 @@ export function HomePage() {
                     />
                   </div>
                 ) : null}
-                <div className="p-5">
+                <div className="p-4">
                   {story.authorName ? (
                     <div className="text-brand text-xs font-semibold">{story.authorName}</div>
                   ) : null}
-                  <h3 className="text-ink mt-2 line-clamp-2 text-base leading-6 font-bold">
+                  <h3 className="text-ink mt-2 line-clamp-2 text-sm leading-6 font-bold md:text-base">
                     {story.title}
                   </h3>
-                  <p className="text-ink-soft mt-3 line-clamp-3 text-sm leading-6">
+                  <p className="text-ink-soft mt-2 line-clamp-2 text-sm leading-6">
                     {story.excerpt || story.content}
                   </p>
                 </div>
@@ -572,34 +630,32 @@ function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
   return (
     <Link
       to={`/teachers/${teacher.id}`}
-      className="group border-line bg-ink relative block h-96 w-72 shrink-0 snap-start overflow-hidden rounded-2xl border text-white shadow-sm select-none md:w-80"
-      onContextMenu={(event) => event.preventDefault()}
-      style={{ WebkitTouchCallout: 'none' }}
+      className="group border-line bg-ink relative block h-80 w-60 shrink-0 snap-start overflow-hidden rounded-xl border text-white shadow-sm select-none md:h-[21rem] md:w-64"
     >
       {teacher.avatarUrl ? (
         <img
           src={teacher.avatarUrl}
           alt={teacher.name}
           draggable={false}
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover transition duration-500 md:group-hover:scale-[1.04]"
         />
       ) : (
         <div className="bg-brand-soft absolute inset-0 flex items-center justify-center">
           <GraduationCap className="text-brand h-16 w-16" />
         </div>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/12 to-transparent" />
-      <div className="absolute right-0 bottom-0 left-0 hidden p-5 transition duration-300 md:block md:group-hover:translate-y-4 md:group-hover:opacity-0">
-        <h3 className="text-2xl leading-tight font-bold">{teacher.name}</h3>
-        <p className="mt-2 text-sm text-white/80">{teacher.title || '教师档案'}</p>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/8 to-transparent" />
+      <div className="absolute right-0 bottom-0 left-0 p-4 transition duration-300 md:p-5 md:group-hover:translate-y-4 md:group-hover:opacity-0">
+        <h3 className="text-lg leading-tight font-bold md:text-xl">{teacher.name}</h3>
+        <p className="mt-1.5 text-sm text-white/80">{teacher.title || '教师档案'}</p>
       </div>
-      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/68 via-black/28 to-transparent p-5 opacity-100 transition duration-300 md:translate-y-8 md:from-black/58 md:via-black/18 md:opacity-0 md:backdrop-blur-[1px] md:group-hover:translate-y-0 md:group-hover:opacity-100">
+      <div className="absolute inset-0 hidden flex-col justify-end bg-gradient-to-t from-black/52 via-black/14 to-transparent p-5 opacity-0 transition duration-300 md:flex md:translate-y-8 md:group-hover:translate-y-0 md:group-hover:opacity-100">
         <div>
-          <h3 className="text-2xl leading-tight font-bold">{teacher.name}</h3>
+          <h3 className="text-xl leading-tight font-bold">{teacher.name}</h3>
           <p className="mt-2 text-sm text-white/75">{teacher.title || '教师档案'}</p>
-          <p className="mt-5 line-clamp-4 text-sm leading-7 text-white/85">{tagline}</p>
+          <p className="mt-4 line-clamp-4 text-sm leading-7 text-white/85">{tagline}</p>
           {specialties.length > 0 ? (
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {specialties.map((item) => (
                 <span
                   key={item}
@@ -610,7 +666,7 @@ function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
               ))}
             </div>
           ) : null}
-          <div className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-white">
+          <div className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-white">
             查看老师档案
             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </div>

@@ -11,6 +11,7 @@ import {
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
+import { useSeo } from '@/lib/seo';
 
 export function AboutPage() {
   const [home, setHome] = useState<HomePayload | null>(null);
@@ -30,6 +31,21 @@ export function AboutPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const organization = home?.organization;
+  const about = organization?.publicSite?.aboutPage;
+  const blocks = about?.bodyBlocks ?? [];
+  const platformTitle = platformTitleFor(organization?.brandName, about?.operatorIntroTitle);
+  const teachingTitle =
+    about?.brandCooperationTitle && about.brandCooperationTitle !== '品牌合作'
+      ? about.brandCooperationTitle
+      : '教学机构';
+
+  useSeo({
+    title: about?.title || '关于我们',
+    description: about?.subtitle,
+    brandName: organization?.brandName,
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -37,18 +53,6 @@ export function AboutPage() {
       </Layout>
     );
   }
-
-  const organization = home?.organization;
-  const about = organization?.publicSite?.aboutPage;
-  const blocks = about?.bodyBlocks ?? [];
-  const platformTitle =
-    about?.operatorIntroTitle && about.operatorIntroTitle !== '运营方介绍'
-      ? about.operatorIntroTitle
-      : '美智成长空间预约平台';
-  const teachingTitle =
-    about?.brandCooperationTitle && about.brandCooperationTitle !== '品牌合作'
-      ? about.brandCooperationTitle
-      : '教学机构';
 
   return (
     <Layout>
@@ -77,7 +81,7 @@ export function AboutPage() {
               icon={<Landmark className="h-5 w-5" />}
               title={platformTitle}
               content={about?.operatorIntro}
-              fallback="美智成长空间负责线上课程展示、试听预约、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排，并把预约信息准确同步给教学机构。"
+              fallback={platformIntroFallbackFor(organization?.brandName)}
             />
 
             <InfoSection
@@ -135,7 +139,7 @@ export function AboutPage() {
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <ContactPanel
               title="平台联系方式"
-              name={organization?.brandName || '美智成长空间'}
+              name={organization?.brandName || organization?.name || '预约平台'}
               phone={organization?.phone}
               address={organization?.address}
             />
@@ -160,6 +164,26 @@ export function AboutPage() {
       </section>
     </Layout>
   );
+}
+
+function platformTitleFor(brandName?: string, configuredTitle?: string) {
+  const raw = configuredTitle?.trim();
+  const legacyDefaults = new Set(['运营方介绍', '预约平台', '美智成长空间预约平台']);
+  if (raw && !legacyDefaults.has(raw)) {
+    return raw;
+  }
+
+  const brand = brandName?.trim();
+  if (!brand) {
+    return '预约平台';
+  }
+  return brand.endsWith('平台') ? brand : `${brand}预约平台`;
+}
+
+function platformIntroFallbackFor(brandName?: string) {
+  const brand = brandName?.trim();
+  const subject = brand ? (brand.endsWith('平台') ? brand : `${brand}预约平台`) : '预约平台';
+  return `${subject}负责线上课程展示、试听预约、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排，并把预约信息准确同步给教学机构。`;
 }
 
 function InfoSection({

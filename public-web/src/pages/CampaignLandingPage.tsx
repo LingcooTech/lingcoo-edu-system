@@ -10,6 +10,7 @@ import {
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
 const initialForm = {
@@ -84,6 +85,12 @@ export function CampaignLandingPage() {
   const inputClass = 'border-line w-full rounded-xl border bg-surface px-3.5 py-3 text-sm';
 
   const contentBlocks = useMemo(() => parseBlocks(payload?.campaign.content), [payload]);
+
+  useSeo({
+    title: payload?.campaign.name || '招生活动',
+    description: payload?.course?.summary || payload?.organization.publicProfile.bannerSubtitle,
+    brandName: payload?.organization.brandName,
+  });
 
   if (loading) {
     return (

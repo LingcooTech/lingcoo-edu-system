@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { fetchPublicCheckIn, submitPublicCheckIn, type PublicCheckInPayload } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { useSeo } from '@/lib/seo';
 import { formatDateTime } from '@/lib/utils';
 
 export function CheckInPage() {
@@ -34,6 +35,11 @@ export function CheckInPage() {
     () => payload?.roster.find((student) => student.id === selectedStudentId) ?? null,
     [payload, selectedStudentId],
   );
+
+  useSeo({
+    title: payload?.session.topic ? `课堂签到：${payload.session.topic}` : '课堂签到',
+    description: payload ? `${payload.class.name} · ${payload.course.name}` : undefined,
+  });
 
   async function submit(event: FormEvent) {
     event.preventDefault();

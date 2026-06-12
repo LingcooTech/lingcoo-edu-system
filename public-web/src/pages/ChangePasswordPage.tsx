@@ -6,6 +6,7 @@ import { changeParentPassword, getParentToken } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { useSession } from '@/features/session';
 import { sendToAccountHome } from '@/lib/auth-redirect';
+import { useSeo } from '@/lib/seo';
 
 // First-login forced password change (accounts provisioned with a default
 // password = phone's last 6 digits land here until they set a new one).
@@ -16,6 +17,10 @@ export function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useSeo({
+    title: '设置新密码',
+  });
 
   useEffect(() => {
     if (!getParentToken()) {

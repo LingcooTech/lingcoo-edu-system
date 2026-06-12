@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 
 import { fetchStories, loadHome, type ContentItem, type HomePayload } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { getPageCopy } from '@/lib/page-copy';
+import { useSeo } from '@/lib/seo';
 
 const PAGE_SIZE = 12;
 
@@ -42,15 +44,21 @@ export function StoriesPage() {
     };
   }, [search]);
 
-  const title = home?.organization.publicProfile.contentMarketingTitle || '成长故事';
+  const pageCopy = getPageCopy(home, 'stories');
+
+  useSeo({
+    title: pageCopy.title,
+    description: pageCopy.subtitle,
+    brandName: home?.organization.brandName,
+  });
 
   return (
     <Layout>
       <section className="container-narrow py-10">
-        <div className="eyebrow">{title}</div>
-        <h1 className="section-title mt-2">{title}</h1>
+        <div className="eyebrow">{pageCopy.eyebrow}</div>
+        <h1 className="section-title mt-2">{pageCopy.title}</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-          记录孩子从试听、练习到形成习惯的真实变化，用故事呈现课程带来的长期影响。
+          {pageCopy.subtitle}
         </p>
 
         <div className="border-line bg-surface mt-7 flex max-w-xl items-center gap-2 rounded-full border px-4 py-2">
