@@ -26,7 +26,7 @@ export function TrialListPage() {
   const pageCopy = getPageCopy(home, 'trials');
 
   useSeo({
-    title: pageCopy.title,
+    title: pageCopy.seoTitle || pageCopy.title,
     description: pageCopy.subtitle,
     brandName: home?.organization.brandName,
   });
@@ -35,9 +35,11 @@ export function TrialListPage() {
     <Layout>
       <section className="container-narrow py-10">
         <div className="mobile-page-head">
-          <div className="eyebrow">{pageCopy.eyebrow}</div>
+          {pageCopy.eyebrow ? <div className="eyebrow">{pageCopy.eyebrow}</div> : null}
           <h1 className="section-title mt-2">{pageCopy.title}</h1>
-          <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+          {pageCopy.subtitle ? (
+            <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+          ) : null}
         </div>
 
         {loading ? (

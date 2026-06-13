@@ -31,6 +31,7 @@ export function Shell({ account }: { account: AuthAccount }) {
   useEffect(() => {
     if (organization) {
       updateDocumentFavicon(organization.branding.faviconUrl);
+      document.title = `${organization.brandName || organization.name}管理后台`;
     }
   }, [organization]);
 

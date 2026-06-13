@@ -36,10 +36,7 @@ export const adminSections = [
     label: '前台页面',
     path: '/institution',
     icon: Home,
-    items: [
-      { key: 'institutionHome', label: '首页内容', path: '/institution', icon: Home },
-      { key: 'institutionAbout', label: '关于我们', path: '/institution/about', icon: Building2 },
-    ],
+    items: [{ key: 'institutionPages', label: '页面配置', path: '/institution', icon: Home }],
   },
   {
     key: 'resources',
@@ -119,9 +116,13 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
     eyebrow: 'Todo',
     title: '待办事项',
   },
+  institutionPages: {
+    eyebrow: 'Institution',
+    title: '前台页面配置',
+  },
   institutionHome: {
     eyebrow: 'Institution',
-    title: '机构主页',
+    title: '首页内容',
   },
   institutionAbout: {
     eyebrow: 'Institution',

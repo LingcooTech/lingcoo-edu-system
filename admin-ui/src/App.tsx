@@ -16,7 +16,6 @@ import { CoursesPage } from '@/pages/CoursesPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ForbiddenPage } from '@/pages/ForbiddenPage';
 import { GuardiansPage } from '@/pages/GuardiansPage';
-import { InstitutionAboutPage } from '@/pages/InstitutionAboutPage';
 import { InstitutionHomePage } from '@/pages/InstitutionHomePage';
 import { LeadsPage } from '@/pages/LeadsPage';
 import { LessonsPage } from '@/pages/LessonsPage';
@@ -89,7 +88,7 @@ const router = createBrowserRouter(
         { path: 'overview/todos', element: <TodoPage /> },
         // 机构主页
         { path: 'institution', element: <InstitutionHomePage /> },
-        { path: 'institution/about', element: <InstitutionAboutPage /> },
+        { path: 'institution/about', element: <InstitutionHomePage /> },
         // 教学资源
         { path: 'resources/venues', element: <VenueResourcesPage /> },
         { path: 'resources/classrooms', element: <ClassroomsPage /> },

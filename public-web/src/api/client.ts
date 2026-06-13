@@ -119,6 +119,7 @@ export interface PublicPageCopy {
   eyebrow: string;
   title: string;
   subtitle: string;
+  seoTitle: string;
 }
 
 export interface PublicSitePageCopies {
@@ -165,6 +166,7 @@ export interface HomePayload {
         eyebrow: string;
         title: string;
         subtitle: string;
+        seoTitle: string;
         heroImageUrl: string;
         operatorIntroTitle: string;
         operatorIntro: string;

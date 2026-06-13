@@ -132,6 +132,7 @@ const publicSiteSchema = z
             eyebrow: z.string().max(80).optional(),
             title: z.string().max(120).optional(),
             subtitle: z.string().max(240).optional(),
+            seoTitle: z.string().max(120).optional(),
           })
           .optional(),
         trials: z
@@ -139,6 +140,7 @@ const publicSiteSchema = z
             eyebrow: z.string().max(80).optional(),
             title: z.string().max(120).optional(),
             subtitle: z.string().max(240).optional(),
+            seoTitle: z.string().max(120).optional(),
           })
           .optional(),
         teachers: z
@@ -146,6 +148,7 @@ const publicSiteSchema = z
             eyebrow: z.string().max(80).optional(),
             title: z.string().max(120).optional(),
             subtitle: z.string().max(240).optional(),
+            seoTitle: z.string().max(120).optional(),
           })
           .optional(),
         stories: z
@@ -153,6 +156,7 @@ const publicSiteSchema = z
             eyebrow: z.string().max(80).optional(),
             title: z.string().max(120).optional(),
             subtitle: z.string().max(240).optional(),
+            seoTitle: z.string().max(120).optional(),
           })
           .optional(),
       })
@@ -162,6 +166,7 @@ const publicSiteSchema = z
         eyebrow: z.string().max(80).optional(),
         title: z.string().max(120).optional(),
         subtitle: z.string().max(240).optional(),
+        seoTitle: z.string().max(120).optional(),
         heroImageUrl: z.string().max(500).optional(),
         operatorIntroTitle: z.string().max(80).optional(),
         operatorIntro: z.string().max(5000).optional(),

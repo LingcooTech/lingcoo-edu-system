@@ -34,6 +34,9 @@ export function AboutPage() {
   const organization = home?.organization;
   const about = organization?.publicSite?.aboutPage;
   const blocks = about?.bodyBlocks ?? [];
+  const eyebrow = about?.eyebrow ?? organization?.brandName ?? 'About';
+  const title = about?.title || '关于我们';
+  const subtitle = about?.subtitle ?? '了解预约平台、教学机构和到店咨询方式。';
   const platformTitle = platformTitleFor(organization?.brandName, about?.operatorIntroTitle);
   const teachingTitle =
     about?.brandCooperationTitle && about.brandCooperationTitle !== '品牌合作'
@@ -41,8 +44,8 @@ export function AboutPage() {
       : '教学机构';
 
   useSeo({
-    title: about?.title || '关于我们',
-    description: about?.subtitle,
+    title: about?.seoTitle || title,
+    description: subtitle,
     brandName: organization?.brandName,
   });
 
@@ -58,18 +61,18 @@ export function AboutPage() {
     <Layout>
       <section className="container-narrow py-10">
         <div>
-          <div className="eyebrow">{about?.eyebrow || organization?.brandName || 'About'}</div>
-          <h1 className="section-title mt-2">{about?.title ?? '关于我们'}</h1>
-          <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">
-            {about?.subtitle ?? '了解预约平台、教学机构和到店咨询方式。'}
-          </p>
+          {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
+          <h1 className="section-title mt-2">{title}</h1>
+          {subtitle ? (
+            <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{subtitle}</p>
+          ) : null}
         </div>
 
         {about?.heroImageUrl ? (
           <div className="border-line bg-brand-soft mt-7 aspect-[21/8] overflow-hidden rounded-lg border">
             <img
               src={about.heroImageUrl}
-              alt={about.title}
+              alt={title}
               className="h-full w-full object-cover"
             />
           </div>

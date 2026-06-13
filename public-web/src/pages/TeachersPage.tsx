@@ -51,7 +51,7 @@ export function TeachersPage() {
   const pageCopy = getPageCopy(home, 'teachers');
 
   useSeo({
-    title: pageCopy.title,
+    title: pageCopy.seoTitle || pageCopy.title,
     description: pageCopy.subtitle,
     brandName: home?.organization.brandName,
   });
@@ -68,9 +68,11 @@ export function TeachersPage() {
         ) : (
           <>
             <div className="mobile-page-head">
-              <div className="eyebrow">{pageCopy.eyebrow}</div>
+              {pageCopy.eyebrow ? <div className="eyebrow">{pageCopy.eyebrow}</div> : null}
               <h1 className="section-title mt-2">{pageCopy.title}</h1>
-              <p className="text-ink-soft mt-2 text-sm">{pageCopy.subtitle}</p>
+              {pageCopy.subtitle ? (
+                <p className="text-ink-soft mt-2 text-sm">{pageCopy.subtitle}</p>
+              ) : null}
             </div>
           </>
         )}

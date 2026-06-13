@@ -27,7 +27,6 @@ import type {
   ContentImportSettingsOverview,
   PaymentProviderItem,
   PublicNavItem,
-  PublicPageCopy,
   PublicSiteSettings,
   SystemSettingOverview,
 } from '@/api/types';
@@ -45,7 +44,6 @@ const SOURCE_LABEL: Record<string, string> = {
 const brandTabs = [
   { key: 'identity', label: '基础 VI' },
   { key: 'navigation', label: 'Header 菜单' },
-  { key: 'pages', label: '页面文案' },
   { key: 'footer', label: 'Footer 备案' },
 ] as const;
 
@@ -73,27 +71,32 @@ const DEFAULT_SITE: PublicSiteSettings = {
       eyebrow: '课程',
       title: '全部课程',
       subtitle: '按年龄与方向开设的小班课程，先预约试听，老师会电话确认适合的班型与时间。',
+      seoTitle: '',
     },
     trials: {
       eyebrow: '试听预约',
       title: '公开课 / 试听课',
       subtitle: '选择一节公开课，扫码或填表即可预约名额，老师会在课前与你确认。',
+      seoTitle: '',
     },
     teachers: {
       eyebrow: '教师团队',
       title: '教师团队',
       subtitle: '认识我们的老师，找到适合孩子的那一位。',
+      seoTitle: '',
     },
     stories: {
       eyebrow: '成长故事',
       title: '成长故事',
       subtitle: '记录孩子从试听、练习到形成习惯的真实变化，用故事呈现课程带来的长期影响。',
+      seoTitle: '',
     },
   },
   aboutPage: {
     eyebrow: 'About',
     title: '关于我们',
     subtitle: '',
+    seoTitle: '',
     heroImageUrl: '',
     operatorIntroTitle: '',
     operatorIntro: '',
@@ -468,11 +471,6 @@ export function SettingsPage() {
       'navigation',
       'Header 菜单已保存',
     );
-  }
-
-  async function submitPages(event: FormEvent) {
-    event.preventDefault();
-    await savePublicSitePatch({ pages: publicSite.pages }, 'pages', '页面文案已保存');
   }
 
   async function submitFooter(event: FormEvent) {
@@ -910,24 +908,6 @@ export function SettingsPage() {
                   </div>
                   <button className={`${buttonClass} mt-4`} disabled={saving === 'navigation'}>
                     {saving === 'navigation' ? '保存中...' : '保存 Header 菜单'}
-                  </button>
-                </form>
-              )}
-
-              {brandTab === 'pages' && (
-                <form className="resource-card mt-4 p-5" onSubmit={submitPages}>
-                  <div className="text-sm font-semibold">前台页面文案</div>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    配置列表页顶部的标签、标题和标题下方说明；页面主体内容仍来自课程、试听场次、教师和内容营销。
-                  </p>
-                  <div className="mt-4">
-                    <PageCopyEditor
-                      value={publicSite.pages}
-                      onChange={(pages) => updatePublicSite({ pages })}
-                    />
-                  </div>
-                  <button className={`${buttonClass} mt-4`} disabled={saving === 'pages'}>
-                    {saving === 'pages' ? '保存中...' : '保存页面文案'}
                   </button>
                 </form>
               )}
@@ -1467,88 +1447,6 @@ function SettingsTabs({
           {tab.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-const PAGE_COPY_META: Array<{
-  key: keyof PublicSiteSettings['pages'];
-  label: string;
-  description: string;
-}> = [
-  {
-    key: 'courses',
-    label: '课程列表页',
-    description: '用于 /courses 顶部文案；课程卡片内容来自课程库。',
-  },
-  {
-    key: 'trials',
-    label: '试听 / 公开课页',
-    description: '用于 /trials 顶部文案；场次内容来自试听场次。',
-  },
-  {
-    key: 'teachers',
-    label: '教师团队页',
-    description: '用于 /teachers 顶部文案；教师内容来自老师资源。',
-  },
-  {
-    key: 'stories',
-    label: '成长故事页',
-    description: '用于 /stories 顶部文案；文章内容来自内容营销。',
-  },
-];
-
-function PageCopyEditor({
-  value,
-  onChange,
-}: {
-  value: PublicSiteSettings['pages'];
-  onChange: (value: PublicSiteSettings['pages']) => void;
-}) {
-  function patch(key: keyof PublicSiteSettings['pages'], partial: Partial<PublicPageCopy>) {
-    onChange({
-      ...value,
-      [key]: {
-        ...value[key],
-        ...partial,
-      },
-    });
-  }
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {PAGE_COPY_META.map((item) => {
-        const copy = value[item.key];
-        return (
-          <section key={item.key} className="rounded-lg border p-4">
-            <div className="text-sm font-semibold">{item.label}</div>
-            <p className="text-muted-foreground mt-1 text-xs">{item.description}</p>
-            <div className="mt-4 grid gap-3">
-              <Field label="页面标签">
-                <input
-                  className="form-input"
-                  value={copy.eyebrow}
-                  onChange={(event) => patch(item.key, { eyebrow: event.target.value })}
-                />
-              </Field>
-              <Field label="页面标题">
-                <input
-                  className="form-input"
-                  value={copy.title}
-                  onChange={(event) => patch(item.key, { title: event.target.value })}
-                />
-              </Field>
-              <Field label="页面副标题">
-                <textarea
-                  className="form-input h-20"
-                  value={copy.subtitle}
-                  onChange={(event) => patch(item.key, { subtitle: event.target.value })}
-                />
-              </Field>
-            </div>
-          </section>
-        );
-      })}
     </div>
   );
 }

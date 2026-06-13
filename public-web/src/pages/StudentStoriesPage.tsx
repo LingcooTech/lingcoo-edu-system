@@ -47,7 +47,7 @@ export function StoriesPage() {
   const pageCopy = getPageCopy(home, 'stories');
 
   useSeo({
-    title: pageCopy.title,
+    title: pageCopy.seoTitle || pageCopy.title,
     description: pageCopy.subtitle,
     brandName: home?.organization.brandName,
   });
@@ -56,9 +56,11 @@ export function StoriesPage() {
     <Layout>
       <section className="container-narrow py-10">
         <div className="mobile-page-head">
-          <div className="eyebrow">{pageCopy.eyebrow}</div>
+          {pageCopy.eyebrow ? <div className="eyebrow">{pageCopy.eyebrow}</div> : null}
           <h1 className="section-title mt-2">{pageCopy.title}</h1>
-          <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+          {pageCopy.subtitle ? (
+            <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{pageCopy.subtitle}</p>
+          ) : null}
         </div>
 
         <div className="border-line bg-surface mt-7 flex max-w-xl items-center gap-2 rounded-full border px-4 py-2">
