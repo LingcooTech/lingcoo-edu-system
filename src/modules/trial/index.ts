@@ -510,7 +510,11 @@ export const trialModule: AppModule = {
         const { trialSessionId } = request.params as {
           trialSessionId: string;
         };
-        const trialSession = await trialRepo.cancelTrialSession(app.db, trialSessionId);
+        const { mode } = request.query as { mode?: string };
+        const trialSession =
+          mode === 'hard'
+            ? await trialRepo.deleteTrialSession(app.db, trialSessionId)
+            : await trialRepo.cancelTrialSession(app.db, trialSessionId);
         if (!trialSession) throw notFound('Trial session not found');
         return { trialSession };
       },

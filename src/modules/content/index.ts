@@ -1020,6 +1020,17 @@ export const contentModule: AppModule = {
       return new ContentService(app.db).upsertContent(params.contentId, payload);
     });
 
+    app.delete(
+      '/v1/admin/content/:contentId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const params = contentIdParamsSchema.parse(request.params);
+        const item = await contentRepo.deleteContent(app.db, params.contentId);
+        if (!item) throw httpError(404, 'Content not found');
+        return item;
+      },
+    );
+
     app.post(
       '/v1/admin/content/import/wordpress',
       { preHandler: app.requireAdmin },

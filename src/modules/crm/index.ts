@@ -380,6 +380,22 @@ export const crmModule: AppModule = {
         },
       );
 
+      app.delete(
+        `${prefix}/leads/:leadId`,
+        { preHandler: app.requireAdmin },
+        async (request) => {
+          const { leadId } = request.params as { leadId: string };
+          const existing = await crmRepo.requireLead(app.db, leadId);
+          const hasSeatReservation = await crmRepo.hasSeatReservationForLead(app.db, leadId);
+          const lead = await crmRepo.deleteLead(app.db, leadId);
+          if (!lead) throw notFound('Lead not found');
+          if (existing.trialSessionId && !hasSeatReservation) {
+            await trialRepo.decrementBookedCount(app.db, existing.trialSessionId);
+          }
+          return { lead };
+        },
+      );
+
       app.post(
         `${prefix}/leads/:leadId/follow-ups`,
         { preHandler: app.requireAdmin },

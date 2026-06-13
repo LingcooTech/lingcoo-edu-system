@@ -172,3 +172,12 @@ export async function updateContent(db: Database, id: string, input: Partial<New
 
   return item ?? null;
 }
+
+export async function deleteContent(db: Database, id: string) {
+  const [item] = await db
+    .delete(schema.contentItems)
+    .where(eq(schema.contentItems.id, id))
+    .returning();
+
+  return item ?? null;
+}

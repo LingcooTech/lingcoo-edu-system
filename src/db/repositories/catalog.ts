@@ -59,7 +59,8 @@ export async function updateCourse(db: Database, courseId: string, patch: Partia
 
 export async function deleteCourse(db: Database, courseId: string) {
   const [course] = await db
-    .delete(schema.courses)
+    .update(schema.courses)
+    .set({ status: 'archived', onlineSalesEnabled: false, updatedAt: new Date() })
     .where(eq(schema.courses.id, courseId))
     .returning();
   return course ?? null;

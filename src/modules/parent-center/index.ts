@@ -25,6 +25,11 @@ const seatReservationRescheduleSchema = z.object({
 const parentCheckInSchema = z.object({
   studentId: z.string().uuid(),
 });
+const parentCalendarQuerySchema = z.object({
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+  studentId: z.string().uuid().optional(),
+});
 
 const homeworkCheckInSchema = z
   .object({
@@ -50,6 +55,12 @@ function canRescheduleSeatReservation(
     reservation.rescheduleCount < 1 &&
     (!reservation.cancelBefore || reservation.cancelBefore > now)
   );
+}
+
+function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, to?: Date) {
+  if (from && session.endsAt < from) return false;
+  if (to && session.startsAt > to) return false;
+  return true;
 }
 
 export const parentCenterModule: AppModule = {
@@ -410,6 +421,100 @@ export const parentCenterModule: AppModule = {
             ];
           });
         }),
+      };
+    });
+
+    app.get('/public/me/calendar', { preHandler: app.requireParent }, async (request) => {
+      const query = parentCalendarQuerySchema.parse(request.query);
+      const from = query.from ? new Date(query.from) : undefined;
+      const to = query.to ? new Date(query.to) : undefined;
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = query.studentId
+        ? students.some((student) => student.id === query.studentId)
+          ? [query.studentId]
+          : []
+        : students.map((student) => student.id);
+
+      if (studentIds.length === 0) {
+        return { events: [] };
+      }
+
+      const enrollments = await app.db
+        .select()
+        .from(schema.classEnrollments)
+        .where(
+          and(
+            inArray(schema.classEnrollments.studentId, studentIds),
+            eq(schema.classEnrollments.active, true),
+          ),
+        );
+      if (enrollments.length === 0) {
+        return { events: [] };
+      }
+
+      const classIds = Array.from(new Set(enrollments.map((enrollment) => enrollment.classId)));
+      const [sessions, classes, courses, classrooms, attendanceRecords] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.classSessions)
+          .where(inArray(schema.classSessions.classId, classIds)),
+        schedulingRepo.listClasses(app.db),
+        catalogRepo.listCourses(app.db),
+        teachingRepo.listClassrooms(app.db),
+        app.db
+          .select()
+          .from(schema.attendanceRecords)
+          .where(inArray(schema.attendanceRecords.studentId, studentIds)),
+      ]);
+
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const classroomById = new Map(classrooms.map((classroom) => [classroom.id, classroom]));
+      const enrollmentsByClassId = new Map<string, typeof enrollments>();
+      for (const enrollment of enrollments) {
+        enrollmentsByClassId.set(enrollment.classId, [
+          ...(enrollmentsByClassId.get(enrollment.classId) ?? []),
+          enrollment,
+        ]);
+      }
+      const attendanceBySessionStudent = new Map(
+        attendanceRecords.map((record) => [`${record.classSessionId}:${record.studentId}`, record]),
+      );
+
+      return {
+        events: sessions
+          .filter((session) => overlapsRange(session, from, to))
+          .flatMap((session) => {
+            const classGroup = classById.get(session.classId);
+            if (!classGroup) return [];
+            const course = courseById.get(classGroup.courseId) ?? null;
+            const classroom = classroomById.get(session.classroomId) ?? null;
+            return (enrollmentsByClassId.get(session.classId) ?? []).flatMap((enrollment) => {
+              const student = studentById.get(enrollment.studentId);
+              if (!student) return [];
+              const attendanceRecord = attendanceBySessionStudent.get(
+                `${session.id}:${student.id}`,
+              );
+              return [
+                {
+                  id: `${session.id}:${student.id}`,
+                  sessionId: session.id,
+                  type: 'class_session',
+                  title: session.topic,
+                  startsAt: session.startsAt,
+                  endsAt: session.endsAt,
+                  status: session.status,
+                  student: { id: student.id, name: student.name, grade: student.grade },
+                  class: { id: classGroup.id, name: classGroup.name },
+                  course,
+                  classroom,
+                  attendanceStatus: attendanceRecord?.status ?? null,
+                  checkedIn: Boolean(attendanceRecord),
+                },
+              ];
+            });
+          }),
       };
     });
 

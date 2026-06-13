@@ -603,6 +603,34 @@ export async function fetchParentCheckInSessions() {
   ).checkInSessions;
 }
 
+export interface ParentCalendarEvent {
+  id: string;
+  sessionId: string;
+  type: 'class_session';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  student: { id: string; name: string; grade: string };
+  class: { id: string; name: string };
+  course: Course | null;
+  classroom: { id: string; name: string } | null;
+  checkedIn: boolean;
+  attendanceStatus: AttendanceStatus | null;
+}
+
+export async function fetchParentCalendar(params: {
+  from?: string;
+  to?: string;
+  studentId?: string;
+} = {}) {
+  return (
+    await publicApi<{ events: ParentCalendarEvent[] }>(
+      `/public/me/calendar${buildQueryString(params)}`,
+    )
+  ).events;
+}
+
 export async function submitParentCheckIn(sessionId: string, studentId: string) {
   return publicApi<{ attendanceRecord: SessionAttendanceRecord | null; message: string }>(
     `/public/me/check-in-sessions/${sessionId}/check-in`,
@@ -907,6 +935,26 @@ export interface TeacherSessionAttendance {
 
 export async function fetchTeacherSessionAttendance(sessionId: string) {
   return publicApi<TeacherSessionAttendance>(`/public/teacher/sessions/${sessionId}/attendance`);
+}
+
+export interface TeacherCalendarEvent {
+  id: string;
+  type: 'class_session';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  class: { id: string; name: string } | null;
+  course: { id: string; name: string } | null;
+  classroom: { id: string; name: string } | null;
+}
+
+export async function fetchTeacherCalendar(params: { from?: string; to?: string } = {}) {
+  return (
+    await publicApi<{ events: TeacherCalendarEvent[] }>(
+      `/public/teacher/calendar${buildQueryString(params)}`,
+    )
+  ).events;
 }
 
 export async function recordTeacherAttendance(

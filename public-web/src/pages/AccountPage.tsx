@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -21,12 +21,14 @@ import {
   createParentHomeworkCheckIn,
   fetchChildren,
   fetchParentAttendance,
+  fetchParentCalendar,
   fetchParentCheckInSessions,
   fetchParentHomeworkCheckIns,
   fetchParentLessonAccounts,
   fetchParentOrders,
   fetchParentSeatReservations,
   fetchTeacherDashboard,
+  fetchTeacherCalendar,
   fetchTeacherHomeworkCheckIns,
   fetchTeacherSessionAttendance,
   publicApi,
@@ -38,12 +40,14 @@ import {
   type AuthAccount,
   type ChildStudent,
   type ParentAttendanceRecord,
+  type ParentCalendarEvent,
   type ParentCheckInSession,
   type ParentHomeworkCheckIn,
   type ParentLessonAccount,
   type ParentOrder,
   type ParentSeatReservation,
   type TeacherClass,
+  type TeacherCalendarEvent,
   type TeacherClassSession,
   type TeacherHomeworkCheckIn,
 } from '@/api/client';
@@ -119,6 +123,55 @@ function SectionHeading({ icon, children }: { icon: ReactNode; children: ReactNo
       {icon}
       {children}
     </div>
+  );
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function calendarRange(days = 30) {
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const to = addDays(from, days);
+  to.setHours(23, 59, 59, 999);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+function dateKey(value: string) {
+  const date = new Date(value);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function dateLabel(value: string) {
+  const date = new Date(value);
+  return `${date.getMonth() + 1}月${date.getDate()}日 周${'日一二三四五六'[date.getDay()]}`;
+}
+
+function timeRange(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  const pad = (input: number) => String(input).padStart(2, '0');
+  return `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(
+    end.getMinutes(),
+  )}`;
+}
+
+function groupEventsByDate<T extends { startsAt: string }>(events: T[]) {
+  return Array.from(
+    events
+      .slice()
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+      .reduce((groups, event) => {
+        const key = dateKey(event.startsAt);
+        groups.set(key, [...(groups.get(key) ?? []), event]);
+        return groups;
+      }, new Map<string, T[]>())
+      .entries(),
   );
 }
 
@@ -249,6 +302,7 @@ function ParentView({ account }: { account: AuthAccount }) {
   const [accounts, setAccounts] = useState<ParentLessonAccount[]>([]);
   const [orders, setOrders] = useState<ParentOrder[]>([]);
   const [seatReservations, setSeatReservations] = useState<ParentSeatReservation[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<ParentCalendarEvent[]>([]);
   const [checkInSessions, setCheckInSessions] = useState<ParentCheckInSession[]>([]);
   const [attendance, setAttendance] = useState<ParentAttendanceRecord[]>([]);
   const [homeworkCheckIns, setHomeworkCheckIns] = useState<ParentHomeworkCheckIn[]>([]);
@@ -285,6 +339,12 @@ function ParentView({ account }: { account: AuthAccount }) {
       .catch(() => undefined);
   }, []);
 
+  const reloadCalendar = useCallback(() => {
+    fetchParentCalendar(calendarRange(30))
+      .then(setCalendarEvents)
+      .catch(() => undefined);
+  }, []);
+
   const reloadHomeworkCheckIns = useCallback(() => {
     fetchParentHomeworkCheckIns()
       .then(setHomeworkCheckIns)
@@ -306,12 +366,19 @@ function ParentView({ account }: { account: AuthAccount }) {
       .catch(() => undefined);
     reloadOrders();
     reloadSeatReservations();
+    reloadCalendar();
     reloadCheckInSessions();
     fetchParentAttendance()
       .then(setAttendance)
       .catch(() => undefined);
     reloadHomeworkCheckIns();
-  }, [reloadCheckInSessions, reloadHomeworkCheckIns, reloadOrders, reloadSeatReservations]);
+  }, [
+    reloadCalendar,
+    reloadCheckInSessions,
+    reloadHomeworkCheckIns,
+    reloadOrders,
+    reloadSeatReservations,
+  ]);
 
   useEffect(() => {
     const accountTargetExists = accounts.some((item) => item.id === homeworkTargetId);
@@ -373,6 +440,7 @@ function ParentView({ account }: { account: AuthAccount }) {
         fetchParentLessonAccounts().then(setAccounts),
         fetchParentAttendance().then(setAttendance),
         fetchParentCheckInSessions().then(setCheckInSessions),
+        fetchParentCalendar(calendarRange(30)).then(setCalendarEvents),
       ]);
     } catch (err) {
       setCheckInMessage(err instanceof Error ? err.message : '签到失败');
@@ -454,6 +522,7 @@ function ParentView({ account }: { account: AuthAccount }) {
 
   const homeworkAccountTargets = accounts.filter((item) => item.student?.id);
   const homeworkChildTargets = homeworkAccountTargets.length === 0 ? children : [];
+  const calendarGroups = useMemo(() => groupEventsByDate(calendarEvents), [calendarEvents]);
 
   return (
     <>
@@ -493,6 +562,52 @@ function ParentView({ account }: { account: AuthAccount }) {
                 <div className="text-muted mt-1 text-xs">
                   {child.grade}
                   {child.school ? ` · ${child.school}` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6">
+        <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
+          课程表
+        </SectionHeading>
+        {calendarGroups.length === 0 ? (
+          <EmptyCard>近 30 天暂无正式课程安排。</EmptyCard>
+        ) : (
+          <div className="grid gap-3">
+            {calendarGroups.map(([day, events]) => (
+              <div key={day} className="pwcard overflow-hidden">
+                <div className="bg-paper text-ink flex items-center justify-between px-4 py-2 text-sm font-semibold">
+                  <span>{dateLabel(events[0].startsAt)}</span>
+                  <span className="text-muted text-xs">{events.length} 节</span>
+                </div>
+                <div className="divide-line divide-y">
+                  {events.map((event) => (
+                    <div key={event.id} className="p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-ink text-sm font-semibold">
+                            {event.course?.name ?? '课程'} · {event.title}
+                          </div>
+                          <div className="text-muted mt-1 text-xs">
+                            {event.student.name} · {event.class.name}
+                          </div>
+                        </div>
+                        <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                          {event.checkedIn
+                            ? (ATTENDANCE_STATUS_LABEL[event.attendanceStatus ?? 'present'] ??
+                              '已签到')
+                            : (SESSION_STATUS_LABEL[event.status] ?? event.status)}
+                        </span>
+                      </div>
+                      <div className="text-ink-soft mt-3 text-xs">
+                        {timeRange(event.startsAt, event.endsAt)} ·{' '}
+                        {event.classroom?.name ?? '教室待确认'}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -938,7 +1053,7 @@ function ParentView({ account }: { account: AuthAccount }) {
 // --- Teacher: schedule (with 点名) + classes ---
 
 function TeacherView() {
-  const [sessions, setSessions] = useState<TeacherClassSession[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<TeacherCalendarEvent[]>([]);
   const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [homeworkCheckIns, setHomeworkCheckIns] = useState<TeacherHomeworkCheckIn[]>([]);
   const [rollCallSession, setRollCallSession] = useState<TeacherClassSession | null>(null);
@@ -951,9 +1066,11 @@ function TeacherView() {
   const reload = useCallback(() => {
     fetchTeacherDashboard()
       .then((dashboard) => {
-        setSessions(dashboard.sessions);
         setClasses(dashboard.classes);
       })
+      .catch(() => undefined);
+    fetchTeacherCalendar(calendarRange(30))
+      .then(setCalendarEvents)
       .catch(() => undefined);
     fetchTeacherHomeworkCheckIns()
       .then(setHomeworkCheckIns)
@@ -992,45 +1109,68 @@ function TeacherView() {
     }
   }
 
+  const calendarGroups = useMemo(() => groupEventsByDate(calendarEvents), [calendarEvents]);
+
   return (
     <>
       <section className="mt-6">
         <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
           我的课表
         </SectionHeading>
-        {sessions.length === 0 ? (
-          <EmptyCard>暂无排课。</EmptyCard>
+        {calendarGroups.length === 0 ? (
+          <EmptyCard>近 30 天暂无排课。</EmptyCard>
         ) : (
-          <div className="grid gap-2">
-            {sessions.map((session) => (
-              <div key={session.id} className="pwcard p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-ink text-sm font-semibold">
-                      {session.class?.name ?? '班级'} · {session.topic}
-                    </div>
-                    <div className="text-muted mt-1 text-xs">
-                      {session.course?.name ?? '课程'} · {session.classroom?.name ?? '教室'}
-                    </div>
-                  </div>
-                  <span className="bg-paper text-ink-soft rounded-full px-2.5 py-1 text-xs">
-                    {SESSION_STATUS_LABEL[session.status] ?? session.status}
-                  </span>
+          <div className="grid gap-3">
+            {calendarGroups.map(([day, events]) => (
+              <div key={day} className="pwcard overflow-hidden">
+                <div className="bg-paper text-ink flex items-center justify-between px-4 py-2 text-sm font-semibold">
+                  <span>{dateLabel(events[0].startsAt)}</span>
+                  <span className="text-muted text-xs">{events.length} 节</span>
                 </div>
-                <div className="text-ink-soft mt-3 flex items-center justify-between text-sm">
-                  <span>
-                    {formatDateTime(session.startsAt)} - {formatDateTime(session.endsAt)}
-                  </span>
-                  {session.status !== 'cancelled' ? (
-                    <button
-                      type="button"
-                      className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
-                      onClick={() => setRollCallSession(session)}
-                    >
-                      <ClipboardList className="h-3.5 w-3.5" />
-                      点名
-                    </button>
-                  ) : null}
+                <div className="divide-line divide-y">
+                  {events.map((event) => (
+                    <div key={event.id} className="p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-ink text-sm font-semibold">
+                            {event.class?.name ?? '班级'} · {event.title}
+                          </div>
+                          <div className="text-muted mt-1 text-xs">
+                            {event.course?.name ?? '课程'} · {event.classroom?.name ?? '教室'}
+                          </div>
+                        </div>
+                        <span className="bg-paper text-ink-soft rounded-full px-2.5 py-1 text-xs">
+                          {SESSION_STATUS_LABEL[event.status] ?? event.status}
+                        </span>
+                      </div>
+                      <div className="text-ink-soft mt-3 flex items-center justify-between gap-3 text-sm">
+                        <span>{timeRange(event.startsAt, event.endsAt)}</span>
+                        {event.status !== 'cancelled' ? (
+                          <button
+                            type="button"
+                            className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                            onClick={() =>
+                              setRollCallSession({
+                                id: event.id,
+                                startsAt: event.startsAt,
+                                endsAt: event.endsAt,
+                                topic: event.title,
+                                status: event.status,
+                                class: event.class ? { name: event.class.name } : undefined,
+                                course: event.course ? { name: event.course.name } : undefined,
+                                classroom: event.classroom
+                                  ? { name: event.classroom.name }
+                                  : undefined,
+                              })
+                            }
+                          >
+                            <ClipboardList className="h-3.5 w-3.5" />
+                            点名
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

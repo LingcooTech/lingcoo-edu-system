@@ -55,6 +55,14 @@ export async function cancelTrialSession(db: Database, trialSessionId: string) {
   return updateTrialSession(db, trialSessionId, { status: 'cancelled' });
 }
 
+export async function deleteTrialSession(db: Database, trialSessionId: string) {
+  const [session] = await db
+    .delete(schema.trialSessions)
+    .where(eq(schema.trialSessions.id, trialSessionId))
+    .returning();
+  return session ?? null;
+}
+
 export async function incrementBookedCount(db: Database, trialSessionId: string) {
   const [session] = await db
     .select()
@@ -67,6 +75,21 @@ export async function incrementBookedCount(db: Database, trialSessionId: string)
   await db
     .update(schema.trialSessions)
     .set({ bookedCount: session.bookedCount + 1, updatedAt: new Date() })
+    .where(eq(schema.trialSessions.id, trialSessionId));
+}
+
+export async function decrementBookedCount(db: Database, trialSessionId: string) {
+  const [session] = await db
+    .select()
+    .from(schema.trialSessions)
+    .where(eq(schema.trialSessions.id, trialSessionId))
+    .limit(1);
+  if (!session) {
+    return;
+  }
+  await db
+    .update(schema.trialSessions)
+    .set({ bookedCount: Math.max(0, session.bookedCount - 1), updatedAt: new Date() })
     .where(eq(schema.trialSessions.id, trialSessionId));
 }
 

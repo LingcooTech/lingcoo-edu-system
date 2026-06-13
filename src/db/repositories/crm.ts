@@ -154,6 +154,15 @@ export async function listLeadsByTrialSession(db: Database, trialSessionId: stri
     .orderBy(desc(schema.leads.createdAt));
 }
 
+export async function hasSeatReservationForLead(db: Database, leadId: string) {
+  const [reservation] = await db
+    .select({ id: schema.seatReservations.id })
+    .from(schema.seatReservations)
+    .where(eq(schema.seatReservations.leadId, leadId))
+    .limit(1);
+  return Boolean(reservation);
+}
+
 export async function createLead(db: Database, values: NewLead) {
   const [lead] = await db.insert(schema.leads).values(values).returning();
   return lead;
@@ -178,6 +187,11 @@ export async function updateLead(
     .where(eq(schema.leads.id, leadId))
     .returning();
   return lead;
+}
+
+export async function deleteLead(db: Database, leadId: string) {
+  const [lead] = await db.delete(schema.leads).where(eq(schema.leads.id, leadId)).returning();
+  return lead ?? null;
 }
 
 export async function addFollowUp(

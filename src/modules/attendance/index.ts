@@ -208,11 +208,26 @@ export const attendanceModule: AppModule = {
           sessionId,
           courseId: classGroup.courseId,
           records: body.records,
+          completeSession: false,
         });
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
+
+        const [enrollments, latestAttendanceRecords] = await Promise.all([
+          schedulingRepo.listEnrollments(app.db, classGroup.id),
+          attendanceRepo.listAttendanceForSession(app.db, sessionId),
+        ]);
+        const checkedInStudentIds = new Set(
+          latestAttendanceRecords.map((record) => record.studentId),
+        );
+        if (
+          enrollments.length > 0 &&
+          enrollments.every((enrollment) => checkedInStudentIds.has(enrollment.studentId))
+        ) {
+          await schedulingRepo.markSessionCompleted(app.db, sessionId);
+        }
 
         return { attendanceRecords };
       },

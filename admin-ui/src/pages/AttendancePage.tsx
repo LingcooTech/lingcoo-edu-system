@@ -51,7 +51,7 @@ export function AttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, AttendanceDraft>>({});
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingStudentId, setSavingStudentId] = useState('');
 
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === sessionId) ?? null,
@@ -115,64 +115,50 @@ export function AttendancePage() {
     }));
   }
 
-  async function submit() {
-    if (!selectedSession) return;
-    const pending = enrollments
-      .filter((enrollment) => !recordByStudentId.has(enrollment.studentId))
-      .map((enrollment) => ({
-        studentId: enrollment.studentId,
-        status: drafts[enrollment.studentId]?.status ?? 'present',
-        note: drafts[enrollment.studentId]?.note?.trim() || undefined,
-      }));
-
-    if (pending.length === 0) {
-      toast.show('该课次已完成签到');
-      return;
-    }
-
-    setSaving(true);
+  async function submitEnrollment(enrollment: Enrollment) {
+    if (!selectedSession || recordByStudentId.has(enrollment.studentId)) return;
+    const draft = drafts[enrollment.studentId] ?? defaultDraft();
+    setSavingStudentId(enrollment.studentId);
     try {
       const { attendanceRecords } = await apiPost<{ attendanceRecords: AttendanceRecord[] }>(
         `/v1/class-sessions/${selectedSession.id}/attendance`,
-        { records: pending },
+        {
+          records: [
+            {
+              studentId: enrollment.studentId,
+              status: draft.status,
+              note: draft.note.trim() || undefined,
+            },
+          ],
+        },
       );
       setRecords((current) => {
         const byStudentId = new Map(current.map((record) => [record.studentId, record]));
         attendanceRecords.forEach((record) => byStudentId.set(record.studentId, record));
-        return Array.from(byStudentId.values());
+        const nextRecords = Array.from(byStudentId.values());
+        const checkedInStudentIds = new Set(nextRecords.map((record) => record.studentId));
+        if (
+          enrollments.length > 0 &&
+          enrollments.every((item) => checkedInStudentIds.has(item.studentId))
+        ) {
+          setSessions(
+            sessions.map((session) =>
+              session.id === selectedSession.id ? { ...session, status: 'completed' } : session,
+            ),
+          );
+        }
+        return nextRecords;
       });
-      setSessions(
-        sessions.map((session) =>
-          session.id === selectedSession.id ? { ...session, status: 'completed' } : session,
-        ),
-      );
-      toast.success('签到已提交，课时流水已更新');
+      toast.success('补签/核销已提交，课时流水已更新');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '提交签到失败');
+      toast.error(err instanceof Error ? err.message : '提交失败');
     } finally {
-      setSaving(false);
+      setSavingStudentId('');
     }
   }
 
   return (
-    <PageFrame
-      section="attendance"
-      actions={
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={submit}
-          disabled={!selectedSession || loading || saving || enrollments.length === 0}
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" />
-          )}
-          手动补签/核销
-        </button>
-      }
-    >
+    <PageFrame section="attendance">
       <div className="resource-card mb-4 p-4">
         <label className="form-label">选择课次</label>
         <select
@@ -264,7 +250,19 @@ export function AttendancePage() {
                         已签到 · {STATUS_LABEL[record.status]}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground text-xs">待签到</span>
+                      <button
+                        type="button"
+                        className="btn btn-primary px-3 py-1.5"
+                        disabled={!selectedSession || loading || savingStudentId !== ''}
+                        onClick={() => submitEnrollment(enrollment)}
+                      >
+                        {savingStudentId === enrollment.studentId ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        )}
+                        补签/核销
+                      </button>
                     )}
                   </div>
                 </div>

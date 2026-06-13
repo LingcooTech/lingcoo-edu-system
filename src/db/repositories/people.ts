@@ -71,7 +71,8 @@ export async function updateStudent(
 
 export async function deleteStudent(db: Database, studentId: string) {
   const [student] = await db
-    .delete(schema.students)
+    .update(schema.students)
+    .set({ status: 'inactive', updatedAt: new Date() })
     .where(eq(schema.students.id, studentId))
     .returning();
   return student ?? null;

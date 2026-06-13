@@ -305,6 +305,19 @@ export interface ClassSession {
   classroom?: { name: string };
 }
 
+export interface CalendarEvent {
+  id: string;
+  type: 'class_session';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  class?: { id: string; name: string } | null;
+  course?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+  classroom?: { id: string; name: string } | null;
+}
+
 export type AttendanceStatus = 'present' | 'leave' | 'absent' | 'makeup' | 'trial';
 
 export interface AttendanceRecord {

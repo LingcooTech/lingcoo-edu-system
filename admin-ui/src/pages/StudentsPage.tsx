@@ -111,10 +111,10 @@ export function StudentsPage() {
     if (!deleteTarget) return;
     try {
       const { student } = await apiDelete<{ student: Student }>(`${STUDENTS()}/${deleteTarget.id}`);
-      setData(data.filter((item) => item.id !== student.id));
+      setData(data.map((item) => (item.id === student.id ? { ...item, ...student } : item)));
       setDeleteTarget(null);
-      setSelected((current) => (current?.id === student.id ? null : current));
-      toast.success('学员已删除');
+      setSelected((current) => (current?.id === student.id ? { ...current, ...student } : current));
+      toast.success('学员已停用，历史课时、订单和考勤已保留');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '删除失败');
     }
@@ -191,7 +191,7 @@ export function StudentsPage() {
                   onClick={() => setDeleteTarget(row)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  删除
+                  停用
                 </button>
               </div>
             ),
@@ -326,9 +326,9 @@ export function StudentsPage() {
       </Drawer>
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="删除学员？"
-        message={`确认删除「${deleteTarget?.name ?? ''}」？相关课时、考勤和订单引用会按系统约束处理。`}
-        confirmLabel="删除"
+        title="停用学员？"
+        message={`确认停用「${deleteTarget?.name ?? ''}」？历史课时、考勤和订单记录会保留。`}
+        confirmLabel="停用"
         danger
         onCancel={() => setDeleteTarget(null)}
         onConfirm={deleteStudent}

@@ -7,6 +7,7 @@ import {
   Pencil,
   Plus,
   QrCode,
+  Trash2,
   UserX,
   Users,
   XCircle,
@@ -124,6 +125,8 @@ export function TrialsPage() {
   const [form, setForm] = useState<TrialForm>(defaultForm([], []));
   const [saving, setSaving] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<TrialSession | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TrialSession | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [qrSession, setQrSession] = useState<TrialSession | null>(null);
   const [qr, setQr] = useState<{ landingUrl: string; qrCodeDataUrl: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -455,6 +458,24 @@ export function TrialsPage() {
     }
   }
 
+  async function deleteTrial() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { trialSession } = await apiDelete<{ trialSession: TrialSession }>(
+        `${TRIALS()}/${deleteTarget.id}?mode=hard`,
+      );
+      setData(data.filter((item) => item.id !== trialSession.id));
+      setRegistrationSession((current) => (current?.id === trialSession.id ? null : current));
+      setDeleteTarget(null);
+      toast.success('试听课已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function openQr(session: TrialSession) {
     setQrSession(session);
     setQr(null);
@@ -567,6 +588,14 @@ export function TrialsPage() {
                     取消
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
               </div>
             ),
           },
@@ -1140,6 +1169,16 @@ export function TrialsPage() {
         danger
         onConfirm={cancelTrial}
         onCancel={() => setCancelTarget(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除试听课？"
+        message={`确认删除「${deleteTarget?.title ?? ''}」？相关线索和占位费预约会保留，但不再关联这个场次。`}
+        confirmLabel="删除"
+        danger
+        busy={deleting}
+        onConfirm={deleteTrial}
+        onCancel={() => setDeleteTarget(null)}
       />
     </PageFrame>
   );

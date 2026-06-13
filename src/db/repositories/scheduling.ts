@@ -180,6 +180,14 @@ export async function cancelClassSession(db: Database, sessionId: string) {
   return updateClassSession(db, sessionId, { status: 'cancelled' });
 }
 
+export async function deleteClassSession(db: Database, sessionId: string) {
+  const [session] = await db
+    .delete(schema.classSessions)
+    .where(eq(schema.classSessions.id, sessionId))
+    .returning();
+  return session ?? null;
+}
+
 export async function findSession(db: Database, sessionId: string) {
   const [session] = await db
     .select()

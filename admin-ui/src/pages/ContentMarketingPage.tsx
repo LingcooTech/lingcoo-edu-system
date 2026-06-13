@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Edit3, ExternalLink, Plus, RefreshCw } from 'lucide-react';
+import { Edit3, ExternalLink, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import {
   createContent,
+  deleteContent,
   importNotionContent,
   importWechatContent,
   importWordPressContent,
@@ -13,6 +14,7 @@ import {
 } from '@/api/client';
 import type { ContentItem, ContentSourceType, ContentStatus } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
@@ -106,10 +108,13 @@ export function ContentMarketingPage() {
   const [statusFilter, setStatusFilter] = useState<ContentStatus | typeof ALL>(ALL);
   const [sourceFilter, setSourceFilter] = useState<ContentSourceType | typeof ALL>(ALL);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'list' | 'import'>('list');
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<ContentForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ContentItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [wpForm, setWpForm] = useState({
     siteUrl: '',
@@ -207,6 +212,22 @@ export function ContentMarketingPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const item = await deleteContent(deleteTarget.id);
+      setItems((current) => current.filter((row) => row.id !== item.id));
+      setTotal((current) => Math.max(0, current - 1));
+      setDeleteTarget(null);
+      toast.success('内容已删除');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '删除失败');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function runImport(sourceType: ContentSourceType) {
     setImporting(sourceType);
     try {
@@ -290,6 +311,14 @@ export function ContentMarketingPage() {
                 前台
               </a>
             ) : null}
+            <button
+              type="button"
+              className="btn btn-ghost text-red-600"
+              onClick={() => setDeleteTarget(row)}
+            >
+              <Trash2 className="h-4 w-4" />
+              删除
+            </button>
           </div>
         ),
       },
@@ -322,7 +351,28 @@ export function ContentMarketingPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="flex flex-wrap gap-2 border-b">
+          {[
+            { key: 'list', label: '内容列表' },
+            { key: 'import', label: '导入内容' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`border-b-2 px-3 py-2 text-sm font-medium ${
+                activeTab === tab.key
+                  ? 'border-primary text-primary'
+                  : 'text-muted-foreground border-transparent hover:text-foreground'
+              }`}
+              onClick={() => setActiveTab(tab.key as 'list' | 'import')}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'import' && (
+          <div className="grid gap-4 xl:grid-cols-3">
           <ImportCard
             title="导入 WordPress"
             description="输入文章 URL；站点地址和应用密码留空时读取系统集成配置。"
@@ -418,9 +468,11 @@ export function ContentMarketingPage() {
               onChange={(status) => setWechatForm({ ...wechatForm, status })}
             />
           </ImportCard>
-        </div>
+          </div>
+        )}
 
-        <div className="resource-card p-4">
+        {activeTab === 'list' && (
+          <div className="resource-card p-4">
           <div className="mb-4 grid gap-3 md:grid-cols-[1fr_12rem_12rem_auto]">
             <input
               className="form-input"
@@ -487,6 +539,7 @@ export function ContentMarketingPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       <Drawer
@@ -604,6 +657,16 @@ export function ContentMarketingPage() {
           </Field>
         </div>
       </Drawer>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除内容？"
+        message={`确认删除「${deleteTarget?.title ?? ''}」？删除后前台成长故事将不再展示这篇内容。`}
+        confirmLabel="删除"
+        danger
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </PageFrame>
   );
 }

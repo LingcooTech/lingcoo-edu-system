@@ -78,6 +78,16 @@ const teacherAttendanceSchema = z.object({
     }),
   ),
 });
+const teacherCalendarQuerySchema = z.object({
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+});
+
+function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, to?: Date) {
+  if (from && session.endsAt < from) return false;
+  if (to && session.startsAt > to) return false;
+  return true;
+}
 
 const teacherHomeworkReviewSchema = z.object({
   reviewStatus: z.enum(['reviewed', 'needs_revision']).default('reviewed'),
@@ -151,6 +161,54 @@ export const teachingModule: AppModule = {
               };
             }),
           classes: classCards,
+        };
+      },
+    );
+
+    app.get(
+      '/public/teacher/calendar',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const account = await accountsRepo.findById(app.db, request.account!.id);
+        if (!account?.teacherId) {
+          throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
+        }
+        const query = teacherCalendarQuerySchema.parse(request.query);
+        const from = query.from ? new Date(query.from) : undefined;
+        const to = query.to ? new Date(query.to) : undefined;
+
+        const [sessions, classes, courses, classrooms] = await Promise.all([
+          schedulingRepo.listClassSessions(app.db),
+          schedulingRepo.listClasses(app.db),
+          catalogRepo.listCourses(app.db),
+          teachingRepo.listClassrooms(app.db),
+        ]);
+        const classById = new Map(classes.map((item) => [item.id, item]));
+        const courseById = new Map(courses.map((item) => [item.id, item]));
+        const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+
+        return {
+          events: sessions
+            .filter(
+              (session) =>
+                session.teacherId === account.teacherId && overlapsRange(session, from, to),
+            )
+            .map((session) => {
+              const classGroup = classById.get(session.classId);
+              const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
+              const classroom = classroomById.get(session.classroomId);
+              return {
+                id: session.id,
+                type: 'class_session',
+                title: session.topic,
+                startsAt: session.startsAt,
+                endsAt: session.endsAt,
+                status: session.status,
+                class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+                course: course ? { id: course.id, name: course.name } : null,
+                classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
+              };
+            }),
         };
       },
     );

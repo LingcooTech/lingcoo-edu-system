@@ -171,6 +171,12 @@ export async function updateContent(contentId: string, input: ContentUpsertInput
   });
 }
 
+export async function deleteContent(contentId: string) {
+  return api<ContentItem>(`/v1/admin/content/${encodeURIComponent(contentId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function importWordPressContent(input: {
   siteUrl?: string;
   postUrl: string;

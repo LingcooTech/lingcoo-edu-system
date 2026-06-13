@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRightCircle, ListFilter } from 'lucide-react';
+import { ArrowRightCircle, ListFilter, Trash2 } from 'lucide-react';
 
-import { api, apiPost } from '@/api/client';
+import { api, apiDelete, apiPost } from '@/api/client';
 import type { Campaign, Channel, FollowUp, Lead, LeadStatus } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
@@ -87,6 +88,8 @@ export function LeadsPage() {
   const [submittingFollowUp, setSubmittingFollowUp] = useState(false);
   const [convertSchool, setConvertSchool] = useState('');
   const [converting, setConverting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!selected) return;
@@ -154,6 +157,22 @@ export function LeadsPage() {
       toast.error(err instanceof Error ? err.message : '转化失败');
     } finally {
       setConverting(false);
+    }
+  }
+
+  async function deleteLead() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { lead } = await apiDelete<{ lead: Lead }>(`${LEADS_BASE()}/${deleteTarget.id}`);
+      setData(data.filter((item) => item.id !== lead.id));
+      setSelected((current) => (current?.id === lead.id ? null : current));
+      setDeleteTarget(null);
+      toast.success('线索已删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -261,19 +280,29 @@ export function LeadsPage() {
           },
           {
             key: 'action',
-            header: '流转',
+            header: '操作',
             cell: (row) => (
-              <select
-                className="form-input w-auto py-1"
-                value={row.status}
-                onChange={(event) => updateStatus(row, event.target.value as LeadStatus)}
-              >
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabels[status]}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-wrap gap-1">
+                <select
+                  className="form-input w-auto py-1"
+                  value={row.status}
+                  onChange={(event) => updateStatus(row, event.target.value as LeadStatus)}
+                >
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabels[status]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => setDeleteTarget(row)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  删除
+                </button>
+              </div>
             ),
           },
         ]}
@@ -389,6 +418,16 @@ export function LeadsPage() {
           </div>
         )}
       </Drawer>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除线索？"
+        message={`确认删除「${deleteTarget?.studentName ?? ''} / ${deleteTarget?.guardianName ?? ''}」？跟进记录会一并删除。`}
+        confirmLabel="删除"
+        danger
+        busy={deleting}
+        onConfirm={deleteLead}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </PageFrame>
   );
 }

@@ -172,8 +172,8 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
     setDeleting(true);
     try {
       const { course } = await apiDelete<{ course: Course }>(`${COURSE_BASE()}/${deleteTarget.id}`);
-      setCourses(courses.filter((item) => item.id !== course.id));
-      toast.success('课程已删除');
+      setCourses(courses.map((item) => (item.id === course.id ? course : item)));
+      toast.success('课程已归档并从前台下架');
       setDeleteTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '删除失败');
@@ -241,7 +241,7 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
                   onClick={() => setDeleteTarget(row)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  删除
+                  归档
                 </button>
               </div>
             ),
@@ -448,9 +448,9 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="删除课程？"
-        message={`确认删除「${deleteTarget?.name ?? ''}」？如果课程已被班级、订单或课时包引用，系统会阻止删除。`}
-        confirmLabel="删除"
+        title="归档课程？"
+        message={`确认归档「${deleteTarget?.name ?? ''}」？课程会从前台下架，历史班级、订单和课时包记录会保留。`}
+        confirmLabel="归档"
         danger
         busy={deleting}
         onConfirm={confirmDelete}
