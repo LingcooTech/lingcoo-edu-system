@@ -73,6 +73,8 @@ export function AboutPage() {
             <img
               src={about.heroImageUrl}
               alt={title}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
           </div>
@@ -106,6 +108,8 @@ export function AboutPage() {
                           <img
                             src={institution.logoUrl}
                             alt={institution.name}
+                            loading="lazy"
+                            decoding="async"
                             className="border-line h-11 w-11 shrink-0 rounded-lg border object-contain p-1"
                           />
                         ) : (

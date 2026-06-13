@@ -21,6 +21,24 @@
   --color-brand-soft: #f1e9e1;
 }
 
+:root {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-paper: #151412;
+    --color-surface: #1f1d1a;
+    --color-ink: #f5efe7;
+    --color-ink-soft: #cec4b8;
+    --color-muted: #9f958a;
+    --color-line: #3a342e;
+    --color-brand: #d2a17d;
+    --color-brand-soft: #3a2b22;
+  }
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -495,5 +513,26 @@ body {
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .pwcard-hover:hover,
+  .hover\:-translate-y-0\.5:hover,
+  .group:hover .group-hover\:translate-x-0\.5,
+  .group:hover .group-hover\:scale-105,
+  .group:hover .group-hover\:scale-\[1\.04\],
+  .group:hover .md\:group-hover\:scale-\[1\.04\],
+  .group:hover .md\:group-hover\:translate-y-0 {
+    transform: none !important;
   }
 }

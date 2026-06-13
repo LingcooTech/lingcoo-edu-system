@@ -177,6 +177,8 @@ function TeacherDetailBody({ detail }: { detail: PublicTeacherDetail }) {
                   <img
                     src={teacher.wechatQrUrl}
                     alt={`${teacher.name}老师微信二维码`}
+                    loading="lazy"
+                    decoding="async"
                     className="border-line h-24 w-24 shrink-0 rounded-xl border bg-white object-contain p-1 shadow-sm sm:h-28 sm:w-28"
                   />
                   <div className="min-w-0 text-left lg:text-center">
@@ -279,7 +281,15 @@ function TeacherAvatar({ teacher }: { teacher: PublicTeacherDetail['teacher'] })
   const base =
     'border-line h-56 w-full rounded-2xl border object-cover shadow-sm sm:h-full sm:min-h-[248px] sm:w-[188px]';
   if (teacher.avatarUrl) {
-    return <img src={teacher.avatarUrl} alt={teacher.name} className={base} />;
+    return (
+      <img
+        src={teacher.avatarUrl}
+        alt={teacher.name}
+        loading="lazy"
+        decoding="async"
+        className={base}
+      />
+    );
   }
   return (
     <div className={`${base} bg-brand-soft text-brand flex items-center justify-center`}>
@@ -440,6 +450,8 @@ function GallerySection({
             <img
               src={url}
               alt={`${title} ${index + 1}`}
+              loading="lazy"
+              decoding="async"
               className="aspect-[4/3] w-full bg-white object-cover transition duration-300 group-hover:scale-105"
             />
           </button>
@@ -485,6 +497,8 @@ function ResultsSection({
                 <img
                   src={url}
                   alt={`学员作品 ${index + 1}`}
+                  loading="lazy"
+                  decoding="async"
                   className="aspect-[4/3] w-full bg-white object-cover transition duration-300 group-hover:scale-105"
                 />
               </button>
@@ -577,6 +591,7 @@ function Lightbox({
         src={urls[index]}
         alt={`预览图 ${index + 1}`}
         onClick={(event) => event.stopPropagation()}
+        decoding="async"
         className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
       />
 
@@ -602,6 +617,8 @@ function InstitutionMark({
         <img
           src={institution.logoUrl}
           alt={institution.name}
+          loading="lazy"
+          decoding="async"
           className="max-h-8 max-w-36 object-contain"
         />
         <span className="sr-only">{institution.name}</span>

@@ -817,6 +817,8 @@ function ParentView({ account }: { account: AuthAccount }) {
                         key={url}
                         src={url}
                         alt="作业打卡"
+                        loading="lazy"
+                        decoding="async"
                         className="aspect-square rounded-xl object-cover"
                       />
                     ))}
@@ -1252,6 +1254,8 @@ function TeacherView() {
                         key={url}
                         src={url}
                         alt="作业打卡"
+                        loading="lazy"
+                        decoding="async"
                         className="aspect-square rounded-xl object-cover"
                       />
                     ))}

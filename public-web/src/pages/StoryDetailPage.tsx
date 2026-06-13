@@ -73,6 +73,8 @@ export function StoryDetailPage() {
                 <img
                   src={story.coverUrl}
                   alt={story.title}
+                  loading="lazy"
+                  decoding="async"
                   className="aspect-[16/10] w-full object-cover sm:aspect-[21/9]"
                 />
               </div>

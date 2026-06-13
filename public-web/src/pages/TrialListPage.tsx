@@ -78,6 +78,8 @@ function TrialCard({ session }: { session: TrialSession }) {
           <img
             src={session.coverImageUrl}
             alt={session.title}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
         </div>

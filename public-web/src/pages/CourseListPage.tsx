@@ -136,6 +136,8 @@ export function CourseListPage() {
                     <img
                       src={course.coverImageUrl}
                       alt={course.name}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   </div>

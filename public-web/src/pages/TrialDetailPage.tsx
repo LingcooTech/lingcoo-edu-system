@@ -177,6 +177,8 @@ export function TrialDetailPage() {
                 <img
                   src={coverImageUrl}
                   alt={detail.trialSession.title}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               </div>

@@ -256,7 +256,7 @@ export function HomePage() {
                 {stats.map((item) => (
                   <div
                     key={item}
-                    className="border-line text-ink rounded-2xl border bg-[#e7e1d8] px-4 py-3 text-center text-sm font-bold shadow-sm"
+                    className="border-line bg-brand-soft text-ink rounded-2xl border px-4 py-3 text-center text-sm font-bold shadow-sm"
                   >
                     {item}
                   </div>
@@ -278,6 +278,8 @@ export function HomePage() {
               <img
                 src={activeHeroImage}
                 alt={organization?.brandName ?? '机构环境'}
+                decoding="async"
+                loading="eager"
                 className="h-full w-full object-cover"
               />
             ) : null}
@@ -378,7 +380,7 @@ export function HomePage() {
         </section>
       )}
 
-      <section className="bg-[#eee8de] py-10">
+      <section className="bg-brand-soft/45 py-10">
         <div className="container-narrow">
           <div className="mb-4 flex items-end justify-between">
             <div>
@@ -401,6 +403,8 @@ export function HomePage() {
                     <img
                       src={course.coverImageUrl}
                       alt={course.name}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -449,6 +453,8 @@ export function HomePage() {
                     <img
                       src={session.coverImageUrl}
                       alt={session.title}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -520,6 +526,8 @@ export function HomePage() {
                     <img
                       src={story.coverUrl}
                       alt={story.title}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
                   </div>
@@ -637,6 +645,8 @@ function HomeTeacherCard({ teacher }: { teacher: PublicTeacher }) {
           src={teacher.avatarUrl}
           alt={teacher.name}
           draggable={false}
+          loading="lazy"
+          decoding="async"
           className="pointer-events-none absolute inset-0 h-full w-full object-cover transition duration-500 md:group-hover:scale-[1.04]"
         />
       ) : (

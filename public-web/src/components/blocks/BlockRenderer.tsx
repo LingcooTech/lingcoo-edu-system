@@ -76,6 +76,8 @@ function BlockView({ block }: { block: Block }) {
           <img
             src={block.url}
             alt={block.alt || block.caption || ''}
+            loading="lazy"
+            decoding="async"
             className="border-line w-full rounded-2xl border object-cover"
           />
           {block.caption ? (
@@ -95,6 +97,8 @@ function BlockView({ block }: { block: Block }) {
             <img
               src={block.url}
               alt={block.title || ''}
+              loading="lazy"
+              decoding="async"
               className="border-line w-full rounded-2xl border object-cover sm:w-56"
             />
           ) : null}
@@ -154,6 +158,8 @@ function BlockView({ block }: { block: Block }) {
               key={index}
               src={url}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="border-line aspect-square w-full rounded-2xl border object-cover"
             />
           ))}

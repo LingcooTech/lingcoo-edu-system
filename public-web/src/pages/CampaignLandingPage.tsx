@@ -152,6 +152,8 @@ export function CampaignLandingPage() {
               <img
                 src={heroImageUrl}
                 alt={payload.campaign.name}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             ) : null}
@@ -180,6 +182,8 @@ export function CampaignLandingPage() {
                         <img
                           src={session.coverImageUrl}
                           alt={session.title}
+                          loading="lazy"
+                          decoding="async"
                           className="h-14 w-20 shrink-0 rounded-xl object-cover"
                         />
                       ) : null}

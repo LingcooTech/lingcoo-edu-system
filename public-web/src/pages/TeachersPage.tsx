@@ -140,6 +140,8 @@ function InstitutionTab({
         <img
           src={institution.logoUrl}
           alt={institution.name}
+          loading="lazy"
+          decoding="async"
           className="max-h-7 max-w-28 object-contain"
         />
       ) : (
@@ -167,6 +169,8 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
           <img
             src={teacher.avatarUrl}
             alt={teacher.name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
           />
         ) : (

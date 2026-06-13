@@ -90,6 +90,8 @@ export function InstitutionDetailPage() {
                   <img
                     src={institution.logoUrl}
                     alt={institution.name}
+                    loading="lazy"
+                    decoding="async"
                     className="border-line h-16 w-16 rounded-lg border object-contain p-2"
                   />
                 ) : (
@@ -151,6 +153,8 @@ export function InstitutionDetailPage() {
                           <img
                             src={course.coverImageUrl}
                             alt={course.name}
+                            loading="lazy"
+                            decoding="async"
                             className="h-full w-full object-cover"
                           />
                         </div>
@@ -222,6 +226,8 @@ function MediaSection({
                 <img
                   src={item.imageUrl}
                   alt={item.caption || title}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -250,6 +256,8 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
         <img
           src={teacher.avatarUrl}
           alt={teacher.name}
+          loading="lazy"
+          decoding="async"
           className="h-16 w-16 shrink-0 rounded-lg object-cover"
         />
       ) : (
