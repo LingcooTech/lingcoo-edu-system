@@ -8,7 +8,7 @@
 }
 
 .heading {
-  color: #1f2b24;
+  color: #211f1c;
   font-weight: 800;
   line-height: 1.35;
 }
@@ -22,7 +22,7 @@
 }
 
 .paragraph {
-  color: #4f5a53;
+  color: #57534e;
   font-size: 28rpx;
   line-height: 1.75;
   white-space: pre-wrap;
@@ -36,7 +36,7 @@
 .list-row {
   display: flex;
   gap: 12rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 28rpx;
   line-height: 1.65;
 }
@@ -44,7 +44,7 @@
 .list-mark {
   width: 36rpx;
   flex: 0 0 36rpx;
-  color: #1f6f5b;
+  color: #9a6a4b;
   font-weight: 800;
 }
 
@@ -59,7 +59,7 @@
 
 .caption {
   margin-top: 10rpx;
-  color: #6c766f;
+  color: #8b857c;
   font-size: 22rpx;
   text-align: center;
 }
@@ -77,7 +77,7 @@
 
 .image-text-title {
   margin-bottom: 10rpx;
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 30rpx;
   font-weight: 800;
 }
@@ -93,7 +93,7 @@
   border-radius: 18rpx;
   background: #f3efe7;
   padding: 22rpx;
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 26rpx;
   font-weight: 800;
 }
@@ -105,11 +105,11 @@
 
 .quote,
 .faq-card {
-  border: 1rpx solid rgba(31, 43, 36, 0.08);
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
   border-radius: 18rpx;
   background: #fff;
   padding: 24rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 26rpx;
   line-height: 1.7;
 }
@@ -117,7 +117,7 @@
 .cta {
   height: 88rpx;
   border-radius: 999rpx;
-  background: #1f6f5b;
+  background: #9a6a4b;
   color: #fff;
   font-size: 28rpx;
   font-weight: 800;
@@ -135,14 +135,14 @@
 }
 
 .faq-q {
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 27rpx;
   font-weight: 800;
 }
 
 .faq-a {
   margin-top: 8rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 26rpx;
   line-height: 1.7;
   white-space: pre-wrap;
@@ -150,5 +150,5 @@
 
 .divider {
   height: 1rpx;
-  background: rgba(31, 43, 36, 0.1);
+  background: rgba(33, 31, 28, 0.1);
 }

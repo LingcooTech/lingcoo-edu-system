@@ -10,6 +10,8 @@ type TeacherCard = PublicTeacher & {
   institutionLogoUrl?: string | null;
 };
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: {
     loading: true,
@@ -21,6 +23,14 @@ Page({
 
   onLoad() {
     this.load();
+  },
+
+  onShareAppMessage() {
+    return shareCard('教师团队 · 成长教室', '/pages/teachers/index');
+  },
+
+  onShareTimeline() {
+    return timelineCard('教师团队 · 成长教室', '');
   },
 
   async onPullDownRefresh() {

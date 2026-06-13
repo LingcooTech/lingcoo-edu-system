@@ -65,6 +65,8 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
   });
 }
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: {
     loading: true,
@@ -93,6 +95,24 @@ Page({
 
   onLoad(options: { slug?: string }) {
     this.load(options.slug || '');
+  },
+
+  onShareAppMessage() {
+    const course = this.data.course;
+    return shareCard(
+      (course && course.name) || '课程详情',
+      `/pages/course-detail/index?slug=${(course && course.slug) || ''}`,
+      course && course.coverImageUrl,
+    );
+  },
+
+  onShareTimeline() {
+    const course = this.data.course;
+    return timelineCard(
+      (course && course.name) || '课程详情',
+      `slug=${(course && course.slug) || ''}`,
+      course && course.coverImageUrl,
+    );
   },
 
   async load(slug: string) {
@@ -140,7 +160,7 @@ Page({
   },
 
   goCourses() {
-    wx.navigateTo({ url: '/pages/courses/index' });
+    wx.switchTab({ url: '/pages/courses/index' });
   },
 
   onTrialTap() {
@@ -326,7 +346,7 @@ Page({
       confirmText: '去查看',
       success: (result) => {
         if (result.confirm) {
-          wx.navigateTo({ url: '/pages/account/index' });
+          wx.switchTab({ url: '/pages/account/index' });
         }
       },
     });

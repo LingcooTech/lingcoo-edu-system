@@ -5,7 +5,7 @@
     <view class="body-text intro">选择感兴趣的课程，查看详情并预约试听。</view>
   </view>
 
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{courses.length}}" class="course-list">
     <navigator wx:for="{{courses}}" wx:key="id" class="card course-card" url="/pages/course-detail/index?slug={{item.slug}}">
       <image wx:if="{{item.coverImageUrl}}" class="course-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />

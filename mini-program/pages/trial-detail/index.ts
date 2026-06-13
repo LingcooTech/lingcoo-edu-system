@@ -78,6 +78,8 @@ function readPrefill(trialSessionId: string) {
   return payload || {};
 }
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: {
     loading: true,
@@ -102,6 +104,24 @@ Page({
   onLoad(options: { id?: string; trialSessionId?: string }) {
     const trialSessionId = options.id || options.trialSessionId || '';
     this.load(trialSessionId);
+  },
+
+  onShareAppMessage() {
+    const session = this.data.detail && this.data.detail.trialSession;
+    return shareCard(
+      (session && session.title) || '公开课',
+      `/pages/trial-detail/index?id=${this.data.trialSessionId || ''}`,
+      session && session.coverImageUrl,
+    );
+  },
+
+  onShareTimeline() {
+    const session = this.data.detail && this.data.detail.trialSession;
+    return timelineCard(
+      (session && session.title) || '公开课',
+      `id=${this.data.trialSessionId || ''}`,
+      session && session.coverImageUrl,
+    );
   },
 
   async load(trialSessionId: string) {
@@ -140,11 +160,11 @@ Page({
   },
 
   goHome() {
-    wx.redirectTo({ url: '/pages/home/index' });
+    wx.switchTab({ url: '/pages/home/index' });
   },
 
   goAccount() {
-    wx.navigateTo({ url: '/pages/account/index' });
+    wx.switchTab({ url: '/pages/account/index' });
   },
 
   async onSubmit(event: {

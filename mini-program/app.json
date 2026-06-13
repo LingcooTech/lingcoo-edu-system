@@ -7,16 +7,51 @@
     "pages/teachers/index",
     "pages/teacher-detail/index",
     "pages/campaign/index",
-    "pages/account/index"
+    "pages/account/index",
+    "pages/account-students/index",
+    "pages/account-orders/index",
+    "pages/account-trials/index",
+    "pages/account-attendance/index",
+    "pages/account-homework/index",
+    "pages/account-notifications/index"
   ],
   "window": {
     "navigationBarTitleText": "成长教室",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f6f3ed",
+    "backgroundColor": "#f6f4f0",
     "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#8b857c",
+    "selectedColor": "#9a6a4b",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tab/home.png",
+        "selectedIconPath": "assets/tab/home-active.png"
+      },
+      {
+        "pagePath": "pages/courses/index",
+        "text": "课程",
+        "iconPath": "assets/tab/courses.png",
+        "selectedIconPath": "assets/tab/courses-active.png"
+      },
+      {
+        "pagePath": "pages/account/index",
+        "text": "我的",
+        "iconPath": "assets/tab/account.png",
+        "selectedIconPath": "assets/tab/account-active.png"
+      }
+    ]
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "usingComponents": {
+    "skeleton": "/components/skeleton/index"
+  }
 }

@@ -56,6 +56,8 @@ function buildStats(teacher: PublicTeacher): StatItem[] {
   ].filter((item) => item.value.trim().length > 0);
 }
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: {
     loading: true,
@@ -69,6 +71,24 @@ Page({
 
   onLoad(options: { id?: string }) {
     this.load(options.id || '');
+  },
+
+  onShareAppMessage() {
+    const teacher = this.data.teacher;
+    return shareCard(
+      (teacher && teacher.name) || '老师',
+      `/pages/teacher-detail/index?id=${(teacher && teacher.id) || ''}`,
+      teacher && teacher.avatarUrl,
+    );
+  },
+
+  onShareTimeline() {
+    const teacher = this.data.teacher;
+    return timelineCard(
+      (teacher && teacher.name) || '老师',
+      `id=${(teacher && teacher.id) || ''}`,
+      teacher && teacher.avatarUrl,
+    );
   },
 
   async load(id: string) {
@@ -117,6 +137,6 @@ Page({
       });
       return;
     }
-    wx.navigateTo({ url: '/pages/courses/index' });
+    wx.switchTab({ url: '/pages/courses/index' });
   },
 });

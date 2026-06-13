@@ -15,6 +15,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
+import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
 
@@ -43,6 +44,10 @@ const homeworkCheckInSchema = z
   .refine((value) => value.content || value.imageUrls.length > 0, {
     message: '请填写作业打卡内容或图片',
   });
+
+const parentUploadTokenSchema = z.object({
+  filename: z.string().trim().min(1).max(200),
+});
 
 function canRescheduleSeatReservation(
   reservation: typeof schema.seatReservations.$inferSelect,
@@ -664,6 +669,15 @@ export const parentCenterModule: AppModule = {
         };
       },
     );
+
+    // Issues a short-lived Qiniu upload token so the Mini Program can upload
+    // homework photos directly to object storage (wx.uploadFile), then submit
+    // the returned public URL with the homework check-in.
+    app.post('/public/me/upload-token', { preHandler: app.requireParent }, async (request) => {
+      const body = parentUploadTokenSchema.parse(request.body);
+      const qiniu = new QiniuSettingsService(app.db, app.appEnv);
+      return qiniu.createUploadToken({ filename: body.filename, prefix: 'parent-homework' });
+    });
 
     app.get('/public/me/notifications', { preHandler: app.requireParent }, async (request) => {
       const items = await notificationsRepo.listForRecipient(app.db, {

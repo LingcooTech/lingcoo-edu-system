@@ -58,6 +58,8 @@ function prefillStorageKey(trialSessionId: string): string {
   return `trial_registration_prefill:${trialSessionId}`;
 }
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: initialState,
 
@@ -65,6 +67,24 @@ Page({
     const scene = decodeScene(options.scene);
     const code = options.code || scene.campaign || scene.code || '';
     this.load(code);
+  },
+
+  onShareAppMessage() {
+    const campaign = this.data.payload && this.data.payload.campaign;
+    return shareCard(
+      (campaign && campaign.name) || '活动报名',
+      `/pages/campaign/index?code=${this.data.code || ''}`,
+      this.data.heroImageUrl,
+    );
+  },
+
+  onShareTimeline() {
+    const campaign = this.data.payload && this.data.payload.campaign;
+    return timelineCard(
+      (campaign && campaign.name) || '活动报名',
+      `code=${this.data.code || ''}`,
+      this.data.heroImageUrl,
+    );
   },
 
   async load(code: string) {
@@ -169,7 +189,7 @@ Page({
         content: '老师会尽快联系确认试听时间。',
         showCancel: false,
         success() {
-          wx.redirectTo({ url: '/pages/home/index' });
+          wx.switchTab({ url: '/pages/home/index' });
         },
       });
     } catch (error) {

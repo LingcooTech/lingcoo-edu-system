@@ -8,6 +8,8 @@ import { coursePriceLabel } from '../../utils/format';
 
 type CourseListItem = Course & { priceLabel: string };
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: {
     loading: true,
@@ -19,8 +21,17 @@ Page({
     this.load();
   },
 
+  onShareAppMessage() {
+    return shareCard('精选课程 · 成长教室', '/pages/courses/index');
+  },
+
+  onShareTimeline() {
+    return timelineCard('精选课程 · 成长教室', '');
+  },
+
   async onPullDownRefresh() {
     await this.load();
+    wx.stopPullDownRefresh();
   },
 
   async load() {

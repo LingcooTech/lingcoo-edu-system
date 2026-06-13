@@ -22,20 +22,20 @@
   width: calc(100% + 48rpx);
   height: 260rpx;
   margin: -24rpx -24rpx 22rpx;
-  background: #e9f4ef;
+  background: #f1e9e1;
 }
 
 .course-name {
   flex: 1;
   min-width: 0;
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 31rpx;
   font-weight: 800;
 }
 
 .price {
   flex-shrink: 0;
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 26rpx;
   font-weight: 800;
 }

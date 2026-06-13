@@ -1,9 +1,9 @@
 <view class="page">
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
     <view class="section-title">活动不存在或已结束</view>
-    <navigator class="btn btn-outline empty-button" url="/pages/home/index" open-type="redirect">返回首页</navigator>
+    <navigator class="btn btn-outline empty-button" url="/pages/home/index" open-type="switchTab">返回首页</navigator>
   </view>
 
   <block wx:else>
@@ -49,7 +49,7 @@
               <view wx:if="{{item.reservationFeeLabel}}" class="trial-fee">{{item.reservationFeeLabel}}</view>
             </view>
           </view>
-          <radio value="{{item.id}}" checked="{{trialSessionId == item.id}}" color="#1f6f5b" />
+          <radio value="{{item.id}}" checked="{{trialSessionId == item.id}}" color="#9a6a4b" />
         </label>
       </radio-group>
       <view wx:else class="muted trial-empty">当前活动不绑定固定试听课，提交后老师会电话确认合适时间。</view>

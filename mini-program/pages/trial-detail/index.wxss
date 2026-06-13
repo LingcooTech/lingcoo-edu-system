@@ -19,7 +19,7 @@
   height: 330rpx;
   margin-top: 24rpx;
   border-radius: 20rpx;
-  background: #e9f4ef;
+  background: #f1e9e1;
 }
 
 .meta-grid {
@@ -36,13 +36,13 @@
 }
 
 .meta-label {
-  color: #6c766f;
+  color: #8b857c;
   font-size: 22rpx;
 }
 
 .meta-value {
   margin-top: 8rpx;
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 24rpx;
   font-weight: 800;
   line-height: 1.45;
@@ -87,8 +87,8 @@
 }
 
 .order-status.paid {
-  background: #e9f4ef;
-  color: #1f6f5b;
+  background: #f1e9e1;
+  color: #9a6a4b;
 }
 
 .order-line {
@@ -96,7 +96,7 @@
 }
 
 .order-amount {
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 30rpx;
   font-weight: 800;
 }

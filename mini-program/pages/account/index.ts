@@ -1,197 +1,68 @@
 import {
   bindWechatMiniPhone,
   clearToken,
-  createParentHomeworkCheckIn,
   fetchMe,
-  fetchParentAttendance,
-  fetchParentCheckInSessions,
   fetchParentChildren,
-  fetchParentHomeworkCheckIns,
   fetchParentLessonAccounts,
   fetchParentNotifications,
   fetchParentOrders,
-  fetchParentSeatReservations,
   hasToken,
   logout,
-  markParentNotificationRead,
-  rescheduleParentSeatReservation,
   setToken,
-  submitParentCheckIn,
   wechatMiniLogin,
   type AuthAccount,
-  type ParentCheckInSession,
-  type ParentAttendance,
-  type ParentChild,
-  type ParentHomeworkCheckIn,
-  type ParentLessonAccount,
-  type ParentNotification,
-  type ParentOrder,
-  type ParentSeatReservation,
 } from '../../services/api';
-import { requestSubscribe } from '../../services/subscribe';
-import { formatDateTime, money } from '../../utils/format';
 
-type LessonAccountItem = ParentLessonAccount & {
-  courseName: string;
-  studentName: string;
-  updatedAtLabel: string;
+type HubStats = {
+  childCount: number;
+  totalBalance: number;
+  pendingOrders: number;
+  unreadNotifications: number;
 };
 
-type OrderItem = ParentOrder & {
-  amountLabel: string;
-  createdAtLabel: string;
-  packageName: string;
-  statusLabel: string;
-  studentName: string;
-  courseName: string;
-};
-
-type AttendanceItem = ParentAttendance & {
-  startsAtLabel: string;
-  statusLabel: string;
-  studentName: string;
-};
-
-type CheckInItem = ParentCheckInSession & {
-  checkInKey: string;
-  startsAtLabel: string;
-  courseName: string;
-  classroomName: string;
-  attendanceStatusLabel: string;
-};
-
-type HomeworkItem = ParentHomeworkCheckIn & {
-  createdAtLabel: string;
-  studentName: string;
-  courseName: string;
-  reviewStatusLabel: string;
-};
-
-type SeatReservationItem = ParentSeatReservation & {
-  courseName: string;
-  feeLabel: string;
-  startsAtLabel: string;
-  campusName: string;
-  reservationStatusLabel: string;
-  paymentStatusLabel: string;
-  checkInStatusLabel: string;
-  rescheduleOptionLabels: string[];
-  canSelfReschedule: boolean;
-};
-
-type NotificationItem = ParentNotification & {
-  createdAtLabel: string;
-  statusLabel: string;
-};
-
-type HomeworkTarget = {
-  key: string;
-  studentId: string;
-  courseId?: string | null;
-  label: string;
-};
-
-function orderStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: '待支付',
-    unpaid: '未支付',
-    paid: '已支付',
-    cancelled: '已取消',
-    refunded: '已退款',
-  };
-  return labels[status] || status;
+function emptyStats(): HubStats {
+  return { childCount: 0, totalBalance: 0, pendingOrders: 0, unreadNotifications: 0 };
 }
 
-function reservationStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending_payment: '待支付',
-    reserved: '已保留',
-    cancelled: '已取消',
-    expired: '已过期',
-  };
-  return labels[status] || status;
-}
+const ENTRIES = [
+  { key: 'students', icon: '👶', label: '学员与课时', desc: '孩子档案与课时余额', url: '/pages/account-students/index' },
+  { key: 'orders', icon: '🧾', label: '订单', desc: '购买与支付记录', url: '/pages/account-orders/index' },
+  { key: 'trials', icon: '🎟', label: '试听席位', desc: '预约、改期与到课', url: '/pages/account-trials/index' },
+  { key: 'attendance', icon: '✅', label: '上课签到', desc: '签到与到课记录', url: '/pages/account-attendance/index' },
+  { key: 'homework', icon: '📷', label: '作业打卡', desc: '上传作业、查看批阅', url: '/pages/account-homework/index' },
+  { key: 'notifications', icon: '🔔', label: '消息通知', desc: '提醒订阅与站内消息', url: '/pages/account-notifications/index' },
+];
 
-function checkInStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: '待到课',
-    checked_in: '已签到',
-    no_show: '未到课',
-  };
-  return labels[status] || status;
-}
-
-function orderTitle(order: ParentOrder): string {
-  if (order.orderType === 'seat_reservation') return '试听席位保留费';
-  if (order.orderType === 'manual_package_grant') return order.package?.name || '线下课时包';
-  return order.package?.name || `${order.lessonCount} 课时包`;
-}
-
-function attendanceStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    present: '到课',
-    leave: '请假',
-    absent: '缺勤',
-    makeup: '补课',
-    trial: '试听',
-  };
-  return labels[status] || status;
-}
-
-function notificationStatusLabel(status: string): string {
-  if (status === 'unread') return '未读';
-  if (status === 'read') return '已读';
-  return status;
-}
-
-function homeworkReviewStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    submitted: '待批阅',
-    reviewed: '已批阅',
-    needs_revision: '需订正',
-  };
-  return labels[status] || status;
-}
-
-function emptyStats() {
-  return {
-    childCount: 0,
-    totalBalance: 0,
-    pendingOrders: 0,
-    unreadNotifications: 0,
-  };
-}
+const ACCOUNT_TAB_INDEX = 2;
 
 Page({
   data: {
     loading: false,
-    refreshing: false,
     binding: false,
-    subscribingReminders: false,
+    refreshing: false,
+    booting: false,
     bindToken: '',
     account: null as AuthAccount | null,
     defaultPassword: '',
-    children: [] as ParentChild[],
-    lessonAccounts: [] as LessonAccountItem[],
-    seatReservations: [] as SeatReservationItem[],
-    checkInSessions: [] as CheckInItem[],
-    checkingInKey: '',
-    orders: [] as OrderItem[],
-    attendance: [] as AttendanceItem[],
-    homeworkCheckIns: [] as HomeworkItem[],
-    homeworkTargets: [] as HomeworkTarget[],
-    homeworkTargetLabels: [] as string[],
-    homeworkTargetIndex: 0,
-    homeworkContent: '',
-    homeworkImageUrls: '',
-    submittingHomework: false,
-    notifications: [] as NotificationItem[],
+    avatarText: '我',
+    entries: ENTRIES,
     stats: emptyStats(),
   },
 
   onShow() {
     if (hasToken()) {
+      this.setData({ booting: !this.data.account });
       this.loadSession();
+    } else {
+      this.updateTabBadge(0);
+    }
+  },
+
+  onPullDownRefresh() {
+    if (hasToken()) {
+      this.loadSummary().finally(() => wx.stopPullDownRefresh());
+    } else {
+      wx.stopPullDownRefresh();
     }
   },
 
@@ -204,143 +75,48 @@ Page({
         this.resetAccountState();
         return;
       }
-      this.setData({ account: payload.account, bindToken: '' });
-      await this.loadParentCenter();
+      this.applyAccount(payload.account);
+      await this.loadSummary();
     } catch {
       clearToken();
       this.resetAccountState();
     } finally {
-      this.setData({ refreshing: false });
+      this.setData({ refreshing: false, booting: false });
     }
   },
 
-  async loadParentCenter() {
+  applyAccount(account: AuthAccount) {
+    const source = account.displayName || account.phone || '我';
+    this.setData({
+      account,
+      bindToken: '',
+      avatarText: source.slice(0, 1).toUpperCase(),
+    });
+  },
+
+  async loadSummary() {
     if (!this.data.account) return;
-    this.setData({ refreshing: true });
     try {
-      const [
-        children,
-        lessonAccounts,
-        seatReservations,
-        checkInSessions,
-        orders,
-        attendance,
-        homeworkCheckIns,
-        notifications,
-      ] = await Promise.all([
+      const [children, lessonAccounts, orders, notifications] = await Promise.all([
         fetchParentChildren(),
         fetchParentLessonAccounts(),
-        fetchParentSeatReservations(),
-        fetchParentCheckInSessions(),
         fetchParentOrders(),
-        fetchParentAttendance(),
-        fetchParentHomeworkCheckIns(),
         fetchParentNotifications(),
       ]);
-
-      const lessonItems: LessonAccountItem[] = lessonAccounts.map((item) => ({
-        ...item,
-        courseName: item.course?.name || '未知课程',
-        studentName: item.student?.name || '未知学员',
-        updatedAtLabel: formatDateTime(item.updatedAt),
-      }));
-      const orderItems: OrderItem[] = orders.map((item) => ({
-        ...item,
-        amountLabel: money(item.amount),
-        createdAtLabel: formatDateTime(item.createdAt),
-        packageName: orderTitle(item),
-        statusLabel: orderStatusLabel(item.status),
-        studentName: item.student?.name || '未关联学员',
-        courseName: item.course?.name || '未关联课程',
-      }));
-      const seatItems: SeatReservationItem[] = seatReservations.map((item) => ({
-        ...item,
-        courseName: item.course?.name || '课程待确认',
-        feeLabel: money(item.reservationFeeAmount),
-        startsAtLabel: item.trialSession
-          ? formatDateTime(item.trialSession.startsAt)
-          : '时间待确认',
-        campusName: item.campus?.name || '地点待确认',
-        reservationStatusLabel: reservationStatusLabel(item.reservationStatus),
-        paymentStatusLabel: orderStatusLabel(item.paymentStatus),
-        checkInStatusLabel: checkInStatusLabel(item.checkInStatus),
-        rescheduleOptionLabels: item.rescheduleOptions.map(
-          (session) =>
-            `${session.title} · ${formatDateTime(session.startsAt)} · ${session.bookedCount}/${session.capacity}`,
-        ),
-        canSelfReschedule: item.canReschedule && item.rescheduleOptions.length > 0,
-      }));
-      const attendanceItems: AttendanceItem[] = attendance.map((item) => ({
-        ...item,
-        startsAtLabel: formatDateTime(item.startsAt),
-        statusLabel: attendanceStatusLabel(item.status),
-        studentName: item.student?.name || '未知学员',
-      }));
-      const checkInItems: CheckInItem[] = checkInSessions.map((item) => ({
-        ...item,
-        checkInKey: `${item.sessionId}:${item.student.id}`,
-        startsAtLabel: formatDateTime(item.startsAt),
-        courseName: item.course?.name || '课程',
-        classroomName: item.classroom?.name || '教室待确认',
-        attendanceStatusLabel: item.attendanceStatus
-          ? attendanceStatusLabel(item.attendanceStatus)
-          : '已签到',
-      }));
-      const homeworkItems: HomeworkItem[] = homeworkCheckIns.map((item) => ({
-        ...item,
-        createdAtLabel: formatDateTime(item.createdAt),
-        studentName: item.student?.name || '未知学员',
-        courseName: item.course?.name || item.title,
-        reviewStatusLabel: homeworkReviewStatusLabel(item.reviewStatus),
-      }));
-      const homeworkTargets: HomeworkTarget[] = lessonItems.length
-        ? lessonItems.map((item) => ({
-            key: item.id,
-            studentId: item.studentId,
-            courseId: item.courseId,
-            label: `${item.studentName} · ${item.courseName}`,
-          }))
-        : children.map((child) => ({
-            key: `child:${child.id}`,
-            studentId: child.id,
-            courseId: null,
-            label: child.name,
-          }));
-      const notificationItems: NotificationItem[] = notifications.map((item) => ({
-        ...item,
-        createdAtLabel: formatDateTime(item.createdAt),
-        statusLabel: notificationStatusLabel(item.status),
-      }));
-
       this.setData({
-        children,
-        lessonAccounts: lessonItems,
-        seatReservations: seatItems,
-        checkInSessions: checkInItems,
-        orders: orderItems,
-        attendance: attendanceItems,
-        homeworkCheckIns: homeworkItems,
-        homeworkTargets,
-        homeworkTargetLabels: homeworkTargets.map((target) => target.label),
-        homeworkTargetIndex:
-          this.data.homeworkTargetIndex >= homeworkTargets.length
-            ? 0
-            : this.data.homeworkTargetIndex,
-        notifications: notificationItems,
         stats: {
           childCount: children.length,
-          totalBalance: lessonItems.reduce((sum, item) => sum + item.balance, 0),
-          pendingOrders: orderItems.filter((item) => item.status === 'pending').length,
-          unreadNotifications: notificationItems.filter((item) => item.status === 'unread').length,
+          totalBalance: lessonAccounts.reduce((sum, item) => sum + item.balance, 0),
+          pendingOrders: orders.filter((item) => item.status === 'pending').length,
+          unreadNotifications: notifications.filter((item) => item.status === 'unread').length,
         },
       });
+      this.updateTabBadge(notifications.filter((item) => item.status === 'unread').length);
     } catch (error) {
       wx.showToast({
         title: error instanceof Error ? error.message : '家长中心加载失败',
         icon: 'none',
       });
-    } finally {
-      this.setData({ refreshing: false });
     }
   },
 
@@ -349,22 +125,25 @@ Page({
       account: null,
       bindToken: '',
       defaultPassword: '',
-      children: [],
-      lessonAccounts: [],
-      seatReservations: [],
-      checkInSessions: [],
-      checkingInKey: '',
-      orders: [],
-      attendance: [],
-      homeworkCheckIns: [],
-      homeworkTargets: [],
-      homeworkTargetLabels: [],
-      homeworkTargetIndex: 0,
-      homeworkContent: '',
-      homeworkImageUrls: '',
-      submittingHomework: false,
-      notifications: [],
+      avatarText: '我',
       stats: emptyStats(),
+    });
+    this.updateTabBadge(0);
+  },
+
+  updateTabBadge(unreadCount: number) {
+    if (unreadCount > 0) {
+      wx.setTabBarBadge?.({
+        index: ACCOUNT_TAB_INDEX,
+        text: unreadCount > 99 ? '99+' : String(unreadCount),
+        fail: () => undefined,
+      });
+      return;
+    }
+
+    wx.removeTabBarBadge?.({
+      index: ACCOUNT_TAB_INDEX,
+      fail: () => undefined,
     });
   },
 
@@ -376,8 +155,9 @@ Page({
           const payload = await wechatMiniLogin(result.code);
           if (payload.bound) {
             setToken(payload.token);
-            this.setData({ account: payload.account, bindToken: '', defaultPassword: '' });
-            await this.loadParentCenter();
+            this.applyAccount(payload.account);
+            this.setData({ defaultPassword: '' });
+            await this.loadSummary();
             wx.showToast({ title: '登录成功', icon: 'success' });
           } else {
             clearToken();
@@ -410,17 +190,11 @@ Page({
 
     this.setData({ binding: true });
     try {
-      const payload = await bindWechatMiniPhone({
-        bindToken,
-        ...input,
-      });
+      const payload = await bindWechatMiniPhone({ bindToken, ...input });
       setToken(payload.token);
-      this.setData({
-        account: payload.account,
-        bindToken: '',
-        defaultPassword: payload.defaultPassword || '',
-      });
-      await this.loadParentCenter();
+      this.applyAccount(payload.account);
+      this.setData({ defaultPassword: payload.defaultPassword || '' });
+      await this.loadSummary();
       wx.showToast({ title: '绑定成功', icon: 'success' });
     } catch (error) {
       wx.showToast({
@@ -441,177 +215,14 @@ Page({
     this.bindPhone({ phoneCode: code });
   },
 
-  async onBindSubmit(event: {
-    detail: {
-      value: {
-        phone?: string;
-        displayName?: string;
-      };
-    };
-  }) {
+  async onBindSubmit(event: { detail: { value: { phone?: string; displayName?: string } } }) {
     const phone = (event.detail.value.phone || '').trim();
     const displayName = (event.detail.value.displayName || '').trim();
     if (!phone) {
       wx.showToast({ title: '请输入手机号', icon: 'none' });
       return;
     }
-
-    await this.bindPhone({
-      phone,
-      displayName: displayName || undefined,
-    });
-  },
-
-  async onMarkNotificationRead(event: { currentTarget: { dataset: { id?: string } } }) {
-    const id = event.currentTarget.dataset.id;
-    if (!id) return;
-    try {
-      const updated = await markParentNotificationRead(id);
-      const currentNotifications = this.data.notifications as NotificationItem[];
-      const notifications = currentNotifications.map((item: NotificationItem) =>
-        item.id === id
-          ? {
-              ...item,
-              status: updated.status,
-              statusLabel: notificationStatusLabel(updated.status),
-            }
-          : item,
-      );
-      this.setData({
-        notifications,
-        stats: {
-          ...this.data.stats,
-          unreadNotifications: notifications.filter((item) => item.status === 'unread').length,
-        },
-      });
-    } catch (error) {
-      wx.showToast({
-        title: error instanceof Error ? error.message : '操作失败',
-        icon: 'none',
-      });
-    }
-  },
-
-  async onRescheduleSeatReservation(event: {
-    currentTarget: { dataset: { id?: string } };
-    detail: { value?: string | number };
-  }) {
-    const id = event.currentTarget.dataset.id;
-    const optionIndex = Number(event.detail.value ?? -1);
-    if (!id || Number.isNaN(optionIndex)) return;
-
-    const reservation = (this.data.seatReservations as SeatReservationItem[]).find(
-      (item) => item.id === id,
-    );
-    const target = reservation?.rescheduleOptions[optionIndex];
-    const label = reservation?.rescheduleOptionLabels[optionIndex];
-    if (!reservation || !target || !label) return;
-
-    wx.showModal({
-      title: '确认改期',
-      content: `改到：${label}`,
-      confirmText: '确认',
-      success: async (result) => {
-        if (!result.confirm) return;
-        try {
-          await rescheduleParentSeatReservation(reservation.id, target.id);
-          await this.loadParentCenter();
-          wx.showToast({ title: '改期成功', icon: 'success' });
-        } catch (error) {
-          wx.showToast({
-            title: error instanceof Error ? error.message : '改期失败',
-            icon: 'none',
-          });
-        }
-      },
-    });
-  },
-
-  async onParentCheckIn(event: {
-    currentTarget: { dataset: { sessionId?: string; studentId?: string; key?: string } };
-  }) {
-    const { sessionId, studentId, key } = event.currentTarget.dataset;
-    if (!sessionId || !studentId || !key) return;
-    this.setData({ checkingInKey: key });
-    try {
-      const result = await submitParentCheckIn(sessionId, studentId);
-      await this.loadParentCenter();
-      wx.showToast({ title: result.message || '签到成功', icon: 'success' });
-    } catch (error) {
-      wx.showToast({
-        title: error instanceof Error ? error.message : '签到失败',
-        icon: 'none',
-      });
-    } finally {
-      this.setData({ checkingInKey: '' });
-    }
-  },
-
-  onHomeworkTargetChange(event: { detail: { value?: string | number } }) {
-    const index = Number(event.detail.value ?? 0);
-    if (Number.isNaN(index)) return;
-    this.setData({ homeworkTargetIndex: index });
-  },
-
-  onHomeworkContentInput(event: { detail: { value?: string } }) {
-    this.setData({ homeworkContent: event.detail.value || '' });
-  },
-
-  onHomeworkImageUrlsInput(event: { detail: { value?: string } }) {
-    this.setData({ homeworkImageUrls: event.detail.value || '' });
-  },
-
-  async onHomeworkSubmit() {
-    const targets = this.data.homeworkTargets as HomeworkTarget[];
-    const target = targets[this.data.homeworkTargetIndex] || targets[0];
-    const content = String(this.data.homeworkContent || '').trim();
-    const imageUrls = String(this.data.homeworkImageUrls || '')
-      .split(/[\n,]/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    if (!target) {
-      wx.showToast({ title: '请选择学员', icon: 'none' });
-      return;
-    }
-    if (!content && imageUrls.length === 0) {
-      wx.showToast({ title: '请填写打卡内容', icon: 'none' });
-      return;
-    }
-
-    this.setData({ submittingHomework: true });
-    try {
-      const result = await createParentHomeworkCheckIn({
-        studentId: target.studentId,
-        courseId: target.courseId ?? null,
-        content,
-        imageUrls,
-      });
-      this.setData({ homeworkContent: '', homeworkImageUrls: '' });
-      await this.loadParentCenter();
-      wx.showToast({ title: result.message || '已提交', icon: 'success' });
-    } catch (error) {
-      wx.showToast({
-        title: error instanceof Error ? error.message : '提交失败',
-        icon: 'none',
-      });
-    } finally {
-      this.setData({ submittingHomework: false });
-    }
-  },
-
-  async onSubscribeLessonNotifications() {
-    this.setData({ subscribingReminders: true });
-    try {
-      const result = await requestSubscribe(['lesson_reminder', 'lesson_consumed']);
-      const accepted = Object.values(result).some((value) => value === 'accept');
-      wx.showToast({
-        title: accepted ? '订阅成功' : '未授权',
-        icon: accepted ? 'success' : 'none',
-      });
-    } finally {
-      this.setData({ subscribingReminders: false });
-    }
+    await this.bindPhone({ phone, displayName: displayName || undefined });
   },
 
   async onLogout() {
@@ -623,13 +234,5 @@ Page({
     clearToken();
     this.resetAccountState();
     wx.showToast({ title: '已退出', icon: 'success' });
-  },
-
-  goCourses() {
-    wx.navigateTo({ url: '/pages/courses/index' });
-  },
-
-  goTeachers() {
-    wx.navigateTo({ url: '/pages/teachers/index' });
   },
 });

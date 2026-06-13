@@ -1,0 +1,88 @@
+<view class="page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    请先在“我的”登录
+    <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
+  </view>
+  <block wx:else>
+    <view class="card panel">
+      <view class="section-title">作业打卡</view>
+      <view class="homework-form">
+        <picker
+          wx:if="{{targetLabels.length}}"
+          mode="selector"
+          range="{{targetLabels}}"
+          value="{{targetIndex}}"
+          bindchange="onTargetChange"
+        >
+          <view class="picker-field">{{targetLabels[targetIndex]}}</view>
+        </picker>
+        <view wx:else class="empty compact-empty">暂无可打卡学员</view>
+
+        <textarea
+          class="form-field homework-textarea"
+          value="{{content}}"
+          placeholder="完成内容、练习情况或需要老师关注的问题"
+          bindinput="onContentInput"
+        />
+
+        <view class="image-grid">
+          <view wx:for="{{images}}" wx:key="*this" class="image-cell">
+            <image
+              class="image-thumb"
+              src="{{item}}"
+              mode="aspectFill"
+              data-index="{{index}}"
+              bindtap="onPreviewImage"
+            />
+            <view class="image-remove" data-index="{{index}}" catchtap="onRemoveImage">×</view>
+          </view>
+          <view wx:if="{{images.length < maxImages}}" class="image-add" bindtap="onChooseImages">
+            <view class="image-add-plus">＋</view>
+            <view class="image-add-text">{{uploading ? '上传中' : '加图片'}}</view>
+          </view>
+        </view>
+
+        <button
+          class="btn btn-primary homework-submit"
+          loading="{{submitting}}"
+          disabled="{{submitting || uploading || !targetLabels.length}}"
+          bindtap="onSubmit"
+        >
+          {{submitting ? '提交中...' : '提交打卡'}}
+        </button>
+      </view>
+    </view>
+
+    <view class="section card panel">
+      <view class="section-title">打卡记录</view>
+      <view wx:if="{{homeworkCheckIns.length}}" class="item-list">
+        <view wx:for="{{homeworkCheckIns}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="row-meta">{{item.createdAtLabel}}</view>
+            </view>
+            <view class="notice-status {{item.reviewStatus}}">{{item.reviewStatusLabel}}</view>
+          </view>
+          <view wx:if="{{item.content}}" class="attendance-topic">{{item.content}}</view>
+          <view wx:if="{{item.imageUrls.length}}" class="hw-thumbs">
+            <image
+              wx:for="{{item.imageUrls}}"
+              wx:for-item="url"
+              wx:key="*this"
+              class="hw-thumb"
+              src="{{url}}"
+              mode="aspectFill"
+              data-url="{{url}}"
+              data-urls="{{item.imageUrls}}"
+              bindtap="onPreviewSubmitted"
+            />
+          </view>
+          <view wx:if="{{item.teacherFeedback}}" class="teacher-feedback">{{item.teacherFeedback}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无作业打卡</view>
+    </view>
+  </block>
+</view>

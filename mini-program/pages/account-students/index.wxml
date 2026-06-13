@@ -1,0 +1,36 @@
+<view class="page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    请先在“我的”登录
+    <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
+  </view>
+  <block wx:else>
+    <view class="card panel">
+      <view class="section-title">我的孩子</view>
+      <view wx:if="{{children.length}}" class="item-list">
+        <view wx:for="{{children}}" wx:key="id" class="info-row">
+          <view>
+            <view class="row-title">{{item.name}}</view>
+            <view class="row-meta">{{item.grade}} · {{item.status}}</view>
+          </view>
+          <view wx:if="{{item.school}}" class="row-side">{{item.school}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">还没有绑定孩子档案</view>
+    </view>
+
+    <view class="section card panel">
+      <view class="section-title">课时余额</view>
+      <view wx:if="{{lessonAccounts.length}}" class="item-list">
+        <view wx:for="{{lessonAccounts}}" wx:key="id" class="info-row">
+          <view>
+            <view class="row-title">{{item.courseName}}</view>
+            <view class="row-meta">{{item.studentName}} · 更新 {{item.updatedAtLabel}}</view>
+          </view>
+          <view class="balance-pill">{{item.balance}} 课时</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无课时账户</view>
+    </view>
+  </block>
+</view>

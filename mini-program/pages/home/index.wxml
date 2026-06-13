@@ -1,5 +1,5 @@
 <view class="page">
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <skeleton wx:if="{{loading}}" variant="home" />
 
   <block wx:else>
     <view class="hero card">
@@ -132,12 +132,6 @@
         </view>
       </view>
       <button class="btn contact-btn" bindtap="onGrowthPrimaryCta">{{growthLoopPrimaryCtaText}}</button>
-    </view>
-
-    <view class="section quick-nav">
-      <button class="btn btn-outline" bindtap="goCourses">课程</button>
-      <button class="btn btn-outline" bindtap="goTeachers">老师</button>
-      <button class="btn btn-outline" bindtap="goAccount">我的</button>
     </view>
   </block>
 </view>

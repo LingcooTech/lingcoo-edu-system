@@ -1,0 +1,9 @@
+// Builds the payload for onShareAppMessage / onShareTimeline. Drops an empty
+// imageUrl so WeChat falls back to a page snapshot instead of a blank card.
+export function shareCard(title: string, path: string, imageUrl?: string | null) {
+  return imageUrl ? { title, path, imageUrl } : { title, path };
+}
+
+export function timelineCard(title: string, query: string, imageUrl?: string | null) {
+  return imageUrl ? { title, query, imageUrl } : { title, query };
+}

@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "老师",
+  "enablePullDownRefresh": true,
   "usingComponents": {
     "block-renderer": "../../components/block-renderer/index"
   }

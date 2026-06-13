@@ -1,5 +1,5 @@
 <view class="page">
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
     <view class="section-title">老师不存在或已下线</view>

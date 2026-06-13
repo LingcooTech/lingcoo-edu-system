@@ -1,0 +1,26 @@
+<view class="page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    请先在“我的”登录
+    <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
+  </view>
+  <block wx:else>
+    <view class="card panel">
+      <view class="section-title">订单</view>
+      <view wx:if="{{orders.length}}" class="item-list">
+        <view wx:for="{{orders}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view class="row-title">{{item.packageName}}</view>
+            <view class="order-status {{item.status}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="row-meta">{{item.studentName}} · {{item.courseName}}</view>
+          <view class="order-line">
+            <view class="row-meta">{{item.createdAtLabel}}</view>
+            <view class="order-amount">{{item.amountLabel}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无订单</view>
+    </view>
+  </block>
+</view>

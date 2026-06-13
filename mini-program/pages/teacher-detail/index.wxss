@@ -3,7 +3,7 @@
   margin-bottom: 20rpx;
   padding: 0;
   background: transparent;
-  color: #1f6f5b;
+  color: #9a6a4b;
   font-size: 28rpx;
   font-weight: 700;
   line-height: 1.6;
@@ -58,8 +58,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e9f4ef;
-  color: #1f6f5b;
+  background: #f1e9e1;
+  color: #9a6a4b;
   font-size: 40rpx;
   font-weight: 800;
 }
@@ -70,7 +70,7 @@
 }
 
 .teacher-name {
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 36rpx;
   font-weight: 800;
 }
@@ -154,14 +154,14 @@
 }
 
 .stat-value {
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 30rpx;
   font-weight: 800;
 }
 
 .stat-label {
   margin-top: 4rpx;
-  color: #6c766f;
+  color: #8b857c;
   font-size: 22rpx;
 }
 
@@ -188,7 +188,7 @@
 }
 
 .profile-section {
-  border: 1rpx solid rgba(31, 43, 36, 0.08);
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
   border-left: 6rpx solid #17324d;
   border-radius: 18rpx;
   background: #faf7ef;
@@ -203,7 +203,7 @@
 
 .profile-text {
   margin-top: 8rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 27rpx;
   line-height: 1.65;
   white-space: pre-wrap;
@@ -212,7 +212,7 @@
 .profile-quote {
   border-left: 4rpx solid #c59a54;
   padding-left: 18rpx;
-  color: #1f2b24;
+  color: #211f1c;
 }
 
 .profile-lines {
@@ -224,7 +224,7 @@
 .profile-line {
   display: flex;
   gap: 12rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 27rpx;
   line-height: 1.6;
 }
@@ -256,14 +256,14 @@
 
 .course-card {
   display: block;
-  border: 1rpx solid rgba(31, 43, 36, 0.08);
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
   border-radius: 18rpx;
   background: #faf7ef;
   padding: 24rpx;
 }
 
 .course-name {
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 29rpx;
   font-weight: 800;
 }
@@ -275,7 +275,7 @@
 
 .course-summary {
   margin-top: 12rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 26rpx;
   line-height: 1.6;
 }
@@ -298,7 +298,7 @@
   border-radius: 18rpx;
   background: #faf7ef;
   padding: 24rpx;
-  color: #4f5a53;
+  color: #57534e;
   font-size: 26rpx;
   line-height: 1.7;
 }

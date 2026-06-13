@@ -1,263 +1,102 @@
 <view class="page">
-  <view class="card account-card">
-    <view class="row-between account-heading">
-      <view>
-        <view class="eyebrow">家长中心</view>
-        <view class="title account-title">家长中心</view>
+  <skeleton wx:if="{{booting}}" variant="hub" />
+  <block wx:elif="{{account}}">
+    <view class="card profile-card">
+      <view class="profile-avatar">{{avatarText}}</view>
+      <view class="profile-body">
+        <view class="profile-name">{{account.displayName || '家长'}}</view>
+        <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
+        <view wx:else class="profile-phone muted">已用微信登录</view>
       </view>
-      <button wx:if="{{account}}" class="text-button" bindtap="onLogout">退出</button>
+      <button class="mini-button" bindtap="onLogout">退出</button>
     </view>
 
-    <block wx:if="{{account}}">
-      <view class="body-text account-desc">已登录：{{account.displayName}}</view>
-      <view wx:if="{{account.phone}}" class="muted account-phone">{{account.phone}}</view>
-      <view wx:if="{{defaultPassword}}" class="password-note">
-        初始密码：{{defaultPassword}}。手机号账号已同步创建。
-      </view>
-      <view class="account-actions">
-        <button class="btn btn-outline" loading="{{refreshing}}" disabled="{{refreshing}}" bindtap="loadParentCenter">
-          {{refreshing ? '同步中...' : '刷新数据'}}
-        </button>
-        <button class="btn btn-primary" loading="{{subscribingReminders}}" disabled="{{subscribingReminders}}" bindtap="onSubscribeLessonNotifications">
-          {{subscribingReminders ? '请求中...' : '订阅提醒'}}
-        </button>
-      </view>
-    </block>
-
-    <block wx:else>
-      <view class="body-text account-desc">
-        微信登录后可查看孩子、课时余额、订单、签到和通知。
-      </view>
-      <button class="btn btn-primary login-button" loading="{{loading}}" disabled="{{loading}}" bindtap="onWechatLogin">
-        {{loading ? '登录中...' : '微信登录'}}
-      </button>
-    </block>
-  </view>
-
-  <form wx:if="{{bindToken && !account}}" class="section card bind-card" bindsubmit="onBindSubmit">
-    <view class="section-title">绑定手机号</view>
-    <view class="muted bind-hint">正式环境使用微信手机号授权；本地测试可手动填写。</view>
-    <button class="btn btn-primary bind-button" open-type="getPhoneNumber" bindgetphonenumber="onPhoneAuth" loading="{{binding}}" disabled="{{binding}}">
-      微信授权手机号
-    </button>
-    <view class="test-divider">本地测试</view>
-    <view class="form-gap">
-      <input class="form-field" name="phone" type="number" placeholder="手机号" />
-      <input class="form-field" name="displayName" placeholder="家长称呼（选填）" />
-    </view>
-    <button class="btn btn-outline bind-button" form-type="submit" loading="{{binding}}" disabled="{{binding}}">
-      {{binding ? '绑定中...' : '手动绑定'}}
-    </button>
-  </form>
-
-  <block wx:if="{{account}}">
-    <view class="section stats-grid">
-      <view class="stat-card">
-        <view class="stat-value">{{stats.childCount}}</view>
-        <view class="stat-label">孩子</view>
-      </view>
-      <view class="stat-card">
-        <view class="stat-value">{{stats.totalBalance}}</view>
-        <view class="stat-label">剩余课时</view>
-      </view>
-      <view class="stat-card">
-        <view class="stat-value">{{stats.pendingOrders}}</view>
-        <view class="stat-label">待支付</view>
-      </view>
-      <view class="stat-card">
-        <view class="stat-value">{{stats.unreadNotifications}}</view>
-        <view class="stat-label">未读</view>
-      </view>
+    <view wx:if="{{defaultPassword}}" class="password-note">
+      初始密码：{{defaultPassword}}。手机号账号已同步创建。
     </view>
 
-    <view class="section card panel">
-      <view class="section-title">我的孩子</view>
-      <view wx:if="{{children.length}}" class="item-list">
-        <view wx:for="{{children}}" wx:key="id" class="info-row">
-          <view>
-            <view class="row-title">{{item.name}}</view>
-            <view class="muted row-meta">{{item.grade}} · {{item.status}}</view>
-          </view>
-          <view wx:if="{{item.school}}" class="muted row-side">{{item.school}}</view>
+    <view class="capsule-grid">
+      <navigator class="capsule" url="/pages/account-students/index" hover-class="capsule-hover">
+        <view class="capsule-value">{{stats.childCount}}</view>
+        <view class="capsule-label">孩子</view>
+      </navigator>
+      <navigator class="capsule" url="/pages/account-students/index" hover-class="capsule-hover">
+        <view class="capsule-value">{{stats.totalBalance}}</view>
+        <view class="capsule-label">课时</view>
+      </navigator>
+      <navigator class="capsule" url="/pages/account-orders/index" hover-class="capsule-hover">
+        <view class="capsule-value">{{stats.pendingOrders}}</view>
+        <view class="capsule-label">待付</view>
+      </navigator>
+      <navigator class="capsule" url="/pages/account-notifications/index" hover-class="capsule-hover">
+        <view class="capsule-value">{{stats.unreadNotifications}}</view>
+        <view class="capsule-label">未读</view>
+      </navigator>
+    </view>
+
+    <view class="card entry-list">
+      <navigator
+        wx:for="{{entries}}"
+        wx:key="key"
+        class="entry-row"
+        url="{{item.url}}"
+        hover-class="entry-row-hover"
+      >
+        <view class="entry-icon">{{item.icon}}</view>
+        <view class="entry-text">
+          <view class="entry-label">{{item.label}}</view>
+          <view class="entry-desc">{{item.desc}}</view>
         </view>
-      </view>
-      <view wx:else class="empty compact-empty">还没有绑定孩子档案</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">课时余额</view>
-      <view wx:if="{{lessonAccounts.length}}" class="item-list">
-        <view wx:for="{{lessonAccounts}}" wx:key="id" class="info-row">
-          <view>
-            <view class="row-title">{{item.courseName}}</view>
-            <view class="muted row-meta">{{item.studentName}} · 更新 {{item.updatedAtLabel}}</view>
-          </view>
-          <view class="balance-pill">{{item.balance}} 课时</view>
+        <view wx:if="{{item.key == 'notifications' && stats.unreadNotifications}}" class="entry-badge">
+          {{stats.unreadNotifications}}
         </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无课时账户</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">试听席位</view>
-      <view wx:if="{{seatReservations.length}}" class="item-list">
-        <view wx:for="{{seatReservations}}" wx:key="id" class="stack-row">
-          <view class="row-between">
-            <view>
-              <view class="row-title">{{item.trialSession ? item.trialSession.title : '试听预约'}}</view>
-              <view class="muted row-meta">{{item.courseName}} · {{item.studentName}}</view>
-            </view>
-            <view class="seat-status {{item.reservationStatus}}">{{item.reservationStatusLabel}}</view>
-          </view>
-          <view class="muted row-meta">{{item.startsAtLabel}} · {{item.campusName}}</view>
-          <view class="row-between order-line">
-            <view class="muted row-meta">{{item.paymentStatusLabel}} · {{item.checkInStatusLabel}} · 改期 {{item.rescheduleCount}}/1</view>
-            <view class="order-amount">{{item.feeLabel}}</view>
-          </view>
-          <picker wx:if="{{item.canSelfReschedule}}" mode="selector" range="{{item.rescheduleOptionLabels}}" data-id="{{item.id}}" bindchange="onRescheduleSeatReservation">
-            <view class="mini-button reschedule-button">改期</view>
-          </picker>
-          <view wx:elif="{{item.canReschedule}}" class="muted row-meta">暂无可改期场次</view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无试听席位预约</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">上课签到</view>
-      <view wx:if="{{checkInSessions.length}}" class="item-list">
-        <view wx:for="{{checkInSessions}}" wx:key="checkInKey" class="stack-row">
-          <view class="row-between">
-            <view>
-              <view class="row-title">{{item.courseName}} · {{item.topic}}</view>
-              <view class="muted row-meta">{{item.student.name}} · {{item.class.name}}</view>
-            </view>
-            <view wx:if="{{item.checkedIn}}" class="attendance-status">{{item.attendanceStatusLabel}}</view>
-            <button
-              wx:else
-              class="mini-button"
-              data-session-id="{{item.sessionId}}"
-              data-student-id="{{item.student.id}}"
-              data-key="{{item.checkInKey}}"
-              loading="{{checkingInKey == item.checkInKey}}"
-              disabled="{{checkingInKey == item.checkInKey || !item.canCheckIn}}"
-              bindtap="onParentCheckIn"
-            >
-              签到
-            </button>
-          </view>
-          <view class="muted row-meta">{{item.startsAtLabel}} · {{item.classroomName}}</view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无可签到课次</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">作业打卡</view>
-      <view class="homework-form">
-        <picker
-          wx:if="{{homeworkTargetLabels.length}}"
-          mode="selector"
-          range="{{homeworkTargetLabels}}"
-          value="{{homeworkTargetIndex}}"
-          bindchange="onHomeworkTargetChange"
-        >
-          <view class="picker-field">{{homeworkTargetLabels[homeworkTargetIndex]}}</view>
-        </picker>
-        <view wx:else class="empty compact-empty">暂无可打卡学员</view>
-        <textarea
-          class="form-field homework-textarea"
-          value="{{homeworkContent}}"
-          placeholder="完成内容、练习情况或需要老师关注的问题"
-          bindinput="onHomeworkContentInput"
-        />
-        <textarea
-          class="form-field homework-textarea small"
-          value="{{homeworkImageUrls}}"
-          placeholder="图片链接，可选，一行一个"
-          bindinput="onHomeworkImageUrlsInput"
-        />
-        <button
-          class="btn btn-primary homework-submit"
-          loading="{{submittingHomework}}"
-          disabled="{{submittingHomework || !homeworkTargetLabels.length}}"
-          bindtap="onHomeworkSubmit"
-        >
-          {{submittingHomework ? '提交中...' : '提交打卡'}}
-        </button>
-      </view>
-      <view wx:if="{{homeworkCheckIns.length}}" class="item-list homework-list">
-        <view wx:for="{{homeworkCheckIns}}" wx:key="id" class="stack-row">
-          <view class="row-between">
-            <view>
-              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
-              <view class="muted row-meta">{{item.createdAtLabel}}</view>
-            </view>
-            <view class="notice-status {{item.reviewStatus}}">{{item.reviewStatusLabel}}</view>
-          </view>
-          <view wx:if="{{item.content}}" class="body-text attendance-topic">{{item.content}}</view>
-          <view wx:if="{{item.teacherFeedback}}" class="body-text teacher-feedback">{{item.teacherFeedback}}</view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无作业打卡</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">订单</view>
-      <view wx:if="{{orders.length}}" class="item-list">
-        <view wx:for="{{orders}}" wx:key="id" class="stack-row">
-          <view class="row-between">
-            <view class="row-title">{{item.packageName}}</view>
-            <view class="order-status {{item.status}}">{{item.statusLabel}}</view>
-          </view>
-          <view class="muted row-meta">{{item.studentName}} · {{item.courseName}}</view>
-          <view class="row-between order-line">
-            <view class="muted row-meta">{{item.createdAtLabel}}</view>
-            <view class="order-amount">{{item.amountLabel}}</view>
-          </view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无订单</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">签到记录</view>
-      <view wx:if="{{attendance.length}}" class="item-list">
-        <view wx:for="{{attendance}}" wx:key="id" class="stack-row">
-          <view class="row-between">
-            <view class="row-title">{{item.courseName}}</view>
-            <view class="attendance-status">{{item.statusLabel}}</view>
-          </view>
-          <view class="muted row-meta">{{item.studentName}} · {{item.className}} · {{item.startsAtLabel}}</view>
-          <view wx:if="{{item.topic}}" class="body-text attendance-topic">{{item.topic}}</view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无签到记录</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">通知</view>
-      <view wx:if="{{notifications.length}}" class="item-list">
-        <view wx:for="{{notifications}}" wx:key="id" class="notification-row">
-          <view class="row-between">
-            <view class="row-title">{{item.title}}</view>
-            <view class="notice-status {{item.status}}">{{item.statusLabel}}</view>
-          </view>
-          <view wx:if="{{item.body}}" class="body-text notice-body">{{item.body}}</view>
-          <view class="row-between notice-footer">
-            <view class="muted row-meta">{{item.createdAtLabel}}</view>
-            <button wx:if="{{item.status == 'unread'}}" class="mini-button" data-id="{{item.id}}" bindtap="onMarkNotificationRead">
-              已读
-            </button>
-          </view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无通知</view>
+        <view class="entry-arrow">›</view>
+      </navigator>
     </view>
   </block>
 
-  <view class="section quick-nav">
-    <button class="btn btn-outline" bindtap="goCourses">看课程</button>
-    <button class="btn btn-outline" bindtap="goTeachers">看老师</button>
-  </view>
+  <block wx:else>
+    <view class="card login-card">
+      <view class="eyebrow">家长中心</view>
+      <view class="title login-title">登录家长中心</view>
+      <view class="body-text login-desc">
+        微信登录后可查看孩子、课时余额、订单、签到、作业和通知。
+      </view>
+      <button
+        class="btn btn-primary login-button"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="onWechatLogin"
+      >
+        {{loading ? '登录中...' : '微信登录'}}
+      </button>
+    </view>
+
+    <form wx:if="{{bindToken}}" class="section card bind-card" bindsubmit="onBindSubmit">
+      <view class="section-title">绑定手机号</view>
+      <view class="muted bind-hint">正式环境使用微信手机号授权；本地测试可手动填写。</view>
+      <button
+        class="btn btn-primary bind-button"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onPhoneAuth"
+        loading="{{binding}}"
+        disabled="{{binding}}"
+      >
+        微信授权手机号
+      </button>
+      <view class="test-divider">本地测试</view>
+      <view class="form-gap">
+        <input class="form-field" name="phone" type="number" placeholder="手机号" />
+        <input class="form-field" name="displayName" placeholder="家长称呼（选填）" />
+      </view>
+      <button
+        class="btn btn-outline bind-button"
+        form-type="submit"
+        loading="{{binding}}"
+        disabled="{{binding}}"
+      >
+        {{binding ? '绑定中...' : '手动绑定'}}
+      </button>
+    </form>
+  </block>
 </view>

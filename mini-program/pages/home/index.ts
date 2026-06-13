@@ -198,6 +198,8 @@ function toState(home: HomePayload): HomeState {
   };
 }
 
+import { shareCard, timelineCard } from '../../utils/share';
+
 Page({
   data: initialState,
 
@@ -205,8 +207,25 @@ Page({
     this.load();
   },
 
+  onShareAppMessage() {
+    return shareCard(
+      this.data.bannerTitle || '成长教室',
+      '/pages/home/index',
+      this.data.bannerImages && this.data.bannerImages[0],
+    );
+  },
+
+  onShareTimeline() {
+    return timelineCard(
+      this.data.bannerTitle || '成长教室',
+      '',
+      this.data.bannerImages && this.data.bannerImages[0],
+    );
+  },
+
   async onPullDownRefresh() {
     await this.load();
+    wx.stopPullDownRefresh();
   },
 
   async load() {
@@ -229,15 +248,11 @@ Page({
   },
 
   goCourses() {
-    wx.navigateTo({ url: '/pages/courses/index' });
+    wx.switchTab({ url: '/pages/courses/index' });
   },
 
   goTeachers() {
     wx.navigateTo({ url: '/pages/teachers/index' });
-  },
-
-  goAccount() {
-    wx.navigateTo({ url: '/pages/account/index' });
   },
 
   onGrowthPrimaryCta() {

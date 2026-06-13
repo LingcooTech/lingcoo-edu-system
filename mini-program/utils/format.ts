@@ -35,7 +35,7 @@ export function formatDateTime(value?: string): string {
 
 export function navigateToWebPath(path: string): void {
   if (!path || path === '/') {
-    wx.redirectTo({ url: '/pages/home/index' });
+    wx.switchTab({ url: '/pages/home/index' });
     return;
   }
 
@@ -50,7 +50,12 @@ export function navigateToWebPath(path: string): void {
   }
 
   if (path === '/courses') {
-    wx.navigateTo({ url: '/pages/courses/index' });
+    wx.switchTab({ url: '/pages/courses/index' });
+    return;
+  }
+
+  if (path === '/account') {
+    wx.switchTab({ url: '/pages/account/index' });
     return;
   }
 

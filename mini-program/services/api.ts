@@ -778,3 +778,18 @@ export async function markParentNotificationRead(
     )
   ).notification;
 }
+
+export interface ParentUploadToken {
+  uploadToken: string;
+  key: string;
+  uploadHost: string;
+  publicUrl: string;
+  expiresIn: number;
+}
+
+export function createParentUploadToken(filename: string): Promise<ParentUploadToken> {
+  return request<ParentUploadToken>('/public/me/upload-token', {
+    method: 'POST',
+    data: { filename },
+  });
+}

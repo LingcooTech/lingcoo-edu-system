@@ -1,0 +1,87 @@
+.homework-form {
+  display: grid;
+  gap: 18rpx;
+  margin-top: 22rpx;
+}
+
+.homework-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 180rpx;
+  line-height: 1.6;
+  padding: 22rpx 24rpx;
+}
+
+.homework-submit {
+  width: 100%;
+}
+
+.image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.image-cell {
+  position: relative;
+  width: 160rpx;
+  height: 160rpx;
+}
+
+.image-thumb {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 16rpx;
+  background: #eef1ee;
+}
+
+.image-remove {
+  position: absolute;
+  top: -12rpx;
+  right: -12rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 999rpx;
+  background: rgba(33, 31, 28, 0.78);
+  color: #fff;
+  font-size: 30rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+
+.image-add {
+  display: flex;
+  width: 160rpx;
+  height: 160rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx dashed rgba(33, 31, 28, 0.22);
+  border-radius: 16rpx;
+  background: #fbfaf7;
+  color: #8b857c;
+}
+
+.image-add-plus {
+  font-size: 50rpx;
+  line-height: 1;
+}
+
+.image-add-text {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+
+.hw-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.hw-thumb {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 14rpx;
+  background: #eef1ee;
+}

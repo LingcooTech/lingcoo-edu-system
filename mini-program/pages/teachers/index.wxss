@@ -85,8 +85,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e9f4ef;
-  color: #1f6f5b;
+  background: #f1e9e1;
+  color: #9a6a4b;
   font-size: 34rpx;
   font-weight: 800;
 }
@@ -97,7 +97,7 @@
 }
 
 .teacher-name {
-  color: #1f2b24;
+  color: #211f1c;
   font-size: 30rpx;
   font-weight: 800;
 }
