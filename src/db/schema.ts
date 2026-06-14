@@ -272,6 +272,7 @@ export const courses = pgTable(
     }),
     defaultTeacherIds: jsonb('default_teacher_ids').$type<string[]>().notNull().default([]),
     classroomId: uuid('classroom_id').references(() => classrooms.id, { onDelete: 'set null' }),
+    classroomIds: jsonb('classroom_ids').$type<string[]>().notNull().default([]),
     teachingLocationLabel: varchar('teaching_location_label', { length: 200 }),
     paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
       .notNull()
@@ -362,6 +363,9 @@ export const leads = pgTable(
     campusId: uuid('campus_id').references(() => campuses.id, { onDelete: 'set null' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
     trialSessionId: uuid('trial_session_id').references(() => trialSessions.id, {
+      onDelete: 'set null',
+    }),
+    preferredTeacherId: uuid('preferred_teacher_id').references(() => teachers.id, {
       onDelete: 'set null',
     }),
     guardianName: varchar('guardian_name', { length: 120 }).notNull(),

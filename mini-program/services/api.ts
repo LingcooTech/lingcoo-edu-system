@@ -13,6 +13,7 @@ export interface Course {
   defaultTeacherId?: string | null;
   defaultTeacherIds?: string[];
   classroomId?: string | null;
+  classroomIds?: string[];
   teachingLocationLabel?: string | null;
   paymentReceiverType?: 'platform' | 'provider' | 'other';
   paymentReceiverInstitutionId?: string | null;
@@ -216,7 +217,9 @@ export interface CourseDetail {
   defaultTeacher?: PublicTeacher | null;
   defaultTeachers?: PublicTeacher[];
   classroom?: PublicClassroom | null;
+  classrooms?: PublicClassroom[];
   campus?: PublicCampus | null;
+  campuses?: PublicCampus[];
   paymentReceiverInstitution?: PublicInstitution | null;
   businessModel: BusinessModelSettings;
 }
@@ -250,8 +253,10 @@ export interface TrialRegistrationInput {
   phone: string;
   studentName: string;
   grade: string;
+  campusId?: string;
   courseId?: string;
   trialSessionId?: string;
+  preferredTeacherId?: string;
   source?: string;
   campaign?: string;
   course?: string;

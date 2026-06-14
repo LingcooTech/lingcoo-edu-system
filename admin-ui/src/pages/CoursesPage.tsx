@@ -10,6 +10,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { QiniuImageField } from '@/components/shared/QiniuImageField';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
@@ -24,7 +25,7 @@ interface CourseForm {
   durationMinutes: string;
   providerInstitutionId: string;
   defaultTeacherIds: string[];
-  classroomId: string;
+  classroomIds: string[];
   paymentReceiverInstitutionId: string;
   trialDescription: string;
   reservationNotice: string;
@@ -43,7 +44,7 @@ const emptyCourseForm: CourseForm = {
   durationMinutes: '60',
   providerInstitutionId: '',
   defaultTeacherIds: [],
-  classroomId: '',
+  classroomIds: [],
   paymentReceiverInstitutionId: '',
   trialDescription: '',
   reservationNotice: '',
@@ -99,6 +100,12 @@ function courseToForm(course: Course): CourseForm {
       : course.defaultTeacherId
         ? [course.defaultTeacherId]
         : [];
+  const classroomIds =
+    course.classroomIds && course.classroomIds.length > 0
+      ? course.classroomIds
+      : course.classroomId
+        ? [course.classroomId]
+        : [];
 
   return {
     slug: course.slug,
@@ -108,7 +115,7 @@ function courseToForm(course: Course): CourseForm {
     durationMinutes: String(course.durationMinutes),
     providerInstitutionId: course.providerInstitutionId ?? '',
     defaultTeacherIds,
-    classroomId: course.classroomId ?? '',
+    classroomIds,
     paymentReceiverInstitutionId:
       course.paymentReceiverInstitutionId ??
       (course.paymentReceiverType === 'provider' ? (course.providerInstitutionId ?? '') : ''),
@@ -136,11 +143,16 @@ function courseFormToPayload(
     institutions: Institution[];
   },
 ) {
-  const selectedClassroom = options.classrooms.find((item) => item.id === form.classroomId);
-  const locationLabel = selectedClassroom
-    ? [selectedClassroom.name, options.campusName.get(selectedClassroom.campusId)]
+  const selectedClassrooms = form.classroomIds
+    .map((id) => options.classrooms.find((item) => item.id === id))
+    .filter((item): item is Classroom => Boolean(item));
+  const locationLabel = selectedClassrooms.length
+    ? selectedClassrooms
+        .map((classroom) =>
+          [classroom.name, options.campusName.get(classroom.campusId)].filter(Boolean).join(' · '),
+        )
         .filter(Boolean)
-        .join(' · ')
+        .join(' / ')
     : null;
   const paymentReceiverInstitution =
     options.institutions.find((item) => item.id === form.paymentReceiverInstitutionId) ?? null;
@@ -160,8 +172,9 @@ function courseFormToPayload(
     providerInstitutionId: form.providerInstitutionId || null,
     defaultTeacherId: defaultTeacherIds[0] ?? null,
     defaultTeacherIds,
-    classroomId: selectedClassroom?.id ?? null,
-    campusId: selectedClassroom?.campusId ?? null,
+    classroomId: selectedClassrooms[0]?.id ?? null,
+    classroomIds: selectedClassrooms.map((classroom) => classroom.id),
+    campusId: selectedClassrooms[0]?.campusId ?? null,
     teachingLocationLabel: locationLabel,
     paymentReceiverType,
     paymentReceiverInstitutionId: form.paymentReceiverInstitutionId || null,
@@ -386,15 +399,18 @@ export function CoursesPage({
               onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
             />
           </Field>
-          <Field label="状态">
+          <Field label="收款方">
             <select
               className="form-input"
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value as CourseForm['status'] })}
+              value={form.paymentReceiverInstitutionId}
+              onChange={(event) =>
+                setForm({ ...form, paymentReceiverInstitutionId: event.target.value })
+              }
             >
-              {(['draft', 'published', 'archived'] as const).map((status) => (
-                <option key={status} value={status}>
-                  {statusLabel(status)}
+              <option value="">平台收款</option>
+              {institutions.map((institution) => (
+                <option key={institution.id} value={institution.id}>
+                  {institution.name}
                 </option>
               ))}
             </select>
@@ -425,21 +441,59 @@ export function CoursesPage({
               ))}
             </select>
           </Field>
-          <Field label="授课教室">
+          <Field label="状态">
             <select
               className="form-input"
-              value={form.classroomId}
-              onChange={(event) => setForm({ ...form, classroomId: event.target.value })}
+              value={form.status}
+              onChange={(e) => setForm({ ...form, status: e.target.value as CourseForm['status'] })}
             >
-              <option value="">待场次确认</option>
-              {classrooms.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {[classroom.name, campusName.get(classroom.campusId)].filter(Boolean).join(' · ')}
+              {(['draft', 'published', 'archived'] as const).map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
                 </option>
               ))}
             </select>
           </Field>
         </FieldRow>
+        <div className="mb-3.5 block">
+          <span className="form-label">授课教室</span>
+          <div className="border-border/80 bg-background grid max-h-44 gap-2 overflow-y-auto rounded-lg border p-2">
+            {classrooms.length > 0 ? (
+              classrooms.map((classroom) => {
+                const checked = form.classroomIds.includes(classroom.id);
+                const label = [classroom.name, campusName.get(classroom.campusId)]
+                  .filter(Boolean)
+                  .join(' · ');
+                return (
+                  <label
+                    key={classroom.id}
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition-colors ${
+                      checked
+                        ? 'border-primary/45 bg-primary/5 text-foreground'
+                        : 'border-border/70 hover:bg-muted/60 text-muted-foreground'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(event) => {
+                        setForm({
+                          ...form,
+                          classroomIds: event.target.checked
+                            ? [...form.classroomIds, classroom.id]
+                            : form.classroomIds.filter((id) => id !== classroom.id),
+                        });
+                      }}
+                    />
+                  </label>
+                );
+              })
+            ) : (
+              <div className="text-muted-foreground px-3 py-2 text-sm">暂无可选教室</div>
+            )}
+          </div>
+        </div>
         <div className="mb-3.5 block">
           <span className="form-label">授课老师</span>
           <div className="border-border/80 bg-background grid max-h-44 gap-2 overflow-y-auto rounded-lg border p-2">
@@ -476,22 +530,6 @@ export function CoursesPage({
             )}
           </div>
         </div>
-        <Field label="收款方">
-          <select
-            className="form-input"
-            value={form.paymentReceiverInstitutionId}
-            onChange={(event) =>
-              setForm({ ...form, paymentReceiverInstitutionId: event.target.value })
-            }
-          >
-            <option value="">平台收款</option>
-            {institutions.map((institution) => (
-              <option key={institution.id} value={institution.id}>
-                {institution.name}
-              </option>
-            ))}
-          </select>
-        </Field>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -528,13 +566,14 @@ export function CoursesPage({
             onChange={(event) => setForm({ ...form, reservationNotice: event.target.value })}
           />
         </Field>
-        <Field label="详情正文">
-          <textarea
-            className="form-input h-80 text-sm leading-6"
+        <div className="mb-3.5 block">
+          <span className="form-label">详情正文</span>
+          <RichTextEditor
             value={form.content}
-            onChange={(event) => setForm({ ...form, content: event.target.value })}
+            onChange={(content) => setForm({ ...form, content })}
+            prefix="courses/content"
           />
-        </Field>
+        </div>
       </Drawer>
 
       <ConfirmDialog

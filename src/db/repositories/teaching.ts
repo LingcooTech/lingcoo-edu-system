@@ -134,6 +134,21 @@ export async function findClassroom(db: Database, classroomId: string | null) {
   return classroom ?? null;
 }
 
+export async function findClassrooms(db: Database, classroomIds: string[]) {
+  const ids = Array.from(new Set(classroomIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+
+  const classrooms = await db
+    .select()
+    .from(schema.classrooms)
+    .where(inArray(schema.classrooms.id, ids));
+  const classroomById = new Map(classrooms.map((classroom) => [classroom.id, classroom]));
+  return ids.flatMap((id) => {
+    const classroom = classroomById.get(id);
+    return classroom ? [classroom] : [];
+  });
+}
+
 export async function createClassroom(db: Database, values: typeof schema.classrooms.$inferInsert) {
   const [classroom] = await db.insert(schema.classrooms).values(values).returning();
   return classroom;

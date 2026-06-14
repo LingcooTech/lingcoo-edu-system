@@ -12,6 +12,7 @@ import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
 import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
+import { validateLeadPreferences } from '../lead-preferences.js';
 import type { AppModule } from '../types.js';
 
 const leadStatuses = [
@@ -53,8 +54,10 @@ const campaignSchema = z.object({
 const campaignUpdateSchema = campaignSchema.partial();
 
 const leadRegistrationSchema = z.object({
+  campusId: z.string().uuid().optional(),
   courseId: z.string().uuid().optional(),
   trialSessionId: z.string().uuid().optional(),
+  preferredTeacherId: z.string().uuid().optional(),
   guardianName: z.string().min(1).max(120),
   phone: z.string().min(6).max(40),
   studentName: z.string().min(1).max(120),
@@ -142,6 +145,7 @@ async function rejectSeatReservationFeeBypass(
 async function resolveCourseId(
   app: Parameters<AppModule['register']>[0],
   input: {
+    campusId?: string;
     courseId?: string;
     course?: string;
     campaign?: Campaign | null;
@@ -159,7 +163,10 @@ async function resolveCourseId(
 
   if (input.courseId) {
     await catalogRepo.requireCourse(app.db, input.courseId);
-    return { campusId: await trialRepo.firstCampusId(app.db), courseId: input.courseId };
+    return {
+      campusId: input.campusId ?? (await trialRepo.firstCampusId(app.db)),
+      courseId: input.courseId,
+    };
   }
 
   const courseSlug = input.course ?? input.campaign?.courseSlug ?? null;
@@ -167,13 +174,13 @@ async function resolveCourseId(
     const course = await catalogRepo.findPublishedCourseBySlug(app.db, courseSlug);
     if (course) {
       return {
-        campusId: course.campusId ?? (await trialRepo.firstCampusId(app.db)),
+        campusId: input.campusId ?? course.campusId ?? (await trialRepo.firstCampusId(app.db)),
         courseId: course.id,
       };
     }
   }
 
-  return { campusId: await trialRepo.firstCampusId(app.db), courseId: null };
+  return { campusId: input.campusId ?? (await trialRepo.firstCampusId(app.db)), courseId: null };
 }
 
 async function createLeadFromRegistration(
@@ -192,6 +199,7 @@ async function createLeadFromRegistration(
         campaignCode: input.campaign,
       });
   const courseResolution = await resolveCourseId(app, {
+    campusId: input.campusId,
     courseId: input.courseId,
     course: input.course,
     campaign,
@@ -207,11 +215,17 @@ async function createLeadFromRegistration(
   ) {
     throw unprocessable('Trial session is full');
   }
+  await validateLeadPreferences(app.db, {
+    campusId: courseResolution.campusId,
+    courseId: courseResolution.courseId,
+    preferredTeacherId: input.preferredTeacherId,
+  });
 
   const lead = await crmRepo.createLead(app.db, {
     campusId: courseResolution.campusId,
     courseId: courseResolution.courseId ?? undefined,
     trialSessionId: input.trialSessionId,
+    preferredTeacherId: input.preferredTeacherId ?? null,
     guardianName: input.guardianName,
     phone: input.phone,
     studentName: input.studentName,
@@ -380,21 +394,17 @@ export const crmModule: AppModule = {
         },
       );
 
-      app.delete(
-        `${prefix}/leads/:leadId`,
-        { preHandler: app.requireAdmin },
-        async (request) => {
-          const { leadId } = request.params as { leadId: string };
-          const existing = await crmRepo.requireLead(app.db, leadId);
-          const hasSeatReservation = await crmRepo.hasSeatReservationForLead(app.db, leadId);
-          const lead = await crmRepo.deleteLead(app.db, leadId);
-          if (!lead) throw notFound('Lead not found');
-          if (existing.trialSessionId && !hasSeatReservation) {
-            await trialRepo.decrementBookedCount(app.db, existing.trialSessionId);
-          }
-          return { lead };
-        },
-      );
+      app.delete(`${prefix}/leads/:leadId`, { preHandler: app.requireAdmin }, async (request) => {
+        const { leadId } = request.params as { leadId: string };
+        const existing = await crmRepo.requireLead(app.db, leadId);
+        const hasSeatReservation = await crmRepo.hasSeatReservationForLead(app.db, leadId);
+        const lead = await crmRepo.deleteLead(app.db, leadId);
+        if (!lead) throw notFound('Lead not found');
+        if (existing.trialSessionId && !hasSeatReservation) {
+          await trialRepo.decrementBookedCount(app.db, existing.trialSessionId);
+        }
+        return { lead };
+      });
 
       app.post(
         `${prefix}/leads/:leadId/follow-ups`,

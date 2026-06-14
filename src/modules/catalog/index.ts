@@ -18,6 +18,7 @@ const courseShape = {
   defaultTeacherId: z.string().uuid().nullable().optional(),
   defaultTeacherIds: z.array(z.string().uuid()),
   classroomId: z.string().uuid().nullable().optional(),
+  classroomIds: z.array(z.string().uuid()),
   teachingLocationLabel: z.string().max(200).nullable().optional(),
   paymentReceiverType: z.enum(['platform', 'provider', 'other']),
   paymentReceiverInstitutionId: z.string().uuid().nullable().optional(),
@@ -34,6 +35,7 @@ const courseShape = {
 const courseSchema = z.object({
   ...courseShape,
   defaultTeacherIds: courseShape.defaultTeacherIds.default([]),
+  classroomIds: courseShape.classroomIds.default([]),
   paymentReceiverType: courseShape.paymentReceiverType.default('platform'),
   trialDescription: courseShape.trialDescription.default(''),
   reservationNotice: courseShape.reservationNotice.default(''),
@@ -69,6 +71,10 @@ function uniqueTeacherIds(ids: string[]) {
   return Array.from(new Set(ids.filter(Boolean)));
 }
 
+function uniqueClassroomIds(ids: string[]) {
+  return Array.from(new Set(ids.filter(Boolean)));
+}
+
 function normalizeCourseCreate(body: z.infer<typeof courseSchema>): catalogRepo.NewCourse {
   const defaultTeacherIds = uniqueTeacherIds(
     body.defaultTeacherIds.length > 0
@@ -77,10 +83,15 @@ function normalizeCourseCreate(body: z.infer<typeof courseSchema>): catalogRepo.
         ? [body.defaultTeacherId]
         : [],
   );
+  const classroomIds = uniqueClassroomIds(
+    body.classroomIds.length > 0 ? body.classroomIds : body.classroomId ? [body.classroomId] : [],
+  );
   return {
     ...body,
     defaultTeacherIds,
     defaultTeacherId: defaultTeacherIds[0] ?? null,
+    classroomIds,
+    classroomId: classroomIds[0] ?? null,
   };
 }
 
@@ -97,6 +108,16 @@ function normalizeCourseUpdate(body: z.infer<typeof courseUpdateSchema>) {
     const defaultTeacherId = body.defaultTeacherId ?? null;
     patch.defaultTeacherId = defaultTeacherId;
     patch.defaultTeacherIds = defaultTeacherId ? [defaultTeacherId] : [];
+  }
+
+  if ('classroomIds' in body) {
+    const classroomIds = uniqueClassroomIds(body.classroomIds ?? []);
+    patch.classroomIds = classroomIds;
+    patch.classroomId = classroomIds[0] ?? null;
+  } else if ('classroomId' in body) {
+    const classroomId = body.classroomId ?? null;
+    patch.classroomId = classroomId;
+    patch.classroomIds = classroomId ? [classroomId] : [];
   }
 
   return patch;
@@ -191,7 +212,7 @@ export const catalogModule: AppModule = {
         providerInstitution,
         defaultTeachers,
         paymentReceiverInstitution,
-        classroom,
+        classrooms,
         campuses,
       ] = await Promise.all([
         packagesRepo.listActivePackagesForCourse(app.db, course.id),
@@ -206,11 +227,21 @@ export const catalogModule: AppModule = {
               : [],
         ),
         teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),
-        teachingRepo.findClassroom(app.db, course.classroomId),
+        teachingRepo.findClassrooms(
+          app.db,
+          course.classroomIds?.length
+            ? course.classroomIds
+            : course.classroomId
+              ? [course.classroomId]
+              : [],
+        ),
         organizationRepo.listCampuses(app.db),
       ]);
+      const classroom = classrooms[0] ?? null;
+      const campusIds = new Set(classrooms.map((item) => item.campusId));
+      const selectedCampuses = campuses.filter((item) => campusIds.has(item.id));
       const campus = classroom
-        ? (campuses.find((item) => item.id === classroom.campusId) ?? null)
+        ? (selectedCampuses.find((item) => item.id === classroom.campusId) ?? null)
         : null;
       const businessModel = readBusinessModel(organization.settings);
       return {
@@ -220,7 +251,9 @@ export const catalogModule: AppModule = {
         defaultTeacher: defaultTeachers[0] ?? null,
         defaultTeachers,
         classroom,
+        classrooms,
         campus,
+        campuses: selectedCampuses,
         paymentReceiverInstitution,
         businessModel,
       };

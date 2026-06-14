@@ -22,6 +22,7 @@ export interface Course {
   defaultTeacherId?: string | null;
   defaultTeacherIds?: string[];
   classroomId?: string | null;
+  classroomIds?: string[];
   teachingLocationLabel?: string | null;
   paymentReceiverType?: 'platform' | 'provider' | 'other';
   paymentReceiverInstitutionId?: string | null;
@@ -164,8 +165,10 @@ export interface Lead {
   grade: string;
   status: LeadStatus;
   source: string;
+  campusId?: string | null;
   courseId?: string | null;
   trialSessionId?: string | null;
+  preferredTeacherId?: string | null;
   channelId?: string | null;
   campaignId?: string | null;
   medium?: string | null;

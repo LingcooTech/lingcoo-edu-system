@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRightCircle, ListFilter, Trash2 } from 'lucide-react';
 
 import { api, apiDelete, apiPost } from '@/api/client';
-import type { Campaign, Channel, FollowUp, Lead, LeadStatus } from '@/api/types';
+import type {
+  Campaign,
+  Campus,
+  Channel,
+  Course,
+  FollowUp,
+  Lead,
+  LeadStatus,
+  Teacher,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -42,6 +51,9 @@ export function LeadsPage() {
   const { data, setData } = useApiResource<Lead>(LEADS_BASE(), 'leads');
   const { data: channels } = useApiResource<Channel>('/v1/crm/channels', 'channels');
   const { data: campaigns } = useApiResource<Campaign>('/v1/crm/campaigns', 'campaigns');
+  const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
+  const { data: campuses } = useApiResource<Campus>('/v1/campuses', 'campuses');
+  const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
 
   const channelName = useMemo(() => {
     const map = new Map(channels.map((c) => [c.id, c.name]));
@@ -51,6 +63,18 @@ export function LeadsPage() {
     const map = new Map(campaigns.map((c) => [c.id, c.name]));
     return (id?: string | null) => (id ? (map.get(id) ?? '—') : '—');
   }, [campaigns]);
+  const courseName = useMemo(() => {
+    const map = new Map(courses.map((course) => [course.id, course.name]));
+    return (id?: string | null) => (id ? (map.get(id) ?? '—') : '—');
+  }, [courses]);
+  const campusName = useMemo(() => {
+    const map = new Map(campuses.map((campus) => [campus.id, campus.name]));
+    return (id?: string | null) => (id ? (map.get(id) ?? '—') : '—');
+  }, [campuses]);
+  const teacherName = useMemo(() => {
+    const map = new Map(teachers.map((teacher) => [teacher.id, teacher.name]));
+    return (id?: string | null) => (id ? (map.get(id) ?? '—') : '—');
+  }, [teachers]);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<'all' | LeadStatus>('all');
@@ -74,10 +98,23 @@ export function LeadsPage() {
         lead.studentName.toLowerCase().includes(q) ||
         lead.guardianName.toLowerCase().includes(q) ||
         lead.phone.includes(q) ||
-        lead.source.toLowerCase().includes(q)
+        lead.source.toLowerCase().includes(q) ||
+        courseName(lead.courseId).toLowerCase().includes(q) ||
+        campusName(lead.campusId).toLowerCase().includes(q) ||
+        teacherName(lead.preferredTeacherId).toLowerCase().includes(q)
       );
     });
-  }, [data, statusFilter, sourceFilter, channelFilter, campaignFilter, query]);
+  }, [
+    data,
+    statusFilter,
+    sourceFilter,
+    channelFilter,
+    campaignFilter,
+    query,
+    courseName,
+    campusName,
+    teacherName,
+  ]);
 
   // Detail drawer
   const [selected, setSelected] = useState<Lead | null>(null);
@@ -259,6 +296,19 @@ export function LeadsPage() {
           },
           { key: 'grade', header: '年级', cell: (row) => row.grade },
           {
+            key: 'intent',
+            header: '意向',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">{courseName(row.courseId)}</span>
+                <span className="cell-subtitle">
+                  {campusName(row.campusId)}
+                  {row.preferredTeacherId ? ` · ${teacherName(row.preferredTeacherId)}` : ''}
+                </span>
+              </div>
+            ),
+          },
+          {
             key: 'source',
             header: '来源 / 渠道',
             cell: (row) => (
@@ -323,6 +373,12 @@ export function LeadsPage() {
                 <span>{selected.grade}</span>
                 <span className="text-muted-foreground">来源</span>
                 <span>{selected.source}</span>
+                <span className="text-muted-foreground">意向课程</span>
+                <span>{courseName(selected.courseId)}</span>
+                <span className="text-muted-foreground">意向校区</span>
+                <span>{campusName(selected.campusId)}</span>
+                <span className="text-muted-foreground">意向老师</span>
+                <span>{teacherName(selected.preferredTeacherId)}</span>
                 <span className="text-muted-foreground">渠道</span>
                 <span>{channelName(selected.channelId)}</span>
                 <span className="text-muted-foreground">活动</span>

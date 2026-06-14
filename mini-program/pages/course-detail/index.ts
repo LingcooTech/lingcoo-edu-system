@@ -156,8 +156,25 @@ Page({
           : payload.defaultTeacher
             ? [payload.defaultTeacher]
             : [];
-      const locationLabel = payload.classroom
-        ? [payload.classroom.name, payload.campus?.name].filter(Boolean).join(' · ')
+      const classrooms =
+        payload.classrooms && payload.classrooms.length
+          ? payload.classrooms
+          : payload.classroom
+            ? [payload.classroom]
+            : [];
+      const campuses =
+        payload.campuses && payload.campuses.length
+          ? payload.campuses
+          : payload.campus
+            ? [payload.campus]
+            : [];
+      const campusName = new Map(campuses.map((campus) => [campus.id, campus.name]));
+      const locationLabel = classrooms.length
+        ? classrooms
+            .map((classroom) =>
+              [classroom.name, campusName.get(classroom.campusId)].filter(Boolean).join(' · '),
+            )
+            .join(' / ')
         : payload.course.teachingLocationLabel || '到店确认';
       this.setData({
         loading: false,

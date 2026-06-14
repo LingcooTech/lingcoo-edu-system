@@ -16,6 +16,8 @@ import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
 import { CheckoutModal, type CheckoutTarget } from '@/components/CheckoutModal';
 import { Layout } from '@/components/Layout';
+import { RichTextRenderer } from '@/components/RichTextRenderer';
+import { TrialRegistrationModal } from '@/components/TrialRegistrationModal';
 import { useSeo } from '@/lib/seo';
 import { money } from '@/lib/utils';
 
@@ -53,13 +55,23 @@ export function CourseDetailPage() {
   const [defaultTeacher, setDefaultTeacher] = useState<PublicTeacher | null>(null);
   const [defaultTeachers, setDefaultTeachers] = useState<PublicTeacher[]>([]);
   const [classroom, setClassroom] = useState<PublicClassroom | null>(null);
+  const [classrooms, setClassrooms] = useState<PublicClassroom[]>([]);
   const [campus, setCampus] = useState<PublicCampus | null>(null);
+  const [campuses, setCampuses] = useState<PublicCampus[]>([]);
   const [paymentReceiverInstitution, setPaymentReceiverInstitution] =
     useState<PublicInstitution | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound'>('loading');
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null);
+  const [trialOpen, setTrialOpen] = useState(false);
 
-  const contentBlocks = useMemo(() => parseBlocks(course?.content), [course]);
+  const contentIsBlockDoc = useMemo(() => {
+    const trimmed = course?.content?.trim() ?? '';
+    return trimmed.startsWith('{') || trimmed.startsWith('[');
+  }, [course]);
+  const contentBlocks = useMemo(
+    () => (contentIsBlockDoc ? parseBlocks(course?.content) : []),
+    [contentIsBlockDoc, course],
+  );
 
   useSeo({
     title: course?.name || '课程详情',
@@ -83,7 +95,17 @@ export function CourseDetailPage() {
               : [],
         );
         setClassroom(payload.classroom ?? null);
+        setClassrooms(
+          payload.classrooms?.length
+            ? payload.classrooms
+            : payload.classroom
+              ? [payload.classroom]
+              : [],
+        );
         setCampus(payload.campus ?? null);
+        setCampuses(
+          payload.campuses?.length ? payload.campuses : payload.campus ? [payload.campus] : [],
+        );
         setPaymentReceiverInstitution(payload.paymentReceiverInstitution ?? null);
         setStatus('ready');
       })
@@ -117,9 +139,26 @@ export function CourseDetailPage() {
     defaultTeachers.length > 0
       ? defaultTeachers.map((teacher) => teacher.name).join(' / ')
       : defaultTeacher?.name || '场次确认';
-  const locationLabel = classroom
-    ? [classroom.name, campus?.name].filter(Boolean).join(' · ')
+  const classroomOptions = course
+    ? classrooms.length
+      ? classrooms
+      : classroom
+        ? [classroom]
+        : []
+    : [];
+  const campusOptions = course ? (campuses.length ? campuses : campus ? [campus] : []) : [];
+  const campusName = new Map(campusOptions.map((item) => [item.id, item.name]));
+  const locationLabel = classroomOptions.length
+    ? classroomOptions
+        .map((item) => [item.name, campusName.get(item.campusId)].filter(Boolean).join(' · '))
+        .join(' / ')
     : course.teachingLocationLabel || '到店确认';
+  const campusLocationLabel =
+    campusOptions.length > 0
+      ? campusOptions
+          .map((item) => (item.address ? `${item.name}：${item.address}` : item.name))
+          .join(' / ')
+      : locationLabel;
   const paymentReceiverLabel =
     paymentReceiverInstitution?.name ||
     course.paymentReceiverName ||
@@ -129,7 +168,6 @@ export function CourseDetailPage() {
         ? '平台'
         : '');
   const price = priceHeadline(packages, onlinePackageSalesAllowed);
-  const registerHref = `/register?course=${course.slug}`;
 
   return (
     <Layout>
@@ -173,9 +211,13 @@ export function CourseDetailPage() {
                     {course.durationMinutes} 分钟/节
                   </div>
                 </div>
-                <Link to={registerHref} className="pwbtn pwbtn-primary mt-4 w-full">
+                <button
+                  type="button"
+                  className="pwbtn pwbtn-primary mt-4 w-full"
+                  onClick={() => setTrialOpen(true)}
+                >
                   预约试听 / 留资
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -209,7 +251,11 @@ export function CourseDetailPage() {
               </div>
               <div className="text-ink-soft flex items-center gap-2">
                 <MapPin className="text-brand h-4 w-4 shrink-0" />
-                <span>授课地点：{locationLabel}</span>
+                <span>授课教室：{locationLabel}</span>
+              </div>
+              <div className="text-ink-soft flex items-center gap-2">
+                <MapPin className="text-brand h-4 w-4 shrink-0" />
+                <span>校区位置：{campusLocationLabel}</span>
               </div>
               {paymentReceiverLabel && (
                 <div className="text-ink-soft flex items-center gap-2">
@@ -219,11 +265,16 @@ export function CourseDetailPage() {
               )}
             </section>
 
-            {contentBlocks.length > 0 && (
+            {contentIsBlockDoc && contentBlocks.length > 0 && (
               <div className="mt-8">
                 <BlockRenderer blocks={contentBlocks} />
               </div>
             )}
+            {!contentIsBlockDoc && course.content?.trim() ? (
+              <div className="mt-8">
+                <RichTextRenderer content={course.content} />
+              </div>
+            ) : null}
 
             {(course.trialDescription || course.reservationNotice) && (
               <section className="mt-10 space-y-3">
@@ -251,9 +302,13 @@ export function CourseDetailPage() {
             <div className="pwcard hidden p-5 lg:block">
               <div className="text-ink text-2xl font-bold">{price.big}</div>
               <div className="text-muted mt-1 text-xs">{price.sub}</div>
-              <Link to={registerHref} className="pwbtn pwbtn-primary mt-5 w-full">
+              <button
+                type="button"
+                className="pwbtn pwbtn-primary mt-5 w-full"
+                onClick={() => setTrialOpen(true)}
+              >
                 预约试听 / 留资
-              </Link>
+              </button>
               <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
@@ -265,7 +320,7 @@ export function CourseDetailPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="text-brand h-4 w-4 shrink-0" />
-                  {locationLabel}
+                  {campusLocationLabel}
                 </div>
               </div>
             </div>
@@ -320,9 +375,13 @@ export function CourseDetailPage() {
                           购买课时包
                         </button>
                       ) : (
-                        <Link to={registerHref} className="pwbtn pwbtn-outline mt-4 w-full">
+                        <button
+                          type="button"
+                          className="pwbtn pwbtn-outline mt-4 w-full"
+                          onClick={() => setTrialOpen(true)}
+                        >
                           预约试听后到店确认
-                        </Link>
+                        </button>
                       )}
                     </div>
                   ))}
@@ -337,6 +396,13 @@ export function CourseDetailPage() {
         open={Boolean(checkoutTarget)}
         target={checkoutTarget}
         onClose={() => setCheckoutTarget(null)}
+      />
+      <TrialRegistrationModal
+        open={trialOpen}
+        course={course}
+        campuses={campusOptions}
+        teachers={defaultTeachers}
+        onClose={() => setTrialOpen(false)}
       />
     </Layout>
   );

@@ -19,6 +19,7 @@ import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
 import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
+import { validateLeadPreferences } from '../lead-preferences.js';
 import type { AppModule } from '../types.js';
 
 const trialSessionSchema = z.object({
@@ -37,8 +38,10 @@ const trialSessionSchema = z.object({
 const trialSessionUpdateSchema = trialSessionSchema.partial();
 
 const registrationSchema = z.object({
+  campusId: z.string().uuid().optional(),
   courseId: z.string().optional(),
   trialSessionId: z.string().optional(),
+  preferredTeacherId: z.string().uuid().optional(),
   guardianName: z.string().min(1),
   phone: z.string().min(6),
   studentName: z.string().min(1),
@@ -303,7 +306,7 @@ export const trialModule: AppModule = {
 
     app.post('/public/trial-registrations', async (request) => {
       const body = registrationSchema.parse(request.body);
-      const campusId = await trialRepo.firstCampusId(app.db);
+      let campusId = body.campusId ?? (await trialRepo.firstCampusId(app.db));
 
       // Prefer the explicit form selection; fall back to the course slug carried
       // in the QR attribution when the form had no course picker.
@@ -331,7 +334,14 @@ export const trialModule: AppModule = {
           throw unprocessable('本场试听需先支付试听席位保留费，请通过试听场次详情预约。');
         }
         courseId = trialSession.courseId;
+        campusId = trialSession.campusId;
       }
+
+      await validateLeadPreferences(app.db, {
+        campusId,
+        courseId,
+        preferredTeacherId: body.preferredTeacherId,
+      });
 
       const { channelId, campaignId } = await crmRepo.resolveAttribution(app.db, {
         source: body.source,
@@ -346,6 +356,7 @@ export const trialModule: AppModule = {
         phone: body.phone,
         studentName: body.studentName,
         grade: body.grade,
+        preferredTeacherId: body.preferredTeacherId ?? null,
         source: body.source,
         channelId,
         campaignId,
