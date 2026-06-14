@@ -20,7 +20,9 @@ interface PackageForm {
   description: string;
   courseId: string;
   lessonCount: string;
+  giftedLessonCount: string;
   priceYuan: string;
+  discountPriceYuan: string;
   status: 'active' | 'archived';
 }
 
@@ -29,9 +31,25 @@ const emptyPackageForm: PackageForm = {
   description: '',
   courseId: '',
   lessonCount: '12',
+  giftedLessonCount: '0',
   priceYuan: '0',
+  discountPriceYuan: '',
   status: 'active',
 };
+
+function effectivePackagePrice(pkg: CoursePackage) {
+  return pkg.discountPriceAmount ?? pkg.priceAmount;
+}
+
+function effectiveLessonCount(pkg: CoursePackage) {
+  return pkg.lessonCount + (pkg.giftedLessonCount ?? 0);
+}
+
+function lessonLabel(pkg: CoursePackage) {
+  return pkg.giftedLessonCount
+    ? `${pkg.lessonCount} + 赠 ${pkg.giftedLessonCount} 节`
+    : `${pkg.lessonCount} 节`;
+}
 
 interface EmbeddedCreateAction {
   label: string;
@@ -82,7 +100,12 @@ export function PackagesPage({
       description: pkg.description ?? '',
       courseId: pkg.courseId ?? '',
       lessonCount: String(pkg.lessonCount),
+      giftedLessonCount: String(pkg.giftedLessonCount ?? 0),
       priceYuan: String(pkg.priceAmount / 100),
+      discountPriceYuan:
+        pkg.discountPriceAmount === null || pkg.discountPriceAmount === undefined
+          ? ''
+          : String(pkg.discountPriceAmount / 100),
       status: (pkg.status as PackageForm['status']) ?? 'active',
     });
     setOpen(true);
@@ -100,7 +123,12 @@ export function PackagesPage({
         description: form.description,
         courseId: form.courseId || undefined,
         lessonCount: Number(form.lessonCount) || 1,
+        giftedLessonCount: Math.max(0, Number(form.giftedLessonCount) || 0),
         priceAmount: Math.round((Number(form.priceYuan) || 0) * 100),
+        discountPriceAmount:
+          form.discountPriceYuan.trim() === ''
+            ? null
+            : Math.round((Number(form.discountPriceYuan) || 0) * 100),
         status: form.status,
       };
       if (editing) {
@@ -159,8 +187,29 @@ export function PackagesPage({
             header: '关联课程',
             cell: (row) => (row.courseId ? (courseName.get(row.courseId) ?? '-') : '通用'),
           },
-          { key: 'lessons', header: '课时', cell: (row) => `${row.lessonCount} 节` },
-          { key: 'price', header: '价格', cell: (row) => money(row.priceAmount) },
+          {
+            key: 'lessons',
+            header: '课时',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">{effectiveLessonCount(row)} 节</span>
+                <span className="cell-subtitle">{lessonLabel(row)}</span>
+              </div>
+            ),
+          },
+          {
+            key: 'price',
+            header: '价格',
+            cell: (row) =>
+              row.discountPriceAmount === null || row.discountPriceAmount === undefined ? (
+                money(row.priceAmount)
+              ) : (
+                <div className="cell-stack">
+                  <span className="cell-title">{money(effectivePackagePrice(row))}</span>
+                  <span className="cell-subtitle line-through">{money(row.priceAmount)}</span>
+                </div>
+              ),
+          },
           {
             key: 'status',
             header: '状态',
@@ -240,12 +289,31 @@ export function PackagesPage({
               onChange={(e) => setForm({ ...form, lessonCount: e.target.value })}
             />
           </Field>
-          <Field label="价格(元)">
+          <Field label="赠送节数">
+            <input
+              className="form-input"
+              type="number"
+              min={0}
+              value={form.giftedLessonCount}
+              onChange={(e) => setForm({ ...form, giftedLessonCount: e.target.value })}
+            />
+          </Field>
+        </FieldRow>
+        <FieldRow>
+          <Field label="原价(元)">
             <input
               className="form-input"
               type="number"
               value={form.priceYuan}
               onChange={(e) => setForm({ ...form, priceYuan: e.target.value })}
+            />
+          </Field>
+          <Field label="折扣价(元)" hint="留空则按原价售卖">
+            <input
+              className="form-input"
+              type="number"
+              value={form.discountPriceYuan}
+              onChange={(e) => setForm({ ...form, discountPriceYuan: e.target.value })}
             />
           </Field>
         </FieldRow>

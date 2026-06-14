@@ -14,6 +14,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as schema from '../../db/schema.js';
 import { readBusinessModel, requiresSeatReservationFee } from '../../lib/business-model.js';
+import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
@@ -133,7 +134,7 @@ async function attachPackageSummary(
   const showPackagePrice = options.showPackagePrice ?? true;
   return courses.map((course) => {
     const coursePackages = packages.filter((item) => item.courseId === course.id);
-    const prices = coursePackages.map((item) => item.priceAmount);
+    const prices = coursePackages.map((item) => packagesRepo.effectivePackagePrice(item));
     return {
       ...course,
       packageCount: coursePackages.length,
@@ -390,6 +391,18 @@ export const trialModule: AppModule = {
       }
 
       const course = await catalogRepo.requireCourse(app.db, trialSession.courseId);
+      const [paymentReceiverInstitution, providerInstitution] = await Promise.all([
+        teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),
+        teachingRepo.findInstitution(app.db, course.providerInstitutionId),
+      ]);
+      const paymentReceiverName = resolvePaymentReceiverName({
+        paymentReceiverType: course.paymentReceiverType,
+        receiverInstitutionName: paymentReceiverInstitution?.name,
+        providerInstitutionName: providerInstitution?.name,
+        legacyDisplayName: course.paymentReceiverName,
+        organizationBrandName: organization.brandName,
+        organizationName: organization.name,
+      });
       const { channelId, campaignId } = await crmRepo.resolveAttribution(app.db, {
         source: body.source,
         campaignCode: body.campaign,
@@ -425,8 +438,7 @@ export const trialModule: AppModule = {
           medium: body.medium ?? null,
           paymentReceiverType: course.paymentReceiverType,
           paymentReceiverInstitutionId: course.paymentReceiverInstitutionId,
-          paymentReceiverName:
-            course.paymentReceiverName || organization.brandName || organization.name,
+          paymentReceiverName,
         });
         const seatReservation = await seatReservationRepo.createSeatReservation(tx, {
           orderId: order.id,

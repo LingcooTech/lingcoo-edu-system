@@ -2,14 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Course, Institution, Teacher } from '@/api/types';
-import { BlockEditor } from '@/components/editor/BlockEditor';
-import {
-  COURSE_ALLOWED,
-  parseBlocks,
-  serializeBlocks,
-  type Block,
-} from '@/components/editor/blocks';
+import type { Campus, Classroom, Course, Institution, Teacher } from '@/api/types';
+import { parseBlocks, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -29,17 +23,15 @@ interface CourseForm {
   ageRange: string;
   durationMinutes: string;
   providerInstitutionId: string;
-  defaultTeacherId: string;
-  teachingLocationLabel: string;
-  paymentReceiverType: 'platform' | 'provider' | 'other';
+  defaultTeacherIds: string[];
+  classroomId: string;
   paymentReceiverInstitutionId: string;
-  paymentReceiverName: string;
   trialDescription: string;
   reservationNotice: string;
   coverImageUrl: string;
   onlineSalesEnabled: boolean;
   summary: string;
-  contentBlocks: Block[];
+  content: string;
   status: 'draft' | 'published' | 'archived';
 }
 
@@ -50,21 +42,64 @@ const emptyCourseForm: CourseForm = {
   ageRange: '',
   durationMinutes: '60',
   providerInstitutionId: '',
-  defaultTeacherId: '',
-  teachingLocationLabel: '',
-  paymentReceiverType: 'platform',
+  defaultTeacherIds: [],
+  classroomId: '',
   paymentReceiverInstitutionId: '',
-  paymentReceiverName: '',
   trialDescription: '',
   reservationNotice: '',
   coverImageUrl: '',
   onlineSalesEnabled: true,
   summary: '',
-  contentBlocks: [],
+  content: '',
   status: 'draft',
 };
 
+function blockToText(block: Block): string {
+  switch (block.type) {
+    case 'heading':
+      return block.text;
+    case 'paragraph':
+      return block.text;
+    case 'list':
+      return block.items.map((item) => `- ${item}`).join('\n');
+    case 'image':
+      return [block.alt, block.caption, block.url].filter(Boolean).join('\n');
+    case 'imageText':
+      return [block.title, block.text, block.url].filter(Boolean).join('\n');
+    case 'stats':
+    case 'testimonials':
+      return block.items.join('\n');
+    case 'cta':
+      return [block.text, block.link].filter(Boolean).join('\n');
+    case 'gallery':
+      return block.urls.join('\n');
+    case 'faq':
+      return block.items.map((item) => [item.q, item.a].filter(Boolean).join('\n')).join('\n\n');
+    case 'divider':
+      return '';
+  }
+}
+
+function contentToEditableText(content?: string) {
+  if (!content) return '';
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return content;
+  }
+
+  const blocks = parseBlocks(content);
+  if (blocks.length === 0) return content;
+  return blocks.map(blockToText).filter(Boolean).join('\n\n');
+}
+
 function courseToForm(course: Course): CourseForm {
+  const defaultTeacherIds =
+    course.defaultTeacherIds && course.defaultTeacherIds.length > 0
+      ? course.defaultTeacherIds
+      : course.defaultTeacherId
+        ? [course.defaultTeacherId]
+        : [];
+
   return {
     slug: course.slug,
     name: course.name,
@@ -72,22 +107,50 @@ function courseToForm(course: Course): CourseForm {
     ageRange: course.ageRange,
     durationMinutes: String(course.durationMinutes),
     providerInstitutionId: course.providerInstitutionId ?? '',
-    defaultTeacherId: course.defaultTeacherId ?? '',
-    teachingLocationLabel: course.teachingLocationLabel ?? '',
-    paymentReceiverType: course.paymentReceiverType ?? 'platform',
-    paymentReceiverInstitutionId: course.paymentReceiverInstitutionId ?? '',
-    paymentReceiverName: course.paymentReceiverName ?? '',
+    defaultTeacherIds,
+    classroomId: course.classroomId ?? '',
+    paymentReceiverInstitutionId:
+      course.paymentReceiverInstitutionId ??
+      (course.paymentReceiverType === 'provider' ? (course.providerInstitutionId ?? '') : ''),
     trialDescription: course.trialDescription ?? '',
     reservationNotice: course.reservationNotice ?? '',
     coverImageUrl: course.coverImageUrl ?? '',
     onlineSalesEnabled: course.onlineSalesEnabled ?? true,
     summary: course.summary ?? '',
-    contentBlocks: parseBlocks(course.content),
+    content: contentToEditableText(course.content),
     status: (course.status as CourseForm['status']) ?? 'draft',
   };
 }
 
-function courseFormToPayload(form: CourseForm) {
+function teacherLabel(teacher: Teacher, institutionName: Map<string, string>) {
+  return `${teacher.name}${
+    teacher.institutionId ? ` · ${institutionName.get(teacher.institutionId) ?? ''}` : ''
+  }`;
+}
+
+function courseFormToPayload(
+  form: CourseForm,
+  options: {
+    classrooms: Classroom[];
+    campusName: Map<string, string>;
+    institutions: Institution[];
+  },
+) {
+  const selectedClassroom = options.classrooms.find((item) => item.id === form.classroomId);
+  const locationLabel = selectedClassroom
+    ? [selectedClassroom.name, options.campusName.get(selectedClassroom.campusId)]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
+  const paymentReceiverInstitution =
+    options.institutions.find((item) => item.id === form.paymentReceiverInstitutionId) ?? null;
+  const paymentReceiverType: Course['paymentReceiverType'] = paymentReceiverInstitution
+    ? paymentReceiverInstitution.id === form.providerInstitutionId
+      ? 'provider'
+      : 'other'
+    : 'platform';
+  const defaultTeacherIds = Array.from(new Set(form.defaultTeacherIds.filter(Boolean)));
+
   return {
     slug: form.slug.trim(),
     name: form.name.trim(),
@@ -95,17 +158,20 @@ function courseFormToPayload(form: CourseForm) {
     ageRange: form.ageRange.trim(),
     durationMinutes: Number(form.durationMinutes) || 60,
     providerInstitutionId: form.providerInstitutionId || null,
-    defaultTeacherId: form.defaultTeacherId || null,
-    teachingLocationLabel: form.teachingLocationLabel.trim() || null,
-    paymentReceiverType: form.paymentReceiverType,
+    defaultTeacherId: defaultTeacherIds[0] ?? null,
+    defaultTeacherIds,
+    classroomId: selectedClassroom?.id ?? null,
+    campusId: selectedClassroom?.campusId ?? null,
+    teachingLocationLabel: locationLabel,
+    paymentReceiverType,
     paymentReceiverInstitutionId: form.paymentReceiverInstitutionId || null,
-    paymentReceiverName: form.paymentReceiverName.trim() || null,
+    paymentReceiverName: paymentReceiverInstitution?.name ?? null,
     trialDescription: form.trialDescription,
     reservationNotice: form.reservationNotice,
     coverImageUrl: form.coverImageUrl.trim() || null,
     onlineSalesEnabled: form.onlineSalesEnabled,
     summary: form.summary,
-    content: serializeBlocks(form.contentBlocks),
+    content: form.content,
     status: form.status,
   };
 }
@@ -126,9 +192,15 @@ export function CoursesPage({
   const { data: courses, setData: setCourses } = useApiResource<Course>(COURSE_BASE(), 'courses');
   const { data: institutions } = useApiResource<Institution>('/v1/institutions', 'institutions');
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
+  const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
+  const { data: campuses } = useApiResource<Campus>('/v1/campuses', 'campuses');
   const institutionName = useMemo(
     () => new Map(institutions.map((institution) => [institution.id, institution.name])),
     [institutions],
+  );
+  const campusName = useMemo(
+    () => new Map(campuses.map((campus) => [campus.id, campus.name])),
+    [campuses],
   );
 
   const [editing, setEditing] = useState<Course | null>(null);
@@ -163,7 +235,7 @@ export function CoursesPage({
     }
     setSaving(true);
     try {
-      const payload = courseFormToPayload(form);
+      const payload = courseFormToPayload(form, { classrooms, campusName, institutions });
       if (editing) {
         const { course } = await apiPatch<{ course: Course }>(
           `${COURSE_BASE()}/${editing.id}`,
@@ -333,7 +405,17 @@ export function CoursesPage({
             <select
               className="form-input"
               value={form.providerInstitutionId}
-              onChange={(event) => setForm({ ...form, providerInstitutionId: event.target.value })}
+              onChange={(event) => {
+                const providerInstitutionId = event.target.value;
+                setForm({
+                  ...form,
+                  providerInstitutionId,
+                  paymentReceiverInstitutionId:
+                    form.paymentReceiverInstitutionId === form.providerInstitutionId
+                      ? providerInstitutionId
+                      : form.paymentReceiverInstitutionId,
+                });
+              }}
             >
               <option value="">平台自有 / 待填写</option>
               {institutions.map((institution) => (
@@ -343,72 +425,72 @@ export function CoursesPage({
               ))}
             </select>
           </Field>
-          <Field label="默认授课老师">
+          <Field label="授课教室">
             <select
               className="form-input"
-              value={form.defaultTeacherId}
-              onChange={(event) => setForm({ ...form, defaultTeacherId: event.target.value })}
+              value={form.classroomId}
+              onChange={(event) => setForm({ ...form, classroomId: event.target.value })}
             >
               <option value="">待场次确认</option>
-              {teachers.map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
-                  {teacher.name}
-                  {teacher.institutionId
-                    ? ` · ${institutionName.get(teacher.institutionId) ?? ''}`
-                    : ''}
+              {classrooms.map((classroom) => (
+                <option key={classroom.id} value={classroom.id}>
+                  {[classroom.name, campusName.get(classroom.campusId)].filter(Boolean).join(' · ')}
                 </option>
               ))}
             </select>
           </Field>
         </FieldRow>
-        <Field label="授课地点展示">
-          <input
+        <div className="mb-3.5 block">
+          <span className="form-label">授课老师</span>
+          <div className="border-border/80 bg-background grid max-h-44 gap-2 overflow-y-auto rounded-lg border p-2">
+            {teachers.length > 0 ? (
+              teachers.map((teacher) => {
+                const checked = form.defaultTeacherIds.includes(teacher.id);
+                return (
+                  <label
+                    key={teacher.id}
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition-colors ${
+                      checked
+                        ? 'border-primary/45 bg-primary/5 text-foreground'
+                        : 'border-border/70 hover:bg-muted/60 text-muted-foreground'
+                    }`}
+                  >
+                    <span>{teacherLabel(teacher, institutionName)}</span>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(event) => {
+                        setForm({
+                          ...form,
+                          defaultTeacherIds: event.target.checked
+                            ? [...form.defaultTeacherIds, teacher.id]
+                            : form.defaultTeacherIds.filter((id) => id !== teacher.id),
+                        });
+                      }}
+                    />
+                  </label>
+                );
+              })
+            ) : (
+              <div className="text-muted-foreground px-3 py-2 text-sm">暂无可选老师</div>
+            )}
+          </div>
+        </div>
+        <Field label="收款方">
+          <select
             className="form-input"
-            placeholder="例如：美智成长教室"
-            value={form.teachingLocationLabel}
-            onChange={(event) => setForm({ ...form, teachingLocationLabel: event.target.value })}
-          />
-        </Field>
-        <FieldRow>
-          <Field label="收款方类型">
-            <select
-              className="form-input"
-              value={form.paymentReceiverType}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  paymentReceiverType: event.target.value as CourseForm['paymentReceiverType'],
-                })
-              }
-            >
-              <option value="platform">平台收款</option>
-              <option value="provider">课程提供方收款</option>
-              <option value="other">其他收款方</option>
-            </select>
-          </Field>
-          <Field label="收款方机构">
-            <select
-              className="form-input"
-              value={form.paymentReceiverInstitutionId}
-              onChange={(event) =>
-                setForm({ ...form, paymentReceiverInstitutionId: event.target.value })
-              }
-            >
-              <option value="">不关联</option>
-              {institutions.map((institution) => (
-                <option key={institution.id} value={institution.id}>
-                  {institution.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </FieldRow>
-        <Field label="收款方展示名" hint="留空时使用平台品牌名或所选机构名">
-          <input
-            className="form-input"
-            value={form.paymentReceiverName}
-            onChange={(event) => setForm({ ...form, paymentReceiverName: event.target.value })}
-          />
+            value={form.paymentReceiverInstitutionId}
+            onChange={(event) =>
+              setForm({ ...form, paymentReceiverInstitutionId: event.target.value })
+            }
+          >
+            <option value="">平台收款</option>
+            {institutions.map((institution) => (
+              <option key={institution.id} value={institution.id}>
+                {institution.name}
+              </option>
+            ))}
+          </select>
         </Field>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -446,11 +528,11 @@ export function CoursesPage({
             onChange={(event) => setForm({ ...form, reservationNotice: event.target.value })}
           />
         </Field>
-        <Field label="详情正文" hint="展示在课程详情页，可用模块编排">
-          <BlockEditor
-            value={form.contentBlocks}
-            onChange={(contentBlocks) => setForm({ ...form, contentBlocks })}
-            allowed={COURSE_ALLOWED}
+        <Field label="详情正文">
+          <textarea
+            className="form-input h-80 text-sm leading-6"
+            value={form.content}
+            onChange={(event) => setForm({ ...form, content: event.target.value })}
           />
         </Field>
       </Drawer>

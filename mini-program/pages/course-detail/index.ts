@@ -19,8 +19,22 @@ import { money } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
 import { requestSubscribe } from '../../services/subscribe';
 
-type PackageItem = CoursePackage & { priceLabel: string };
+type PackageItem = CoursePackage & {
+  priceLabel: string;
+  lessonLabel: string;
+  originalPriceLabel: string;
+};
 type CheckoutOrder = ParentOrder & { amountLabel: string; statusLabel: string };
+
+function packagePriceAmount(pkg: CoursePackage): number {
+  return pkg.discountPriceAmount ?? pkg.priceAmount;
+}
+
+function packageLessonLabel(pkg: CoursePackage): string {
+  return pkg.giftedLessonCount
+    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
+    : `${pkg.lessonCount} 课时`;
+}
 
 function orderStatusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -129,13 +143,22 @@ Page({
         Boolean(payload.businessModel.onlinePackageSalesEnabled) &&
         payload.course.onlineSalesEnabled !== false;
       const receiverLabel =
-        payload.course.paymentReceiverName ||
         payload.paymentReceiverInstitution?.name ||
+        payload.course.paymentReceiverName ||
         (payload.course.paymentReceiverType === 'provider'
           ? payload.providerInstitution?.name
           : payload.course.paymentReceiverType === 'platform'
             ? '平台'
             : '');
+      const defaultTeachers =
+        payload.defaultTeachers && payload.defaultTeachers.length
+          ? payload.defaultTeachers
+          : payload.defaultTeacher
+            ? [payload.defaultTeacher]
+            : [];
+      const locationLabel = payload.classroom
+        ? [payload.classroom.name, payload.campus?.name].filter(Boolean).join(' · ')
+        : payload.course.teachingLocationLabel || '到店确认';
       this.setData({
         loading: false,
         course: payload.course,
@@ -145,12 +168,19 @@ Page({
         paymentReceiverInstitution: payload.paymentReceiverInstitution ?? null,
         onlinePackageSalesAllowed,
         providerLabel: payload.providerInstitution?.name || '平台自有 / 待确认',
-        teacherLabel: payload.defaultTeacher?.name || '场次确认',
-        locationLabel: payload.course.teachingLocationLabel || '到店确认',
+        teacherLabel: defaultTeachers.length
+          ? defaultTeachers.map((teacher) => teacher.name).join(' / ')
+          : '场次确认',
+        locationLabel,
         receiverLabel,
         packages: payload.coursePackages.map((item) => ({
           ...item,
-          priceLabel: money(item.priceAmount),
+          priceLabel: money(packagePriceAmount(item)),
+          lessonLabel: packageLessonLabel(item),
+          originalPriceLabel:
+            item.discountPriceAmount === null || item.discountPriceAmount === undefined
+              ? ''
+              : money(item.priceAmount),
         })),
         contentBlocks: parseBlocks(payload.course.content),
       });

@@ -11,6 +11,8 @@ export interface Course {
   durationMinutes: number;
   providerInstitutionId?: string | null;
   defaultTeacherId?: string | null;
+  defaultTeacherIds?: string[];
+  classroomId?: string | null;
   teachingLocationLabel?: string | null;
   paymentReceiverType?: 'platform' | 'provider' | 'other';
   paymentReceiverInstitutionId?: string | null;
@@ -30,7 +32,23 @@ export interface CoursePackage {
   name: string;
   description: string;
   lessonCount: number;
+  giftedLessonCount: number;
   priceAmount: number;
+  discountPriceAmount?: number | null;
+}
+
+export interface PublicCampus {
+  id: string;
+  name: string;
+  address?: string | null;
+}
+
+export interface PublicClassroom {
+  id: string;
+  campusId: string;
+  name: string;
+  capacity: number;
+  status: string;
 }
 
 export interface TrialSession {
@@ -196,6 +214,9 @@ export interface CourseDetail {
   coursePackages: CoursePackage[];
   providerInstitution?: PublicInstitution | null;
   defaultTeacher?: PublicTeacher | null;
+  defaultTeachers?: PublicTeacher[];
+  classroom?: PublicClassroom | null;
+  campus?: PublicCampus | null;
   paymentReceiverInstitution?: PublicInstitution | null;
   businessModel: BusinessModelSettings;
 }

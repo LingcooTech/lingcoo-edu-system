@@ -20,6 +20,8 @@ export interface Course {
   durationMinutes: number;
   providerInstitutionId?: string | null;
   defaultTeacherId?: string | null;
+  defaultTeacherIds?: string[];
+  classroomId?: string | null;
   teachingLocationLabel?: string | null;
   paymentReceiverType?: 'platform' | 'provider' | 'other';
   paymentReceiverInstitutionId?: string | null;
@@ -68,7 +70,9 @@ export interface CoursePackage {
   name: string;
   description: string;
   lessonCount: number;
+  giftedLessonCount: number;
   priceAmount: number;
+  discountPriceAmount?: number | null;
   status: string;
 }
 
@@ -356,7 +360,13 @@ export interface Order {
   createdAt: string;
   student?: { name: string };
   course?: { name: string };
-  package?: { name: string; lessonCount: number; priceAmount: number };
+  package?: {
+    name: string;
+    lessonCount: number;
+    giftedLessonCount?: number;
+    priceAmount: number;
+    discountPriceAmount?: number | null;
+  };
   refundRequests?: RefundRequest[];
 }
 

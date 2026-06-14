@@ -3,8 +3,10 @@ import { z } from 'zod';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
+import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import type { AppModule } from '../types.js';
 
 const paymentMethodSchema = z.enum([
@@ -47,7 +49,12 @@ function normalizeDate(value?: string | null) {
 export const courseContractsModule: AppModule = {
   name: 'course-contracts',
   async register(app) {
-    async function resolveContractDefaults(body: z.infer<typeof courseContractConversionSchema>) {
+    async function resolveContractDefaults(
+      body: Pick<
+        z.infer<typeof courseContractSchema>,
+        'courseId' | 'paymentReceiverType' | 'paymentReceiverInstitutionId' | 'paymentReceiverName'
+      >,
+    ) {
       const [organization, course] = await Promise.all([
         organizationRepo.requireOrganization(app.db),
         catalogRepo.requireCourse(app.db, body.courseId),
@@ -57,17 +64,27 @@ export const courseContractsModule: AppModule = {
         throw httpError(403, '当前业务开关未开启后台手动添加课时包');
       }
 
+      const paymentReceiverInstitutionId =
+        body.paymentReceiverInstitutionId ?? course.paymentReceiverInstitutionId ?? null;
+      const paymentReceiverType = body.paymentReceiverType ?? course.paymentReceiverType;
+      const [paymentReceiverInstitution, providerInstitution] = await Promise.all([
+        teachingRepo.findInstitution(app.db, paymentReceiverInstitutionId),
+        teachingRepo.findInstitution(app.db, course.providerInstitutionId),
+      ]);
+
       return {
         organization,
         course,
-        paymentReceiverType: body.paymentReceiverType ?? course.paymentReceiverType,
-        paymentReceiverInstitutionId:
-          body.paymentReceiverInstitutionId ?? course.paymentReceiverInstitutionId ?? null,
-        paymentReceiverName:
-          body.paymentReceiverName?.trim() ||
-          course.paymentReceiverName ||
-          organization.brandName ||
-          organization.name,
+        paymentReceiverType,
+        paymentReceiverInstitutionId,
+        paymentReceiverName: resolvePaymentReceiverName({
+          paymentReceiverType,
+          receiverInstitutionName: paymentReceiverInstitution?.name,
+          providerInstitutionName: providerInstitution?.name,
+          legacyDisplayName: body.paymentReceiverName || course.paymentReceiverName,
+          organizationBrandName: organization.brandName,
+          organizationName: organization.name,
+        }),
       };
     }
 

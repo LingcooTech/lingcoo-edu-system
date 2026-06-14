@@ -123,6 +123,20 @@ function pendingRefund(order: Order) {
   return order.refundRequests?.find((refund) => refund.status === 'pending') ?? null;
 }
 
+function effectivePackagePrice(coursePackage: CoursePackage) {
+  return coursePackage.discountPriceAmount ?? coursePackage.priceAmount;
+}
+
+function effectivePackageLessonCount(coursePackage: CoursePackage) {
+  return coursePackage.lessonCount + (coursePackage.giftedLessonCount ?? 0);
+}
+
+function packageLessonLabel(coursePackage: CoursePackage) {
+  return coursePackage.giftedLessonCount
+    ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
+    : `${coursePackage.lessonCount} 节`;
+}
+
 export function OrdersPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<Order>('/v1/orders', 'orders');
@@ -234,7 +248,7 @@ export function OrdersPage() {
     setForm({
       studentId: students[0]?.id ?? '',
       packageId: firstPackage?.id ?? '',
-      paidYuan: firstPackage ? String(firstPackage.priceAmount / 100) : '',
+      paidYuan: firstPackage ? String(effectivePackagePrice(firstPackage) / 100) : '',
       paymentMethod: 'wechat_offline',
       offlinePaymentNote: '',
     });
@@ -403,11 +417,7 @@ export function OrdersPage() {
           value={money(summary.seatReservationAmount)}
           hint={`${summary.manualGrantCount} 笔线下课时包添加`}
         />
-        <MetricCard
-          label="待审退款"
-          value={summary.pendingRefundCount}
-          hint="筛选范围内退款申请"
-        />
+        <MetricCard label="待审退款" value={summary.pendingRefundCount} hint="筛选范围内退款申请" />
       </div>
 
       <DataTable
@@ -552,22 +562,30 @@ export function OrdersPage() {
               setForm({
                 ...form,
                 packageId: event.target.value,
-                paidYuan: coursePackage ? String(coursePackage.priceAmount / 100) : form.paidYuan,
+                paidYuan: coursePackage
+                  ? String(effectivePackagePrice(coursePackage) / 100)
+                  : form.paidYuan,
               });
             }}
           >
             <option value="">选择课时包</option>
             {activePackages.map((coursePackage) => (
               <option key={coursePackage.id} value={coursePackage.id}>
-                {coursePackage.name} · {coursePackage.lessonCount} 节 ·{' '}
-                {money(coursePackage.priceAmount)}
+                {coursePackage.name} · {packageLessonLabel(coursePackage)} ·{' '}
+                {money(effectivePackagePrice(coursePackage))}
               </option>
             ))}
           </select>
         </Field>
         {selectedPackage && (
           <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            系统将添加 {selectedPackage.lessonCount} 节课时。
+            系统将添加 {effectivePackageLessonCount(selectedPackage)} 节课时，课时包展示价{' '}
+            {money(effectivePackagePrice(selectedPackage))}
+            {selectedPackage.discountPriceAmount !== null &&
+            selectedPackage.discountPriceAmount !== undefined
+              ? `（原价 ${money(selectedPackage.priceAmount)}）`
+              : ''}
+            。
           </div>
         )}
         <FieldRow>

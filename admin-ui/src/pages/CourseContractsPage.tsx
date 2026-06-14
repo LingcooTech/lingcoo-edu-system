@@ -88,6 +88,20 @@ function contractStatusTone(status: string) {
   return statusToTone(status);
 }
 
+function effectivePackagePrice(coursePackage: CoursePackage) {
+  return coursePackage.discountPriceAmount ?? coursePackage.priceAmount;
+}
+
+function effectivePackageLessonCount(coursePackage: CoursePackage) {
+  return coursePackage.lessonCount + (coursePackage.giftedLessonCount ?? 0);
+}
+
+function packageLessonLabel(coursePackage: CoursePackage) {
+  return coursePackage.giftedLessonCount
+    ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
+    : `${coursePackage.lessonCount} 节`;
+}
+
 export function CourseContractsPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<CourseContract>(
@@ -156,8 +170,8 @@ export function CourseContractsPage() {
       ...next,
       packageId: coursePackage.id,
       title: next.title || coursePackage.name,
-      lessonCount: String(coursePackage.lessonCount),
-      paidYuan: String(coursePackage.priceAmount / 100),
+      lessonCount: String(effectivePackageLessonCount(coursePackage)),
+      paidYuan: String(effectivePackagePrice(coursePackage) / 100),
     };
   }
 
@@ -467,15 +481,21 @@ export function CourseContractsPage() {
             <option value="">自定义课时</option>
             {selectedCoursePackages.map((coursePackage) => (
               <option key={coursePackage.id} value={coursePackage.id}>
-                {coursePackage.name} · {coursePackage.lessonCount} 节 ·{' '}
-                {money(coursePackage.priceAmount)}
+                {coursePackage.name} · {packageLessonLabel(coursePackage)} ·{' '}
+                {money(effectivePackagePrice(coursePackage))}
               </option>
             ))}
           </select>
         </Field>
         {selectedPackage && (
           <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            课时包展示价 {money(selectedPackage.priceAmount)}，本次以线下实收为准。
+            默认添加 {effectivePackageLessonCount(selectedPackage)} 节课时，展示价{' '}
+            {money(effectivePackagePrice(selectedPackage))}
+            {selectedPackage.discountPriceAmount !== null &&
+            selectedPackage.discountPriceAmount !== undefined
+              ? `（原价 ${money(selectedPackage.priceAmount)}）`
+              : ''}
+            ，本次以线下实收为准。
           </div>
         )}
         <Field label="档案标题">

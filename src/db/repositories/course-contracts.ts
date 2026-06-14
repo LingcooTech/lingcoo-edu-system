@@ -6,6 +6,7 @@ import type { Database } from '../client.js';
 import * as schema from '../schema.js';
 import { httpError } from '../../lib/http-error.js';
 import { applyLessonDelta } from './lesson.js';
+import { effectivePackagePrice } from './packages.js';
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type DbOrTx = Database | Tx;
@@ -298,7 +299,7 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
       packageId: coursePackage?.id ?? null,
       orderNo,
       orderType: 'manual_package_grant',
-      amount: coursePackage?.priceAmount ?? input.paidAmount,
+      amount: coursePackage ? effectivePackagePrice(coursePackage) : input.paidAmount,
       paidAmount: input.paidAmount,
       lessonCount: input.lessonCount,
       paymentReceiverType: input.paymentReceiverType,

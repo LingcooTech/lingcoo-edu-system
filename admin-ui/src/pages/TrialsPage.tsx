@@ -113,6 +113,20 @@ function defaultForm(campuses: Campus[], courses: Course[]): TrialForm {
   };
 }
 
+function effectivePackagePrice(coursePackage: CoursePackage) {
+  return coursePackage.discountPriceAmount ?? coursePackage.priceAmount;
+}
+
+function effectivePackageLessonCount(coursePackage: CoursePackage) {
+  return coursePackage.lessonCount + (coursePackage.giftedLessonCount ?? 0);
+}
+
+function packageLessonLabel(coursePackage: CoursePackage) {
+  return coursePackage.giftedLessonCount
+    ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
+    : `${coursePackage.lessonCount} 节`;
+}
+
 export function TrialsPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<TrialSession>(TRIALS(), 'trialSessions');
@@ -240,8 +254,8 @@ export function TrialsPage() {
       ...next,
       packageId: coursePackage.id,
       title: next.title || coursePackage.name,
-      lessonCount: String(coursePackage.lessonCount),
-      paidYuan: String(coursePackage.priceAmount / 100),
+      lessonCount: String(effectivePackageLessonCount(coursePackage)),
+      paidYuan: String(effectivePackagePrice(coursePackage) / 100),
     };
   }
 
@@ -1039,15 +1053,21 @@ export function TrialsPage() {
               <option value="">自定义课时</option>
               {availablePackages(contractForm.courseId).map((coursePackage) => (
                 <option key={coursePackage.id} value={coursePackage.id}>
-                  {coursePackage.name} · {coursePackage.lessonCount} 节 ·{' '}
-                  {money(coursePackage.priceAmount)}
+                  {coursePackage.name} · {packageLessonLabel(coursePackage)} ·{' '}
+                  {money(effectivePackagePrice(coursePackage))}
                 </option>
               ))}
             </select>
           </Field>
           {contractSelectedPackage && (
             <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              课时包展示价 {money(contractSelectedPackage.priceAmount)}，本次以线下实收为准。
+              默认添加 {effectivePackageLessonCount(contractSelectedPackage)} 节课时，展示价{' '}
+              {money(effectivePackagePrice(contractSelectedPackage))}
+              {contractSelectedPackage.discountPriceAmount !== null &&
+              contractSelectedPackage.discountPriceAmount !== undefined
+                ? `（原价 ${money(contractSelectedPackage.priceAmount)}）`
+                : ''}
+              ，本次以线下实收为准。
             </div>
           )}
           <Field label="档案标题">

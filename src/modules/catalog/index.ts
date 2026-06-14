@@ -7,8 +7,8 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import type { AppModule } from '../types.js';
 
-const courseSchema = z.object({
-  campusId: z.string().optional(),
+const courseShape = {
+  campusId: z.string().uuid().nullable().optional(),
   slug: z.string().min(2),
   name: z.string().min(1),
   category: z.string().min(1),
@@ -16,31 +16,91 @@ const courseSchema = z.object({
   durationMinutes: z.number().int().positive(),
   providerInstitutionId: z.string().uuid().nullable().optional(),
   defaultTeacherId: z.string().uuid().nullable().optional(),
+  defaultTeacherIds: z.array(z.string().uuid()),
+  classroomId: z.string().uuid().nullable().optional(),
   teachingLocationLabel: z.string().max(200).nullable().optional(),
-  paymentReceiverType: z.enum(['platform', 'provider', 'other']).default('platform'),
+  paymentReceiverType: z.enum(['platform', 'provider', 'other']),
   paymentReceiverInstitutionId: z.string().uuid().nullable().optional(),
   paymentReceiverName: z.string().max(160).nullable().optional(),
-  trialDescription: z.string().default(''),
-  reservationNotice: z.string().default(''),
+  trialDescription: z.string(),
+  reservationNotice: z.string(),
   coverImageUrl: z.string().max(500).nullable().optional(),
-  onlineSalesEnabled: z.boolean().default(true),
-  summary: z.string().default(''),
-  content: z.string().default(''),
-  status: z.enum(['draft', 'published', 'archived']).default('draft'),
+  onlineSalesEnabled: z.boolean(),
+  summary: z.string(),
+  content: z.string(),
+  status: z.enum(['draft', 'published', 'archived']),
+};
+
+const courseSchema = z.object({
+  ...courseShape,
+  defaultTeacherIds: courseShape.defaultTeacherIds.default([]),
+  paymentReceiverType: courseShape.paymentReceiverType.default('platform'),
+  trialDescription: courseShape.trialDescription.default(''),
+  reservationNotice: courseShape.reservationNotice.default(''),
+  onlineSalesEnabled: courseShape.onlineSalesEnabled.default(true),
+  summary: courseShape.summary.default(''),
+  content: courseShape.content.default(''),
+  status: courseShape.status.default('draft'),
 });
 
-const courseUpdateSchema = courseSchema.partial();
+const courseUpdateSchema = z.object(courseShape).partial();
 
-const packageSchema = z.object({
+const packageShape = {
   courseId: z.string().optional(),
   name: z.string().min(1),
-  description: z.string().default(''),
+  description: z.string(),
   lessonCount: z.number().int().positive(),
+  giftedLessonCount: z.number().int().nonnegative(),
   priceAmount: z.number().int().nonnegative(),
-  status: z.enum(['active', 'archived']).default('active'),
+  discountPriceAmount: z.number().int().nonnegative().nullable().optional(),
+  status: z.enum(['active', 'archived']),
+};
+
+const packageSchema = z.object({
+  ...packageShape,
+  description: packageShape.description.default(''),
+  giftedLessonCount: packageShape.giftedLessonCount.default(0),
+  status: packageShape.status.default('active'),
 });
 
-const packageUpdateSchema = packageSchema.partial();
+const packageUpdateSchema = z.object(packageShape).partial();
+
+function uniqueTeacherIds(ids: string[]) {
+  return Array.from(new Set(ids.filter(Boolean)));
+}
+
+function normalizeCourseCreate(body: z.infer<typeof courseSchema>): catalogRepo.NewCourse {
+  const defaultTeacherIds = uniqueTeacherIds(
+    body.defaultTeacherIds.length > 0
+      ? body.defaultTeacherIds
+      : body.defaultTeacherId
+        ? [body.defaultTeacherId]
+        : [],
+  );
+  return {
+    ...body,
+    defaultTeacherIds,
+    defaultTeacherId: defaultTeacherIds[0] ?? null,
+  };
+}
+
+function normalizeCourseUpdate(body: z.infer<typeof courseUpdateSchema>) {
+  const patch = Object.fromEntries(
+    Object.entries(body).filter(([, value]) => value !== undefined),
+  ) as Partial<catalogRepo.NewCourse>;
+
+  if ('defaultTeacherIds' in body) {
+    const defaultTeacherIds = uniqueTeacherIds(body.defaultTeacherIds ?? []);
+    patch.defaultTeacherIds = defaultTeacherIds;
+    patch.defaultTeacherId = defaultTeacherIds[0] ?? null;
+  } else if ('defaultTeacherId' in body) {
+    const defaultTeacherId = body.defaultTeacherId ?? null;
+    patch.defaultTeacherId = defaultTeacherId;
+    patch.defaultTeacherIds = defaultTeacherId ? [defaultTeacherId] : [];
+  }
+
+  return patch;
+}
 
 export const catalogModule: AppModule = {
   name: 'catalog',
@@ -51,14 +111,14 @@ export const catalogModule: AppModule = {
 
     app.post('/v1/courses', { preHandler: app.requireAdmin }, async (request) => {
       const body = courseSchema.parse(request.body);
-      const course = await catalogRepo.createCourse(app.db, body);
+      const course = await catalogRepo.createCourse(app.db, normalizeCourseCreate(body));
       return { course };
     });
 
     app.patch('/v1/courses/:courseId', { preHandler: app.requireAdmin }, async (request) => {
       const { courseId } = request.params as { courseId: string };
       const body = courseUpdateSchema.parse(request.body);
-      const course = await catalogRepo.updateCourse(app.db, courseId, body);
+      const course = await catalogRepo.updateCourse(app.db, courseId, normalizeCourseUpdate(body));
       if (!course) {
         throw Object.assign(new Error('Course not found'), { statusCode: 404 });
       }
@@ -129,21 +189,38 @@ export const catalogModule: AppModule = {
         coursePackages,
         organization,
         providerInstitution,
-        defaultTeacher,
+        defaultTeachers,
         paymentReceiverInstitution,
+        classroom,
+        campuses,
       ] = await Promise.all([
         packagesRepo.listActivePackagesForCourse(app.db, course.id),
         organizationRepo.requireOrganization(app.db),
         teachingRepo.findInstitution(app.db, course.providerInstitutionId),
-        teachingRepo.findTeacher(app.db, course.defaultTeacherId),
+        teachingRepo.findTeachers(
+          app.db,
+          course.defaultTeacherIds?.length
+            ? course.defaultTeacherIds
+            : course.defaultTeacherId
+              ? [course.defaultTeacherId]
+              : [],
+        ),
         teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),
+        teachingRepo.findClassroom(app.db, course.classroomId),
+        organizationRepo.listCampuses(app.db),
       ]);
+      const campus = classroom
+        ? (campuses.find((item) => item.id === classroom.campusId) ?? null)
+        : null;
       const businessModel = readBusinessModel(organization.settings);
       return {
         course,
         coursePackages: businessModel.packagePriceDisplayEnabled ? coursePackages : [],
         providerInstitution,
-        defaultTeacher,
+        defaultTeacher: defaultTeachers[0] ?? null,
+        defaultTeachers,
+        classroom,
+        campus,
         paymentReceiverInstitution,
         businessModel,
       };

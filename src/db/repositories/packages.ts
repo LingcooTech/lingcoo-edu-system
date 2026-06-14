@@ -10,6 +10,14 @@ function notFound(message: string): Error {
 export type CoursePackage = typeof schema.coursePackages.$inferSelect;
 export type NewCoursePackage = typeof schema.coursePackages.$inferInsert;
 
+export function effectivePackagePrice(pkg: CoursePackage) {
+  return pkg.discountPriceAmount ?? pkg.priceAmount;
+}
+
+export function effectivePackageLessonCount(pkg: CoursePackage) {
+  return pkg.lessonCount + pkg.giftedLessonCount;
+}
+
 export async function listPackages(db: Database) {
   return db.select().from(schema.coursePackages).orderBy(desc(schema.coursePackages.createdAt));
 }

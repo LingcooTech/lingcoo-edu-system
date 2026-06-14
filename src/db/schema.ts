@@ -270,6 +270,8 @@ export const courses = pgTable(
     defaultTeacherId: uuid('default_teacher_id').references(() => teachers.id, {
       onDelete: 'set null',
     }),
+    defaultTeacherIds: jsonb('default_teacher_ids').$type<string[]>().notNull().default([]),
+    classroomId: uuid('classroom_id').references(() => classrooms.id, { onDelete: 'set null' }),
     teachingLocationLabel: varchar('teaching_location_label', { length: 200 }),
     paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
       .notNull()
@@ -1043,7 +1045,9 @@ export const coursePackages = pgTable(
     name: varchar('name', { length: 160 }).notNull(),
     description: text('description').notNull().default(''),
     lessonCount: integer('lesson_count').notNull(),
+    giftedLessonCount: integer('gifted_lesson_count').notNull().default(0),
     priceAmount: integer('price_amount').notNull(),
+    discountPriceAmount: integer('discount_price_amount'),
     status: coursePackageStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -5,10 +5,12 @@ import * as crmRepo from '../../db/repositories/crm.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as teachingRepo from '../../db/repositories/teaching.js';
 import { requireCourse } from '../../db/repositories/catalog.js';
 import * as schema from '../../db/schema.js';
 import { canUseOnlinePackageSales, readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
+import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { hashPassword } from '../../lib/password.js';
 import type { AppModule } from '../types.js';
 import { getPaymentProvider } from './providers/index.js';
@@ -99,6 +101,20 @@ export const paymentModule: AppModule = {
       if (!canUseOnlinePackageSales(businessModel, course.onlineSalesEnabled)) {
         throw httpError(403, '当前机构不支持线上购买课时包，请预约试听或到店确认');
       }
+      const [paymentReceiverInstitution, providerInstitution] = await Promise.all([
+        teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),
+        teachingRepo.findInstitution(app.db, course.providerInstitutionId),
+      ]);
+      const paymentReceiverName = resolvePaymentReceiverName({
+        paymentReceiverType: course.paymentReceiverType,
+        receiverInstitutionName: paymentReceiverInstitution?.name,
+        providerInstitutionName: providerInstitution?.name,
+        legacyDisplayName: course.paymentReceiverName,
+        organizationBrandName: organization.brandName,
+        organizationName: organization.name,
+      });
+      const amount = packagesRepo.effectivePackagePrice(pkg);
+      const lessonCount = packagesRepo.effectivePackageLessonCount(pkg);
       const phone = normalizePhone(body.guardianPhone);
       const defaultPassword = defaultPasswordForPhone(phone);
       const attribution = await crmRepo.resolveAttribution(app.db, {
@@ -203,13 +219,12 @@ export const paymentModule: AppModule = {
           packageId: pkg.id,
           studentId: student.id,
           courseId,
-          amount: pkg.priceAmount,
-          lessonCount: pkg.lessonCount,
+          amount,
+          lessonCount,
           currency: 'CNY',
           paymentReceiverType: course.paymentReceiverType,
           paymentReceiverInstitutionId: course.paymentReceiverInstitutionId,
-          paymentReceiverName:
-            course.paymentReceiverName || organization.brandName || organization.name,
+          paymentReceiverName,
           source: body.source ?? lead?.source ?? 'unknown',
           channelId: attribution.channelId ?? lead?.channelId ?? null,
           campaignId: attribution.campaignId ?? lead?.campaignId ?? null,

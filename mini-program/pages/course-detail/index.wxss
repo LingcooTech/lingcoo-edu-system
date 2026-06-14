@@ -98,6 +98,17 @@
   font-weight: 800;
 }
 
+.package-price-wrap {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.original-price {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  text-decoration: line-through;
+}
+
 .package-desc {
   margin-top: 14rpx;
 }

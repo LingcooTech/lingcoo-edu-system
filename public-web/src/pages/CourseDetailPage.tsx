@@ -7,6 +7,8 @@ import {
   type BusinessModelSettings,
   type Course,
   type CoursePackage,
+  type PublicCampus,
+  type PublicClassroom,
   type PublicInstitution,
   type PublicTeacher,
 } from '@/api/client';
@@ -22,10 +24,24 @@ function priceHeadline(
   onlineAllowed: boolean,
 ): { big: string; sub: string } {
   if (onlineAllowed && packages.length > 0) {
-    const min = Math.min(...packages.map((pkg) => pkg.priceAmount));
+    const min = Math.min(...packages.map((pkg) => packagePriceAmount(pkg)));
     return { big: `${money(min)} 起`, sub: `共 ${packages.length} 个课时包` };
   }
   return { big: '可预约试听', sub: '免注册 · 老师电话确认时间' };
+}
+
+function packagePriceAmount(pkg: CoursePackage) {
+  return pkg.discountPriceAmount ?? pkg.priceAmount;
+}
+
+function packageLessonCount(pkg: CoursePackage) {
+  return pkg.lessonCount + (pkg.giftedLessonCount ?? 0);
+}
+
+function packageLessonLabel(pkg: CoursePackage) {
+  return pkg.giftedLessonCount
+    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
+    : `${pkg.lessonCount} 课时`;
 }
 
 export function CourseDetailPage() {
@@ -35,6 +51,9 @@ export function CourseDetailPage() {
   const [businessModel, setBusinessModel] = useState<BusinessModelSettings | null>(null);
   const [providerInstitution, setProviderInstitution] = useState<PublicInstitution | null>(null);
   const [defaultTeacher, setDefaultTeacher] = useState<PublicTeacher | null>(null);
+  const [defaultTeachers, setDefaultTeachers] = useState<PublicTeacher[]>([]);
+  const [classroom, setClassroom] = useState<PublicClassroom | null>(null);
+  const [campus, setCampus] = useState<PublicCampus | null>(null);
   const [paymentReceiverInstitution, setPaymentReceiverInstitution] =
     useState<PublicInstitution | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound'>('loading');
@@ -56,6 +75,15 @@ export function CourseDetailPage() {
         setBusinessModel(payload.businessModel);
         setProviderInstitution(payload.providerInstitution ?? null);
         setDefaultTeacher(payload.defaultTeacher ?? null);
+        setDefaultTeachers(
+          payload.defaultTeachers?.length
+            ? payload.defaultTeachers
+            : payload.defaultTeacher
+              ? [payload.defaultTeacher]
+              : [],
+        );
+        setClassroom(payload.classroom ?? null);
+        setCampus(payload.campus ?? null);
         setPaymentReceiverInstitution(payload.paymentReceiverInstitution ?? null);
         setStatus('ready');
       })
@@ -85,9 +113,16 @@ export function CourseDetailPage() {
 
   const onlinePackageSalesAllowed =
     Boolean(businessModel?.onlinePackageSalesEnabled) && course.onlineSalesEnabled !== false;
+  const teacherLabel =
+    defaultTeachers.length > 0
+      ? defaultTeachers.map((teacher) => teacher.name).join(' / ')
+      : defaultTeacher?.name || '场次确认';
+  const locationLabel = classroom
+    ? [classroom.name, campus?.name].filter(Boolean).join(' · ')
+    : course.teachingLocationLabel || '到店确认';
   const paymentReceiverLabel =
-    course.paymentReceiverName ||
     paymentReceiverInstitution?.name ||
+    course.paymentReceiverName ||
     (course.paymentReceiverType === 'provider'
       ? providerInstitution?.name
       : course.paymentReceiverType === 'platform'
@@ -170,11 +205,11 @@ export function CourseDetailPage() {
               </div>
               <div className="text-ink-soft flex items-center gap-2">
                 <UserRound className="text-brand h-4 w-4 shrink-0" />
-                <span>授课老师：{defaultTeacher?.name ?? '场次确认'}</span>
+                <span>授课老师：{teacherLabel}</span>
               </div>
               <div className="text-ink-soft flex items-center gap-2">
                 <MapPin className="text-brand h-4 w-4 shrink-0" />
-                <span>授课地点：{course.teachingLocationLabel || '到店确认'}</span>
+                <span>授课地点：{locationLabel}</span>
               </div>
               {paymentReceiverLabel && (
                 <div className="text-ink-soft flex items-center gap-2">
@@ -230,7 +265,7 @@ export function CourseDetailPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="text-brand h-4 w-4 shrink-0" />
-                  {course.teachingLocationLabel || '到店确认'}
+                  {locationLabel}
                 </div>
               </div>
             </div>
@@ -249,10 +284,18 @@ export function CourseDetailPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-ink text-sm font-semibold">{pkg.name}</div>
-                          <div className="text-muted mt-1 text-xs">{pkg.lessonCount} 课时</div>
+                          <div className="text-muted mt-1 text-xs">{packageLessonLabel(pkg)}</div>
                         </div>
-                        <div className="text-ink shrink-0 text-base font-semibold">
-                          {money(pkg.priceAmount)}
+                        <div className="shrink-0 text-right">
+                          <div className="text-ink text-base font-semibold">
+                            {money(packagePriceAmount(pkg))}
+                          </div>
+                          {pkg.discountPriceAmount !== null &&
+                          pkg.discountPriceAmount !== undefined ? (
+                            <div className="text-muted mt-1 text-xs line-through">
+                              {money(pkg.priceAmount)}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       {pkg.description ? (
@@ -267,10 +310,10 @@ export function CourseDetailPage() {
                               type: 'package',
                               packageId: pkg.id,
                               title: pkg.name,
-                              subtitle: `${pkg.lessonCount} 课时 · ${course.name}`,
+                              subtitle: `${packageLessonLabel(pkg)} · ${course.name}`,
                               description: pkg.description,
-                              amount: pkg.priceAmount,
-                              lessonCount: pkg.lessonCount,
+                              amount: packagePriceAmount(pkg),
+                              lessonCount: packageLessonCount(pkg),
                             })
                           }
                         >

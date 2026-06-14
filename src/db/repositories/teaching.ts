@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -17,6 +17,18 @@ export async function findTeacher(db: Database, teacherId: string | null) {
     .where(eq(schema.teachers.id, teacherId))
     .limit(1);
   return teacher ?? null;
+}
+
+export async function findTeachers(db: Database, teacherIds: string[]) {
+  const ids = Array.from(new Set(teacherIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+
+  const teachers = await db.select().from(schema.teachers).where(inArray(schema.teachers.id, ids));
+  const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+  return ids.flatMap((id) => {
+    const teacher = teacherById.get(id);
+    return teacher ? [teacher] : [];
+  });
 }
 
 export async function createTeacher(db: Database, values: typeof schema.teachers.$inferInsert) {
@@ -108,6 +120,18 @@ export async function deleteInstitution(db: Database, institutionId: string) {
 
 export async function listClassrooms(db: Database) {
   return db.select().from(schema.classrooms).orderBy(desc(schema.classrooms.createdAt));
+}
+
+export async function findClassroom(db: Database, classroomId: string | null) {
+  if (!classroomId) {
+    return null;
+  }
+  const [classroom] = await db
+    .select()
+    .from(schema.classrooms)
+    .where(eq(schema.classrooms.id, classroomId))
+    .limit(1);
+  return classroom ?? null;
 }
 
 export async function createClassroom(db: Database, values: typeof schema.classrooms.$inferInsert) {
