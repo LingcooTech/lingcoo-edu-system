@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { fetchOrganization, type AuthAccount } from '@/api/client';
 import type { OrganizationSettings } from '@/api/types';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { ADMIN_ORGANIZATION_UPDATED_EVENT, applyAdminTheme } from '@/lib/admin-theme';
 import { updateDocumentFavicon } from '@/lib/favicon';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
@@ -29,7 +30,18 @@ export function Shell({ account }: { account: AuthAccount }) {
   }, []);
 
   useEffect(() => {
+    const handleOrganizationUpdated = (event: Event) => {
+      const nextOrganization = (event as CustomEvent<OrganizationSettings>).detail;
+      if (nextOrganization) setOrganization(nextOrganization);
+    };
+    window.addEventListener(ADMIN_ORGANIZATION_UPDATED_EVENT, handleOrganizationUpdated);
+    return () =>
+      window.removeEventListener(ADMIN_ORGANIZATION_UPDATED_EVENT, handleOrganizationUpdated);
+  }, []);
+
+  useEffect(() => {
     if (organization) {
+      applyAdminTheme(organization);
       updateDocumentFavicon(organization.branding.faviconUrl);
       document.title = `${organization.brandName || organization.name}管理后台`;
     }

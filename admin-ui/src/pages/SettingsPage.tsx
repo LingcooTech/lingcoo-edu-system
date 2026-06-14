@@ -34,6 +34,7 @@ import { PageFrame } from '@/components/layout/PageFrame';
 import { AdminTabs } from '@/components/shared/AdminTabs';
 import { Field } from '@/components/shared/FormField';
 import { QiniuImageField, QiniuMediaLibrary } from '@/components/shared/QiniuImageField';
+import { notifyAdminOrganizationUpdated } from '@/lib/admin-theme';
 import { updateDocumentFavicon } from '@/lib/favicon';
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -466,6 +467,7 @@ export function SettingsPage() {
         bodyFont: updated.branding.bodyFont ?? '',
         radius: updated.branding.radius ?? '',
       }));
+      notifyAdminOrganizationUpdated(updated);
       updateDocumentFavicon(updated.branding.faviconUrl);
       setMessage('品牌 VI 已保存');
     } catch (err) {
@@ -882,7 +884,7 @@ export function SettingsPage() {
 
                   <SettingsSection
                     title="颜色、字体与圆角"
-                    description="这些值会作为前台品牌视觉 token，保存后影响前台页面展示。"
+                    description="这些值会作为品牌视觉 token，保存后同步影响后台界面和前台页面。"
                   >
                     <div className="grid gap-3 sm:grid-cols-2">
                       <ColorInput
