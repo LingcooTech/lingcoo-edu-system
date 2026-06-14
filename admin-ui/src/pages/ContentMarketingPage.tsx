@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Edit3, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 
 import {
   createContent,
@@ -512,28 +512,33 @@ export function ContentMarketingPage() {
                 searchable={false}
               />
             )}
-            <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-3 text-sm">
-              <span>
+            <div className="resource-card table-footer">
+              <span className="text-foreground font-medium whitespace-nowrap">
                 共 {total} 篇，第 {page} / {totalPages} 页
               </span>
-              <div className="flex gap-2">
+              <div className="table-pagination">
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="pagination-button"
+                  aria-label="上一页"
                   disabled={page <= 1}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
-                  上一页
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="pagination-button"
+                  aria-label="下一页"
                   disabled={page >= totalPages}
                   onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                 >
-                  下一页
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
+              <span className="text-muted-foreground justify-self-start text-xs sm:justify-self-end">
+                每页 {PAGE_SIZE}
+              </span>
             </div>
           </div>
         )}

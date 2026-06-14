@@ -20,13 +20,19 @@ export function ResourceToolbar<T extends string>({
   action?: ResourceToolbarAction | null;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <AdminTabs tabs={tabs} activeKey={activeKey} onChange={onTabChange} className="sm:w-auto" />
+    <div className="resource-toolbar">
+      <AdminTabs
+        tabs={tabs}
+        activeKey={activeKey}
+        onChange={onTabChange}
+        variant="table"
+        className="sm:w-auto"
+      />
 
       {action ? (
         <button
           type="button"
-          className="btn btn-primary h-10 shrink-0"
+          className="btn btn-primary h-10 shrink-0 px-4"
           onClick={action.onClick}
           disabled={action.disabled}
         >

@@ -76,7 +76,10 @@ export function DataTable<T>({
     const start = (currentPage - 1) * pageSize;
     return sortedData.slice(start, start + pageSize);
   }, [currentPage, pageSize, sortedData]);
-  const showControls = searchEnabled || data.length > pageSize || sortedData.length > pageSize;
+  const showTopControls = searchEnabled;
+  const showFooter = searchEnabled || totalPages > 1;
+  const firstItem = sortedData.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastItem = Math.min(currentPage * pageSize, sortedData.length);
 
   function toggleSort(column: Column<T>) {
     if (column.sortable === false) return;
@@ -97,14 +100,17 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="resource-card">
-      {showControls ? (
-        <div className="border-border/80 bg-card flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="resource-card data-table-card">
+      {showTopControls ? (
+        <div className="table-control-bar">
+          <div className="text-muted-foreground text-sm">
+            {query ? `筛选 ${sortedData.length} / ${data.length} 条` : `共 ${data.length} 条`}
+          </div>
           {searchEnabled ? (
-            <label className="focus-within:border-ring focus-within:ring-ring/20 border-border/80 bg-background flex h-9 min-w-0 items-center gap-2 rounded-md border px-3 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-within:ring-2 sm:w-80">
+            <label className="table-search">
               <Search className="text-muted-foreground h-4 w-4" />
               <input
-                className="placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent outline-none"
+                className="placeholder:text-muted-foreground/65 min-w-0 flex-1 bg-transparent outline-none"
                 placeholder="搜索表格内容"
                 value={query}
                 onChange={(event) => {
@@ -116,25 +122,6 @@ export function DataTable<T>({
           ) : (
             <span />
           )}
-          <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs sm:justify-end">
-            <span className="whitespace-nowrap">
-              {query ? `筛选 ${sortedData.length} / ${data.length} 条` : `共 ${data.length} 条`}
-            </span>
-            <select
-              className="border-border/80 bg-background h-9 rounded-md border px-2 text-xs outline-none"
-              value={pageSize}
-              onChange={(event) => {
-                setPageSize(Number(event.target.value));
-                setPage(1);
-              }}
-            >
-              {pageSizeOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option} / 页
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       ) : null}
 
@@ -194,7 +181,7 @@ export function DataTable<T>({
               </tr>
             ) : (
               pagedData.map((row, rowIndex) => (
-                <tr key={rowKey(row, rowIndex)} className="hover:bg-muted/35 transition-colors">
+                <tr key={rowKey(row, rowIndex)} className="data-row">
                   {columns.map((column) => (
                     <td key={column.key} className={column.className}>
                       {column.cell(row)}
@@ -207,7 +194,7 @@ export function DataTable<T>({
         </table>
       </div>
 
-      <div className="divide-border/80 divide-y md:hidden">
+      <div className="mobile-table-list">
         {pagedData.length === 0 ? (
           <div className="text-muted-foreground px-4 py-12 text-center text-sm">{emptyMessage}</div>
         ) : (
@@ -228,54 +215,68 @@ export function DataTable<T>({
         )}
       </div>
 
-      {totalPages > 1 ? (
-        <div className="border-border/80 bg-card flex flex-col gap-3 border-t px-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-muted-foreground whitespace-nowrap">
-            第 {currentPage} / {totalPages} 页
+      {showFooter ? (
+        <div className="table-footer">
+          <span className="text-foreground font-medium whitespace-nowrap">
+            共 {sortedData.length} 条{totalPages > 1 ? `，${firstItem}-${lastItem}` : ''}
           </span>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              className="border-border/80 bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="上一页"
-              disabled={currentPage <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            {pageItems.map((item, index) =>
-              item === 'ellipsis' ? (
-                <span
-                  key={`ellipsis-${index}`}
-                  className="text-muted-foreground flex h-8 w-8 items-center justify-center"
-                >
-                  ...
-                </span>
-              ) : (
+          <div className="table-pagination" aria-label="分页">
+            {totalPages > 1 ? (
+              <>
                 <button
-                  key={item}
                   type="button"
-                  className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-semibold transition-colors ${
-                    item === currentPage
-                      ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                      : 'border-border/80 bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                  }`}
-                  onClick={() => setPage(item)}
+                  className="pagination-button"
+                  aria-label="上一页"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
                 >
-                  {item}
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-              ),
-            )}
-            <button
-              type="button"
-              className="border-border/80 bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="下一页"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+                {pageItems.map((item, index) =>
+                  item === 'ellipsis' ? (
+                    <span key={`ellipsis-${index}`} className="pagination-ellipsis">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`pagination-button ${item === currentPage ? 'pagination-active' : ''}`}
+                      onClick={() => setPage(item)}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  className="pagination-button"
+                  aria-label="下一页"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </>
+            ) : null}
           </div>
+          <label className="text-muted-foreground flex items-center gap-2 text-xs">
+            每页
+            <select
+              className="table-page-size"
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       ) : null}
     </div>

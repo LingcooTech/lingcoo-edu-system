@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils';
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral' | 'info';
 
 const toneStyles: Record<Tone, string> = {
-  ok: 'bg-emerald-50 text-emerald-700',
-  warn: 'bg-amber-50 text-amber-700',
-  danger: 'bg-red-50 text-red-700',
-  info: 'bg-blue-50 text-blue-700',
-  neutral: 'bg-muted text-muted-foreground',
+  ok: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  warn: 'bg-amber-50 text-amber-700 ring-amber-100',
+  danger: 'bg-red-50 text-red-700 ring-red-100',
+  info: 'bg-blue-50 text-blue-700 ring-blue-100',
+  neutral: 'bg-muted text-muted-foreground ring-border/70',
 };
 
 const dotStyles: Record<Tone, string> = {
@@ -73,7 +73,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] leading-none font-medium',
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] leading-none font-semibold ring-1',
         toneStyles[tone],
         className,
       )}

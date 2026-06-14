@@ -108,7 +108,23 @@
   }
 
   .resource-card {
-    @apply bg-card border-border/80 overflow-hidden rounded-lg border shadow-[0_1px_2px_rgba(15,23,42,0.04)];
+    @apply bg-card border-border/70 overflow-hidden rounded-lg border shadow-[0_10px_30px_rgba(15,23,42,0.045),0_1px_2px_rgba(15,23,42,0.04)];
+  }
+
+  .resource-toolbar {
+    @apply mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .data-table-card {
+    @apply shadow-[0_16px_42px_rgba(15,23,42,0.055),0_1px_2px_rgba(15,23,42,0.04)];
+  }
+
+  .table-control-bar {
+    @apply border-border/70 bg-card flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .table-search {
+    @apply focus-within:border-ring focus-within:ring-ring/15 border-border/80 bg-background flex h-10 min-w-0 items-center gap-2 rounded-lg border px-3 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-within:ring-4 sm:w-80;
   }
 
   .table-scroll {
@@ -116,19 +132,81 @@
   }
 
   .data-table {
-    @apply w-full min-w-[820px] border-collapse text-sm;
+    @apply w-full min-w-[860px] border-separate border-spacing-0 text-sm;
   }
 
   .data-table th {
-    @apply text-muted-foreground bg-muted/45 border-border/80 border-b px-4 py-3 text-left text-xs font-semibold uppercase;
+    @apply text-muted-foreground bg-card border-border/70 border-b px-5 py-3.5 text-left text-xs font-semibold;
   }
 
   .data-table td {
-    @apply border-border/70 border-b px-4 py-3.5 align-middle;
+    @apply border-border/60 bg-card border-b px-5 py-4 align-middle transition-colors;
   }
 
   .data-table tr:last-child td {
     @apply border-b-0;
+  }
+
+  .data-table tbody tr {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .data-table tbody tr:hover {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .data-table tbody tr:hover td {
+    @apply bg-card;
+  }
+
+  .data-table tbody tr:hover td:first-child {
+    @apply rounded-l-lg;
+  }
+
+  .data-table tbody tr:hover td:last-child {
+    @apply rounded-r-lg;
+  }
+
+  .data-table td .btn {
+    @apply h-8 rounded-lg px-2.5 py-1.5 text-xs;
+  }
+
+  .data-table td .btn-ghost,
+  .data-table td .btn-secondary {
+    @apply border-border/80 bg-card text-muted-foreground hover:bg-muted/55 hover:text-foreground border shadow-[0_1px_2px_rgba(15,23,42,0.03)];
+  }
+
+  .mobile-table-list {
+    @apply divide-border/70 divide-y md:hidden;
+  }
+
+  .table-footer {
+    @apply border-border/70 bg-card grid gap-3 border-t px-4 py-4 text-xs sm:grid-cols-[1fr_auto_1fr] sm:items-center;
+  }
+
+  .table-pagination {
+    @apply flex flex-wrap items-center gap-1.5 sm:justify-center;
+  }
+
+  .pagination-button {
+    @apply border-border/80 bg-card text-muted-foreground hover:bg-muted/70 hover:text-foreground inline-flex h-8 min-w-8 items-center justify-center rounded-lg border px-2 text-xs font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .pagination-button.pagination-active {
+    @apply border-blue-100 bg-blue-50 text-blue-700 shadow-none;
+  }
+
+  .pagination-ellipsis {
+    @apply text-muted-foreground flex h-8 w-8 items-center justify-center;
+  }
+
+  .table-page-size {
+    @apply border-border/80 bg-card text-foreground h-8 rounded-lg border px-2 text-xs outline-none;
   }
 
   .cell-stack {
@@ -179,28 +257,28 @@
     @apply text-muted-foreground mt-1 text-xs;
   }
 
-  .admin-tabs-segmented {
-    @apply bg-card border-border/80 grid w-full gap-1 rounded-lg border p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)];
+  .admin-tabs-page {
+    @apply border-border/70 flex min-w-0 items-center gap-7 overflow-x-auto border-b;
   }
 
-  .admin-tab-segment {
-    @apply text-muted-foreground hover:bg-muted/70 hover:text-foreground h-10 min-w-0 rounded-md px-3 text-center text-sm font-semibold transition-colors;
+  .admin-tab-page {
+    @apply text-muted-foreground hover:text-foreground relative -mb-px inline-flex h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-0 text-sm font-semibold transition-colors;
   }
 
-  .admin-tab-segment.admin-tab-active {
-    @apply bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08)];
-  }
-
-  .admin-tabs-underline {
-    @apply border-border/80 flex min-w-0 items-center gap-6 border-b;
-  }
-
-  .admin-tab-underline {
-    @apply text-muted-foreground hover:text-foreground relative -mb-px inline-flex h-11 items-center gap-2 border-b-2 border-transparent px-0 text-sm font-semibold transition-colors;
-  }
-
-  .admin-tab-underline.admin-tab-active {
+  .admin-tab-page.admin-tab-active {
     @apply border-foreground text-foreground;
+  }
+
+  .admin-tabs-table {
+    @apply border-border/80 bg-card inline-flex max-w-full overflow-hidden rounded-lg border shadow-[0_1px_2px_rgba(15,23,42,0.035)];
+  }
+
+  .admin-tab-table {
+    @apply text-muted-foreground hover:bg-muted/55 hover:text-foreground border-border/70 bg-card inline-flex h-10 min-w-0 items-center justify-center gap-2 border-r px-4 text-sm font-semibold transition-colors last:border-r-0;
+  }
+
+  .admin-tab-table.admin-tab-active {
+    @apply bg-blue-50/80 text-blue-700;
   }
 
   .admin-tab-icon {
