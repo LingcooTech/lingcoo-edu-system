@@ -172,7 +172,6 @@ export function CourseDetailPage() {
                 <div className="flex items-end justify-between gap-3">
                   <div>
                     <div className="mobile-detail-cta-price">预约试听</div>
-                    <div className="text-muted mt-1 text-xs">免注册 · 老师电话确认时间</div>
                   </div>
                   <div className="text-muted text-right text-xs">
                     {course.durationMinutes} 分钟/节
@@ -183,7 +182,7 @@ export function CourseDetailPage() {
                   className="pwbtn pwbtn-primary mt-4 w-full"
                   onClick={() => setTrialOpen(true)}
                 >
-                  预约试听
+                  立即预约
                 </button>
               </div>
             </div>
@@ -200,14 +199,11 @@ export function CourseDetailPage() {
               </div>
             ) : null}
 
-            <div className="text-ink-soft mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              <span className="inline-flex items-center gap-1.5">
-                <Clock className="text-brand h-4 w-4" />
-                单节 {course.durationMinutes} 分钟
-              </span>
-            </div>
-
             <section className="pwcard mt-6 grid gap-3 p-4 text-sm sm:grid-cols-2 sm:p-5">
+              <div className="text-ink-soft flex items-center gap-2">
+                <Clock className="text-brand h-4 w-4 shrink-0" />
+                <span>单节 {course.durationMinutes} 分钟</span>
+              </div>
               <div className="text-ink-soft flex items-center gap-2">
                 <Building2 className="text-brand h-4 w-4 shrink-0" />
                 <span>课程提供方：{providerInstitution?.name ?? '平台自有 / 待确认'}</span>
@@ -216,16 +212,16 @@ export function CourseDetailPage() {
                 <UserRound className="text-brand h-4 w-4 shrink-0" />
                 <span>授课老师：{teacherLabel}</span>
               </div>
-              <div className="text-ink-soft flex items-center gap-2">
-                <MapPin className="text-brand h-4 w-4 shrink-0" />
-                <span>授课校区：{campusLabel}</span>
-              </div>
               {paymentReceiverLabel && (
                 <div className="text-ink-soft flex items-center gap-2">
                   <Building2 className="text-brand h-4 w-4 shrink-0" />
                   <span>收款方：{paymentReceiverLabel}</span>
                 </div>
               )}
+              <div className="text-ink-soft flex items-start gap-2 sm:col-span-2">
+                <MapPin className="text-brand mt-0.5 h-4 w-4 shrink-0" />
+                <span>授课校区：{campusLabel}</span>
+              </div>
             </section>
 
             {contentIsBlockDoc && contentBlocks.length > 0 && (
@@ -239,40 +235,30 @@ export function CourseDetailPage() {
               </div>
             ) : null}
 
-            {trialNotice && (
-              <section className="mt-10">
-                <div className="pwcard p-5">
-                  <h2 className="text-ink text-base font-semibold">试听预约说明</h2>
-                  <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
-                    {trialNotice}
-                  </p>
-                </div>
-              </section>
-            )}
           </article>
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             {packages.length > 0 && (
-              <section id="packages" className="pwcard scroll-mt-24 p-4 sm:p-5">
-                <h2 className="text-ink text-base font-semibold">
+              <section id="packages" className="pwcard scroll-mt-24 p-5 sm:p-6">
+                <h2 className="text-ink text-xl font-bold">
                   {onlinePackageSalesAllowed ? '课时包' : '正式课程参考方案'}
                 </h2>
-                <div className="mt-4 space-y-4">
+                <div className="mt-5 space-y-4">
                   {packages.map((pkg) => (
                     <div
                       key={pkg.id}
-                      className="border-line rounded-2xl border p-4 first:border-t first:pt-4 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:px-0 lg:first:border-t-0 lg:first:pt-0"
+                      className="border-line/80 bg-paper/40 rounded-2xl border p-4"
                     >
                       <div className="min-w-0">
-                        <div className="text-ink text-sm font-semibold">{pkg.name}</div>
+                        <div className="text-ink text-base leading-6 font-semibold">{pkg.name}</div>
                       </div>
                       {pkg.description ? (
-                        <p className="text-ink-soft mt-2 text-sm leading-6">{pkg.description}</p>
+                        <p className="text-ink-soft mt-3 text-sm leading-6">{pkg.description}</p>
                       ) : null}
                       {onlinePackageSalesAllowed ? (
                         <button
                           type="button"
-                          className="pwbtn pwbtn-primary mt-4 w-full"
+                          className="pwbtn pwbtn-primary mt-5 w-full"
                           onClick={() =>
                             setCheckoutTarget({
                               type: 'package',
@@ -290,10 +276,10 @@ export function CourseDetailPage() {
                       ) : (
                         <button
                           type="button"
-                          className="pwbtn pwbtn-outline mt-4 w-full"
+                          className="pwbtn pwbtn-outline mt-5 w-full"
                           onClick={() => setTrialOpen(true)}
                         >
-                          预约试听后到店确认
+                          立即预约
                         </button>
                       )}
                     </div>
@@ -302,15 +288,14 @@ export function CourseDetailPage() {
               </section>
             )}
 
-            <div className="pwcard hidden p-5 lg:block">
-              <div className="text-ink text-lg font-semibold">预约试听</div>
-              <div className="text-muted mt-1 text-xs">免注册提交，老师电话确认时间</div>
+            <div className="pwcard p-5 sm:p-6 lg:block">
+              <div className="text-ink text-xl font-bold">预约试听</div>
               <button
                 type="button"
                 className="pwbtn pwbtn-primary mt-5 w-full"
                 onClick={() => setTrialOpen(true)}
               >
-                预约试听
+                立即预约
               </button>
               <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
                 <div className="flex items-center gap-2">
@@ -327,6 +312,15 @@ export function CourseDetailPage() {
                 </div>
               </div>
             </div>
+
+            {trialNotice ? (
+              <section className="pwcard p-5 sm:p-6">
+                <h2 className="text-ink text-xl font-bold">试听预约说明</h2>
+                <p className="text-ink-soft mt-3 text-sm leading-7 whitespace-pre-wrap">
+                  {trialNotice}
+                </p>
+              </section>
+            ) : null}
           </aside>
         </div>
       </div>
