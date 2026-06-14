@@ -1,4 +1,11 @@
-import { ChevronDown, ChevronsUpDown, ChevronUp, Search } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  ChevronUp,
+  Search,
+} from 'lucide-react';
 import { isValidElement, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -54,13 +61,17 @@ export function DataTable<T>({
     const column = columns.find((item) => item.key === sortState.key);
     if (!column) return filteredData;
     return filteredData.slice().sort((left, right) => {
-      const result = compareSortValue(columnSortValue(column, left), columnSortValue(column, right));
+      const result = compareSortValue(
+        columnSortValue(column, left),
+        columnSortValue(column, right),
+      );
       return sortState.direction === 'asc' ? result : -result;
     });
   }, [columns, filteredData, sortState]);
 
   const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize));
   const currentPage = Math.min(page, totalPages);
+  const pageItems = paginationItems(currentPage, totalPages);
   const pagedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return sortedData.slice(start, start + pageSize);
@@ -88,12 +99,12 @@ export function DataTable<T>({
   return (
     <div className="resource-card">
       {showControls ? (
-        <div className="flex flex-col gap-3 border-b p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-border/80 bg-card flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           {searchEnabled ? (
-            <label className="bg-background focus-within:ring-ring/25 flex h-9 min-w-0 items-center gap-2 rounded-lg border px-3 text-sm focus-within:ring-2 sm:w-72">
+            <label className="focus-within:border-ring focus-within:ring-ring/20 border-border/80 bg-background flex h-9 min-w-0 items-center gap-2 rounded-md border px-3 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-within:ring-2 sm:w-80">
               <Search className="text-muted-foreground h-4 w-4" />
               <input
-                className="min-w-0 flex-1 bg-transparent outline-none"
+                className="placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent outline-none"
                 placeholder="搜索表格内容"
                 value={query}
                 onChange={(event) => {
@@ -106,11 +117,11 @@ export function DataTable<T>({
             <span />
           )}
           <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs sm:justify-end">
-            <span>
-              共 {sortedData.length} 条{query ? ` / 全部 ${data.length} 条` : ''}
+            <span className="whitespace-nowrap">
+              {query ? `筛选 ${sortedData.length} / ${data.length} 条` : `共 ${data.length} 条`}
             </span>
             <select
-              className="bg-background h-9 rounded-lg border px-2 text-xs outline-none"
+              className="border-border/80 bg-background h-9 rounded-md border px-2 text-xs outline-none"
               value={pageSize}
               onChange={(event) => {
                 setPageSize(Number(event.target.value));
@@ -149,7 +160,7 @@ export function DataTable<T>({
                     {sortable ? (
                       <button
                         type="button"
-                        className="hover:text-foreground inline-flex items-center gap-1.5"
+                        className="hover:text-foreground inline-flex h-6 items-center gap-1.5 rounded-sm"
                         onClick={() => toggleSort(column)}
                       >
                         {column.header}
@@ -183,7 +194,7 @@ export function DataTable<T>({
               </tr>
             ) : (
               pagedData.map((row, rowIndex) => (
-                <tr key={rowKey(row, rowIndex)} className="hover:bg-muted/30">
+                <tr key={rowKey(row, rowIndex)} className="hover:bg-muted/35 transition-colors">
                   {columns.map((column) => (
                     <td key={column.key} className={column.className}>
                       {column.cell(row)}
@@ -196,19 +207,17 @@ export function DataTable<T>({
         </table>
       </div>
 
-      <div className="divide-y md:hidden">
+      <div className="divide-border/80 divide-y md:hidden">
         {pagedData.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-12 text-center text-sm">
-            {emptyMessage}
-          </div>
+          <div className="text-muted-foreground px-4 py-12 text-center text-sm">{emptyMessage}</div>
         ) : (
           pagedData.map((row, rowIndex) => (
-            <article key={rowKey(row, rowIndex)} className="space-y-3 p-4">
+            <article key={rowKey(row, rowIndex)} className="bg-card space-y-3 p-4">
               {columns
                 .filter((column) => !column.mobileHidden)
                 .map((column) => (
                   <div key={column.key} className="grid gap-1">
-                    <div className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                    <div className="text-muted-foreground text-[11px] font-semibold uppercase">
                       {column.header}
                     </div>
                     <div className="min-w-0 text-sm">{column.cell(row)}</div>
@@ -220,32 +229,80 @@ export function DataTable<T>({
       </div>
 
       {totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs">
-          <span className="text-muted-foreground">
+        <div className="border-border/80 bg-card flex flex-col gap-3 border-t px-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-muted-foreground whitespace-nowrap">
             第 {currentPage} / {totalPages} 页
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              className="btn btn-secondary px-2.5 py-1.5 text-xs"
+              className="border-border/80 bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="上一页"
               disabled={currentPage <= 1}
               onClick={() => setPage((value) => Math.max(1, value - 1))}
             >
-              上一页
+              <ChevronLeft className="h-4 w-4" />
             </button>
+            {pageItems.map((item, index) =>
+              item === 'ellipsis' ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="text-muted-foreground flex h-8 w-8 items-center justify-center"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-semibold transition-colors ${
+                    item === currentPage
+                      ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                      : 'border-border/80 bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                  }`}
+                  onClick={() => setPage(item)}
+                >
+                  {item}
+                </button>
+              ),
+            )}
             <button
               type="button"
-              className="btn btn-secondary px-2.5 py-1.5 text-xs"
+              className="border-border/80 bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="下一页"
               disabled={currentPage >= totalPages}
               onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
             >
-              下一页
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+function paginationItems(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const items: Array<number | 'ellipsis'> = [];
+  let previous = 0;
+
+  Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((left, right) => left - right)
+    .forEach((page) => {
+      if (previous && page - previous > 1) {
+        items.push('ellipsis');
+      }
+      items.push(page);
+      previous = page;
+    });
+
+  return items;
 }
 
 function columnFilterText<T>(column: Column<T>, row: T) {

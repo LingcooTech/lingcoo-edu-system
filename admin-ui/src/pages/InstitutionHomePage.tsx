@@ -15,6 +15,7 @@ import type {
 import { BlockEditor } from '@/components/editor/BlockEditor';
 import { HOME_ALLOWED } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { AdminTabs } from '@/components/shared/AdminTabs';
 import { Field } from '@/components/shared/FormField';
 import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
@@ -176,9 +177,7 @@ function cleanGrowthLoop(item: PublicProfileGrowthLoop): PublicProfileGrowthLoop
   };
 }
 
-function withoutPageCopyEyebrows(
-  pages: PublicSiteSettings['pages'],
-): PublicSiteSettings['pages'] {
+function withoutPageCopyEyebrows(pages: PublicSiteSettings['pages']): PublicSiteSettings['pages'] {
   return {
     courses: { ...pages.courses, eyebrow: '' },
     trials: { ...pages.trials, eyebrow: '' },
@@ -287,7 +286,7 @@ export function InstitutionHomePage() {
       <div className="bg-muted/35 flex h-full min-h-0 flex-col">
         <div className="bg-background/95 shrink-0 border-b px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
           <div className="max-w-5xl">
-            <SettingsTabs
+            <AdminTabs
               tabs={publicPageTabs}
               activeKey={activeTab}
               onChange={(key) => setActiveTab(key as PublicPageTabKey)}
@@ -535,7 +534,7 @@ function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAct
         </Field>
         <div className="space-y-4">
           {form.highlights.map((item, index) => (
-            <div key={index} className="rounded-lg border p-3">
+            <div key={index} className="border-border/80 rounded-md border p-3">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="text-sm font-medium">优势 {index + 1}</div>
                 <button
@@ -674,7 +673,7 @@ function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAct
           {form.growthLoop.steps.map((item, index) => (
             <div
               key={index}
-              className="grid gap-3 rounded-lg border p-3 md:grid-cols-[10rem_1fr_auto]"
+              className="border-border/80 grid gap-3 rounded-md border p-3 md:grid-cols-[10rem_1fr_auto]"
             >
               <Field label="图标">
                 <select
@@ -851,7 +850,6 @@ function AboutContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAc
           allowed={HOME_ALLOWED}
         />
       </EditorCard>
-
     </div>
   );
 }
@@ -964,7 +962,10 @@ function PageCopyEditor({
       {PAGE_COPY_META.map((item) => {
         const copy = value[item.key];
         return (
-          <section key={item.key} className="bg-background/70 rounded-xl border p-4">
+          <section
+            key={item.key}
+            className="bg-background/70 border-border/80 rounded-lg border p-4"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">{item.label}</div>
@@ -975,7 +976,7 @@ function PageCopyEditor({
               </span>
             </div>
             <div className="mt-4 grid gap-4">
-              <div className="bg-card rounded-lg border p-3">
+              <div className="bg-card border-border/80 rounded-md border p-3">
                 <div className="text-muted-foreground mb-3 text-xs font-semibold">页面展示</div>
                 <div className="grid gap-3">
                   <Field label="页面标题">
@@ -994,7 +995,7 @@ function PageCopyEditor({
                   </Field>
                 </div>
               </div>
-              <div className="bg-card rounded-lg border p-3">
+              <div className="bg-card border-border/80 rounded-md border p-3">
                 <div className="text-muted-foreground mb-3 text-xs font-semibold">SEO</div>
                 <Field label="SEO 标题" hint="设置后用于浏览器标签页标题；留空使用页面标题">
                   <input
@@ -1026,7 +1027,7 @@ function AccordionSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="bg-card overflow-hidden rounded-xl border shadow-sm">
+    <section className="bg-card border-border/80 overflow-hidden rounded-lg border shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <button
         type="button"
         className="hover:bg-muted/35 flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors"
@@ -1052,35 +1053,6 @@ function AccordionSection({
   );
 }
 
-function SettingsTabs({
-  tabs,
-  activeKey,
-  onChange,
-}: {
-  tabs: readonly { key: string; label: string }[];
-  activeKey: string;
-  onChange: (key: string) => void;
-}) {
-  return (
-    <div className="bg-card grid w-full gap-1 rounded-lg border p-1 shadow-sm md:grid-cols-3">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          className={`h-10 rounded-md px-4 text-center text-sm font-semibold transition-colors ${
-            activeKey === tab.key
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-          }`}
-          onClick={() => onChange(tab.key)}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function EditorCard({
   title,
   description,
@@ -1091,7 +1063,7 @@ function EditorCard({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-card overflow-hidden rounded-xl border shadow-sm">
+    <section className="bg-card border-border/80 overflow-hidden rounded-lg border shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="border-b px-5 py-4">
         <h2 className="text-base font-semibold">{title}</h2>
         {description ? (

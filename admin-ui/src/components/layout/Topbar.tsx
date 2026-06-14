@@ -13,12 +13,7 @@ function detectShortcutLabel(): string {
   return platform.includes('mac') || userAgent.includes('mac') ? '⌘K' : 'Ctrl K';
 }
 
-export function Topbar({
-  onMenuClick,
-}: {
-  account: AuthAccount;
-  onMenuClick?: () => void;
-}) {
+export function Topbar({ onMenuClick }: { account: AuthAccount; onMenuClick?: () => void }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [shortcutLabel] = useState(detectShortcutLabel);
@@ -50,7 +45,8 @@ export function Topbar({
     const matched =
       pages
         .filter(
-          (page) => location.pathname === page.path || location.pathname.startsWith(`${page.path}/`),
+          (page) =>
+            location.pathname === page.path || location.pathname.startsWith(`${page.path}/`),
         )
         .sort(
           (left, right) =>
@@ -102,7 +98,7 @@ export function Topbar({
 
   return (
     <>
-      <header className="border-border/70 bg-card/85 sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4 backdrop-blur-md">
+      <header className="border-border/70 bg-card/90 sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4 backdrop-blur-md">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {onMenuClick ? (
             <button
@@ -125,11 +121,13 @@ export function Topbar({
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="text-muted-foreground border-border/70 bg-background hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-10 items-center gap-2 rounded-lg border px-2.5 text-[12px] shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition-colors md:w-56 lg:w-64"
+            className="text-muted-foreground border-border/80 bg-background hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-10 items-center gap-2 rounded-md border px-2.5 text-[12px] shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition-colors md:w-56 lg:w-64"
             title={`搜索 / 跳转（/ 或 ${shortcutLabel}）`}
           >
             <Search className="h-3.5 w-3.5" />
-            <span className="text-muted-foreground/80 hidden flex-1 text-left md:inline">搜索...</span>
+            <span className="text-muted-foreground/80 hidden flex-1 text-left md:inline">
+              搜索...
+            </span>
             <kbd className="border-border/70 bg-card text-muted-foreground/80 ml-1 hidden h-4 items-center rounded border px-1 font-mono text-[10px] md:inline-flex">
               {shortcutLabel}
             </kbd>
@@ -145,7 +143,7 @@ export function Topbar({
             className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px]"
             onClick={() => setSearchOpen(false)}
           />
-          <div className="bg-card absolute left-1/2 top-20 w-[min(92vw,560px)] -translate-x-1/2 overflow-hidden rounded-xl border shadow-xl">
+          <div className="bg-card absolute top-20 left-1/2 w-[min(92vw,560px)] -translate-x-1/2 overflow-hidden rounded-xl border shadow-xl">
             <div className="flex items-center gap-2 border-b px-3 py-2">
               <Search className="text-muted-foreground h-4 w-4" />
               <input

@@ -79,7 +79,7 @@ export function Shell({ account }: { account: AuthAccount }) {
         </SheetContent>
       </Sheet>
 
-      <div className="bg-background flex h-screen min-h-0 flex-col overflow-hidden">
+      <div className="bg-muted/25 flex h-screen min-h-0 flex-col overflow-hidden">
         <Topbar account={account} onMenuClick={() => setMobileOpen(true)} />
         <main className="min-h-0 flex-1 overflow-hidden">
           <Outlet />

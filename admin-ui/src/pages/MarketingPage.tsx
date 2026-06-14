@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, QrCode, Trash2 } from 'lucide-react';
+import { QrCode, Trash2 } from 'lucide-react';
 
 import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Campaign, CampaignFunnelRow, Channel, ChannelFunnelRow, Course } from '@/api/types';
@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
+import { ResourceToolbar, type ResourceToolbarAction } from '@/components/shared/ResourceToolbar';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
@@ -22,6 +23,11 @@ import { useApiResource } from '@/lib/useApiResource';
 const CHANNELS = () => '/v1/crm/channels';
 const CAMPAIGNS = () => '/v1/crm/campaigns';
 const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
+const marketingTabs = [
+  { key: 'channels', label: '渠道' },
+  { key: 'campaigns', label: '活动' },
+  { key: 'funnel', label: '转化漏斗' },
+] as const;
 
 export function MarketingPage() {
   const toast = useToast();
@@ -222,41 +228,23 @@ export function MarketingPage() {
     }
   }
 
-  return (
-    <PageFrame
-      section="marketing"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={() => openCampaign()}>
-          <Plus className="h-4 w-4" />
-          新建活动
-        </button>
-      }
-    >
-      <div className="mb-4 flex flex-wrap gap-2">
-        {[
-          ['channels', '渠道'],
-          ['campaigns', '活动'],
-          ['funnel', '转化漏斗'],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={tab === key ? 'btn btn-primary' : 'btn btn-secondary'}
-            onClick={() => setTab(key as typeof tab)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+  const toolbarAction: ResourceToolbarAction | null =
+    tab === 'channels'
+      ? { label: '新建渠道', onClick: () => openChannel() }
+      : tab === 'campaigns'
+        ? { label: '新建活动', onClick: () => openCampaign() }
+        : null;
 
+  return (
+    <PageFrame section="marketing">
+      <ResourceToolbar
+        tabs={marketingTabs}
+        activeKey={tab}
+        onTabChange={setTab}
+        action={toolbarAction}
+      />
       {tab === 'channels' && (
         <>
-          <div className="mb-3 flex justify-end">
-            <button type="button" className="btn btn-secondary" onClick={() => openChannel()}>
-              <Plus className="h-4 w-4" />
-              新建渠道
-            </button>
-          </div>
           <DataTable
             columns={[
               { key: 'name', header: '渠道', cell: (row) => row.name },

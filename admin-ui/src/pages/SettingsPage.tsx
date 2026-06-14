@@ -31,6 +31,7 @@ import type {
   SystemSettingOverview,
 } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
+import { AdminTabs } from '@/components/shared/AdminTabs';
 import { Field } from '@/components/shared/FormField';
 import { QiniuImageField, QiniuMediaLibrary } from '@/components/shared/QiniuImageField';
 import { updateDocumentFavicon } from '@/lib/favicon';
@@ -143,10 +144,12 @@ const DEFAULT_SITE: PublicSiteSettings = {
   icpUrl: '',
 };
 
-const inputClass = 'mt-1 w-full rounded-lg border px-3 py-2 text-sm';
+const inputClass =
+  'mt-1 w-full rounded-md border border-border/80 bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/25';
 const buttonClass =
-  'bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60';
-const outlineButtonClass = 'rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-60';
+  'bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-colors hover:bg-primary/90 disabled:opacity-60';
+const outlineButtonClass =
+  'rounded-md border border-border/80 bg-card px-4 py-2 text-sm font-medium shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-muted/70 disabled:opacity-60';
 
 function StatusBadge({ configured }: { configured: boolean }) {
   return (
@@ -778,10 +781,11 @@ export function SettingsPage() {
         <>
           {!isIntegrationPage ? (
             <>
-              <SettingsTabs
+              <AdminTabs
                 tabs={brandTabs}
                 activeKey={brandTab}
                 onChange={(key) => setBrandTab(key as BrandTabKey)}
+                className="max-w-5xl"
               />
 
               {brandTab === 'identity' && (
@@ -999,10 +1003,11 @@ export function SettingsPage() {
             </>
           ) : (
             <>
-              <SettingsTabs
+              <AdminTabs
                 tabs={integrationTabs}
                 activeKey={activeTab}
                 onChange={(key) => setActiveTab(key as IntegrationTabKey)}
+                className="max-w-5xl"
               />
 
               {activeTab === 'payment' && (
@@ -1694,40 +1699,6 @@ function displayValue(value: string, fallback: string) {
 
 function colorValue(value: string, fallback: string) {
   return value.trim() || fallback;
-}
-
-function SettingsTabs({
-  tabs,
-  activeKey,
-  onChange,
-}: {
-  tabs: readonly { key: string; label: string; description?: string }[];
-  activeKey: string;
-  onChange: (key: string) => void;
-}) {
-  return (
-    <div className="bg-card grid w-full max-w-5xl gap-2 rounded-xl border p-2 shadow-sm md:grid-cols-3">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-            activeKey === tab.key
-              ? 'border-primary/30 bg-primary/10 text-foreground shadow-sm'
-              : 'text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground border-transparent'
-          }`}
-          onClick={() => onChange(tab.key)}
-        >
-          <span className="block text-sm font-semibold">{tab.label}</span>
-          {tab.description ? (
-            <span className="text-muted-foreground mt-1 block text-xs leading-5">
-              {tab.description}
-            </span>
-          ) : null}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function NavEditor({

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Edit3, ExternalLink, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Edit3, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 
 import {
   createContent,
@@ -19,12 +19,17 @@ import { DataTable, type Column } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { QiniuImageField } from '@/components/shared/QiniuImageField';
+import { ResourceToolbar } from '@/components/shared/ResourceToolbar';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 const ALL = 'all';
+const contentTabs = [
+  { key: 'list', label: '内容列表' },
+  { key: 'import', label: '导入内容' },
+] as const;
 
 interface ContentForm {
   id: string;
@@ -327,17 +332,9 @@ export function ContentMarketingPage() {
   );
 
   return (
-    <PageFrame
-      section="contentMarketing"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={() => openEditor()}>
-          <Plus className="h-4 w-4" />
-          新建内容
-        </button>
-      }
-    >
+    <PageFrame section="contentMarketing">
       <div className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="metric-grid">
           {[
             { label: '当前页内容', value: String(items.length) },
             { label: '草稿', value: String(draftCount) },
@@ -351,194 +348,194 @@ export function ContentMarketingPage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2 border-b">
-          {[
-            { key: 'list', label: '内容列表' },
-            { key: 'import', label: '导入内容' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              className={`border-b-2 px-3 py-2 text-sm font-medium ${
-                activeTab === tab.key
-                  ? 'border-primary text-primary'
-                  : 'text-muted-foreground border-transparent hover:text-foreground'
-              }`}
-              onClick={() => setActiveTab(tab.key as 'list' | 'import')}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <ResourceToolbar
+          tabs={contentTabs}
+          activeKey={activeTab}
+          onTabChange={setActiveTab}
+          action={{ label: '新建内容', onClick: () => openEditor() }}
+        />
 
         {activeTab === 'import' && (
           <div className="grid gap-4 xl:grid-cols-3">
-          <ImportCard
-            title="导入 WordPress"
-            description="输入文章 URL；站点地址和应用密码留空时读取系统集成配置。"
-            actionLabel={importing === 'wordpress' ? '导入中...' : '导入文章'}
-            disabled={importing !== ''}
-            onImport={() => runImport('wordpress')}
-          >
-            <Field label="文章 URL">
-              <input
-                className="form-input"
-                value={wpForm.postUrl}
-                onChange={(event) => setWpForm({ ...wpForm, postUrl: event.target.value })}
-                placeholder="https://your-site.com/post-slug"
-              />
-            </Field>
-            <Field label="站点地址" hint="可选，默认从文章 URL 推断">
-              <input
-                className="form-input"
-                value={wpForm.siteUrl}
-                onChange={(event) => setWpForm({ ...wpForm, siteUrl: event.target.value })}
-                placeholder="https://your-site.com"
-              />
-            </Field>
-            <FieldRow>
-              <Field label="用户名">
+            <ImportCard
+              title="导入 WordPress"
+              description="输入文章 URL；站点地址和应用密码留空时读取系统集成配置。"
+              actionLabel={importing === 'wordpress' ? '导入中...' : '导入文章'}
+              disabled={importing !== ''}
+              onImport={() => runImport('wordpress')}
+            >
+              <Field label="文章 URL">
                 <input
                   className="form-input"
-                  value={wpForm.username}
-                  onChange={(event) => setWpForm({ ...wpForm, username: event.target.value })}
+                  value={wpForm.postUrl}
+                  onChange={(event) => setWpForm({ ...wpForm, postUrl: event.target.value })}
+                  placeholder="https://your-site.com/post-slug"
                 />
               </Field>
-              <Field label="应用密码">
+              <Field label="站点地址" hint="可选，默认从文章 URL 推断">
+                <input
+                  className="form-input"
+                  value={wpForm.siteUrl}
+                  onChange={(event) => setWpForm({ ...wpForm, siteUrl: event.target.value })}
+                  placeholder="https://your-site.com"
+                />
+              </Field>
+              <FieldRow>
+                <Field label="用户名">
+                  <input
+                    className="form-input"
+                    value={wpForm.username}
+                    onChange={(event) => setWpForm({ ...wpForm, username: event.target.value })}
+                  />
+                </Field>
+                <Field label="应用密码">
+                  <input
+                    className="form-input"
+                    type="password"
+                    value={wpForm.appPassword}
+                    onChange={(event) => setWpForm({ ...wpForm, appPassword: event.target.value })}
+                  />
+                </Field>
+              </FieldRow>
+              <ImportStatusSelect
+                value={wpForm.status}
+                onChange={(status) => setWpForm({ ...wpForm, status })}
+              />
+            </ImportCard>
+
+            <ImportCard
+              title="导入 Notion"
+              description="输入页面 URL；Token 留空时读取系统集成配置。"
+              actionLabel={importing === 'notion' ? '导入中...' : '导入页面'}
+              disabled={importing !== ''}
+              onImport={() => runImport('notion')}
+            >
+              <Field label="Notion Token">
                 <input
                   className="form-input"
                   type="password"
-                  value={wpForm.appPassword}
-                  onChange={(event) => setWpForm({ ...wpForm, appPassword: event.target.value })}
+                  value={notionForm.apiToken}
+                  onChange={(event) =>
+                    setNotionForm({ ...notionForm, apiToken: event.target.value })
+                  }
                 />
               </Field>
-            </FieldRow>
-            <ImportStatusSelect
-              value={wpForm.status}
-              onChange={(status) => setWpForm({ ...wpForm, status })}
-            />
-          </ImportCard>
+              <Field label="页面 URL">
+                <input
+                  className="form-input"
+                  value={notionForm.pageUrl}
+                  onChange={(event) =>
+                    setNotionForm({ ...notionForm, pageUrl: event.target.value })
+                  }
+                  placeholder="https://www.notion.so/..."
+                />
+              </Field>
+              <ImportStatusSelect
+                value={notionForm.status}
+                onChange={(status) => setNotionForm({ ...notionForm, status })}
+              />
+            </ImportCard>
 
-          <ImportCard
-            title="导入 Notion"
-            description="输入页面 URL；Token 留空时读取系统集成配置。"
-            actionLabel={importing === 'notion' ? '导入中...' : '导入页面'}
-            disabled={importing !== ''}
-            onImport={() => runImport('notion')}
-          >
-            <Field label="Notion Token">
-              <input
-                className="form-input"
-                type="password"
-                value={notionForm.apiToken}
-                onChange={(event) => setNotionForm({ ...notionForm, apiToken: event.target.value })}
+            <ImportCard
+              title="导入微信公众号"
+              description="输入公众号文章链接，系统会抓取标题、封面、摘要和正文。"
+              actionLabel={importing === 'wechat' ? '导入中...' : '导入公众号文章'}
+              disabled={importing !== ''}
+              onImport={() => runImport('wechat')}
+            >
+              <Field label="公众号文章 URL">
+                <input
+                  className="form-input"
+                  value={wechatForm.url}
+                  onChange={(event) => setWechatForm({ ...wechatForm, url: event.target.value })}
+                  placeholder="https://mp.weixin.qq.com/s/..."
+                />
+              </Field>
+              <ImportStatusSelect
+                value={wechatForm.status}
+                onChange={(status) => setWechatForm({ ...wechatForm, status })}
               />
-            </Field>
-            <Field label="页面 URL">
-              <input
-                className="form-input"
-                value={notionForm.pageUrl}
-                onChange={(event) => setNotionForm({ ...notionForm, pageUrl: event.target.value })}
-                placeholder="https://www.notion.so/..."
-              />
-            </Field>
-            <ImportStatusSelect
-              value={notionForm.status}
-              onChange={(status) => setNotionForm({ ...notionForm, status })}
-            />
-          </ImportCard>
-
-          <ImportCard
-            title="导入微信公众号"
-            description="输入公众号文章链接，系统会抓取标题、封面、摘要和正文。"
-            actionLabel={importing === 'wechat' ? '导入中...' : '导入公众号文章'}
-            disabled={importing !== ''}
-            onImport={() => runImport('wechat')}
-          >
-            <Field label="公众号文章 URL">
-              <input
-                className="form-input"
-                value={wechatForm.url}
-                onChange={(event) => setWechatForm({ ...wechatForm, url: event.target.value })}
-                placeholder="https://mp.weixin.qq.com/s/..."
-              />
-            </Field>
-            <ImportStatusSelect
-              value={wechatForm.status}
-              onChange={(status) => setWechatForm({ ...wechatForm, status })}
-            />
-          </ImportCard>
+            </ImportCard>
           </div>
         )}
 
         {activeTab === 'list' && (
-          <div className="resource-card p-4">
-          <div className="mb-4 grid gap-3 md:grid-cols-[1fr_12rem_12rem_auto]">
-            <input
-              className="form-input"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索标题、slug、摘要、作者或来源链接"
-            />
-            <select
-              className="form-input"
-              value={sourceFilter}
-              onChange={(event) =>
-                setSourceFilter(event.target.value as ContentSourceType | typeof ALL)
-              }
-            >
-              <option value={ALL}>全部来源</option>
-              <option value="manual">手动</option>
-              <option value="wordpress">WordPress</option>
-              <option value="notion">Notion</option>
-              <option value="wechat">微信公众号</option>
-            </select>
-            <select
-              className="form-input"
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as ContentStatus | typeof ALL)
-              }
-            >
-              <option value={ALL}>全部状态</option>
-              <option value="draft">草稿</option>
-              <option value="published">已发布</option>
-              <option value="archived">已归档</option>
-            </select>
-            <button type="button" className="btn btn-secondary" onClick={() => reload()}>
-              <RefreshCw className="h-4 w-4" />
-              刷新
-            </button>
-          </div>
-          {loading ? (
-            <div className="text-muted-foreground py-12 text-center text-sm">加载中...</div>
-          ) : (
-            <DataTable columns={columns} data={items} emptyMessage="暂无内容" />
-          )}
-          <div className="text-muted-foreground mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span>
-              共 {total} 篇，第 {page} / {totalPages} 页
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={page <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
+          <div className="space-y-4">
+            <div className="resource-card grid gap-3 p-4 md:grid-cols-[1fr_12rem_12rem_auto]">
+              <input
+                className="form-input"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜索标题、slug、摘要、作者或来源链接"
+              />
+              <select
+                className="form-input"
+                value={sourceFilter}
+                onChange={(event) =>
+                  setSourceFilter(event.target.value as ContentSourceType | typeof ALL)
+                }
               >
-                上一页
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={page >= totalPages}
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                <option value={ALL}>全部来源</option>
+                <option value="manual">手动</option>
+                <option value="wordpress">WordPress</option>
+                <option value="notion">Notion</option>
+                <option value="wechat">微信公众号</option>
+              </select>
+              <select
+                className="form-input"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as ContentStatus | typeof ALL)
+                }
               >
-                下一页
+                <option value={ALL}>全部状态</option>
+                <option value="draft">草稿</option>
+                <option value="published">已发布</option>
+                <option value="archived">已归档</option>
+              </select>
+              <button type="button" className="btn btn-secondary h-10" onClick={() => reload()}>
+                <RefreshCw className="h-4 w-4" />
+                刷新
               </button>
             </div>
+            {loading ? (
+              <div className="resource-card text-muted-foreground py-12 text-center text-sm">
+                加载中...
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={items}
+                emptyMessage="暂无内容"
+                pageSize={PAGE_SIZE}
+                pageSizeOptions={[PAGE_SIZE]}
+                searchable={false}
+              />
+            )}
+            <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-3 text-sm">
+              <span>
+                共 {total} 篇，第 {page} / {totalPages} 页
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  上一页
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
         )}
       </div>
 

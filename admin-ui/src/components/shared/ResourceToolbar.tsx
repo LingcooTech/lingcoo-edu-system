@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { AdminTabs } from './AdminTabs';
 
 export interface ResourceToolbarAction {
   label: string;
@@ -21,28 +21,12 @@ export function ResourceToolbar<T extends string>({
 }) {
   return (
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="bg-card inline-grid w-full grid-cols-2 gap-1 rounded-lg border p-1 shadow-sm sm:w-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={cn(
-              'h-10 min-w-24 rounded-md px-4 text-sm font-semibold transition-colors',
-              activeKey === tab.key
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-            )}
-            onClick={() => onTabChange(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <AdminTabs tabs={tabs} activeKey={activeKey} onChange={onTabChange} className="sm:w-auto" />
 
       {action ? (
         <button
           type="button"
-          className="btn btn-primary h-10 shrink-0 shadow-sm"
+          className="btn btn-primary h-10 shrink-0"
           onClick={action.onClick}
           disabled={action.disabled}
         >
