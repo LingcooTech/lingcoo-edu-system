@@ -43,7 +43,7 @@ export function BusinessModelPage() {
   }
 
   return (
-    <PageFrame section="businessModel">
+    <PageFrame section="businessModel" contentClassName="content-rail">
       <form className="resource-card p-5" onSubmit={submitBusinessModel}>
         {loading ? (
           <p className="text-muted-foreground text-sm">加载中...</p>

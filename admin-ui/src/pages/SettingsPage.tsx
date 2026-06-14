@@ -764,7 +764,10 @@ export function SettingsPage() {
   }
 
   return (
-    <PageFrame section={isIntegrationPage ? 'integrations' : 'brandSettings'}>
+    <PageFrame
+      section={isIntegrationPage ? 'integrations' : 'brandSettings'}
+      contentClassName="content-rail"
+    >
       {isIntegrationPage ? (
         <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm">
           密钥字段留空表示保持原值；支付、SMTP 和七牛云可优先读取环境变量配置。
@@ -785,7 +788,6 @@ export function SettingsPage() {
                 tabs={brandTabs}
                 activeKey={brandTab}
                 onChange={(key) => setBrandTab(key as BrandTabKey)}
-                className="max-w-5xl"
               />
 
               {brandTab === 'identity' && (
@@ -1007,7 +1009,6 @@ export function SettingsPage() {
                 tabs={integrationTabs}
                 activeKey={activeTab}
                 onChange={(key) => setActiveTab(key as IntegrationTabKey)}
-                className="max-w-5xl"
               />
 
               {activeTab === 'payment' && (

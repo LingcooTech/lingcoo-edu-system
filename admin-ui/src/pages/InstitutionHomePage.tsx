@@ -269,7 +269,7 @@ export function InstitutionHomePage() {
     <PageFrame
       section="institutionPages"
       className="max-w-none px-0 pt-0"
-      headerClassName="mb-0 shrink-0 items-center border-b px-4 py-4 sm:px-6 lg:px-8"
+      headerClassName="mb-0 shrink-0 items-center border-b px-4 py-3 sm:px-5 lg:px-6"
       contentClassName="overflow-hidden pb-0"
       actions={
         <button
@@ -284,8 +284,8 @@ export function InstitutionHomePage() {
       }
     >
       <div className="bg-muted/35 flex h-full min-h-0 flex-col">
-        <div className="bg-background/95 shrink-0 border-b px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
-          <div className="max-w-5xl">
+        <div className="bg-background/95 shrink-0 border-b px-4 py-2 backdrop-blur sm:px-5 lg:px-6">
+          <div className="content-rail">
             <AdminTabs
               tabs={publicPageTabs}
               activeKey={activeTab}
@@ -294,7 +294,7 @@ export function InstitutionHomePage() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 lg:px-6">
           {activeTab === 'home' ? (
             <HomeContentEditor onSaveActionChange={handleSaveActionChange} />
           ) : null}
@@ -456,7 +456,7 @@ function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAct
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-3 pb-10">
+    <div className="content-rail space-y-3 pb-8">
       <AccordionSection
         title="首屏转化"
         description="Slogan、机构介绍、轮播图、行动按钮和数据条。"
@@ -777,7 +777,7 @@ function AboutContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAc
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 pb-10">
+    <div className="content-rail space-y-5 pb-8">
       <EditorCard title="页面头部与介绍">
         <Field label="页面标题">
           <input
@@ -902,7 +902,7 @@ function PageCopySettings({ onSaveActionChange }: { onSaveActionChange: SaveActi
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 pb-10">
+    <div className="content-rail space-y-5 pb-8">
       <EditorCard
         title="列表页文案与 SEO"
         description="配置课程、试听、教师和成长故事列表页顶部文案；SEO 标题会用于浏览器标签页。"

@@ -98,19 +98,19 @@ export function Topbar({ onMenuClick }: { account: AuthAccount; onMenuClick?: ()
 
   return (
     <>
-      <header className="border-border/70 bg-card/90 sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4 backdrop-blur-md">
+      <header className="border-border/70 bg-card/90 sticky top-0 z-20 flex h-10 shrink-0 items-center justify-between gap-2 border-b px-3 backdrop-blur-md sm:px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {onMenuClick ? (
             <button
               type="button"
               onClick={onMenuClick}
               aria-label="打开侧边栏"
-              className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors lg:hidden"
+              className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors lg:hidden"
             >
               <Menu className="h-4 w-4" />
             </button>
           ) : null}
-          <nav aria-label="面包屑" className="flex min-w-0 items-center gap-1.5 text-[13px]">
+          <nav aria-label="面包屑" className="flex min-w-0 items-center gap-1.5 text-[12.5px]">
             <span className="text-muted-foreground/80 hidden sm:inline">{currentPage.group}</span>
             <ChevronRight className="text-muted-foreground/40 hidden h-3.5 w-3.5 sm:inline" />
             <span className="text-foreground truncate font-semibold">{currentPage.title}</span>
@@ -121,7 +121,7 @@ export function Topbar({ onMenuClick }: { account: AuthAccount; onMenuClick?: ()
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="text-muted-foreground border-border/80 bg-background hover:bg-muted/70 hover:text-foreground inline-flex h-8 w-10 items-center gap-2 rounded-md border px-2.5 text-[12px] shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition-colors md:w-56 lg:w-64"
+            className="text-muted-foreground border-border/80 bg-background hover:bg-muted/70 hover:text-foreground inline-flex h-7 w-9 items-center gap-2 rounded-md border px-2 text-[12px] shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition-colors md:w-52 lg:w-60"
             title={`搜索 / 跳转（/ 或 ${shortcutLabel}）`}
           >
             <Search className="h-3.5 w-3.5" />

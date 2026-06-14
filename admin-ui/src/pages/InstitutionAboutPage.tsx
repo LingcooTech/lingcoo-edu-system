@@ -118,6 +118,7 @@ export function InstitutionAboutPage() {
   return (
     <PageFrame
       section="institutionAbout"
+      contentClassName="content-rail"
       actions={
         <button type="button" className="btn btn-primary" onClick={save} disabled={!form || saving}>
           {saving ? '保存中...' : '保存关于页'}
@@ -127,7 +128,7 @@ export function InstitutionAboutPage() {
       {!form ? (
         <p className="text-muted-foreground text-sm">加载中...</p>
       ) : (
-        <div className="max-w-4xl space-y-5">
+        <div className="space-y-5">
           <EditorCard title="关于我们页面">
             <Field label="页面标题">
               <input
