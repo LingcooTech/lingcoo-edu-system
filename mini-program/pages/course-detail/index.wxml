@@ -26,7 +26,7 @@
     <view class="section card info-card">
       <view class="info-row">课程提供方：{{providerLabel}}</view>
       <view class="info-row">授课老师：{{teacherLabel}}</view>
-      <view class="info-row">授课地点：{{locationLabel}}</view>
+      <view class="info-row">授课校区：{{locationLabel}}</view>
       <view wx:if="{{receiverLabel}}" class="info-row">收款方：{{receiverLabel}}</view>
     </view>
 
@@ -56,15 +56,9 @@
       <view wx:else class="empty">{{onlinePackageSalesAllowed ? '课时包暂未上架，可先预约试听。' : '暂无正式课程参考方案，可先预约试听。'}}</view>
     </view>
 
-    <view wx:if="{{course.trialDescription || course.reservationNotice}}" class="section card info-card">
-      <view wx:if="{{course.trialDescription}}">
-        <view class="section-title">试听说明</view>
-        <view class="body-text package-desc">{{course.trialDescription}}</view>
-      </view>
-      <view wx:if="{{course.reservationNotice}}" class="notice-block">
-        <view class="section-title">预约规则</view>
-        <view class="body-text package-desc">{{course.reservationNotice}}</view>
-      </view>
+    <view wx:if="{{trialNotice}}" class="section card info-card">
+      <view class="section-title">试听预约说明</view>
+      <view class="body-text package-desc">{{trialNotice}}</view>
     </view>
 
     <form wx:if="{{showCheckoutForm && selectedPackage}}" class="section card checkout-form" bindsubmit="onCheckoutSubmit">
@@ -122,7 +116,7 @@
 
     <view class="sticky-cta app-bottom-bar">
       <view class="sticky-note">免注册 · 老师电话确认时间</view>
-      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听 / 留资</button>
+      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听</button>
     </view>
   </block>
 </view>

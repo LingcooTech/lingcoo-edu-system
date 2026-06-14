@@ -8,7 +8,6 @@ import {
   type Course,
   type CoursePackage,
   type PublicCampus,
-  type PublicClassroom,
   type PublicInstitution,
   type PublicTeacher,
 } from '@/api/client';
@@ -19,18 +18,6 @@ import { Layout } from '@/components/Layout';
 import { RichTextRenderer } from '@/components/RichTextRenderer';
 import { TrialRegistrationModal } from '@/components/TrialRegistrationModal';
 import { useSeo } from '@/lib/seo';
-import { money } from '@/lib/utils';
-
-function priceHeadline(
-  packages: CoursePackage[],
-  onlineAllowed: boolean,
-): { big: string; sub: string } {
-  if (onlineAllowed && packages.length > 0) {
-    const min = Math.min(...packages.map((pkg) => packagePriceAmount(pkg)));
-    return { big: `${money(min)} 起`, sub: `共 ${packages.length} 个课时包` };
-  }
-  return { big: '可预约试听', sub: '免注册 · 老师电话确认时间' };
-}
 
 function packagePriceAmount(pkg: CoursePackage) {
   return pkg.discountPriceAmount ?? pkg.priceAmount;
@@ -46,6 +33,13 @@ function packageLessonLabel(pkg: CoursePackage) {
     : `${pkg.lessonCount} 课时`;
 }
 
+function mergeNotice(trialDescription?: string, reservationNotice?: string) {
+  const parts = [trialDescription, reservationNotice]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item));
+  return Array.from(new Set(parts)).join('\n\n');
+}
+
 export function CourseDetailPage() {
   const { slug = '' } = useParams();
   const [course, setCourse] = useState<Course | null>(null);
@@ -54,8 +48,6 @@ export function CourseDetailPage() {
   const [providerInstitution, setProviderInstitution] = useState<PublicInstitution | null>(null);
   const [defaultTeacher, setDefaultTeacher] = useState<PublicTeacher | null>(null);
   const [defaultTeachers, setDefaultTeachers] = useState<PublicTeacher[]>([]);
-  const [classroom, setClassroom] = useState<PublicClassroom | null>(null);
-  const [classrooms, setClassrooms] = useState<PublicClassroom[]>([]);
   const [campus, setCampus] = useState<PublicCampus | null>(null);
   const [campuses, setCampuses] = useState<PublicCampus[]>([]);
   const [paymentReceiverInstitution, setPaymentReceiverInstitution] =
@@ -92,14 +84,6 @@ export function CourseDetailPage() {
             ? payload.defaultTeachers
             : payload.defaultTeacher
               ? [payload.defaultTeacher]
-              : [],
-        );
-        setClassroom(payload.classroom ?? null);
-        setClassrooms(
-          payload.classrooms?.length
-            ? payload.classrooms
-            : payload.classroom
-              ? [payload.classroom]
               : [],
         );
         setCampus(payload.campus ?? null);
@@ -139,26 +123,9 @@ export function CourseDetailPage() {
     defaultTeachers.length > 0
       ? defaultTeachers.map((teacher) => teacher.name).join(' / ')
       : defaultTeacher?.name || '场次确认';
-  const classroomOptions = course
-    ? classrooms.length
-      ? classrooms
-      : classroom
-        ? [classroom]
-        : []
-    : [];
   const campusOptions = course ? (campuses.length ? campuses : campus ? [campus] : []) : [];
-  const campusName = new Map(campusOptions.map((item) => [item.id, item.name]));
-  const locationLabel = classroomOptions.length
-    ? classroomOptions
-        .map((item) => [item.name, campusName.get(item.campusId)].filter(Boolean).join(' · '))
-        .join(' / ')
-    : course.teachingLocationLabel || '到店确认';
-  const campusLocationLabel =
-    campusOptions.length > 0
-      ? campusOptions
-          .map((item) => (item.address ? `${item.name}：${item.address}` : item.name))
-          .join(' / ')
-      : locationLabel;
+  const campusLabel =
+    campusOptions.length > 0 ? campusOptions.map((item) => item.name).join(' / ') : '到店确认';
   const paymentReceiverLabel =
     paymentReceiverInstitution?.name ||
     course.paymentReceiverName ||
@@ -167,7 +134,7 @@ export function CourseDetailPage() {
       : course.paymentReceiverType === 'platform'
         ? '平台'
         : '');
-  const price = priceHeadline(packages, onlinePackageSalesAllowed);
+  const trialNotice = mergeNotice(course.trialDescription, course.reservationNotice);
 
   return (
     <Layout>
@@ -204,8 +171,8 @@ export function CourseDetailPage() {
               <div className="mobile-detail-cta">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <div className="mobile-detail-cta-price">{price.big}</div>
-                    <div className="text-muted mt-1 text-xs">{price.sub}</div>
+                    <div className="mobile-detail-cta-price">预约试听</div>
+                    <div className="text-muted mt-1 text-xs">免注册 · 老师电话确认时间</div>
                   </div>
                   <div className="text-muted text-right text-xs">
                     {course.durationMinutes} 分钟/节
@@ -216,7 +183,7 @@ export function CourseDetailPage() {
                   className="pwbtn pwbtn-primary mt-4 w-full"
                   onClick={() => setTrialOpen(true)}
                 >
-                  预约试听 / 留资
+                  预约试听
                 </button>
               </div>
             </div>
@@ -251,11 +218,7 @@ export function CourseDetailPage() {
               </div>
               <div className="text-ink-soft flex items-center gap-2">
                 <MapPin className="text-brand h-4 w-4 shrink-0" />
-                <span>授课教室：{locationLabel}</span>
-              </div>
-              <div className="text-ink-soft flex items-center gap-2">
-                <MapPin className="text-brand h-4 w-4 shrink-0" />
-                <span>校区位置：{campusLocationLabel}</span>
+                <span>授课校区：{campusLabel}</span>
               </div>
               {paymentReceiverLabel && (
                 <div className="text-ink-soft flex items-center gap-2">
@@ -276,55 +239,19 @@ export function CourseDetailPage() {
               </div>
             ) : null}
 
-            {(course.trialDescription || course.reservationNotice) && (
-              <section className="mt-10 space-y-3">
-                {course.trialDescription && (
-                  <div className="pwcard p-5">
-                    <h2 className="text-ink text-base font-semibold">试听说明</h2>
-                    <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
-                      {course.trialDescription}
-                    </p>
-                  </div>
-                )}
-                {course.reservationNotice && (
-                  <div className="pwcard p-5">
-                    <h2 className="text-ink text-base font-semibold">预约规则</h2>
-                    <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
-                      {course.reservationNotice}
-                    </p>
-                  </div>
-                )}
+            {trialNotice && (
+              <section className="mt-10">
+                <div className="pwcard p-5">
+                  <h2 className="text-ink text-base font-semibold">试听预约说明</h2>
+                  <p className="text-ink-soft mt-2 max-w-2xl text-sm leading-6 whitespace-pre-wrap">
+                    {trialNotice}
+                  </p>
+                </div>
               </section>
             )}
           </article>
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            <div className="pwcard hidden p-5 lg:block">
-              <div className="text-ink text-2xl font-bold">{price.big}</div>
-              <div className="text-muted mt-1 text-xs">{price.sub}</div>
-              <button
-                type="button"
-                className="pwbtn pwbtn-primary mt-5 w-full"
-                onClick={() => setTrialOpen(true)}
-              >
-                预约试听 / 留资
-              </button>
-              <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
-                  免注册预约，老师电话确认上课时间
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="text-brand h-4 w-4 shrink-0" />
-                  单节 {course.durationMinutes} 分钟
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="text-brand h-4 w-4 shrink-0" />
-                  {campusLocationLabel}
-                </div>
-              </div>
-            </div>
-
             {packages.length > 0 && (
               <section id="packages" className="pwcard scroll-mt-24 p-4 sm:p-5">
                 <h2 className="text-ink text-base font-semibold">
@@ -336,22 +263,8 @@ export function CourseDetailPage() {
                       key={pkg.id}
                       className="border-line rounded-2xl border p-4 first:border-t first:pt-4 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:px-0 lg:first:border-t-0 lg:first:pt-0"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-ink text-sm font-semibold">{pkg.name}</div>
-                          <div className="text-muted mt-1 text-xs">{packageLessonLabel(pkg)}</div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <div className="text-ink text-base font-semibold">
-                            {money(packagePriceAmount(pkg))}
-                          </div>
-                          {pkg.discountPriceAmount !== null &&
-                          pkg.discountPriceAmount !== undefined ? (
-                            <div className="text-muted mt-1 text-xs line-through">
-                              {money(pkg.priceAmount)}
-                            </div>
-                          ) : null}
-                        </div>
+                      <div className="min-w-0">
+                        <div className="text-ink text-sm font-semibold">{pkg.name}</div>
                       </div>
                       {pkg.description ? (
                         <p className="text-ink-soft mt-2 text-sm leading-6">{pkg.description}</p>
@@ -388,6 +301,32 @@ export function CourseDetailPage() {
                 </div>
               </section>
             )}
+
+            <div className="pwcard hidden p-5 lg:block">
+              <div className="text-ink text-lg font-semibold">预约试听</div>
+              <div className="text-muted mt-1 text-xs">免注册提交，老师电话确认时间</div>
+              <button
+                type="button"
+                className="pwbtn pwbtn-primary mt-5 w-full"
+                onClick={() => setTrialOpen(true)}
+              >
+                预约试听
+              </button>
+              <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
+                  免注册预约，老师电话确认上课时间
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="text-brand h-4 w-4 shrink-0" />
+                  单节 {course.durationMinutes} 分钟
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="text-brand h-4 w-4 shrink-0" />
+                  {campusLabel}
+                </div>
+              </div>
+            </div>
           </aside>
         </div>
       </div>

@@ -154,32 +154,40 @@ export function TrialRegistrationModal({
                 />
               </div>
               {campuses.length > 0 ? (
-                <select
-                  className="border-line bg-surface rounded-xl border px-3 py-2.5 text-sm"
-                  value={form.campusId}
-                  onChange={(event) => setForm({ ...form, campusId: event.target.value })}
-                  required
-                >
-                  {campuses.map((campus) => (
-                    <option key={campus.id} value={campus.id}>
-                      {campus.address ? `${campus.name} · ${campus.address}` : campus.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="grid gap-1.5">
+                  <span className="text-muted text-xs font-medium">意向校区</span>
+                  <select
+                    className="border-line bg-surface rounded-xl border px-3 py-2.5 text-sm"
+                    value={form.campusId}
+                    onChange={(event) => setForm({ ...form, campusId: event.target.value })}
+                    required
+                  >
+                    {campuses.map((campus) => (
+                      <option key={campus.id} value={campus.id}>
+                        {campus.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : null}
               {activeTeachers.length > 0 ? (
-                <select
-                  className="border-line bg-surface rounded-xl border px-3 py-2.5 text-sm"
-                  value={form.preferredTeacherId}
-                  onChange={(event) => setForm({ ...form, preferredTeacherId: event.target.value })}
-                  required
-                >
-                  {activeTeachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.title ? `${teacher.name} · ${teacher.title}` : teacher.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="grid gap-1.5">
+                  <span className="text-muted text-xs font-medium">意向老师</span>
+                  <select
+                    className="border-line bg-surface rounded-xl border px-3 py-2.5 text-sm"
+                    value={form.preferredTeacherId}
+                    onChange={(event) =>
+                      setForm({ ...form, preferredTeacherId: event.target.value })
+                    }
+                    required
+                  >
+                    {activeTeachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : null}
             </div>
 

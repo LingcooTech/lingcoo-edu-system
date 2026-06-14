@@ -239,10 +239,11 @@ export const catalogModule: AppModule = {
       ]);
       const classroom = classrooms[0] ?? null;
       const campusIds = new Set(classrooms.map((item) => item.campusId));
+      if (course.campusId) campusIds.add(course.campusId);
       const selectedCampuses = campuses.filter((item) => campusIds.has(item.id));
-      const campus = classroom
-        ? (selectedCampuses.find((item) => item.id === classroom.campusId) ?? null)
-        : null;
+      const campus =
+        selectedCampuses.find((item) => item.id === (classroom?.campusId ?? course.campusId)) ??
+        null;
       const businessModel = readBusinessModel(organization.settings);
       return {
         course,

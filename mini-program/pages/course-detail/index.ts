@@ -10,6 +10,7 @@ import {
   type Course,
   type CoursePackage,
   type BusinessModelSettings,
+  type PublicCampus,
   type PublicInstitution,
   type PublicTeacher,
   type ParentOrder,
@@ -34,6 +35,17 @@ function packageLessonLabel(pkg: CoursePackage): string {
   return pkg.giftedLessonCount
     ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
     : `${pkg.lessonCount} 课时`;
+}
+
+function campusLabel(campuses: PublicCampus[]): string {
+  return campuses.length ? campuses.map((campus) => campus.name).join(' / ') : '到店确认';
+}
+
+function mergeNotice(trialDescription?: string, reservationNotice?: string): string {
+  const parts = [trialDescription, reservationNotice]
+    .map((item) => (item || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts)).join('\n\n');
 }
 
 function orderStatusLabel(status: string): string {
@@ -94,6 +106,7 @@ Page({
     providerLabel: '',
     teacherLabel: '',
     locationLabel: '',
+    trialNotice: '',
     receiverLabel: '',
     packages: [] as PackageItem[],
     contentBlocks: [] as Block[],
@@ -156,26 +169,12 @@ Page({
           : payload.defaultTeacher
             ? [payload.defaultTeacher]
             : [];
-      const classrooms =
-        payload.classrooms && payload.classrooms.length
-          ? payload.classrooms
-          : payload.classroom
-            ? [payload.classroom]
-            : [];
       const campuses =
         payload.campuses && payload.campuses.length
           ? payload.campuses
           : payload.campus
             ? [payload.campus]
             : [];
-      const campusName = new Map(campuses.map((campus) => [campus.id, campus.name]));
-      const locationLabel = classrooms.length
-        ? classrooms
-            .map((classroom) =>
-              [classroom.name, campusName.get(classroom.campusId)].filter(Boolean).join(' · '),
-            )
-            .join(' / ')
-        : payload.course.teachingLocationLabel || '到店确认';
       this.setData({
         loading: false,
         course: payload.course,
@@ -188,7 +187,8 @@ Page({
         teacherLabel: defaultTeachers.length
           ? defaultTeachers.map((teacher) => teacher.name).join(' / ')
           : '场次确认',
-        locationLabel,
+        locationLabel: campusLabel(campuses),
+        trialNotice: mergeNotice(payload.course.trialDescription, payload.course.reservationNotice),
         receiverLabel,
         packages: payload.coursePackages.map((item) => ({
           ...item,

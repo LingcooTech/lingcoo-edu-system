@@ -28,7 +28,6 @@ interface CourseForm {
   classroomIds: string[];
   paymentReceiverInstitutionId: string;
   trialDescription: string;
-  reservationNotice: string;
   coverImageUrl: string;
   onlineSalesEnabled: boolean;
   summary: string;
@@ -47,7 +46,6 @@ const emptyCourseForm: CourseForm = {
   classroomIds: [],
   paymentReceiverInstitutionId: '',
   trialDescription: '',
-  reservationNotice: '',
   coverImageUrl: '',
   onlineSalesEnabled: true,
   summary: '',
@@ -93,6 +91,13 @@ function contentToEditableText(content?: string) {
   return blocks.map(blockToText).filter(Boolean).join('\n\n');
 }
 
+function mergeTrialNotice(trialDescription?: string, reservationNotice?: string) {
+  const parts = [trialDescription, reservationNotice]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item));
+  return Array.from(new Set(parts)).join('\n\n');
+}
+
 function courseToForm(course: Course): CourseForm {
   const defaultTeacherIds =
     course.defaultTeacherIds && course.defaultTeacherIds.length > 0
@@ -119,8 +124,7 @@ function courseToForm(course: Course): CourseForm {
     paymentReceiverInstitutionId:
       course.paymentReceiverInstitutionId ??
       (course.paymentReceiverType === 'provider' ? (course.providerInstitutionId ?? '') : ''),
-    trialDescription: course.trialDescription ?? '',
-    reservationNotice: course.reservationNotice ?? '',
+    trialDescription: mergeTrialNotice(course.trialDescription, course.reservationNotice),
     coverImageUrl: course.coverImageUrl ?? '',
     onlineSalesEnabled: course.onlineSalesEnabled ?? true,
     summary: course.summary ?? '',
@@ -180,7 +184,7 @@ function courseFormToPayload(
     paymentReceiverInstitutionId: form.paymentReceiverInstitutionId || null,
     paymentReceiverName: paymentReceiverInstitution?.name ?? null,
     trialDescription: form.trialDescription,
-    reservationNotice: form.reservationNotice,
+    reservationNotice: '',
     coverImageUrl: form.coverImageUrl.trim() || null,
     onlineSalesEnabled: form.onlineSalesEnabled,
     summary: form.summary,
@@ -552,18 +556,11 @@ export function CoursesPage({
           onChange={(coverImageUrl) => setForm({ ...form, coverImageUrl })}
           prefix="courses/cover"
         />
-        <Field label="试听说明">
+        <Field label="试听预约说明">
           <textarea
-            className="form-input h-20"
+            className="form-input h-28"
             value={form.trialDescription}
             onChange={(event) => setForm({ ...form, trialDescription: event.target.value })}
-          />
-        </Field>
-        <Field label="预约/取消规则">
-          <textarea
-            className="form-input h-20"
-            value={form.reservationNotice}
-            onChange={(event) => setForm({ ...form, reservationNotice: event.target.value })}
           />
         </Field>
         <div className="mb-3.5 block">
