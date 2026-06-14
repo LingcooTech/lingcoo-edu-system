@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
@@ -42,9 +42,9 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const brandTabs = [
-  { key: 'identity', label: '基础 VI' },
-  { key: 'navigation', label: 'Header 菜单' },
-  { key: 'footer', label: 'Footer 备案' },
+  { key: 'identity', label: '基础 VI', description: '品牌名、Logo、颜色、字体和圆角' },
+  { key: 'navigation', label: 'Header 菜单', description: '前台顶部导航名称、路径和显示状态' },
+  { key: 'footer', label: 'Footer 备案', description: '网站底部备案信息与跳转链接' },
 ] as const;
 
 const integrationTabs = [
@@ -56,6 +56,41 @@ const integrationTabs = [
 
 type BrandTabKey = (typeof brandTabs)[number]['key'];
 type IntegrationTabKey = (typeof integrationTabs)[number]['key'];
+
+interface BrandFormState {
+  name: string;
+  brandName: string;
+  phone: string;
+  address: string;
+  fullLogoUrl: string;
+  squareLogoUrl: string;
+  logoUrl: string;
+  darkLogoUrl: string;
+  faviconUrl: string;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  cardColor: string;
+  textColor: string;
+  headingFont: string;
+  bodyFont: string;
+  radius: string;
+}
+
+const BRAND_COLOR_FIELDS: Array<{
+  key: keyof Pick<
+    BrandFormState,
+    'primaryColor' | 'secondaryColor' | 'backgroundColor' | 'cardColor' | 'textColor'
+  >;
+  label: string;
+  fallback: string;
+}> = [
+  { key: 'primaryColor', label: '主色', fallback: '#9a6a4b' },
+  { key: 'secondaryColor', label: '辅助色', fallback: '#211f1c' },
+  { key: 'backgroundColor', label: '背景色', fallback: '#f6f4f0' },
+  { key: 'cardColor', label: '卡片色', fallback: '#ffffff' },
+  { key: 'textColor', label: '文字色', fallback: '#211f1c' },
+];
 
 const DEFAULT_SITE: PublicSiteSettings = {
   navigation: [
@@ -197,7 +232,7 @@ export function SettingsPage() {
     useState<ContentImportSettingsOverview | null>(null);
   const [publicSite, setPublicSite] = useState<PublicSiteSettings>(DEFAULT_SITE);
 
-  const [org, setOrg] = useState({
+  const [org, setOrg] = useState<BrandFormState>({
     name: '',
     brandName: '',
     phone: '',
@@ -750,192 +785,215 @@ export function SettingsPage() {
               />
 
               {brandTab === 'identity' && (
-                <form className="resource-card mt-4 p-5" onSubmit={submitBrand}>
-                  <div className="text-sm font-semibold">品牌 VI / 机构信息</div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="text-sm font-medium">经营主体 / 机构名称</span>
-                      <input
-                        className={inputClass}
-                        value={org.name}
-                        onChange={(e) => setOrg({ ...org, name: e.target.value })}
+                <form className="mt-4 space-y-5 pb-24" onSubmit={submitBrand}>
+                  <BrandIdentityPreview org={org} />
+
+                  <SettingsSection
+                    title="机构信息"
+                    description="用于后台主体、前台品牌名、联系方式和地址展示。"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="text-sm font-medium">经营主体 / 机构名称</span>
+                        <input
+                          className={inputClass}
+                          value={org.name}
+                          onChange={(e) => setOrg({ ...org, name: e.target.value })}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-medium">前台品牌名</span>
+                        <input
+                          className={inputClass}
+                          value={org.brandName}
+                          onChange={(e) => setOrg({ ...org, brandName: e.target.value })}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-medium">电话</span>
+                        <input
+                          className={inputClass}
+                          value={org.phone}
+                          onChange={(e) => setOrg({ ...org, phone: e.target.value })}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-medium">地址</span>
+                        <input
+                          className={inputClass}
+                          value={org.address}
+                          onChange={(e) => setOrg({ ...org, address: e.target.value })}
+                        />
+                      </label>
+                    </div>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    title="Logo 与站点图标"
+                    description="完整 Logo 用于官网页眉；方形 Logo 用于头像、小程序和应用图标。"
+                  >
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <QiniuImageField
+                        label="完整 Logo URL"
+                        hint="横版完整 logo，适合页眉/官网使用"
+                        value={org.fullLogoUrl}
+                        onChange={(fullLogoUrl) => setOrg({ ...org, fullLogoUrl })}
+                        prefix="brand/logo"
+                        previewAlt="完整 Logo"
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">前台品牌名</span>
-                      <input
-                        className={inputClass}
-                        value={org.brandName}
-                        onChange={(e) => setOrg({ ...org, brandName: e.target.value })}
+                      <QiniuImageField
+                        label="方形 Logo URL"
+                        hint="方形图标，适合头像/小程序/应用图标"
+                        value={org.squareLogoUrl}
+                        onChange={(squareLogoUrl) => setOrg({ ...org, squareLogoUrl })}
+                        prefix="brand/logo"
+                        previewAlt="方形 Logo"
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">电话</span>
-                      <input
-                        className={inputClass}
-                        value={org.phone}
-                        onChange={(e) => setOrg({ ...org, phone: e.target.value })}
+                      <QiniuImageField
+                        label="暗色 Logo URL"
+                        value={org.darkLogoUrl}
+                        onChange={(darkLogoUrl) => setOrg({ ...org, darkLogoUrl })}
+                        prefix="brand/logo"
+                        previewAlt="暗色 Logo"
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">地址</span>
-                      <input
-                        className={inputClass}
-                        value={org.address}
-                        onChange={(e) => setOrg({ ...org, address: e.target.value })}
+                      <QiniuImageField
+                        label="兼容 Logo URL"
+                        hint="历史字段；为空时保存完整 Logo"
+                        value={org.logoUrl}
+                        onChange={(logoUrl) => setOrg({ ...org, logoUrl })}
+                        prefix="brand/logo"
+                        previewAlt="兼容 Logo"
                       />
-                    </label>
-                    <QiniuImageField
-                      label="完整 Logo URL"
-                      hint="横版完整 logo，适合页眉/官网使用"
-                      value={org.fullLogoUrl}
-                      onChange={(fullLogoUrl) => setOrg({ ...org, fullLogoUrl })}
-                      prefix="brand/logo"
-                      previewAlt="完整 Logo"
-                    />
-                    <QiniuImageField
-                      label="方形 Logo URL"
-                      hint="方形图标，适合头像/小程序/应用图标"
-                      value={org.squareLogoUrl}
-                      onChange={(squareLogoUrl) => setOrg({ ...org, squareLogoUrl })}
-                      prefix="brand/logo"
-                      previewAlt="方形 Logo"
-                    />
-                    <QiniuImageField
-                      label="暗色 Logo URL"
-                      value={org.darkLogoUrl}
-                      onChange={(darkLogoUrl) => setOrg({ ...org, darkLogoUrl })}
-                      prefix="brand/logo"
-                      previewAlt="暗色 Logo"
-                    />
-                    <QiniuImageField
-                      label="兼容 Logo URL"
-                      hint="历史字段；为空时保存完整 Logo"
-                      value={org.logoUrl}
-                      onChange={(logoUrl) => setOrg({ ...org, logoUrl })}
-                      prefix="brand/logo"
-                      previewAlt="兼容 Logo"
-                    />
-                    <QiniuImageField
-                      label="Favicon URL"
-                      value={org.faviconUrl}
-                      onChange={(faviconUrl) => setOrg({ ...org, faviconUrl })}
-                      prefix="brand/favicon"
-                      previewAlt="Favicon"
-                    />
-                    <label className="block">
-                      <span className="text-sm font-medium">主色</span>
-                      <input
-                        className={inputClass}
-                        placeholder="#1f6f5b"
+                      <QiniuImageField
+                        label="Favicon URL"
+                        value={org.faviconUrl}
+                        onChange={(faviconUrl) => setOrg({ ...org, faviconUrl })}
+                        prefix="brand/favicon"
+                        previewAlt="Favicon"
+                      />
+                    </div>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    title="颜色、字体与圆角"
+                    description="这些值会作为前台品牌视觉 token，保存后影响前台页面展示。"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <ColorInput
+                        label="主色"
                         value={org.primaryColor}
-                        onChange={(e) => setOrg({ ...org, primaryColor: e.target.value })}
+                        placeholder="#9a6a4b"
+                        onChange={(primaryColor) => setOrg({ ...org, primaryColor })}
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">辅助色</span>
-                      <input
-                        className={inputClass}
-                        placeholder="#f2a65a"
+                      <ColorInput
+                        label="辅助色"
                         value={org.secondaryColor}
-                        onChange={(e) => setOrg({ ...org, secondaryColor: e.target.value })}
+                        placeholder="#211f1c"
+                        onChange={(secondaryColor) => setOrg({ ...org, secondaryColor })}
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">背景色</span>
-                      <input
-                        className={inputClass}
+                      <ColorInput
+                        label="背景色"
                         value={org.backgroundColor}
-                        onChange={(e) => setOrg({ ...org, backgroundColor: e.target.value })}
+                        placeholder="#f6f4f0"
+                        onChange={(backgroundColor) => setOrg({ ...org, backgroundColor })}
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">卡片色</span>
-                      <input
-                        className={inputClass}
+                      <ColorInput
+                        label="卡片色"
                         value={org.cardColor}
-                        onChange={(e) => setOrg({ ...org, cardColor: e.target.value })}
+                        placeholder="#ffffff"
+                        onChange={(cardColor) => setOrg({ ...org, cardColor })}
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">文字色</span>
-                      <input
-                        className={inputClass}
+                      <ColorInput
+                        label="文字色"
                         value={org.textColor}
-                        onChange={(e) => setOrg({ ...org, textColor: e.target.value })}
+                        placeholder="#211f1c"
+                        onChange={(textColor) => setOrg({ ...org, textColor })}
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">标题字体</span>
-                      <input
-                        className={inputClass}
-                        value={org.headingFont}
-                        onChange={(e) => setOrg({ ...org, headingFont: e.target.value })}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">正文字体</span>
-                      <input
-                        className={inputClass}
-                        value={org.bodyFont}
-                        onChange={(e) => setOrg({ ...org, bodyFont: e.target.value })}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">圆角</span>
-                      <input
-                        className={inputClass}
-                        placeholder="18px"
-                        value={org.radius}
-                        onChange={(e) => setOrg({ ...org, radius: e.target.value })}
-                      />
-                    </label>
-                  </div>
-                  <button className={`${buttonClass} mt-4`} disabled={saving === 'brand'}>
-                    {saving === 'brand' ? '保存中...' : '保存品牌 VI'}
-                  </button>
+                      <label className="block">
+                        <span className="text-sm font-medium">圆角</span>
+                        <input
+                          className={inputClass}
+                          placeholder="18px"
+                          value={org.radius}
+                          onChange={(e) => setOrg({ ...org, radius: e.target.value })}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-medium">标题字体</span>
+                        <input
+                          className={inputClass}
+                          value={org.headingFont}
+                          onChange={(e) => setOrg({ ...org, headingFont: e.target.value })}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-medium">正文字体</span>
+                        <input
+                          className={inputClass}
+                          value={org.bodyFont}
+                          onChange={(e) => setOrg({ ...org, bodyFont: e.target.value })}
+                        />
+                      </label>
+                    </div>
+                  </SettingsSection>
+
+                  <FloatingSubmitBar
+                    title="基础 VI"
+                    label={saving === 'brand' ? '保存中...' : '保存品牌 VI'}
+                    disabled={saving === 'brand'}
+                  />
                 </form>
               )}
 
               {brandTab === 'navigation' && (
-                <form className="resource-card mt-4 p-5" onSubmit={submitNavigation}>
-                  <div className="text-sm font-semibold">前台 Header 菜单</div>
-                  <div className="mt-4">
+                <form className="mt-4 space-y-5 pb-24" onSubmit={submitNavigation}>
+                  <SettingsSection
+                    title="前台 Header 菜单"
+                    description="按展示顺序维护前台页眉导航；关闭显示后该菜单不会出现在前台。"
+                  >
                     <NavEditor
                       value={publicSite.navigation}
                       onChange={(navigation) => updatePublicSite({ navigation })}
                     />
-                  </div>
-                  <button className={`${buttonClass} mt-4`} disabled={saving === 'navigation'}>
-                    {saving === 'navigation' ? '保存中...' : '保存 Header 菜单'}
-                  </button>
+                  </SettingsSection>
+                  <FloatingSubmitBar
+                    title="Header 菜单"
+                    label={saving === 'navigation' ? '保存中...' : '保存 Header 菜单'}
+                    disabled={saving === 'navigation'}
+                  />
                 </form>
               )}
 
               {brandTab === 'footer' && (
-                <form className="resource-card mt-4 p-5" onSubmit={submitFooter}>
-                  <div className="text-sm font-semibold">Footer / 备案</div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <Field label="备案号">
-                      <input
-                        className="form-input"
-                        placeholder="例如：沪ICP备00000000号-1"
-                        value={publicSite.icpNumber}
-                        onChange={(event) => updatePublicSite({ icpNumber: event.target.value })}
-                      />
-                    </Field>
-                    <Field label="备案链接">
-                      <input
-                        className="form-input"
-                        placeholder="https://beian.miit.gov.cn"
-                        value={publicSite.icpUrl}
-                        onChange={(event) => updatePublicSite({ icpUrl: event.target.value })}
-                      />
-                    </Field>
-                  </div>
-                  <button className={`${buttonClass} mt-4`} disabled={saving === 'footer'}>
-                    {saving === 'footer' ? '保存中...' : '保存 Footer 备案'}
-                  </button>
+                <form className="mt-4 space-y-5 pb-24" onSubmit={submitFooter}>
+                  <SettingsSection
+                    title="Footer / 备案"
+                    description="用于前台页面底部的备案号和备案系统跳转链接。"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="备案号">
+                        <input
+                          className="form-input"
+                          placeholder="例如：沪ICP备00000000号-1"
+                          value={publicSite.icpNumber}
+                          onChange={(event) => updatePublicSite({ icpNumber: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="备案链接">
+                        <input
+                          className="form-input"
+                          placeholder="https://beian.miit.gov.cn"
+                          value={publicSite.icpUrl}
+                          onChange={(event) => updatePublicSite({ icpUrl: event.target.value })}
+                        />
+                      </Field>
+                    </div>
+                  </SettingsSection>
+                  <FloatingSubmitBar
+                    title="Footer 备案"
+                    label={saving === 'footer' ? '保存中...' : '保存 Footer 备案'}
+                    disabled={saving === 'footer'}
+                  />
                 </form>
               )}
             </>
@@ -1422,29 +1480,250 @@ export function SettingsPage() {
   );
 }
 
+function SettingsSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="resource-card overflow-hidden p-0">
+      <div className="border-b px-5 py-4">
+        <h2 className="text-base font-semibold">{title}</h2>
+        {description ? (
+          <p className="text-muted-foreground mt-1 text-sm leading-5">{description}</p>
+        ) : null}
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
+
+function BrandIdentityPreview({ org }: { org: BrandFormState }) {
+  const brandName = displayValue(org.brandName || org.name, '未设置品牌名');
+  const backgroundColor = colorValue(org.backgroundColor, '#f6f4f0');
+  const cardColor = colorValue(org.cardColor, '#ffffff');
+  const primaryColor = colorValue(org.primaryColor, '#9a6a4b');
+  const textColor = colorValue(org.textColor, '#211f1c');
+  const secondaryColor = colorValue(org.secondaryColor, '#211f1c');
+  const logoUrl = org.fullLogoUrl || org.squareLogoUrl || org.logoUrl;
+
+  return (
+    <section className="resource-card overflow-hidden p-0">
+      <div className="border-b px-5 py-4">
+        <div className="text-primary text-xs font-semibold">当前 VI</div>
+        <h2 className="mt-1 text-base font-semibold">品牌视觉预览</h2>
+        <p className="text-muted-foreground mt-1 text-sm leading-5">
+          当前颜色值、字体、圆角和 Logo 会在这里同步展示。
+        </p>
+      </div>
+      <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div
+          className="rounded-xl border p-4"
+          style={{
+            backgroundColor,
+            color: textColor,
+            borderRadius: org.radius || '18px',
+            fontFamily: org.bodyFont || undefined,
+          }}
+        >
+          <div
+            className="rounded-lg border p-4 shadow-sm"
+            style={{ backgroundColor: cardColor, borderRadius: org.radius || '14px' }}
+          >
+            <div className="flex items-center gap-3">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={brandName}
+                  className="h-12 w-12 rounded-lg border object-contain"
+                />
+              ) : (
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  {brandName.slice(0, 1)}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div
+                  className="truncate text-lg font-semibold"
+                  style={{ fontFamily: org.headingFont || undefined }}
+                >
+                  {brandName}
+                </div>
+                <div className="mt-1 truncate text-xs opacity-70">
+                  {displayValue(org.address, '地址未设置')}
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span
+                className="rounded-full px-3 py-1 text-xs font-semibold text-white"
+                style={{ backgroundColor: primaryColor }}
+              >
+                主色按钮
+              </span>
+              <span
+                className="rounded-full border px-3 py-1 text-xs font-semibold"
+                style={{ borderColor: secondaryColor, color: secondaryColor }}
+              >
+                辅助按钮
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {BRAND_COLOR_FIELDS.map((item) => (
+            <BrandColorValue
+              key={item.key}
+              label={item.label}
+              value={org[item.key]}
+              fallback={item.fallback}
+            />
+          ))}
+          <ValueChip label="标题字体" value={displayValue(org.headingFont, '默认字体')} />
+          <ValueChip label="正文字体" value={displayValue(org.bodyFont, '默认字体')} />
+          <ValueChip label="圆角" value={displayValue(org.radius, '默认圆角')} />
+          <ValueChip label="联系电话" value={displayValue(org.phone, '未设置')} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BrandColorValue({
+  label,
+  value,
+  fallback,
+}: {
+  label: string;
+  value: string;
+  fallback: string;
+}) {
+  const resolved = colorValue(value, fallback);
+  return (
+    <div className="bg-card rounded-lg border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">{label}</span>
+        <span
+          className="h-7 w-7 shrink-0 rounded-full border"
+          style={{ backgroundColor: resolved }}
+          aria-hidden="true"
+        />
+      </div>
+      <div className="text-muted-foreground mt-2 font-mono text-xs">{resolved}</div>
+    </div>
+  );
+}
+
+function ValueChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-card rounded-lg border p-3">
+      <div className="text-sm font-medium">{label}</div>
+      <div className="text-muted-foreground mt-2 text-xs break-words">{value}</div>
+    </div>
+  );
+}
+
+function ColorInput({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const resolved = colorValue(value, placeholder);
+  return (
+    <label className="block">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-muted-foreground font-mono text-xs">{resolved}</span>
+      </div>
+      <div className="bg-background mt-1 flex items-center rounded-lg border">
+        <span
+          className="ml-2 h-7 w-7 shrink-0 rounded-md border"
+          style={{ backgroundColor: resolved }}
+          aria-hidden="true"
+        />
+        <input
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </label>
+  );
+}
+
+function FloatingSubmitBar({
+  title,
+  label,
+  disabled,
+}: {
+  title: string;
+  label: string;
+  disabled: boolean;
+}) {
+  return (
+    <div className="bg-card/95 fixed right-4 bottom-4 z-40 flex w-[calc(100vw-2rem)] max-w-sm items-center justify-between gap-3 rounded-xl border p-3 shadow-xl backdrop-blur md:right-8">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold">{title}</div>
+        <div className="text-muted-foreground text-xs">当前 tab</div>
+      </div>
+      <button className={`${buttonClass} shrink-0`} disabled={disabled}>
+        {label}
+      </button>
+    </div>
+  );
+}
+
+function displayValue(value: string, fallback: string) {
+  return value.trim() || fallback;
+}
+
+function colorValue(value: string, fallback: string) {
+  return value.trim() || fallback;
+}
+
 function SettingsTabs({
   tabs,
   activeKey,
   onChange,
 }: {
-  tabs: readonly { key: string; label: string }[];
+  tabs: readonly { key: string; label: string; description?: string }[];
   activeKey: string;
   onChange: (key: string) => void;
 }) {
   return (
-    <div className="border-border/70 bg-muted/40 flex w-full flex-wrap gap-1 rounded-lg border p-1 sm:w-fit">
+    <div className="bg-card grid w-full max-w-5xl gap-2 rounded-xl border p-2 shadow-sm md:grid-cols-3">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           type="button"
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-lg border px-4 py-3 text-left transition-colors ${
             activeKey === tab.key
-              ? 'bg-card text-foreground shadow-sm'
-              : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
+              ? 'border-primary/30 bg-primary/10 text-foreground shadow-sm'
+              : 'text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground border-transparent'
           }`}
           onClick={() => onChange(tab.key)}
         >
-          {tab.label}
+          <span className="block text-sm font-semibold">{tab.label}</span>
+          {tab.description ? (
+            <span className="text-muted-foreground mt-1 block text-xs leading-5">
+              {tab.description}
+            </span>
+          ) : null}
         </button>
       ))}
     </div>

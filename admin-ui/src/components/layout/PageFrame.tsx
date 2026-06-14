@@ -17,8 +17,7 @@ export function PageFrame({
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <div className="eyebrow">{meta.eyebrow}</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{meta.title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{meta.title}</h1>
         </div>
         {actions}
       </div>

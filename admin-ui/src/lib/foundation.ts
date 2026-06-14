@@ -33,10 +33,10 @@ export const adminSections = [
   },
   {
     key: 'institution',
-    label: '前台页面',
+    label: '前台页面设置',
     path: '/institution',
     icon: Home,
-    items: [{ key: 'institutionPages', label: '页面配置', path: '/institution', icon: Home }],
+    items: [],
   },
   {
     key: 'resources',
@@ -117,6 +117,10 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
     title: '待办事项',
   },
   institutionPages: {
+    eyebrow: 'Institution',
+    title: '前台页面配置',
+  },
+  institution: {
     eyebrow: 'Institution',
     title: '前台页面配置',
   },

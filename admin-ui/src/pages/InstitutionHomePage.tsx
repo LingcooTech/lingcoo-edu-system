@@ -88,9 +88,9 @@ const DEFAULT_SITE: PublicSiteSettings = {
 };
 
 const publicPageTabs = [
-  { key: 'home', label: '首页内容' },
-  { key: 'about', label: '关于我们' },
-  { key: 'copy', label: '页面文案' },
+  { key: 'home', label: '首页内容', description: '首屏、优势、成长闭环与联系信息' },
+  { key: 'about', label: '关于我们', description: '关于页头图、介绍文案和自由内容模块' },
+  { key: 'copy', label: '页面文案', description: '课程、试听、教师、故事页面标题与 SEO' },
 ] as const;
 
 type PublicPageTabKey = (typeof publicPageTabs)[number]['key'];
@@ -242,11 +242,13 @@ export function InstitutionHomePage() {
 
   return (
     <PageFrame section="institutionPages">
-      <SettingsTabs
-        tabs={publicPageTabs}
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as PublicPageTabKey)}
-      />
+      <div className="max-w-5xl">
+        <SettingsTabs
+          tabs={publicPageTabs}
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as PublicPageTabKey)}
+        />
+      </div>
 
       <div className="mt-4">
         {activeTab === 'home' ? <HomeContentEditor /> : null}
@@ -394,295 +396,298 @@ function HomeContentEditor() {
   }
 
   return (
-    <div className="max-w-5xl space-y-5">
-      <div className="flex justify-end">
-        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-          {saving ? '保存中...' : '保存主页'}
-        </button>
-      </div>
-          <EditorCard
-            title="首屏定位与转化"
-            description="对应首页首屏：定位、Slogan、机构介绍、轮播图、行动按钮和数据条。"
-          >
-            <Field label="定位" hint="例如：社区小班成长教室">
-              <input
-                className="form-input"
-                value={form.eyebrow}
-                onChange={(e) => update('eyebrow', e.target.value)}
-              />
-            </Field>
-            <Field label="Slogan">
-              <input
-                className="form-input"
-                value={form.bannerTitle}
-                onChange={(e) => update('bannerTitle', e.target.value)}
-              />
-            </Field>
-            <Field label="机构介绍">
-              <textarea
-                className="form-input h-20"
-                value={form.bannerSubtitle}
-                onChange={(e) => update('bannerSubtitle', e.target.value)}
-              />
-            </Field>
-            <QiniuGalleryField
-              label="首屏轮播图"
-              hint="可上传或从素材库勾选多张图片"
-              value={form.bannerImagesText}
-              onChange={(value) => update('bannerImagesText', value)}
-              prefix="homepage/banner"
+    <div className="max-w-5xl space-y-5 pb-24">
+      <TabPanelHeader
+        title="首页内容"
+        description="维护前台首页的首屏信息、优势卡片、内容入口、成长闭环和联系时间。"
+      />
+
+      <EditorCard
+        title="首屏定位与转化"
+        description="对应首页首屏：定位、Slogan、机构介绍、轮播图、行动按钮和数据条。"
+      >
+        <Field label="定位" hint="例如：社区小班成长教室">
+          <input
+            className="form-input"
+            value={form.eyebrow}
+            onChange={(e) => update('eyebrow', e.target.value)}
+          />
+        </Field>
+        <Field label="Slogan">
+          <input
+            className="form-input"
+            value={form.bannerTitle}
+            onChange={(e) => update('bannerTitle', e.target.value)}
+          />
+        </Field>
+        <Field label="机构介绍">
+          <textarea
+            className="form-input h-20"
+            value={form.bannerSubtitle}
+            onChange={(e) => update('bannerSubtitle', e.target.value)}
+          />
+        </Field>
+        <QiniuGalleryField
+          label="首屏轮播图"
+          hint="可上传或从素材库勾选多张图片"
+          value={form.bannerImagesText}
+          onChange={(value) => update('bannerImagesText', value)}
+          prefix="homepage/banner"
+        />
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="主按钮文字">
+            <input
+              className="form-input"
+              value={form.ctaText}
+              onChange={(e) => update('ctaText', e.target.value)}
             />
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="主按钮文字">
-                <input
-                  className="form-input"
-                  value={form.ctaText}
-                  onChange={(e) => update('ctaText', e.target.value)}
-                />
-              </Field>
-              <Field label="主按钮链接" hint="如 /register">
-                <input
-                  className="form-input"
-                  value={form.ctaLink}
-                  onChange={(e) => update('ctaLink', e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="次按钮文字">
-                <input
-                  className="form-input"
-                  value={form.secondaryCtaText}
-                  onChange={(e) => update('secondaryCtaText', e.target.value)}
-                />
-              </Field>
-              <Field label="次按钮链接" hint="如 /courses">
-                <input
-                  className="form-input"
-                  value={form.secondaryCtaLink}
-                  onChange={(e) => update('secondaryCtaLink', e.target.value)}
-                />
-              </Field>
-            </div>
-            <Field label="首屏数据" hint="每行一项，如「6-8 人小班」">
-              <textarea
-                className="form-input h-20"
-                value={form.statsText}
-                onChange={(e) => update('statsText', e.target.value)}
-              />
-            </Field>
-          </EditorCard>
+          </Field>
+          <Field label="主按钮链接" hint="如 /register">
+            <input
+              className="form-input"
+              value={form.ctaLink}
+              onChange={(e) => update('ctaLink', e.target.value)}
+            />
+          </Field>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="次按钮文字">
+            <input
+              className="form-input"
+              value={form.secondaryCtaText}
+              onChange={(e) => update('secondaryCtaText', e.target.value)}
+            />
+          </Field>
+          <Field label="次按钮链接" hint="如 /courses">
+            <input
+              className="form-input"
+              value={form.secondaryCtaLink}
+              onChange={(e) => update('secondaryCtaLink', e.target.value)}
+            />
+          </Field>
+        </div>
+        <Field label="首屏数据" hint="每行一项，如「6-8 人小班」">
+          <textarea
+            className="form-input h-20"
+            value={form.statsText}
+            onChange={(e) => update('statsText', e.target.value)}
+          />
+        </Field>
+      </EditorCard>
 
-          <EditorCard title="核心优势" description="首页首屏下方的核心优势总结。">
-            <Field label="优势模块标题" hint="移动端显示在优势卡片上方，例如：为什么选择我们">
-              <input
-                className="form-input"
-                value={form.highlightsTitle}
-                onChange={(event) => update('highlightsTitle', event.target.value)}
-              />
-            </Field>
-            <div className="space-y-4">
-              {form.highlights.map((item, index) => (
-                <div key={index} className="rounded-lg border p-3">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">优势 {index + 1}</div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost px-2 py-1 text-red-600"
-                      onClick={() => removeHighlight(index)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Field label="图标">
-                      <select
-                        className="form-input"
-                        value={item.icon}
-                        onChange={(event) => updateHighlight(index, { icon: event.target.value })}
-                      >
-                        {HIGHLIGHT_ICON_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="标题" hint="例如：离家近">
-                      <input
-                        className="form-input"
-                        value={item.title}
-                        onChange={(event) => updateHighlight(index, { title: event.target.value })}
-                      />
-                    </Field>
-                  </div>
-                  <Field label="说明文案">
-                    <textarea
-                      className="form-input h-20"
-                      value={item.text}
-                      onChange={(event) => updateHighlight(index, { text: event.target.value })}
-                    />
-                  </Field>
-                  <QiniuImageField
-                    label="背景图片"
-                    hint="可选；前台优势卡片会用作背景图"
-                    value={item.imageUrl}
-                    onChange={(imageUrl) => updateHighlight(index, { imageUrl })}
-                    prefix="homepage/highlights"
+      <EditorCard title="核心优势" description="首页首屏下方的核心优势总结。">
+        <Field label="优势模块标题" hint="移动端显示在优势卡片上方，例如：为什么选择我们">
+          <input
+            className="form-input"
+            value={form.highlightsTitle}
+            onChange={(event) => update('highlightsTitle', event.target.value)}
+          />
+        </Field>
+        <div className="space-y-4">
+          {form.highlights.map((item, index) => (
+            <div key={index} className="rounded-lg border p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-medium">优势 {index + 1}</div>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => removeHighlight(index)}
+                >
+                  删除
+                </button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="图标">
+                  <select
+                    className="form-input"
+                    value={item.icon}
+                    onChange={(event) => updateHighlight(index, { icon: event.target.value })}
+                  >
+                    {HIGHLIGHT_ICON_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="标题" hint="例如：离家近">
+                  <input
+                    className="form-input"
+                    value={item.title}
+                    onChange={(event) => updateHighlight(index, { title: event.target.value })}
                   />
-                </div>
-              ))}
-              <button type="button" className="btn btn-secondary" onClick={addHighlight}>
-                添加优势
-              </button>
-            </div>
-          </EditorCard>
-
-          <EditorCard
-            title="内容营销模块"
-            description="首页读取「招生转化 / 内容营销」中已发布内容，这里只维护模块标题。"
-          >
-            <Field label="模块标题" hint="例如：成长故事、课堂观察、学员变化记录">
-              <input
-                className="form-input"
-                value={form.contentMarketingTitle}
-                onChange={(event) => update('contentMarketingTitle', event.target.value)}
-              />
-            </Field>
-          </EditorCard>
-
-          <EditorCard
-            title="成长闭环"
-            description="首页底部的成长路径模块，可设置文案、步骤、按钮和背景。"
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="模块标签">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.eyebrow}
-                  onChange={(event) => updateGrowthLoop({ eyebrow: event.target.value })}
-                />
-              </Field>
-              <Field label="模块标题">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.title}
-                  onChange={(event) => updateGrowthLoop({ title: event.target.value })}
-                />
-              </Field>
-            </div>
-            <Field label="模块说明">
-              <textarea
-                className="form-input h-20"
-                value={form.growthLoop.summary}
-                onChange={(event) => updateGrowthLoop({ summary: event.target.value })}
-              />
-            </Field>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="主按钮文字">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.primaryCtaText}
-                  onChange={(event) => updateGrowthLoop({ primaryCtaText: event.target.value })}
-                />
-              </Field>
-              <Field label="主按钮链接" hint="如 /register">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.primaryCtaLink}
-                  onChange={(event) => updateGrowthLoop({ primaryCtaLink: event.target.value })}
-                />
-              </Field>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="次按钮文字">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.secondaryCtaText}
-                  onChange={(event) => updateGrowthLoop({ secondaryCtaText: event.target.value })}
-                />
-              </Field>
-              <Field label="次按钮链接" hint="如 tel:15269284351">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.secondaryCtaLink}
-                  onChange={(event) => updateGrowthLoop({ secondaryCtaLink: event.target.value })}
-                />
-              </Field>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="背景色" hint="如 #211f1c">
-                <input
-                  className="form-input"
-                  value={form.growthLoop.backgroundColor}
-                  onChange={(event) => updateGrowthLoop({ backgroundColor: event.target.value })}
+                </Field>
+              </div>
+              <Field label="说明文案">
+                <textarea
+                  className="form-input h-20"
+                  value={item.text}
+                  onChange={(event) => updateHighlight(index, { text: event.target.value })}
                 />
               </Field>
               <QiniuImageField
                 label="背景图片"
-                hint="可选；前台会叠加深色遮罩保证文字可读"
-                value={form.growthLoop.backgroundImageUrl}
-                onChange={(backgroundImageUrl) => updateGrowthLoop({ backgroundImageUrl })}
-                prefix="homepage/growth-loop"
+                hint="可选；前台优势卡片会用作背景图"
+                value={item.imageUrl}
+                onChange={(imageUrl) => updateHighlight(index, { imageUrl })}
+                prefix="homepage/highlights"
               />
             </div>
-            <div className="space-y-3">
-              <div className="text-sm font-medium">成长步骤</div>
-              {form.growthLoop.steps.map((item, index) => (
-                <div
-                  key={index}
-                  className="grid gap-3 rounded-lg border p-3 md:grid-cols-[10rem_1fr_auto]"
-                >
-                  <Field label="图标">
-                    <select
-                      className="form-input"
-                      value={item.icon}
-                      onChange={(event) =>
-                        updateGrowthLoopStep(index, { icon: event.target.value })
-                      }
-                    >
-                      {GROWTH_LOOP_ICON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="步骤标题">
-                    <input
-                      className="form-input"
-                      value={item.title}
-                      onChange={(event) =>
-                        updateGrowthLoopStep(index, { title: event.target.value })
-                      }
-                    />
-                  </Field>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      className="btn btn-ghost px-2 py-1 text-red-600"
-                      onClick={() => removeGrowthLoopStep(index)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button type="button" className="btn btn-secondary" onClick={addGrowthLoopStep}>
-                添加步骤
-              </button>
-            </div>
-          </EditorCard>
+          ))}
+          <button type="button" className="btn btn-secondary" onClick={addHighlight}>
+            添加优势
+          </button>
+        </div>
+      </EditorCard>
 
-          <EditorCard title="联系与上课时间">
-            <Field label="营业 / 上课时间">
-              <input
-                className="form-input"
-                value={form.businessHours}
-                onChange={(e) => update('businessHours', e.target.value)}
-              />
-            </Field>
-          </EditorCard>
+      <EditorCard
+        title="内容营销模块"
+        description="首页读取「招生转化 / 内容营销」中已发布内容，这里只维护模块标题。"
+      >
+        <Field label="模块标题" hint="例如：成长故事、课堂观察、学员变化记录">
+          <input
+            className="form-input"
+            value={form.contentMarketingTitle}
+            onChange={(event) => update('contentMarketingTitle', event.target.value)}
+          />
+        </Field>
+      </EditorCard>
+
+      <EditorCard
+        title="成长闭环"
+        description="首页底部的成长路径模块，可设置文案、步骤、按钮和背景。"
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="模块标签">
+            <input
+              className="form-input"
+              value={form.growthLoop.eyebrow}
+              onChange={(event) => updateGrowthLoop({ eyebrow: event.target.value })}
+            />
+          </Field>
+          <Field label="模块标题">
+            <input
+              className="form-input"
+              value={form.growthLoop.title}
+              onChange={(event) => updateGrowthLoop({ title: event.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="模块说明">
+          <textarea
+            className="form-input h-20"
+            value={form.growthLoop.summary}
+            onChange={(event) => updateGrowthLoop({ summary: event.target.value })}
+          />
+        </Field>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="主按钮文字">
+            <input
+              className="form-input"
+              value={form.growthLoop.primaryCtaText}
+              onChange={(event) => updateGrowthLoop({ primaryCtaText: event.target.value })}
+            />
+          </Field>
+          <Field label="主按钮链接" hint="如 /register">
+            <input
+              className="form-input"
+              value={form.growthLoop.primaryCtaLink}
+              onChange={(event) => updateGrowthLoop({ primaryCtaLink: event.target.value })}
+            />
+          </Field>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="次按钮文字">
+            <input
+              className="form-input"
+              value={form.growthLoop.secondaryCtaText}
+              onChange={(event) => updateGrowthLoop({ secondaryCtaText: event.target.value })}
+            />
+          </Field>
+          <Field label="次按钮链接" hint="如 tel:15269284351">
+            <input
+              className="form-input"
+              value={form.growthLoop.secondaryCtaLink}
+              onChange={(event) => updateGrowthLoop({ secondaryCtaLink: event.target.value })}
+            />
+          </Field>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="背景色" hint="如 #211f1c">
+            <input
+              className="form-input"
+              value={form.growthLoop.backgroundColor}
+              onChange={(event) => updateGrowthLoop({ backgroundColor: event.target.value })}
+            />
+          </Field>
+          <QiniuImageField
+            label="背景图片"
+            hint="可选；前台会叠加深色遮罩保证文字可读"
+            value={form.growthLoop.backgroundImageUrl}
+            onChange={(backgroundImageUrl) => updateGrowthLoop({ backgroundImageUrl })}
+            prefix="homepage/growth-loop"
+          />
+        </div>
+        <div className="space-y-3">
+          <div className="text-sm font-medium">成长步骤</div>
+          {form.growthLoop.steps.map((item, index) => (
+            <div
+              key={index}
+              className="grid gap-3 rounded-lg border p-3 md:grid-cols-[10rem_1fr_auto]"
+            >
+              <Field label="图标">
+                <select
+                  className="form-input"
+                  value={item.icon}
+                  onChange={(event) => updateGrowthLoopStep(index, { icon: event.target.value })}
+                >
+                  {GROWTH_LOOP_ICON_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="步骤标题">
+                <input
+                  className="form-input"
+                  value={item.title}
+                  onChange={(event) => updateGrowthLoopStep(index, { title: event.target.value })}
+                />
+              </Field>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  onClick={() => removeGrowthLoopStep(index)}
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          ))}
+          <button type="button" className="btn btn-secondary" onClick={addGrowthLoopStep}>
+            添加步骤
+          </button>
+        </div>
+      </EditorCard>
+
+      <EditorCard title="联系与上课时间">
+        <Field label="营业 / 上课时间">
+          <input
+            className="form-input"
+            value={form.businessHours}
+            onChange={(e) => update('businessHours', e.target.value)}
+          />
+        </Field>
+      </EditorCard>
+
+      <FloatingSaveBar
+        title="首页内容"
+        label={saving ? '保存中...' : '保存主页'}
+        disabled={saving}
+        onClick={save}
+      />
     </div>
   );
 }
@@ -730,14 +735,13 @@ function AboutContentEditor() {
   }
 
   return (
-    <div className="max-w-4xl space-y-5">
-      <div className="flex justify-end">
-        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-          {saving ? '保存中...' : '保存关于页'}
-        </button>
-      </div>
+    <div className="max-w-4xl space-y-5 pb-24">
+      <TabPanelHeader
+        title="关于我们"
+        description="维护关于页首屏、平台介绍、教学机构介绍，以及可自由编排的内容模块。"
+      />
 
-      <EditorCard title="关于我们页面">
+      <EditorCard title="页面头部与介绍">
         <Field label="页面标签">
           <input
             className="form-input"
@@ -806,13 +810,23 @@ function AboutContentEditor() {
         </Field>
       </EditorCard>
 
-      <EditorCard title="关于页自由内容模块" description="用于补充团队、资质、合作案例、媒体报道等内容">
+      <EditorCard
+        title="关于页自由内容模块"
+        description="用于补充团队、资质、合作案例、媒体报道等内容"
+      >
         <BlockEditor
           value={form.aboutPage.bodyBlocks}
           onChange={(bodyBlocks) => updateAbout({ bodyBlocks })}
           allowed={HOME_ALLOWED}
         />
       </EditorCard>
+
+      <FloatingSaveBar
+        title="关于我们"
+        label={saving ? '保存中...' : '保存关于页'}
+        disabled={saving}
+        onClick={save}
+      />
     </div>
   );
 }
@@ -856,18 +870,23 @@ function PageCopySettings() {
   }
 
   return (
-    <div className="max-w-5xl space-y-5">
-      <div className="flex justify-end">
-        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-          {saving ? '保存中...' : '保存页面文案'}
-        </button>
-      </div>
+    <div className="max-w-5xl space-y-5 pb-24">
+      <TabPanelHeader
+        title="页面文案"
+        description="集中维护课程、试听、教师和成长故事列表页的页头文案与浏览器标题。"
+      />
       <EditorCard
         title="列表页文案与 SEO"
         description="配置课程、试听、教师和成长故事列表页顶部文案；SEO 标题会用于浏览器标签页。"
       >
         <PageCopyEditor value={form.pages} onChange={updatePages} />
       </EditorCard>
+      <FloatingSaveBar
+        title="页面文案"
+        label={saving ? '保存中...' : '保存页面文案'}
+        disabled={saving}
+        onClick={save}
+      />
     </div>
   );
 }
@@ -921,42 +940,96 @@ function PageCopyEditor({
       {PAGE_COPY_META.map((item) => {
         const copy = value[item.key];
         return (
-          <section key={item.key} className="rounded-lg border p-4">
-            <div className="text-sm font-semibold">{item.label}</div>
-            <p className="text-muted-foreground mt-1 text-xs">{item.description}</p>
-            <div className="mt-4 grid gap-3">
-              <Field label="页面标签">
-                <input
-                  className="form-input"
-                  value={copy.eyebrow}
-                  onChange={(event) => patch(item.key, { eyebrow: event.target.value })}
-                />
-              </Field>
-              <Field label="页面标题">
-                <input
-                  className="form-input"
-                  value={copy.title}
-                  onChange={(event) => patch(item.key, { title: event.target.value })}
-                />
-              </Field>
-              <Field label="页面副标题">
-                <textarea
-                  className="form-input h-20"
-                  value={copy.subtitle}
-                  onChange={(event) => patch(item.key, { subtitle: event.target.value })}
-                />
-              </Field>
-              <Field label="SEO 标题" hint="设置后用于浏览器标签页标题；留空使用页面标题">
-                <input
-                  className="form-input"
-                  value={copy.seoTitle}
-                  onChange={(event) => patch(item.key, { seoTitle: event.target.value })}
-                />
-              </Field>
+          <section key={item.key} className="bg-background/70 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">{item.label}</div>
+                <p className="text-muted-foreground mt-1 text-xs">{item.description}</p>
+              </div>
+              <span className="bg-muted text-muted-foreground rounded-full px-2 py-1 text-[11px] font-medium">
+                {item.key}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-4">
+              <div className="bg-card rounded-lg border p-3">
+                <div className="text-muted-foreground mb-3 text-xs font-semibold">页面展示</div>
+                <div className="grid gap-3">
+                  <Field label="页面标签">
+                    <input
+                      className="form-input"
+                      value={copy.eyebrow}
+                      onChange={(event) => patch(item.key, { eyebrow: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="页面标题">
+                    <input
+                      className="form-input"
+                      value={copy.title}
+                      onChange={(event) => patch(item.key, { title: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="页面副标题">
+                    <textarea
+                      className="form-input h-20"
+                      value={copy.subtitle}
+                      onChange={(event) => patch(item.key, { subtitle: event.target.value })}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="bg-card rounded-lg border p-3">
+                <div className="text-muted-foreground mb-3 text-xs font-semibold">SEO</div>
+                <Field label="SEO 标题" hint="设置后用于浏览器标签页标题；留空使用页面标题">
+                  <input
+                    className="form-input"
+                    value={copy.seoTitle}
+                    onChange={(event) => patch(item.key, { seoTitle: event.target.value })}
+                  />
+                </Field>
+              </div>
             </div>
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function TabPanelHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="bg-card rounded-xl border p-5 shadow-sm">
+      <div className="text-primary text-xs font-semibold">当前配置</div>
+      <h2 className="mt-2 text-lg font-semibold tracking-tight">{title}</h2>
+      <p className="text-muted-foreground mt-1 text-sm leading-6">{description}</p>
+    </div>
+  );
+}
+
+function FloatingSaveBar({
+  title,
+  label,
+  disabled,
+  onClick,
+}: {
+  title: string;
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="bg-card/95 fixed right-4 bottom-4 z-40 flex w-[calc(100vw-2rem)] max-w-sm items-center justify-between gap-3 rounded-xl border p-3 shadow-xl backdrop-blur md:right-8">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold">{title}</div>
+        <div className="text-muted-foreground text-xs">当前 tab</div>
+      </div>
+      <button
+        type="button"
+        className="btn btn-primary shrink-0"
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {label}
+      </button>
     </div>
   );
 }
@@ -966,24 +1039,29 @@ function SettingsTabs({
   activeKey,
   onChange,
 }: {
-  tabs: readonly { key: string; label: string }[];
+  tabs: readonly { key: string; label: string; description?: string }[];
   activeKey: string;
   onChange: (key: string) => void;
 }) {
   return (
-    <div className="border-border/70 bg-muted/40 flex w-full flex-wrap gap-1 rounded-lg border p-1 sm:w-fit">
+    <div className="bg-card grid w-full gap-2 rounded-xl border p-2 shadow-sm md:grid-cols-3">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           type="button"
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-lg border px-4 py-3 text-left transition-colors ${
             activeKey === tab.key
-              ? 'bg-card text-foreground shadow-sm'
-              : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
+              ? 'border-primary/30 bg-primary/10 text-foreground shadow-sm'
+              : 'text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground border-transparent'
           }`}
           onClick={() => onChange(tab.key)}
         >
-          {tab.label}
+          <span className="block text-sm font-semibold">{tab.label}</span>
+          {tab.description ? (
+            <span className="text-muted-foreground mt-1 block text-xs leading-5">
+              {tab.description}
+            </span>
+          ) : null}
         </button>
       ))}
     </div>
@@ -1000,12 +1078,14 @@ function EditorCard({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-card rounded-lg border p-4">
-      <div className="mb-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {description ? <p className="text-muted-foreground mt-0.5 text-xs">{description}</p> : null}
+    <section className="bg-card overflow-hidden rounded-xl border shadow-sm">
+      <div className="border-b px-5 py-4">
+        <h2 className="text-base font-semibold">{title}</h2>
+        {description ? (
+          <p className="text-muted-foreground mt-1 text-sm leading-5">{description}</p>
+        ) : null}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-4 p-5">{children}</div>
     </section>
   );
 }
