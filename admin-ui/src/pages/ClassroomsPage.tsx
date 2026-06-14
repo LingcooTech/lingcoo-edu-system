@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
@@ -28,7 +28,18 @@ const emptyClassroomForm: ClassroomForm = {
   status: 'active',
 };
 
-export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}) {
+interface EmbeddedCreateAction {
+  label: string;
+  onClick: () => void;
+}
+
+export function ClassroomsPage({
+  embedded = false,
+  onCreateActionChange,
+}: {
+  embedded?: boolean;
+  onCreateActionChange?: (action: EmbeddedCreateAction | null) => void;
+} = {}) {
   const toast = useToast();
   const { data: classrooms, setData: setClassrooms } = useApiResource<Classroom>(
     CLASSROOMS(),
@@ -47,7 +58,7 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Classroom | null>(null);
 
-  function openEditor(classroom?: Classroom) {
+  const openEditor = useCallback((classroom?: Classroom) => {
     setEditing(classroom ?? null);
     setForm(
       classroom
@@ -60,7 +71,13 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
         : { ...emptyClassroomForm, campusId: campuses[0]?.id ?? '' },
     );
     setOpen(true);
-  }
+  }, [campuses]);
+
+  useEffect(() => {
+    if (!embedded) return;
+    onCreateActionChange?.({ label: '新增教室', onClick: () => openEditor() });
+    return () => onCreateActionChange?.(null);
+  }, [embedded, onCreateActionChange, openEditor]);
 
   async function submit() {
     if (!form.campusId || !form.name.trim()) {
@@ -108,16 +125,8 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  const page = (
-    <PageFrame
-      section="classrooms"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={() => openEditor()}>
-          <Plus className="h-4 w-4" />
-          新增教室
-        </button>
-      }
-    >
+  const content = (
+    <>
       <DataTable
         columns={[
           { key: 'name', header: '教室', cell: (row) => row.name },
@@ -225,14 +234,24 @@ export function ClassroomsPage({ embedded = false }: { embedded?: boolean } = {}
         onConfirm={deleteClassroom}
         onCancel={() => setDeleteTarget(null)}
       />
-    </PageFrame>
+    </>
   );
 
-  return embedded ? (
-    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
-      {page}
-    </div>
-  ) : (
-    page
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageFrame
+      section="classrooms"
+      actions={
+        <button type="button" className="btn btn-primary" onClick={() => openEditor()}>
+          <Plus className="h-4 w-4" />
+          新增教室
+        </button>
+      }
+    >
+      {content}
+    </PageFrame>
   );
 }

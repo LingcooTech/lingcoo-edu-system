@@ -91,11 +91,16 @@
 
 @layer components {
   .page-shell {
-    @apply mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8;
+    @apply mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col overflow-hidden px-4 pt-5 sm:px-6 lg:px-8;
   }
 
   .page-header {
-    @apply mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between;
+    @apply shrink-0 border-b pb-4;
+    @apply mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .page-content {
+    @apply min-h-0 flex-1 overflow-y-auto pb-6;
   }
 
   .eyebrow {

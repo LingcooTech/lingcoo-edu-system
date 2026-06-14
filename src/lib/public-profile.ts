@@ -79,7 +79,7 @@ const defaultGrowthLoopSteps: PublicProfileGrowthLoopStep[] = [
 ];
 
 export const defaultPublicProfile: PublicProfile = {
-  eyebrow: '社区小班成长教室',
+  eyebrow: '',
   highlightsTitle: '为什么选择我们',
   highlights: [
     {
@@ -120,7 +120,7 @@ export const defaultPublicProfile: PublicProfile = {
   studentStories: [],
   contentMarketingTitle: '成长故事',
   growthLoop: {
-    eyebrow: '成长闭环',
+    eyebrow: '',
     title: '让课程围绕孩子持续迭代',
     summary: '目标、计划、课堂、反馈、复盘、调整，形成可追踪的成长路径。',
     primaryCtaText: '预约成长评估',
@@ -300,7 +300,7 @@ function normalizeGrowthLoop(
   }
 
   return {
-    eyebrow: normalizeString(value.eyebrow) || fallback.eyebrow,
+    eyebrow: '',
     title: normalizeString(value.title) || fallback.title,
     summary: normalizeString(value.summary) || fallback.summary,
     primaryCtaText: normalizeString(value.primaryCtaText) || fallback.primaryCtaText,
@@ -324,7 +324,7 @@ export function readPublicProfile(settings: unknown): PublicProfile {
   );
 
   return {
-    eyebrow: normalizeString(raw.eyebrow) || defaultPublicProfile.eyebrow,
+    eyebrow: '',
     highlightsTitle: normalizeString(raw.highlightsTitle) || defaultPublicProfile.highlightsTitle,
     highlights: normalizeHighlights(raw.highlights, defaultPublicProfile.highlights, 6),
     bannerImages,
@@ -357,7 +357,7 @@ export function normalizePublicProfile(input: PublicProfileInput) {
   );
 
   return {
-    eyebrow: normalizeString(input.eyebrow) || defaultPublicProfile.eyebrow,
+    eyebrow: '',
     highlightsTitle:
       normalizeString(input.highlightsTitle) || defaultPublicProfile.highlightsTitle,
     highlights: normalizeHighlights(input.highlights, defaultPublicProfile.highlights, 6),

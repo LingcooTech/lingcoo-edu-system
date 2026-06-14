@@ -34,7 +34,6 @@ export function AboutPage() {
   const organization = home?.organization;
   const about = organization?.publicSite?.aboutPage;
   const blocks = about?.bodyBlocks ?? [];
-  const eyebrow = about?.eyebrow ?? organization?.brandName ?? 'About';
   const title = about?.title || '关于我们';
   const subtitle = about?.subtitle ?? '了解预约平台、教学机构和到店咨询方式。';
   const platformTitle = platformTitleFor(organization?.brandName, about?.operatorIntroTitle);
@@ -61,8 +60,7 @@ export function AboutPage() {
     <Layout>
       <section className="container-narrow py-10">
         <div>
-          {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
-          <h1 className="section-title mt-2">{title}</h1>
+          <h1 className="section-title">{title}</h1>
           {subtitle ? (
             <p className="text-ink-soft mt-3 max-w-2xl text-sm leading-7">{subtitle}</p>
           ) : null}

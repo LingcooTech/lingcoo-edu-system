@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ChevronDown, Save } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
@@ -19,7 +20,6 @@ import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuIma
 import { useToast } from '@/components/shared/Toast';
 
 interface HomeForm {
-  eyebrow: string;
   highlightsTitle: string;
   bannerTitle: string;
   bannerSubtitle: string;
@@ -36,6 +36,14 @@ interface HomeForm {
   businessHours: string;
 }
 
+interface PageSaveAction {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}
+
+type SaveActionChange = (action: PageSaveAction | null) => void;
+
 const DEFAULT_SITE: PublicSiteSettings = {
   navigation: [
     { label: '首页', path: '/', visible: true },
@@ -47,32 +55,32 @@ const DEFAULT_SITE: PublicSiteSettings = {
   ],
   pages: {
     courses: {
-      eyebrow: '课程',
+      eyebrow: '',
       title: '全部课程',
       subtitle: '按年龄与方向开设的小班课程，先预约试听，老师会电话确认适合的班型与时间。',
       seoTitle: '',
     },
     trials: {
-      eyebrow: '试听预约',
+      eyebrow: '',
       title: '公开课 / 试听课',
       subtitle: '选择一节公开课，扫码或填表即可预约名额，老师会在课前与你确认。',
       seoTitle: '',
     },
     teachers: {
-      eyebrow: '教师团队',
+      eyebrow: '',
       title: '教师团队',
       subtitle: '认识我们的老师，找到适合孩子的那一位。',
       seoTitle: '',
     },
     stories: {
-      eyebrow: '成长故事',
+      eyebrow: '',
       title: '成长故事',
       subtitle: '记录孩子从试听、练习到形成习惯的真实变化，用故事呈现课程带来的长期影响。',
       seoTitle: '',
     },
   },
   aboutPage: {
-    eyebrow: 'About',
+    eyebrow: '',
     title: '关于我们',
     subtitle: '',
     seoTitle: '',
@@ -88,9 +96,9 @@ const DEFAULT_SITE: PublicSiteSettings = {
 };
 
 const publicPageTabs = [
-  { key: 'home', label: '首页内容', description: '首屏、优势、成长闭环与联系信息' },
-  { key: 'about', label: '关于我们', description: '关于页头图、介绍文案和自由内容模块' },
-  { key: 'copy', label: '页面文案', description: '课程、试听、教师、故事页面标题与 SEO' },
+  { key: 'home', label: '首页' },
+  { key: 'about', label: '关于我们' },
+  { key: 'copy', label: '页面文案' },
 ] as const;
 
 type PublicPageTabKey = (typeof publicPageTabs)[number]['key'];
@@ -155,7 +163,7 @@ function cleanGrowthLoopSteps(items: PublicProfileGrowthLoopStep[]): PublicProfi
 
 function cleanGrowthLoop(item: PublicProfileGrowthLoop): PublicProfileGrowthLoop {
   return {
-    eyebrow: item.eyebrow.trim(),
+    eyebrow: '',
     title: item.title.trim(),
     summary: item.summary.trim(),
     primaryCtaText: item.primaryCtaText.trim(),
@@ -168,9 +176,19 @@ function cleanGrowthLoop(item: PublicProfileGrowthLoop): PublicProfileGrowthLoop
   };
 }
 
+function withoutPageCopyEyebrows(
+  pages: PublicSiteSettings['pages'],
+): PublicSiteSettings['pages'] {
+  return {
+    courses: { ...pages.courses, eyebrow: '' },
+    trials: { ...pages.trials, eyebrow: '' },
+    teachers: { ...pages.teachers, eyebrow: '' },
+    stories: { ...pages.stories, eyebrow: '' },
+  };
+}
+
 function profileToForm(profile: PublicProfile): HomeForm {
   return {
-    eyebrow: profile.eyebrow,
     highlightsTitle: profile.highlightsTitle,
     bannerTitle: profile.bannerTitle,
     bannerSubtitle: profile.bannerSubtitle,
@@ -233,6 +251,10 @@ export function InstitutionHomePage() {
   const [activeTab, setActiveTab] = useState<PublicPageTabKey>(
     location.pathname.includes('/about') ? 'about' : 'home',
   );
+  const [saveAction, setSaveAction] = useState<PageSaveAction | null>(null);
+  const handleSaveActionChange = useCallback<SaveActionChange>((action) => {
+    setSaveAction(action);
+  }, []);
 
   useEffect(() => {
     if (location.pathname.includes('/about')) {
@@ -240,26 +262,56 @@ export function InstitutionHomePage() {
     }
   }, [location.pathname]);
 
-  return (
-    <PageFrame section="institutionPages">
-      <div className="max-w-5xl">
-        <SettingsTabs
-          tabs={publicPageTabs}
-          activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as PublicPageTabKey)}
-        />
-      </div>
+  useEffect(() => {
+    setSaveAction(null);
+  }, [activeTab]);
 
-      <div className="mt-4">
-        {activeTab === 'home' ? <HomeContentEditor /> : null}
-        {activeTab === 'about' ? <AboutContentEditor /> : null}
-        {activeTab === 'copy' ? <PageCopySettings /> : null}
+  return (
+    <PageFrame
+      section="institutionPages"
+      className="max-w-none px-0 pt-0"
+      headerClassName="mb-0 shrink-0 items-center border-b px-4 py-4 sm:px-6 lg:px-8"
+      contentClassName="overflow-hidden pb-0"
+      actions={
+        <button
+          type="button"
+          className="btn btn-primary shrink-0"
+          onClick={() => saveAction?.onClick()}
+          disabled={!saveAction || saveAction.disabled}
+        >
+          <Save className="h-4 w-4" />
+          {saveAction?.label ?? '保存'}
+        </button>
+      }
+    >
+      <div className="bg-muted/35 flex h-full min-h-0 flex-col">
+        <div className="bg-background/95 shrink-0 border-b px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+          <div className="max-w-5xl">
+            <SettingsTabs
+              tabs={publicPageTabs}
+              activeKey={activeTab}
+              onChange={(key) => setActiveTab(key as PublicPageTabKey)}
+            />
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+          {activeTab === 'home' ? (
+            <HomeContentEditor onSaveActionChange={handleSaveActionChange} />
+          ) : null}
+          {activeTab === 'about' ? (
+            <AboutContentEditor onSaveActionChange={handleSaveActionChange} />
+          ) : null}
+          {activeTab === 'copy' ? (
+            <PageCopySettings onSaveActionChange={handleSaveActionChange} />
+          ) : null}
+        </div>
       </div>
     </PageFrame>
   );
 }
 
-function HomeContentEditor() {
+function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveActionChange }) {
   const toast = useToast();
   const [form, setForm] = useState<HomeForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -356,14 +408,14 @@ function HomeContentEditor() {
     );
   }
 
-  async function save() {
-    if (!form) return;
+  const save = useCallback(async () => {
+    if (!form || saving) return;
     const bannerImages = linesToList(form.bannerImagesText);
     setSaving(true);
     try {
       const updated = await saveOrganization({
         publicProfile: {
-          eyebrow: form.eyebrow,
+          eyebrow: '',
           highlightsTitle: form.highlightsTitle,
           bannerImages,
           bannerImageUrl: bannerImages[0] ?? '',
@@ -389,30 +441,28 @@ function HomeContentEditor() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [form, saving, toast]);
+
+  useEffect(() => {
+    onSaveActionChange({
+      label: saving ? '保存中...' : '保存主页',
+      disabled: !form || saving,
+      onClick: save,
+    });
+    return () => onSaveActionChange(null);
+  }, [form, onSaveActionChange, save, saving]);
 
   if (!form) {
     return <p className="text-muted-foreground text-sm">加载中...</p>;
   }
 
   return (
-    <div className="max-w-5xl space-y-5 pb-24">
-      <TabPanelHeader
-        title="首页内容"
-        description="维护前台首页的首屏信息、优势卡片、内容入口、成长闭环和联系时间。"
-      />
-
-      <EditorCard
-        title="首屏定位与转化"
-        description="对应首页首屏：定位、Slogan、机构介绍、轮播图、行动按钮和数据条。"
+    <div className="mx-auto max-w-5xl space-y-3 pb-10">
+      <AccordionSection
+        title="首屏转化"
+        description="Slogan、机构介绍、轮播图、行动按钮和数据条。"
+        defaultOpen
       >
-        <Field label="定位" hint="例如：社区小班成长教室">
-          <input
-            className="form-input"
-            value={form.eyebrow}
-            onChange={(e) => update('eyebrow', e.target.value)}
-          />
-        </Field>
         <Field label="Slogan">
           <input
             className="form-input"
@@ -473,9 +523,9 @@ function HomeContentEditor() {
             onChange={(e) => update('statsText', e.target.value)}
           />
         </Field>
-      </EditorCard>
+      </AccordionSection>
 
-      <EditorCard title="核心优势" description="首页首屏下方的核心优势总结。">
+      <AccordionSection title="核心优势" description="首页首屏下方的核心优势总结。">
         <Field label="优势模块标题" hint="移动端显示在优势卡片上方，例如：为什么选择我们">
           <input
             className="form-input"
@@ -538,9 +588,9 @@ function HomeContentEditor() {
             添加优势
           </button>
         </div>
-      </EditorCard>
+      </AccordionSection>
 
-      <EditorCard
+      <AccordionSection
         title="内容营销模块"
         description="首页读取「招生转化 / 内容营销」中已发布内容，这里只维护模块标题。"
       >
@@ -551,28 +601,19 @@ function HomeContentEditor() {
             onChange={(event) => update('contentMarketingTitle', event.target.value)}
           />
         </Field>
-      </EditorCard>
+      </AccordionSection>
 
-      <EditorCard
+      <AccordionSection
         title="成长闭环"
         description="首页底部的成长路径模块，可设置文案、步骤、按钮和背景。"
       >
-        <div className="grid gap-3 md:grid-cols-2">
-          <Field label="模块标签">
-            <input
-              className="form-input"
-              value={form.growthLoop.eyebrow}
-              onChange={(event) => updateGrowthLoop({ eyebrow: event.target.value })}
-            />
-          </Field>
-          <Field label="模块标题">
-            <input
-              className="form-input"
-              value={form.growthLoop.title}
-              onChange={(event) => updateGrowthLoop({ title: event.target.value })}
-            />
-          </Field>
-        </div>
+        <Field label="模块标题">
+          <input
+            className="form-input"
+            value={form.growthLoop.title}
+            onChange={(event) => updateGrowthLoop({ title: event.target.value })}
+          />
+        </Field>
         <Field label="模块说明">
           <textarea
             className="form-input h-20"
@@ -670,9 +711,9 @@ function HomeContentEditor() {
             添加步骤
           </button>
         </div>
-      </EditorCard>
+      </AccordionSection>
 
-      <EditorCard title="联系与上课时间">
+      <AccordionSection title="联系与上课时间">
         <Field label="营业 / 上课时间">
           <input
             className="form-input"
@@ -680,19 +721,12 @@ function HomeContentEditor() {
             onChange={(e) => update('businessHours', e.target.value)}
           />
         </Field>
-      </EditorCard>
-
-      <FloatingSaveBar
-        title="首页内容"
-        label={saving ? '保存中...' : '保存主页'}
-        disabled={saving}
-        onClick={save}
-      />
+      </AccordionSection>
     </div>
   );
 }
 
-function AboutContentEditor() {
+function AboutContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveActionChange }) {
   const toast = useToast();
   const [form, setForm] = useState<PublicSiteSettings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -711,14 +745,14 @@ function AboutContentEditor() {
     );
   }
 
-  async function save() {
-    if (!form) return;
+  const save = useCallback(async () => {
+    if (!form || saving) return;
     setSaving(true);
     try {
       const current = await fetchOrganization();
       const publicSite = {
         ...normalizeSite(current.publicSite),
-        aboutPage: form.aboutPage,
+        aboutPage: { ...form.aboutPage, eyebrow: '' },
       };
       const updated = await saveOrganization({ publicSite });
       setForm(normalizeSite(updated.publicSite));
@@ -728,27 +762,24 @@ function AboutContentEditor() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [form, saving, toast]);
+
+  useEffect(() => {
+    onSaveActionChange({
+      label: saving ? '保存中...' : '保存关于页',
+      disabled: !form || saving,
+      onClick: save,
+    });
+    return () => onSaveActionChange(null);
+  }, [form, onSaveActionChange, save, saving]);
 
   if (!form) {
     return <p className="text-muted-foreground text-sm">加载中...</p>;
   }
 
   return (
-    <div className="max-w-4xl space-y-5 pb-24">
-      <TabPanelHeader
-        title="关于我们"
-        description="维护关于页首屏、平台介绍、教学机构介绍，以及可自由编排的内容模块。"
-      />
-
+    <div className="mx-auto max-w-4xl space-y-5 pb-10">
       <EditorCard title="页面头部与介绍">
-        <Field label="页面标签">
-          <input
-            className="form-input"
-            value={form.aboutPage.eyebrow}
-            onChange={(event) => updateAbout({ eyebrow: event.target.value })}
-          />
-        </Field>
         <Field label="页面标题">
           <input
             className="form-input"
@@ -821,17 +852,11 @@ function AboutContentEditor() {
         />
       </EditorCard>
 
-      <FloatingSaveBar
-        title="关于我们"
-        label={saving ? '保存中...' : '保存关于页'}
-        disabled={saving}
-        onClick={save}
-      />
     </div>
   );
 }
 
-function PageCopySettings() {
+function PageCopySettings({ onSaveActionChange }: { onSaveActionChange: SaveActionChange }) {
   const toast = useToast();
   const [form, setForm] = useState<PublicSiteSettings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -846,14 +871,14 @@ function PageCopySettings() {
     setForm((current) => (current ? { ...current, pages } : current));
   }
 
-  async function save() {
-    if (!form) return;
+  const save = useCallback(async () => {
+    if (!form || saving) return;
     setSaving(true);
     try {
       const current = await fetchOrganization();
       const publicSite = {
         ...normalizeSite(current.publicSite),
-        pages: form.pages,
+        pages: withoutPageCopyEyebrows(form.pages),
       };
       const updated = await saveOrganization({ publicSite });
       setForm(normalizeSite(updated.publicSite));
@@ -863,30 +888,29 @@ function PageCopySettings() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [form, saving, toast]);
+
+  useEffect(() => {
+    onSaveActionChange({
+      label: saving ? '保存中...' : '保存页面文案',
+      disabled: !form || saving,
+      onClick: save,
+    });
+    return () => onSaveActionChange(null);
+  }, [form, onSaveActionChange, save, saving]);
 
   if (!form) {
     return <p className="text-muted-foreground text-sm">加载中...</p>;
   }
 
   return (
-    <div className="max-w-5xl space-y-5 pb-24">
-      <TabPanelHeader
-        title="页面文案"
-        description="集中维护课程、试听、教师和成长故事列表页的页头文案与浏览器标题。"
-      />
+    <div className="mx-auto max-w-5xl space-y-5 pb-10">
       <EditorCard
         title="列表页文案与 SEO"
         description="配置课程、试听、教师和成长故事列表页顶部文案；SEO 标题会用于浏览器标签页。"
       >
         <PageCopyEditor value={form.pages} onChange={updatePages} />
       </EditorCard>
-      <FloatingSaveBar
-        title="页面文案"
-        label={saving ? '保存中...' : '保存页面文案'}
-        disabled={saving}
-        onClick={save}
-      />
     </div>
   );
 }
@@ -954,13 +978,6 @@ function PageCopyEditor({
               <div className="bg-card rounded-lg border p-3">
                 <div className="text-muted-foreground mb-3 text-xs font-semibold">页面展示</div>
                 <div className="grid gap-3">
-                  <Field label="页面标签">
-                    <input
-                      className="form-input"
-                      value={copy.eyebrow}
-                      onChange={(event) => patch(item.key, { eyebrow: event.target.value })}
-                    />
-                  </Field>
                   <Field label="页面标题">
                     <input
                       className="form-input"
@@ -995,42 +1012,43 @@ function PageCopyEditor({
   );
 }
 
-function TabPanelHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="bg-card rounded-xl border p-5 shadow-sm">
-      <div className="text-primary text-xs font-semibold">当前配置</div>
-      <h2 className="mt-2 text-lg font-semibold tracking-tight">{title}</h2>
-      <p className="text-muted-foreground mt-1 text-sm leading-6">{description}</p>
-    </div>
-  );
-}
-
-function FloatingSaveBar({
+function AccordionSection({
   title,
-  label,
-  disabled,
-  onClick,
+  description,
+  defaultOpen = false,
+  children,
 }: {
   title: string;
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
+  description?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
-    <div className="bg-card/95 fixed right-4 bottom-4 z-40 flex w-[calc(100vw-2rem)] max-w-sm items-center justify-between gap-3 rounded-xl border p-3 shadow-xl backdrop-blur md:right-8">
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold">{title}</div>
-        <div className="text-muted-foreground text-xs">当前 tab</div>
-      </div>
+    <section className="bg-card overflow-hidden rounded-xl border shadow-sm">
       <button
         type="button"
-        className="btn btn-primary shrink-0"
-        onClick={onClick}
-        disabled={disabled}
+        className="hover:bg-muted/35 flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
       >
-        {label}
+        <span className="min-w-0">
+          <span className="block text-base font-semibold">{title}</span>
+          {description ? (
+            <span className="text-muted-foreground mt-1 block text-sm leading-5">
+              {description}
+            </span>
+          ) : null}
+        </span>
+        <ChevronDown
+          className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
       </button>
-    </div>
+      {open ? <div className="space-y-4 border-t p-5">{children}</div> : null}
+    </section>
   );
 }
 
@@ -1039,29 +1057,24 @@ function SettingsTabs({
   activeKey,
   onChange,
 }: {
-  tabs: readonly { key: string; label: string; description?: string }[];
+  tabs: readonly { key: string; label: string }[];
   activeKey: string;
   onChange: (key: string) => void;
 }) {
   return (
-    <div className="bg-card grid w-full gap-2 rounded-xl border p-2 shadow-sm md:grid-cols-3">
+    <div className="bg-card grid w-full gap-1 rounded-lg border p-1 shadow-sm md:grid-cols-3">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           type="button"
-          className={`rounded-lg border px-4 py-3 text-left transition-colors ${
+          className={`h-10 rounded-md px-4 text-center text-sm font-semibold transition-colors ${
             activeKey === tab.key
-              ? 'border-primary/30 bg-primary/10 text-foreground shadow-sm'
-              : 'text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground border-transparent'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
           }`}
           onClick={() => onChange(tab.key)}
         >
-          <span className="block text-sm font-semibold">{tab.label}</span>
-          {tab.description ? (
-            <span className="text-muted-foreground mt-1 block text-xs leading-5">
-              {tab.description}
-            </span>
-          ) : null}
+          {tab.label}
         </button>
       ))}
     </div>

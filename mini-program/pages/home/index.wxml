@@ -3,7 +3,6 @@
 
   <block wx:else>
     <view class="hero card">
-      <view class="eyebrow">{{eyebrow}}</view>
       <view class="title hero-title">{{bannerTitle}}</view>
       <view class="body-text hero-subtitle">{{bannerSubtitle}}</view>
       <swiper
@@ -122,7 +121,6 @@
     </view>
 
     <view wx:if="{{growthLoopTitle}}" class="section contact-card">
-      <view class="contact-kicker">{{growthLoopEyebrow}}</view>
       <view class="contact-title">{{growthLoopTitle}}</view>
       <view wx:if="{{growthLoopSummary}}" class="contact-copy">{{growthLoopSummary}}</view>
       <view class="contact-steps">

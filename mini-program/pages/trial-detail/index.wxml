@@ -8,7 +8,6 @@
 
   <block wx:else>
     <view class="header card">
-      <view class="eyebrow">试听预约</view>
       <view class="title trial-title">{{detail.trialSession.title}}</view>
       <view class="body-text summary">{{detail.course.summary}}</view>
       <image

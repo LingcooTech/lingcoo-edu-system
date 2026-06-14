@@ -89,10 +89,6 @@ body {
     @apply bg-line/70 animate-pulse rounded-xl;
   }
 
-  .eyebrow {
-    @apply text-brand text-xs font-semibold tracking-[0.16em] uppercase;
-  }
-
   .chip {
     @apply bg-brand-soft text-brand inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium;
   }
@@ -435,10 +431,6 @@ body {
 
     .section-title {
       @apply text-[1.45rem] leading-tight;
-    }
-
-    .eyebrow {
-      @apply text-[11px] tracking-[0.1em];
     }
 
     .mobile-page-head {

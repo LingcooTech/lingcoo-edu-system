@@ -100,8 +100,7 @@ export function InstitutionDetailPage() {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="eyebrow">教学机构</div>
-                  <h1 className="section-title mt-2">{institution.name}</h1>
+                  <h1 className="section-title">{institution.name}</h1>
                 </div>
               </div>
               <p className="text-ink-soft mt-5 max-w-3xl text-sm leading-7 whitespace-pre-line">

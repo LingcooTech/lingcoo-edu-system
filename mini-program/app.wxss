@@ -33,14 +33,6 @@ textarea {
   color: #8b857c;
 }
 
-.eyebrow {
-  color: #9a6a4b;
-  font-size: 22rpx;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
 .title {
   color: #211f1c;
   font-size: 42rpx;

@@ -57,7 +57,6 @@
 
   <block wx:else>
     <view class="card login-card">
-      <view class="eyebrow">家长中心</view>
       <view class="title login-title">登录家长中心</view>
       <view class="body-text login-desc">
         微信登录后可查看孩子、课时余额、订单、签到、作业和通知。

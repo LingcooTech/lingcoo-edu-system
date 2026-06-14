@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
@@ -56,7 +56,18 @@ function normalizeMediaItems(items?: InstitutionMediaItem[] | null) {
     : [];
 }
 
-export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = {}) {
+interface EmbeddedCreateAction {
+  label: string;
+  onClick: () => void;
+}
+
+export function InstitutionsPage({
+  embedded = false,
+  onCreateActionChange,
+}: {
+  embedded?: boolean;
+  onCreateActionChange?: (action: EmbeddedCreateAction | null) => void;
+} = {}) {
   const toast = useToast();
   const { data, setData } = useApiResource<Institution>('/v1/institutions', 'institutions');
   const [open, setOpen] = useState(false);
@@ -66,11 +77,17 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
   const [savingOrder, setSavingOrder] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Institution | null>(null);
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditing(null);
     setForm(emptyForm);
     setOpen(true);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!embedded) return;
+    onCreateActionChange?.({ label: '新增合作方', onClick: openCreate });
+    return () => onCreateActionChange?.(null);
+  }, [embedded, onCreateActionChange, openCreate]);
 
   function openEdit(institution: Institution) {
     setEditing(institution);
@@ -156,16 +173,8 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
     }
   }
 
-  const page = (
-    <PageFrame
-      section="institutions"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          新增机构
-        </button>
-      }
-    >
+  const content = (
+    <>
       <DataTable
         columns={[
           {
@@ -327,15 +336,25 @@ export function InstitutionsPage({ embedded = false }: { embedded?: boolean } = 
         onCancel={() => setDeleteTarget(null)}
         onConfirm={deleteInstitution}
       />
-    </PageFrame>
+    </>
   );
 
-  return embedded ? (
-    <div className="[&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-header>div]:hidden [&_.page-shell]:p-0">
-      {page}
-    </div>
-  ) : (
-    page
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageFrame
+      section="institutions"
+      actions={
+        <button type="button" className="btn btn-primary" onClick={openCreate}>
+          <Plus className="h-4 w-4" />
+          新增机构
+        </button>
+      }
+    >
+      {content}
+    </PageFrame>
   );
 }
 

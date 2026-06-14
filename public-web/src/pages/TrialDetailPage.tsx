@@ -162,8 +162,7 @@ export function TrialDetailPage() {
 
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
           <article className="pwcard p-5 md:p-8">
-            <div className="eyebrow">试听预约</div>
-            <h1 className="text-ink mt-2 text-3xl font-bold tracking-tight">
+            <h1 className="text-ink text-3xl font-bold tracking-tight">
               {detail.trialSession.title}
             </h1>
             <Link

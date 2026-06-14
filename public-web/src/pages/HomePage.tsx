@@ -229,8 +229,7 @@ export function HomePage() {
       <section className="border-line bg-surface border-b">
         <div className="container-narrow hero-grid home-hero-grid" style={heroGridStyle}>
           <div ref={heroContentRef}>
-            <div className="eyebrow">{profile?.eyebrow || '儿童成长教室'}</div>
-            <h1 className="text-ink mt-3 text-4xl leading-tight font-bold md:text-5xl">
+            <h1 className="text-ink text-4xl leading-tight font-bold md:text-5xl">
               {profile?.bannerTitle || organization?.brandName || '儿童成长教室'}
             </h1>
             <p className="text-ink-soft mt-4 max-w-2xl text-base leading-8">
@@ -556,10 +555,7 @@ export function HomePage() {
             style={growthLoopStyle}
           >
             <div>
-              <div className="text-sm font-semibold text-white/55">{growthLoop.eyebrow}</div>
-              <h2 className="mt-2 text-xl leading-tight font-bold md:text-2xl">
-                {growthLoop.title}
-              </h2>
+              <h2 className="text-xl leading-tight font-bold md:text-2xl">{growthLoop.title}</h2>
               <p className="mt-3 text-sm leading-6 text-white/70">{growthLoop.summary}</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {growthLoop.primaryCtaText ? (

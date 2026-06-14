@@ -50,7 +50,7 @@ export function Shell({ account }: { account: AuthAccount }) {
   return (
     <div
       className={cn(
-        'grid min-h-screen w-full grid-cols-1',
+        'grid h-screen w-full grid-cols-1 overflow-hidden',
         collapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)]',
       )}
     >
@@ -79,9 +79,9 @@ export function Shell({ account }: { account: AuthAccount }) {
         </SheetContent>
       </Sheet>
 
-      <div className="bg-background flex min-h-screen flex-col overflow-hidden">
+      <div className="bg-background flex h-screen min-h-0 flex-col overflow-hidden">
         <Topbar account={account} onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-auto">
+        <main className="min-h-0 flex-1 overflow-hidden">
           <Outlet />
         </main>
       </div>

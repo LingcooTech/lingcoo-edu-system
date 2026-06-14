@@ -41,7 +41,6 @@ interface HomeState {
   loading: boolean;
   organizationName: string;
   brandName: string;
-  eyebrow: string;
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImages: string[];
@@ -54,7 +53,6 @@ interface HomeState {
   address: string;
   phone: string;
   businessHours: string;
-  growthLoopEyebrow: string;
   growthLoopTitle: string;
   growthLoopSummary: string;
   growthLoopPrimaryCtaText: string;
@@ -70,7 +68,6 @@ const initialState: HomeState = {
   loading: true,
   organizationName: '',
   brandName: '',
-  eyebrow: '',
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
@@ -83,7 +80,6 @@ const initialState: HomeState = {
   address: '',
   phone: '',
   businessHours: '',
-  growthLoopEyebrow: '成长闭环',
   growthLoopTitle: '',
   growthLoopSummary: '',
   growthLoopPrimaryCtaText: '预约成长评估',
@@ -156,7 +152,6 @@ function toState(home: HomePayload): HomeState {
     loading: false,
     organizationName: home.organization.name,
     brandName: home.organization.brandName,
-    eyebrow: profile.eyebrow || '儿童成长教室',
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
@@ -169,7 +164,6 @@ function toState(home: HomePayload): HomeState {
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,
-    growthLoopEyebrow: profile.growthLoop?.eyebrow || '成长闭环',
     growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
     growthLoopSummary: profile.growthLoop?.summary || '',
     growthLoopPrimaryCtaText: profile.growthLoop?.primaryCtaText || '预约成长评估',

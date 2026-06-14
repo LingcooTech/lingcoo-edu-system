@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
@@ -33,7 +33,18 @@ const emptyPackageForm: PackageForm = {
   status: 'active',
 };
 
-export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) {
+interface EmbeddedCreateAction {
+  label: string;
+  onClick: () => void;
+}
+
+export function PackagesPage({
+  embedded = false,
+  onCreateActionChange,
+}: {
+  embedded?: boolean;
+  onCreateActionChange?: (action: EmbeddedCreateAction | null) => void;
+} = {}) {
   const toast = useToast();
   const { data: packages, setData: setPackages } = useApiResource<CoursePackage>(
     PKG_BASE(),
@@ -52,11 +63,17 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CoursePackage | null>(null);
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditing(null);
     setForm(emptyPackageForm);
     setOpen(true);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!embedded) return;
+    onCreateActionChange?.({ label: '新增课时包', onClick: openCreate });
+    return () => onCreateActionChange?.(null);
+  }, [embedded, onCreateActionChange, openCreate]);
 
   function openEdit(pkg: CoursePackage) {
     setEditing(pkg);
@@ -123,16 +140,8 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }
 
-  const page = (
-    <PageFrame
-      section="packages"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          新增课时包
-        </button>
-      }
-    >
+  const content = (
+    <>
       <DataTable
         columns={[
           {
@@ -269,14 +278,24 @@ export function PackagesPage({ embedded = false }: { embedded?: boolean } = {}) 
         onCancel={() => setDeleteTarget(null)}
         onConfirm={deletePackage}
       />
-    </PageFrame>
+    </>
   );
 
-  return embedded ? (
-    <div className="[&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-header>div]:hidden [&_.page-shell]:p-0">
-      {page}
-    </div>
-  ) : (
-    page
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageFrame
+      section="packages"
+      actions={
+        <button type="button" className="btn btn-primary" onClick={openCreate}>
+          <Plus className="h-4 w-4" />
+          新增课时包
+        </button>
+      }
+    >
+      {content}
+    </PageFrame>
   );
 }

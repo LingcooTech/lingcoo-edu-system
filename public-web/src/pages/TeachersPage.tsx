@@ -68,8 +68,7 @@ export function TeachersPage() {
         ) : (
           <>
             <div className="mobile-page-head">
-              {pageCopy.eyebrow ? <div className="eyebrow">{pageCopy.eyebrow}</div> : null}
-              <h1 className="section-title mt-2">{pageCopy.title}</h1>
+              <h1 className="section-title">{pageCopy.title}</h1>
               {pageCopy.subtitle ? (
                 <p className="text-ink-soft mt-2 text-sm">{pageCopy.subtitle}</p>
               ) : null}

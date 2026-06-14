@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
@@ -110,7 +110,18 @@ function courseFormToPayload(form: CourseForm) {
   };
 }
 
-export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
+interface EmbeddedCreateAction {
+  label: string;
+  onClick: () => void;
+}
+
+export function CoursesPage({
+  embedded = false,
+  onCreateActionChange,
+}: {
+  embedded?: boolean;
+  onCreateActionChange?: (action: EmbeddedCreateAction | null) => void;
+} = {}) {
   const toast = useToast();
   const { data: courses, setData: setCourses } = useApiResource<Course>(COURSE_BASE(), 'courses');
   const { data: institutions } = useApiResource<Institution>('/v1/institutions', 'institutions');
@@ -127,11 +138,17 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditing(null);
     setForm(emptyCourseForm);
     setOpen(true);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!embedded) return;
+    onCreateActionChange?.({ label: '新增课程', onClick: openCreate });
+    return () => onCreateActionChange?.(null);
+  }, [embedded, onCreateActionChange, openCreate]);
 
   function openEdit(course: Course) {
     setEditing(course);
@@ -182,16 +199,8 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
     }
   }
 
-  const page = (
-    <PageFrame
-      section="courses"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          新增课程
-        </button>
-      }
-    >
+  const content = (
+    <>
       <DataTable
         columns={[
           {
@@ -456,14 +465,24 @@ export function CoursesPage({ embedded = false }: { embedded?: boolean } = {}) {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
-    </PageFrame>
+    </>
   );
 
-  return embedded ? (
-    <div className="[&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-header>div]:hidden [&_.page-shell]:p-0">
-      {page}
-    </div>
-  ) : (
-    page
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageFrame
+      section="courses"
+      actions={
+        <button type="button" className="btn btn-primary" onClick={openCreate}>
+          <Plus className="h-4 w-4" />
+          新增课程
+        </button>
+      }
+    >
+      {content}
+    </PageFrame>
   );
 }

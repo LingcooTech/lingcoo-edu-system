@@ -214,8 +214,7 @@ export function CourseDetailPage() {
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <div className="pwcard hidden p-5 lg:block">
-              <div className="eyebrow">预约</div>
-              <div className="text-ink mt-2 text-2xl font-bold">{price.big}</div>
+              <div className="text-ink text-2xl font-bold">{price.big}</div>
               <div className="text-muted mt-1 text-xs">{price.sub}</div>
               <Link to={registerHref} className="pwbtn pwbtn-primary mt-5 w-full">
                 预约试听 / 留资

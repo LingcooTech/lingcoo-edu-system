@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
@@ -28,7 +28,18 @@ function campusToForm(campus: Campus): CampusForm {
   };
 }
 
-export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) {
+interface EmbeddedCreateAction {
+  label: string;
+  onClick: () => void;
+}
+
+export function CampusesPage({
+  embedded = false,
+  onCreateActionChange,
+}: {
+  embedded?: boolean;
+  onCreateActionChange?: (action: EmbeddedCreateAction | null) => void;
+} = {}) {
   const toast = useToast();
   const { data, setData } = useApiResource<Campus>('/v1/campuses', 'campuses');
   const [open, setOpen] = useState(false);
@@ -37,11 +48,17 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Campus | null>(null);
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditing(null);
     setForm(emptyForm);
     setOpen(true);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!embedded) return;
+    onCreateActionChange?.({ label: '新增校区', onClick: openCreate });
+    return () => onCreateActionChange?.(null);
+  }, [embedded, onCreateActionChange, openCreate]);
 
   function openEdit(campus: Campus) {
     setEditing(campus);
@@ -92,16 +109,8 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }
 
-  const page = (
-    <PageFrame
-      section="campuses"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          新增校区
-        </button>
-      }
-    >
+  const content = (
+    <>
       <DataTable
         columns={[
           { key: 'name', header: '校区', cell: (row) => row.name },
@@ -173,14 +182,24 @@ export function CampusesPage({ embedded = false }: { embedded?: boolean } = {}) 
         onCancel={() => setDeleteTarget(null)}
         onConfirm={deleteCampus}
       />
-    </PageFrame>
+    </>
   );
 
-  return embedded ? (
-    <div className="[&_.page-header>div]:hidden [&_.page-header]:mb-3 [&_.page-header]:justify-end [&_.page-header]:border-b-0 [&_.page-header]:pb-0 [&_.page-shell]:p-0">
-      {page}
-    </div>
-  ) : (
-    page
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageFrame
+      section="campuses"
+      actions={
+        <button type="button" className="btn btn-primary" onClick={openCreate}>
+          <Plus className="h-4 w-4" />
+          新增校区
+        </button>
+      }
+    >
+      {content}
+    </PageFrame>
   );
 }

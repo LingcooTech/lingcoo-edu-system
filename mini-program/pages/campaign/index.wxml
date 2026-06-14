@@ -8,7 +8,6 @@
 
   <block wx:else>
     <view class="hero card">
-      <view class="eyebrow">{{payload.channel ? payload.channel.name : '招生活动'}}</view>
       <view class="title hero-title">{{payload.campaign.name}}</view>
       <view class="body-text hero-subtitle">
         {{payload.course ? payload.course.name + ' · ' + payload.course.summary : payload.organization.publicProfile.bannerSubtitle}}

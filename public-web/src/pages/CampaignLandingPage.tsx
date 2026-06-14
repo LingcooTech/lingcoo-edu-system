@@ -130,8 +130,7 @@ export function CampaignLandingPage() {
       <section className="border-line bg-surface border-b">
         <div className="container-narrow hero-grid">
           <div>
-            <div className="eyebrow">{payload.channel?.name ?? '招生活动'}</div>
-            <h1 className="text-ink mt-4 text-4xl leading-tight font-bold tracking-tight">
+            <h1 className="text-ink text-4xl leading-tight font-bold tracking-tight">
               {payload.campaign.name}
             </h1>
             <p className="text-ink-soft mt-5 text-base leading-8">
