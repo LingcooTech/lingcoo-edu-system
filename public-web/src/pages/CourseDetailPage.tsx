@@ -136,6 +136,10 @@ export function CourseDetailPage() {
         ? '平台'
         : '');
   const trialNotice = mergeNotice(course.trialDescription, course.reservationNotice);
+  const trialNoticeItems = (trialNotice || '免注册预约，老师电话确认上课时间')
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 
   return (
     <Layout>
@@ -241,33 +245,30 @@ export function CourseDetailPage() {
             {packages.length > 0 && (
               <section id="packages" className="pwcard scroll-mt-24 p-5 sm:p-6">
                 <h2 className="text-ink text-base font-semibold">课时包</h2>
-                <div className="mt-5 space-y-4">
+                <div className="mt-5 space-y-5">
                   {packages.map((pkg) => (
-                    <div
-                      key={pkg.id}
-                      className="border-line/80 bg-paper/40 rounded-2xl border p-4"
-                    >
-                      <div className="min-w-0">
-                        <div className="text-ink text-base leading-6 font-semibold">{pkg.name}</div>
+                    <div key={pkg.id}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="text-ink text-base leading-6 font-semibold">
+                            {pkg.name}
+                          </div>
+                          <div className="text-muted mt-1 text-xs">{packageLessonLabel(pkg)}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-ink text-base font-semibold">
+                            {money(packagePriceAmount(pkg))}
+                          </div>
+                          {pkg.discountPriceAmount !== null &&
+                          pkg.discountPriceAmount !== undefined ? (
+                            <div className="text-muted mt-1 text-xs line-through">
+                              {money(pkg.priceAmount)}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                       {pkg.description ? (
                         <p className="text-ink-soft mt-3 text-sm leading-6">{pkg.description}</p>
-                      ) : null}
-                      {!onlinePackageSalesAllowed ? (
-                        <div className="border-line/80 mt-4 flex items-baseline justify-between gap-3 border-t pt-4">
-                          <span className="text-muted text-xs">参考价格</span>
-                          <div className="shrink-0 text-right">
-                            <div className="text-ink text-base font-semibold">
-                              {money(packagePriceAmount(pkg))}
-                            </div>
-                            {pkg.discountPriceAmount !== null &&
-                            pkg.discountPriceAmount !== undefined ? (
-                              <div className="text-muted mt-1 text-xs line-through">
-                                {money(pkg.priceAmount)}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
                       ) : null}
                       {onlinePackageSalesAllowed ? (
                         <button
@@ -303,9 +304,11 @@ export function CourseDetailPage() {
               >
                 立即预约
               </button>
-              <div className="border-line text-ink-soft mt-5 border-t pt-4 text-xs leading-6 whitespace-pre-wrap">
-                {trialNotice || '免注册预约，老师电话确认上课时间'}
-              </div>
+              <ul className="border-line text-ink-soft mt-5 list-disc space-y-1 border-t pt-4 pl-5 text-xs leading-6">
+                {trialNoticeItems.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
             </div>
           </aside>
         </div>
