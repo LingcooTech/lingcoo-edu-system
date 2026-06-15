@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Campus, Classroom, Course, Institution, Teacher } from '@/api/types';
+import type { Campus, Classroom, Course, CourseSeries, Institution, Teacher } from '@/api/types';
 import { parseBlocks, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -18,6 +18,7 @@ import { useApiResource } from '@/lib/useApiResource';
 const COURSE_BASE = () => '/v1/courses';
 
 interface CourseForm {
+  courseSeriesId: string;
   slug: string;
   name: string;
   category: string;
@@ -36,6 +37,7 @@ interface CourseForm {
 }
 
 const emptyCourseForm: CourseForm = {
+  courseSeriesId: '',
   slug: '',
   name: '',
   category: '',
@@ -113,6 +115,7 @@ function courseToForm(course: Course): CourseForm {
         : [];
 
   return {
+    courseSeriesId: course.courseSeriesId ?? '',
     slug: course.slug,
     name: course.name,
     category: course.category,
@@ -169,6 +172,7 @@ function courseFormToPayload(
 
   return {
     slug: form.slug.trim(),
+    courseSeriesId: form.courseSeriesId || null,
     name: form.name.trim(),
     category: form.category.trim(),
     ageRange: form.ageRange.trim(),
@@ -207,6 +211,7 @@ export function CoursesPage({
 } = {}) {
   const toast = useToast();
   const { data: courses, setData: setCourses } = useApiResource<Course>(COURSE_BASE(), 'courses');
+  const { data: courseSeries } = useApiResource<CourseSeries>('/v1/course-series', 'courseSeries');
   const { data: institutions } = useApiResource<Institution>('/v1/institutions', 'institutions');
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
   const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
@@ -395,6 +400,22 @@ export function CoursesPage({
           </Field>
         </FieldRow>
         <FieldRow>
+          <Field label="课程系列">
+            <select
+              className="form-input"
+              value={form.courseSeriesId}
+              onChange={(event) => setForm({ ...form, courseSeriesId: event.target.value })}
+            >
+              <option value="">不归属课程系列</option>
+              {courseSeries
+                .filter((series) => series.status !== 'archived')
+                .map((series) => (
+                  <option key={series.id} value={series.id}>
+                    {series.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
           <Field label="单节时长(分钟)">
             <input
               className="form-input"

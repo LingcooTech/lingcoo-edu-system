@@ -136,7 +136,11 @@ async function attachPackageSummary(
   const packages = await packagesRepo.listActivePackages(app.db);
   const showPackagePrice = options.showPackagePrice ?? true;
   return courses.map((course) => {
-    const coursePackages = packages.filter((item) => item.courseId === course.id);
+    const coursePackages = packages.filter(
+      (item) =>
+        item.courseId === course.id ||
+        (course.courseSeriesId && item.courseSeriesId === course.courseSeriesId),
+    );
     const prices = coursePackages.map((item) => packagesRepo.effectivePackagePrice(item));
     return {
       ...course,

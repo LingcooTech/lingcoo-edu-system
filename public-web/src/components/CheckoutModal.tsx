@@ -25,6 +25,7 @@ export type CheckoutTarget =
   | {
       type: 'package';
       packageId: string;
+      courseId?: string;
       title: string;
       subtitle: string;
       description?: string;
@@ -184,6 +185,7 @@ export function CheckoutModal({
     const attribution = getAttribution();
     const created = await createOrder({
       packageId: target.packageId,
+      courseId: target.courseId,
       guardianName: guardianName.trim() || undefined,
       guardianPhone: phone,
       studentName: studentName.trim(),

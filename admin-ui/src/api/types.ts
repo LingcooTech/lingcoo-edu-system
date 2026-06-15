@@ -12,6 +12,7 @@ export type LeadStatus =
 
 export interface Course {
   id: string;
+  courseSeriesId?: string | null;
   slug: string;
   campusId?: string | null;
   name: string;
@@ -34,6 +35,15 @@ export interface Course {
   status: string;
   summary: string;
   content?: string;
+}
+
+export interface CourseSeries {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  status: string;
+  sortOrder: number;
 }
 
 export type ContentSourceType = 'manual' | 'wordpress' | 'notion' | 'wechat';
@@ -68,6 +78,7 @@ export interface ContentListResponse {
 export interface CoursePackage {
   id: string;
   courseId?: string | null;
+  courseSeriesId?: string | null;
   name: string;
   description: string;
   lessonCount: number;

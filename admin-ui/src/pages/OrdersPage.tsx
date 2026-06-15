@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 
 import { api, apiPost } from '@/api/client';
-import type { CoursePackage, Order, Student } from '@/api/types';
+import type { Course, CoursePackage, Order, Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
@@ -141,6 +141,7 @@ export function OrdersPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<Order>('/v1/orders', 'orders');
   const { data: students } = useApiResource<Student>('/v1/students', 'students');
+  const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
   const { data: packages } = useApiResource<CoursePackage>('/v1/course-packages', 'coursePackages');
   const activePackages = useMemo(
     () => packages.filter((coursePackage) => coursePackage.status === 'active'),
@@ -152,6 +153,7 @@ export function OrdersPage() {
   const [form, setForm] = useState({
     studentId: '',
     packageId: '',
+    courseId: '',
     paidYuan: '',
     paymentMethod: 'wechat_offline',
     offlinePaymentNote: '',
@@ -166,6 +168,9 @@ export function OrdersPage() {
   const [reloading, setReloading] = useState(false);
 
   const selectedPackage = activePackages.find((item) => item.id === form.packageId);
+  const selectableCourses = selectedPackage?.courseSeriesId
+    ? courses.filter((course) => course.courseSeriesId === selectedPackage.courseSeriesId)
+    : courses;
   const paymentMethods = useMemo(
     () =>
       Array.from(
@@ -248,6 +253,7 @@ export function OrdersPage() {
     setForm({
       studentId: students[0]?.id ?? '',
       packageId: firstPackage?.id ?? '',
+      courseId: firstPackage?.courseId ?? '',
       paidYuan: firstPackage ? String(effectivePackagePrice(firstPackage) / 100) : '',
       paymentMethod: 'wechat_offline',
       offlinePaymentNote: '',
@@ -265,6 +271,7 @@ export function OrdersPage() {
       const { order } = await apiPost<{ order: Order }>('/v1/orders/manual-package-grants', {
         studentId: form.studentId,
         packageId: form.packageId,
+        courseId: form.courseId || undefined,
         paidAmount: Math.round((Number(form.paidYuan) || 0) * 100),
         paymentMethod: form.paymentMethod,
         offlinePaymentNote: form.offlinePaymentNote.trim() || undefined,
@@ -562,6 +569,7 @@ export function OrdersPage() {
               setForm({
                 ...form,
                 packageId: event.target.value,
+                courseId: coursePackage?.courseId ?? '',
                 paidYuan: coursePackage
                   ? String(effectivePackagePrice(coursePackage) / 100)
                   : form.paidYuan,
@@ -577,6 +585,22 @@ export function OrdersPage() {
             ))}
           </select>
         </Field>
+        {selectedPackage?.courseSeriesId ? (
+          <Field label="落账课程" required hint="系列课时包需选择本次先计入哪个课程账户">
+            <select
+              className="form-input"
+              value={form.courseId}
+              onChange={(event) => setForm({ ...form, courseId: event.target.value })}
+            >
+              <option value="">选择课程</option>
+              {selectableCourses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
         {selectedPackage && (
           <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
             系统将添加 {effectivePackageLessonCount(selectedPackage)} 节课时，课时包展示价{' '}

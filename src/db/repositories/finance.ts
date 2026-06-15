@@ -57,6 +57,7 @@ export async function createOrder(
   input: {
     studentId: string;
     courseId: string;
+    courseSeriesId?: string | null;
     packageId?: string | null;
     orderType?: (typeof schema.orderTypeEnum.enumValues)[number];
     amount: number;
@@ -77,6 +78,7 @@ export async function createOrder(
       .values({
         studentId: input.studentId,
         courseId: input.courseId,
+        courseSeriesId: input.courseSeriesId ?? null,
         packageId: input.packageId ?? null,
         orderNo,
         orderType: input.orderType ?? 'manual_package_grant',
@@ -120,6 +122,7 @@ export async function createPackageOrder(
     packageId: string;
     studentId: string;
     courseId: string;
+    courseSeriesId?: string | null;
     amount: number;
     lessonCount: number;
     currency?: string;
@@ -140,6 +143,7 @@ export async function createPackageOrder(
       packageId: input.packageId,
       studentId: input.studentId,
       courseId: input.courseId,
+      courseSeriesId: input.courseSeriesId ?? null,
       orderNo,
       orderType: 'package_purchase',
       amount: input.amount,

@@ -6,12 +6,12 @@ import * as financeRepo from '../../db/repositories/finance.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
-import { requireCourse } from '../../db/repositories/catalog.js';
 import * as schema from '../../db/schema.js';
 import { canUseOnlinePackageSales, readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { hashPassword } from '../../lib/password.js';
+import { resolvePackageCourse } from '../package-course.js';
 import type { AppModule } from '../types.js';
 import { getPaymentProvider } from './providers/index.js';
 import { PaymentService } from './service.js';
@@ -23,6 +23,7 @@ import {
 
 const createOrderSchema = z.object({
   packageId: z.string().uuid(),
+  courseId: z.string().uuid().optional(),
   guardianName: z.string().min(1).max(120).optional(),
   guardianPhone: z.string().min(6).max(40),
   studentName: z.string().min(1).max(120),
@@ -89,12 +90,8 @@ export const paymentModule: AppModule = {
       if (pkg.status !== 'active') {
         throw httpError(422, '该课时包已下架');
       }
-      const courseId = pkg.courseId;
-      if (!courseId) {
-        throw httpError(422, '该课时包未绑定课程，暂不能购买');
-      }
       const [course, organization] = await Promise.all([
-        requireCourse(app.db, courseId),
+        resolvePackageCourse(app.db, pkg, body.courseId),
         organizationRepo.requireOrganization(app.db),
       ]);
       const businessModel = readBusinessModel(organization.settings);
@@ -218,7 +215,8 @@ export const paymentModule: AppModule = {
           accountId: account.id,
           packageId: pkg.id,
           studentId: student.id,
-          courseId,
+          courseId: course.id,
+          courseSeriesId: pkg.courseSeriesId ?? course.courseSeriesId,
           amount,
           lessonCount,
           currency: 'CNY',

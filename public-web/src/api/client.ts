@@ -6,6 +6,7 @@ const API_BASE_URL =
 export interface Course {
   id: string;
   slug: string;
+  courseSeriesId?: string | null;
   campusId?: string | null;
   name: string;
   category: string;
@@ -404,6 +405,8 @@ export async function applyOrderRefund(
 
 export interface CoursePackage {
   id: string;
+  courseId?: string | null;
+  courseSeriesId?: string | null;
   name: string;
   description: string;
   lessonCount: number;
@@ -844,6 +847,7 @@ export interface PaymentIntent {
 
 export interface CreateOrderInput {
   packageId: string;
+  courseId?: string;
   guardianName?: string;
   guardianPhone: string;
   studentName: string;

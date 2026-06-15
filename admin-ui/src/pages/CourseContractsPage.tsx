@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { CheckCircle2, Plus, XCircle } from 'lucide-react';
 
 import { apiPatch, apiPost } from '@/api/client';
@@ -127,12 +127,26 @@ export function CourseContractsPage() {
     () => packages.filter((coursePackage) => coursePackage.status === 'active'),
     [packages],
   );
+  const courseById = useMemo(
+    () => new Map(courses.map((course) => [course.id, course])),
+    [courses],
+  );
+  const packageAppliesToCourse = useCallback(
+    (coursePackage: CoursePackage, courseId: string) => {
+      const course = courseById.get(courseId);
+      return (
+        coursePackage.courseId === courseId ||
+        Boolean(course?.courseSeriesId && coursePackage.courseSeriesId === course.courseSeriesId)
+      );
+    },
+    [courseById],
+  );
   const selectedCoursePackages = useMemo(
     () =>
       activePackages.filter((coursePackage) =>
-        form.courseId ? coursePackage.courseId === form.courseId : true,
+        form.courseId ? packageAppliesToCourse(coursePackage, form.courseId) : true,
       ),
-    [activePackages, form.courseId],
+    [activePackages, form.courseId, packageAppliesToCourse],
   );
   const selectedCourseClasses = useMemo(
     () =>
@@ -177,7 +191,7 @@ export function CourseContractsPage() {
 
   function openCreate() {
     const courseId = courses[0]?.id ?? '';
-    const firstPackage = activePackages.find((item) => item.courseId === courseId);
+    const firstPackage = activePackages.find((item) => packageAppliesToCourse(item, courseId));
     const firstClass = classes.find(
       (item) => item.courseId === courseId && !['archived', 'completed'].includes(item.status),
     );
@@ -196,7 +210,7 @@ export function CourseContractsPage() {
   }
 
   function handleCourseChange(courseId: string) {
-    const firstPackage = activePackages.find((item) => item.courseId === courseId);
+    const firstPackage = activePackages.find((item) => packageAppliesToCourse(item, courseId));
     const firstClass = classes.find(
       (item) => item.courseId === courseId && !['archived', 'completed'].includes(item.status),
     );

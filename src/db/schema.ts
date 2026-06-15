@@ -17,6 +17,7 @@ import {
 export const accountRoleEnum = pgEnum('account_role', ['admin', 'teacher', 'parent']);
 export const accountStatusEnum = pgEnum('account_status', ['active', 'suspended']);
 export const courseStatusEnum = pgEnum('course_status', ['draft', 'published', 'archived']);
+export const courseSeriesStatusEnum = pgEnum('course_series_status', ['active', 'archived']);
 export const contentSourceEnum = pgEnum('content_source', [
   'manual',
   'wordpress',
@@ -254,10 +255,31 @@ export const campaigns = pgTable(
   }),
 );
 
+export const courseSeries = pgTable(
+  'course_series',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    slug: varchar('slug', { length: 120 }).notNull(),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description').notNull().default(''),
+    status: courseSeriesStatusEnum('status').notNull().default('active'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    slugUnique: uniqueIndex('course_series_slug_idx').on(table.slug),
+    statusIdx: index('course_series_status_idx').on(table.status),
+  }),
+);
+
 export const courses = pgTable(
   'courses',
   {
     id: uuid('id').defaultRandom().primaryKey(),
+    courseSeriesId: uuid('course_series_id').references(() => courseSeries.id, {
+      onDelete: 'set null',
+    }),
     campusId: uuid('campus_id').references(() => campuses.id, { onDelete: 'set null' }),
     slug: varchar('slug', { length: 120 }).notNull(),
     name: varchar('name', { length: 160 }).notNull(),
@@ -689,6 +711,9 @@ export const orders = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     studentId: uuid('student_id').references(() => students.id, { onDelete: 'restrict' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'restrict' }),
+    courseSeriesId: uuid('course_series_id').references(() => courseSeries.id, {
+      onDelete: 'set null',
+    }),
     accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
     packageId: uuid('package_id').references(() => coursePackages.id, { onDelete: 'set null' }),
     orderNo: varchar('order_no', { length: 64 }).notNull().unique(),
@@ -721,6 +746,7 @@ export const orders = pgTable(
   (table) => ({
     statusIdx: index('orders_status_idx').on(table.status),
     accountIdx: index('orders_account_idx').on(table.accountId),
+    courseSeriesIdx: index('orders_course_series_idx').on(table.courseSeriesId),
     channelIdx: index('orders_channel_idx').on(table.channelId),
     campaignIdx: index('orders_campaign_idx').on(table.campaignId),
   }),
@@ -1046,6 +1072,9 @@ export const coursePackages = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    courseSeriesId: uuid('course_series_id').references(() => courseSeries.id, {
+      onDelete: 'set null',
+    }),
     name: varchar('name', { length: 160 }).notNull(),
     description: text('description').notNull().default(''),
     lessonCount: integer('lesson_count').notNull(),
@@ -1058,6 +1087,8 @@ export const coursePackages = pgTable(
   },
   (table) => ({
     statusIdx: index('course_packages_status_idx').on(table.status),
+    courseIdx: index('course_packages_course_idx').on(table.courseId),
+    courseSeriesIdx: index('course_packages_course_series_idx').on(table.courseSeriesId),
   }),
 );
 

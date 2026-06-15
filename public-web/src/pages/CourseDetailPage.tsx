@@ -278,6 +278,7 @@ export function CourseDetailPage() {
                             setCheckoutTarget({
                               type: 'package',
                               packageId: pkg.id,
+                              courseId: course.id,
                               title: pkg.name,
                               subtitle: `${packageLessonLabel(pkg)} · ${course.name}`,
                               description: pkg.description,

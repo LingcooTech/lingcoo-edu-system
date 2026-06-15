@@ -269,8 +269,11 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
   if (coursePackage && coursePackage.status !== 'active') {
     throw httpError(422, '该课时包已下架');
   }
-  if (coursePackage && coursePackage.courseId !== input.courseId) {
+  if (coursePackage?.courseId && coursePackage.courseId !== input.courseId) {
     throw httpError(422, '课时包与课程不匹配');
+  }
+  if (coursePackage?.courseSeriesId && course.courseSeriesId !== coursePackage.courseSeriesId) {
+    throw httpError(422, '课时包与课程系列不匹配');
   }
 
   let classGroup: typeof schema.classes.$inferSelect | null = null;
@@ -296,6 +299,7 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
     .values({
       studentId: input.studentId,
       courseId: input.courseId,
+      courseSeriesId: coursePackage?.courseSeriesId ?? course.courseSeriesId ?? null,
       packageId: coursePackage?.id ?? null,
       orderNo,
       orderType: 'manual_package_grant',

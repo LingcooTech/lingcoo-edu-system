@@ -204,6 +204,13 @@
       "when": 1781568000000,
       "tag": "0028_course_classroom_and_lead_teacher",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1781654400000,
+      "tag": "0029_course_series_packages",
+      "breakpoints": true
     }
   ]
 }

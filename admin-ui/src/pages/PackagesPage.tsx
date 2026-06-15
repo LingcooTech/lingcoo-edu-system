@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Course, CoursePackage } from '@/api/types';
+import type { Course, CoursePackage, CourseSeries } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -19,6 +19,7 @@ interface PackageForm {
   name: string;
   description: string;
   courseId: string;
+  courseSeriesId: string;
   lessonCount: string;
   giftedLessonCount: string;
   priceYuan: string;
@@ -30,6 +31,7 @@ const emptyPackageForm: PackageForm = {
   name: '',
   description: '',
   courseId: '',
+  courseSeriesId: '',
   lessonCount: '12',
   giftedLessonCount: '0',
   priceYuan: '0',
@@ -70,9 +72,14 @@ export function PackagesPage({
   );
   // 课程列表只用于「关联课程」下拉与列表展示，不在本页增删改。
   const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
+  const { data: courseSeries } = useApiResource<CourseSeries>('/v1/course-series', 'courseSeries');
   const courseName = useMemo(
     () => new Map(courses.map((course) => [course.id, course.name])),
     [courses],
+  );
+  const seriesName = useMemo(
+    () => new Map(courseSeries.map((series) => [series.id, series.name])),
+    [courseSeries],
   );
 
   const [editing, setEditing] = useState<CoursePackage | null>(null);
@@ -99,6 +106,7 @@ export function PackagesPage({
       name: pkg.name,
       description: pkg.description ?? '',
       courseId: pkg.courseId ?? '',
+      courseSeriesId: pkg.courseSeriesId ?? '',
       lessonCount: String(pkg.lessonCount),
       giftedLessonCount: String(pkg.giftedLessonCount ?? 0),
       priceYuan: String(pkg.priceAmount / 100),
@@ -116,12 +124,17 @@ export function PackagesPage({
       toast.error('课时包名称必填');
       return;
     }
+    if (!form.courseSeriesId && !form.courseId) {
+      toast.error('请选择课时包适用的课程系列或单个课程');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         name: form.name.trim(),
         description: form.description,
-        courseId: form.courseId || undefined,
+        courseId: form.courseId || null,
+        courseSeriesId: form.courseSeriesId || null,
         lessonCount: Number(form.lessonCount) || 1,
         giftedLessonCount: Math.max(0, Number(form.giftedLessonCount) || 0),
         priceAmount: Math.round((Number(form.priceYuan) || 0) * 100),
@@ -184,8 +197,13 @@ export function PackagesPage({
           },
           {
             key: 'course',
-            header: '关联课程',
-            cell: (row) => (row.courseId ? (courseName.get(row.courseId) ?? '-') : '通用'),
+            header: '适用范围',
+            cell: (row) =>
+              row.courseId
+                ? `课程：${courseName.get(row.courseId) ?? '-'}`
+                : row.courseSeriesId
+                  ? `系列：${seriesName.get(row.courseSeriesId) ?? '-'}`
+                  : '未关联',
           },
           {
             key: 'lessons',
@@ -247,7 +265,7 @@ export function PackagesPage({
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? '编辑课时包' : '新增课时包'}
-        description="课时包可用于线上售卖，也可用于线下收款后手动添加课时；公开端是否购买由业务开关控制。"
+        description="课时包需绑定课程系列或单个课程；公开端是否购买由业务开关控制。"
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
@@ -266,20 +284,42 @@ export function PackagesPage({
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
         </Field>
-        <Field label="关联课程" hint="可留空（通用课时包）">
-          <select
-            className="form-input"
-            value={form.courseId}
-            onChange={(e) => setForm({ ...form, courseId: e.target.value })}
-          >
-            <option value="">— 不关联 —</option>
-            {courses.map((course) => (
-              <option key={course.id} value={course.id}>
-                {course.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <FieldRow>
+          <Field label="适用课程系列" hint="同系列课程共享课时包">
+            <select
+              className="form-input"
+              value={form.courseSeriesId}
+              onChange={(event) =>
+                setForm({ ...form, courseSeriesId: event.target.value, courseId: '' })
+              }
+            >
+              <option value="">选择课程系列</option>
+              {courseSeries
+                .filter((series) => series.status !== 'archived')
+                .map((series) => (
+                  <option key={series.id} value={series.id}>
+                    {series.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+          <Field label="适用单个课程" hint="特殊价格课程使用">
+            <select
+              className="form-input"
+              value={form.courseId}
+              onChange={(event) =>
+                setForm({ ...form, courseId: event.target.value, courseSeriesId: '' })
+              }
+            >
+              <option value="">选择单个课程</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </FieldRow>
         <FieldRow>
           <Field label="课时数(节)">
             <input

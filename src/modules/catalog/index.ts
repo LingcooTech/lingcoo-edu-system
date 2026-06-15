@@ -8,6 +8,7 @@ import { readBusinessModel } from '../../lib/business-model.js';
 import type { AppModule } from '../types.js';
 
 const courseShape = {
+  courseSeriesId: z.string().uuid().nullable().optional(),
   campusId: z.string().uuid().nullable().optional(),
   slug: z.string().min(2),
   name: z.string().min(1),
@@ -48,7 +49,8 @@ const courseSchema = z.object({
 const courseUpdateSchema = z.object(courseShape).partial();
 
 const packageShape = {
-  courseId: z.string().optional(),
+  courseId: z.string().uuid().nullable().optional(),
+  courseSeriesId: z.string().uuid().nullable().optional(),
   name: z.string().min(1),
   description: z.string(),
   lessonCount: z.number().int().positive(),
@@ -58,14 +60,50 @@ const packageShape = {
   status: z.enum(['active', 'archived']),
 };
 
-const packageSchema = z.object({
-  ...packageShape,
-  description: packageShape.description.default(''),
-  giftedLessonCount: packageShape.giftedLessonCount.default(0),
-  status: packageShape.status.default('active'),
+const packageSchema = z
+  .object({
+    ...packageShape,
+    description: packageShape.description.default(''),
+    giftedLessonCount: packageShape.giftedLessonCount.default(0),
+    status: packageShape.status.default('active'),
+  })
+  .refine((body) => Boolean(body.courseId || body.courseSeriesId), {
+    message: '课时包必须关联课程或课程系列',
+    path: ['courseSeriesId'],
+  })
+  .refine((body) => !(body.courseId && body.courseSeriesId), {
+    message: '课时包只能关联课程或课程系列其中一个',
+    path: ['courseSeriesId'],
+  });
+
+const packageUpdateSchema = z
+  .object(packageShape)
+  .partial()
+  .refine(
+    (body) => {
+      const scopeChanged =
+        Object.hasOwn(body, 'courseId') || Object.hasOwn(body, 'courseSeriesId');
+      return !scopeChanged || Boolean(body.courseId || body.courseSeriesId);
+    },
+    {
+      message: '课时包必须关联课程或课程系列',
+      path: ['courseSeriesId'],
+    },
+  )
+  .refine((body) => !(body.courseId && body.courseSeriesId), {
+    message: '课时包只能关联课程或课程系列其中一个',
+    path: ['courseSeriesId'],
+  });
+
+const courseSeriesSchema = z.object({
+  slug: z.string().min(2).max(120),
+  name: z.string().min(1).max(160),
+  description: z.string().default(''),
+  status: z.enum(['active', 'archived']).default('active'),
+  sortOrder: z.number().int().default(0),
 });
 
-const packageUpdateSchema = z.object(packageShape).partial();
+const courseSeriesUpdateSchema = courseSeriesSchema.partial();
 
 function uniqueTeacherIds(ids: string[]) {
   return Array.from(new Set(ids.filter(Boolean)));
@@ -123,9 +161,71 @@ function normalizeCourseUpdate(body: z.infer<typeof courseUpdateSchema>) {
   return patch;
 }
 
+function normalizePackageCreate(body: z.infer<typeof packageSchema>): packagesRepo.NewCoursePackage {
+  return {
+    ...body,
+    courseId: body.courseId ?? null,
+    courseSeriesId: body.courseSeriesId ?? null,
+  };
+}
+
+function normalizePackageUpdate(body: z.infer<typeof packageUpdateSchema>) {
+  const patch = Object.fromEntries(
+    Object.entries(body).filter(([, value]) => value !== undefined),
+  ) as Partial<packagesRepo.NewCoursePackage>;
+
+  if ('courseId' in body) {
+    patch.courseId = body.courseId ?? null;
+    if (patch.courseId) patch.courseSeriesId = null;
+  }
+  if ('courseSeriesId' in body) {
+    patch.courseSeriesId = body.courseSeriesId ?? null;
+    if (patch.courseSeriesId) patch.courseId = null;
+  }
+
+  return patch;
+}
+
 export const catalogModule: AppModule = {
   name: 'catalog',
   async register(app) {
+    app.get('/v1/course-series', { preHandler: app.requireAdmin }, async () => {
+      return { courseSeries: await catalogRepo.listCourseSeries(app.db) };
+    });
+
+    app.post('/v1/course-series', { preHandler: app.requireAdmin }, async (request) => {
+      const body = courseSeriesSchema.parse(request.body);
+      const courseSeries = await catalogRepo.createCourseSeries(app.db, body);
+      return { courseSeries };
+    });
+
+    app.patch(
+      '/v1/course-series/:courseSeriesId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseSeriesId } = request.params as { courseSeriesId: string };
+        const body = courseSeriesUpdateSchema.parse(request.body);
+        const courseSeries = await catalogRepo.updateCourseSeries(app.db, courseSeriesId, body);
+        if (!courseSeries) {
+          throw Object.assign(new Error('Course series not found'), { statusCode: 404 });
+        }
+        return { courseSeries };
+      },
+    );
+
+    app.delete(
+      '/v1/course-series/:courseSeriesId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseSeriesId } = request.params as { courseSeriesId: string };
+        const courseSeries = await catalogRepo.deleteCourseSeries(app.db, courseSeriesId);
+        if (!courseSeries) {
+          throw Object.assign(new Error('Course series not found'), { statusCode: 404 });
+        }
+        return { courseSeries };
+      },
+    );
+
     app.get('/v1/courses', { preHandler: app.requireAdmin }, async () => {
       return { courses: await catalogRepo.listCourses(app.db) };
     });
@@ -163,7 +263,7 @@ export const catalogModule: AppModule = {
 
     app.post('/v1/course-packages', { preHandler: app.requireAdmin }, async (request) => {
       const body = packageSchema.parse(request.body);
-      const coursePackage = await packagesRepo.createPackage(app.db, body);
+      const coursePackage = await packagesRepo.createPackage(app.db, normalizePackageCreate(body));
       return { coursePackage };
     });
 
@@ -173,7 +273,11 @@ export const catalogModule: AppModule = {
       async (request) => {
         const { packageId } = request.params as { packageId: string };
         const body = packageUpdateSchema.parse(request.body);
-        const coursePackage = await packagesRepo.updatePackage(app.db, packageId, body);
+        const coursePackage = await packagesRepo.updatePackage(
+          app.db,
+          packageId,
+          normalizePackageUpdate(body),
+        );
         if (!coursePackage) {
           throw Object.assign(new Error('Course package not found'), { statusCode: 404 });
         }
@@ -215,7 +319,7 @@ export const catalogModule: AppModule = {
         classrooms,
         campuses,
       ] = await Promise.all([
-        packagesRepo.listActivePackagesForCourse(app.db, course.id),
+        packagesRepo.listActivePackagesForCourse(app.db, course.id, course.courseSeriesId),
         organizationRepo.requireOrganization(app.db),
         teachingRepo.findInstitution(app.db, course.providerInstitutionId),
         teachingRepo.findTeachers(

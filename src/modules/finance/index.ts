@@ -11,6 +11,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
+import { resolvePackageCourse } from '../package-course.js';
 import type { AppModule } from '../types.js';
 
 const orderSchema = z.object({
@@ -31,6 +32,7 @@ const orderSchema = z.object({
 const manualPackageGrantSchema = z.object({
   studentId: z.string(),
   packageId: z.string(),
+  courseId: z.string().uuid().optional(),
   paidAmount: z.number().int().nonnegative(),
   paymentMethod: z.enum([
     'cash',
@@ -161,10 +163,7 @@ export const financeModule: AppModule = {
         if (pkg.status !== 'active') {
           throw httpError(422, '该课时包已下架');
         }
-        if (!pkg.courseId) {
-          throw httpError(422, '该课时包未绑定课程，不能添加课时');
-        }
-        const course = await catalogRepo.requireCourse(app.db, pkg.courseId);
+        const course = await resolvePackageCourse(app.db, pkg, body.courseId);
         const [paymentReceiverInstitution, providerInstitution] = await Promise.all([
           teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),
           teachingRepo.findInstitution(app.db, course.providerInstitutionId),
@@ -180,6 +179,7 @@ export const financeModule: AppModule = {
         const order = await financeRepo.createOrder(app.db, {
           studentId: student.id,
           courseId: course.id,
+          courseSeriesId: pkg.courseSeriesId ?? course.courseSeriesId,
           packageId: pkg.id,
           orderType: 'manual_package_grant',
           amount: packagesRepo.effectivePackagePrice(pkg),

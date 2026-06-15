@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Ban,
   BookOpen,
@@ -154,6 +154,10 @@ export function TrialsPage() {
   const [contractTarget, setContractTarget] = useState<ContractTarget | null>(null);
   const [contractForm, setContractForm] = useState<ContractForm>(emptyContractForm);
   const [contractSaving, setContractSaving] = useState(false);
+  const courseById = useMemo(
+    () => new Map(courses.map((course) => [course.id, course])),
+    [courses],
+  );
   const contractSelectedPackage = packages.find((item) => item.id === contractForm.packageId);
 
   function applySeatReservationUpdate(payload: {
@@ -237,7 +241,16 @@ export function TrialsPage() {
 
   function availablePackages(courseId: string) {
     return packages.filter(
-      (coursePackage) => coursePackage.status === 'active' && coursePackage.courseId === courseId,
+      (coursePackage) =>
+        coursePackage.status === 'active' && packageAppliesToCourse(coursePackage, courseId),
+    );
+  }
+
+  function packageAppliesToCourse(coursePackage: CoursePackage, courseId: string) {
+    const course = courseById.get(courseId);
+    return (
+      coursePackage.courseId === courseId ||
+      Boolean(course?.courseSeriesId && coursePackage.courseSeriesId === course.courseSeriesId)
     );
   }
 

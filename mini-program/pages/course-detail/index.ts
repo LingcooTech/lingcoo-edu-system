@@ -275,6 +275,7 @@ Page({
       }
       const payload = await createPublicOrder({
         packageId: selectedPackage.id,
+        courseId: this.data.course?.id,
         guardianName: guardianName || undefined,
         guardianPhone,
         studentName,

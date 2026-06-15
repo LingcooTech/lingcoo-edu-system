@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, or } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -30,13 +30,21 @@ export async function listActivePackages(db: Database) {
     .orderBy(desc(schema.coursePackages.createdAt));
 }
 
-export async function listActivePackagesForCourse(db: Database, courseId: string) {
+export async function listActivePackagesForCourse(
+  db: Database,
+  courseId: string,
+  courseSeriesId?: string | null,
+) {
+  const scope = courseSeriesId
+    ? or(
+        eq(schema.coursePackages.courseId, courseId),
+        eq(schema.coursePackages.courseSeriesId, courseSeriesId),
+      )
+    : eq(schema.coursePackages.courseId, courseId);
   return db
     .select()
     .from(schema.coursePackages)
-    .where(
-      and(eq(schema.coursePackages.courseId, courseId), eq(schema.coursePackages.status, 'active')),
-    )
+    .where(and(scope, eq(schema.coursePackages.status, 'active')))
     .orderBy(desc(schema.coursePackages.createdAt));
 }
 
