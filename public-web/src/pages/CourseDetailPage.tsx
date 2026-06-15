@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Building2, ChevronLeft, Clock, MapPin, ShieldCheck, UserRound } from 'lucide-react';
+import { Building2, ChevronLeft, Clock, MapPin, UserRound } from 'lucide-react';
 
 import {
   fetchCourse,
@@ -235,15 +235,12 @@ export function CourseDetailPage() {
                 <RichTextRenderer content={course.content} />
               </div>
             ) : null}
-
           </article>
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             {packages.length > 0 && (
               <section id="packages" className="pwcard scroll-mt-24 p-5 sm:p-6">
-                <h2 className="text-ink text-xl font-bold">
-                  {onlinePackageSalesAllowed ? '课时包' : '正式课程参考方案'}
-                </h2>
+                <h2 className="text-ink text-base font-semibold">课时包</h2>
                 <div className="mt-5 space-y-4">
                   {packages.map((pkg) => (
                     <div
@@ -298,7 +295,7 @@ export function CourseDetailPage() {
             )}
 
             <div className="pwcard p-5 sm:p-6 lg:block">
-              <div className="text-ink text-xl font-bold">预约试听</div>
+              <div className="text-ink text-base font-semibold">预约试听</div>
               <button
                 type="button"
                 className="pwbtn pwbtn-primary mt-5 w-full"
@@ -306,30 +303,10 @@ export function CourseDetailPage() {
               >
                 立即预约
               </button>
-              <div className="border-line text-ink-soft mt-5 space-y-2 border-t pt-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="text-brand h-4 w-4 shrink-0" />
-                  免注册预约，老师电话确认上课时间
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="text-brand h-4 w-4 shrink-0" />
-                  单节 {course.durationMinutes} 分钟
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="text-brand h-4 w-4 shrink-0" />
-                  {campusLabel}
-                </div>
+              <div className="border-line text-ink-soft mt-5 border-t pt-4 text-xs leading-6 whitespace-pre-wrap">
+                {trialNotice || '免注册预约，老师电话确认上课时间'}
               </div>
             </div>
-
-            {trialNotice ? (
-              <section className="pwcard p-5 sm:p-6">
-                <h2 className="text-ink text-xl font-bold">试听预约说明</h2>
-                <p className="text-ink-soft mt-3 text-sm leading-7 whitespace-pre-wrap">
-                  {trialNotice}
-                </p>
-              </section>
-            ) : null}
           </aside>
         </div>
       </div>
