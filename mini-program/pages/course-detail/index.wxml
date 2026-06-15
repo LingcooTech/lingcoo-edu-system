@@ -50,7 +50,6 @@
           </view>
           <view wx:if="{{item.description}}" class="body-text package-desc">{{item.description}}</view>
           <button wx:if="{{onlinePackageSalesAllowed}}" class="btn btn-outline package-button" data-id="{{item.id}}" bindtap="onBuyTap">购买课时包</button>
-          <button wx:else class="btn btn-outline package-button" bindtap="onTrialTap">预约试听后到店确认</button>
         </view>
       </view>
       <view wx:else class="empty">{{onlinePackageSalesAllowed ? '课时包暂未上架，可先预约试听。' : '暂无正式课程参考方案，可先预约试听。'}}</view>

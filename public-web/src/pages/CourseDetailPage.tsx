@@ -18,6 +18,7 @@ import { Layout } from '@/components/Layout';
 import { RichTextRenderer } from '@/components/RichTextRenderer';
 import { TrialRegistrationModal } from '@/components/TrialRegistrationModal';
 import { useSeo } from '@/lib/seo';
+import { money } from '@/lib/utils';
 
 function packagePriceAmount(pkg: CoursePackage) {
   return pkg.discountPriceAmount ?? pkg.priceAmount;
@@ -255,6 +256,22 @@ export function CourseDetailPage() {
                       {pkg.description ? (
                         <p className="text-ink-soft mt-3 text-sm leading-6">{pkg.description}</p>
                       ) : null}
+                      {!onlinePackageSalesAllowed ? (
+                        <div className="border-line/80 mt-4 flex items-baseline justify-between gap-3 border-t pt-4">
+                          <span className="text-muted text-xs">参考价格</span>
+                          <div className="shrink-0 text-right">
+                            <div className="text-ink text-base font-semibold">
+                              {money(packagePriceAmount(pkg))}
+                            </div>
+                            {pkg.discountPriceAmount !== null &&
+                            pkg.discountPriceAmount !== undefined ? (
+                              <div className="text-muted mt-1 text-xs line-through">
+                                {money(pkg.priceAmount)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
                       {onlinePackageSalesAllowed ? (
                         <button
                           type="button"
@@ -273,15 +290,7 @@ export function CourseDetailPage() {
                         >
                           购买课时包
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="pwbtn pwbtn-outline mt-5 w-full"
-                          onClick={() => setTrialOpen(true)}
-                        >
-                          立即预约
-                        </button>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>
