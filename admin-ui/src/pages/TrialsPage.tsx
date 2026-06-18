@@ -46,11 +46,17 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 };
 
 interface TrialForm {
+  scheduleMode: 'single' | 'weekly';
   campusId: string;
   courseId: string;
   title: string;
   startsAt: string;
   endsAt: string;
+  startsOn: string;
+  endsOn: string;
+  weekdays: number[];
+  startTime: string;
+  endTime: string;
   capacity: string;
   reservationFeeYuan: string;
   reservationNotice: string;
@@ -86,6 +92,28 @@ const emptyContractForm: ContractForm = {
   note: '',
 };
 
+const WEEKDAYS = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 0, label: '周日' },
+];
+
+function toDateKey(value: string | Date): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const pad = (input: number) => String(input).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function toTimeLocal(value: string | Date): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const pad = (input: number) => String(input).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function toDateTimeLocal(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   const pad = (input: number) => String(input).padStart(2, '0');
@@ -94,17 +122,35 @@ function toDateTimeLocal(value: string | Date): string {
   )}:${pad(date.getMinutes())}`;
 }
 
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function sortTrialSessions(sessions: TrialSession[]) {
+  return [...sessions].sort(
+    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+  );
+}
+
 function defaultForm(campuses: Campus[], courses: Course[]): TrialForm {
   const now = new Date();
   now.setMinutes(0, 0, 0);
   const end = new Date(now);
   end.setMinutes(end.getMinutes() + 60);
   return {
+    scheduleMode: 'single',
     campusId: campuses[0]?.id ?? '',
     courseId: courses[0]?.id ?? '',
     title: '',
     startsAt: toDateTimeLocal(now),
     endsAt: toDateTimeLocal(end),
+    startsOn: toDateKey(now),
+    endsOn: toDateKey(addDays(now, 27)),
+    weekdays: [now.getDay()],
+    startTime: toTimeLocal(now),
+    endTime: toTimeLocal(end),
     capacity: '8',
     reservationFeeYuan: '0',
     reservationNotice: '',
@@ -418,14 +464,31 @@ export function TrialsPage() {
     setOpen(true);
   }
 
+  function toggleWeeklyWeekday(day: number) {
+    setForm((current) => ({
+      ...current,
+      weekdays: current.weekdays.includes(day)
+        ? current.weekdays.filter((item) => item !== day)
+        : [...current.weekdays, day],
+    }));
+  }
+
   function openEdit(session: TrialSession) {
+    const startsAt = new Date(session.startsAt);
+    const endsAt = new Date(session.endsAt);
     setEditing(session);
     setForm({
+      scheduleMode: 'single',
       campusId: session.campusId,
       courseId: session.courseId,
       title: session.title,
-      startsAt: toDateTimeLocal(session.startsAt),
-      endsAt: toDateTimeLocal(session.endsAt),
+      startsAt: toDateTimeLocal(startsAt),
+      endsAt: toDateTimeLocal(endsAt),
+      startsOn: toDateKey(startsAt),
+      endsOn: toDateKey(startsAt),
+      weekdays: [startsAt.getDay()],
+      startTime: toTimeLocal(startsAt),
+      endTime: toTimeLocal(endsAt),
       capacity: String(session.capacity),
       reservationFeeYuan: String((session.reservationFeeAmount ?? 0) / 100),
       reservationNotice: session.reservationNotice ?? '',
@@ -440,29 +503,81 @@ export function TrialsPage() {
       toast.error('请填写标题并选择校区和课程');
       return;
     }
+    if (editing || form.scheduleMode === 'single') {
+      const startsAt = new Date(form.startsAt).getTime();
+      const endsAt = new Date(form.endsAt).getTime();
+      if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) {
+        toast.error('结束时间必须晚于开始时间');
+        return;
+      }
+    } else {
+      if (!form.startsOn || !form.endsOn || !form.startTime || !form.endTime) {
+        toast.error('请填写重复试听课的日期和时间');
+        return;
+      }
+      if (form.endsOn < form.startsOn) {
+        toast.error('结束日期不能早于开始日期');
+        return;
+      }
+      if (form.endTime <= form.startTime) {
+        toast.error('下课时间必须晚于上课时间');
+        return;
+      }
+      if (form.weekdays.length === 0) {
+        toast.error('请选择每周可预约日');
+        return;
+      }
+    }
     setSaving(true);
     try {
-      const payload = {
-        ...form,
+      const basePayload = {
+        campusId: form.campusId,
+        courseId: form.courseId,
         title: form.title.trim(),
-        startsAt: new Date(form.startsAt).toISOString(),
-        endsAt: new Date(form.endsAt).toISOString(),
         capacity: Number(form.capacity) || 8,
         reservationFeeAmount: Math.round((Number(form.reservationFeeYuan) || 0) * 100),
         reservationNotice: form.reservationNotice,
         coverImageUrl: form.coverImageUrl.trim() || null,
+        status: form.status,
       };
-      if (editing) {
+
+      if (!editing && form.scheduleMode === 'weekly') {
+        const { trialSessions } = await apiPost<{ trialSessions: TrialSession[] }>(
+          `${TRIALS()}/batch`,
+          {
+            ...basePayload,
+            startsOn: form.startsOn,
+            endsOn: form.endsOn,
+            weekdays: form.weekdays,
+            startTime: form.startTime,
+            endTime: form.endTime,
+            timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+          },
+        );
+        setData((current) => sortTrialSessions([...trialSessions, ...current]));
+        toast.success(`已生成 ${trialSessions.length} 节试听课`);
+      } else if (editing) {
+        const payload = {
+          ...basePayload,
+          startsAt: new Date(form.startsAt).toISOString(),
+          endsAt: new Date(form.endsAt).toISOString(),
+        };
         const { trialSession } = await apiPatch<{ trialSession: TrialSession }>(
           `${TRIALS()}/${editing.id}`,
           payload,
         );
         setData(data.map((item) => (item.id === trialSession.id ? trialSession : item)));
+        toast.success('试听课已保存');
       } else {
+        const payload = {
+          ...basePayload,
+          startsAt: new Date(form.startsAt).toISOString(),
+          endsAt: new Date(form.endsAt).toISOString(),
+        };
         const { trialSession } = await apiPost<{ trialSession: TrialSession }>(TRIALS(), payload);
-        setData([trialSession, ...data]);
+        setData((current) => sortTrialSessions([trialSession, ...current]));
+        toast.success('试听课已保存');
       }
-      toast.success('试听课已保存');
       setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
@@ -640,7 +755,11 @@ export function TrialsPage() {
               取消
             </button>
             <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
-              {saving ? '保存中...' : '保存'}
+              {saving
+                ? '保存中...'
+                : !editing && form.scheduleMode === 'weekly'
+                  ? '生成试听课'
+                  : '保存'}
             </button>
           </>
         }
@@ -682,24 +801,107 @@ export function TrialsPage() {
             </select>
           </Field>
         </FieldRow>
-        <FieldRow>
-          <Field label="开始时间" required>
-            <input
-              className="form-input"
-              type="datetime-local"
-              value={form.startsAt}
-              onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
-            />
+        {!editing && (
+          <Field label="排课方式">
+            <div className="flex rounded-lg border p-1">
+              {[
+                { value: 'single', label: '单次试听' },
+                { value: 'weekly', label: '每周重复' },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={`btn flex-1 py-1.5 ${
+                    form.scheduleMode === item.value ? 'btn-primary' : 'btn-ghost'
+                  }`}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      scheduleMode: item.value as TrialForm['scheduleMode'],
+                    })
+                  }
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </Field>
-          <Field label="结束时间" required>
-            <input
-              className="form-input"
-              type="datetime-local"
-              value={form.endsAt}
-              onChange={(event) => setForm({ ...form, endsAt: event.target.value })}
-            />
-          </Field>
-        </FieldRow>
+        )}
+        {editing || form.scheduleMode === 'single' ? (
+          <FieldRow>
+            <Field label="开始时间" required>
+              <input
+                className="form-input"
+                type="datetime-local"
+                value={form.startsAt}
+                onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
+              />
+            </Field>
+            <Field label="结束时间" required>
+              <input
+                className="form-input"
+                type="datetime-local"
+                value={form.endsAt}
+                onChange={(event) => setForm({ ...form, endsAt: event.target.value })}
+              />
+            </Field>
+          </FieldRow>
+        ) : (
+          <>
+            <FieldRow>
+              <Field label="开始日期" required>
+                <input
+                  className="form-input"
+                  type="date"
+                  value={form.startsOn}
+                  onChange={(event) => setForm({ ...form, startsOn: event.target.value })}
+                />
+              </Field>
+              <Field label="结束日期" required>
+                <input
+                  className="form-input"
+                  type="date"
+                  value={form.endsOn}
+                  onChange={(event) => setForm({ ...form, endsOn: event.target.value })}
+                />
+              </Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label="上课时间" required>
+                <input
+                  className="form-input"
+                  type="time"
+                  value={form.startTime}
+                  onChange={(event) => setForm({ ...form, startTime: event.target.value })}
+                />
+              </Field>
+              <Field label="下课时间" required>
+                <input
+                  className="form-input"
+                  type="time"
+                  value={form.endTime}
+                  onChange={(event) => setForm({ ...form, endTime: event.target.value })}
+                />
+              </Field>
+            </FieldRow>
+            <Field label="每周可预约日" required>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAYS.map((day) => (
+                  <button
+                    key={day.value}
+                    type="button"
+                    className={`btn px-3 py-1.5 ${
+                      form.weekdays.includes(day.value) ? 'btn-primary' : 'btn-secondary'
+                    }`}
+                    onClick={() => toggleWeeklyWeekday(day.value)}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </>
+        )}
         <FieldRow>
           <Field label="容量">
             <input

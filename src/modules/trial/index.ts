@@ -36,6 +36,16 @@ const trialSessionSchema = z.object({
 });
 
 const trialSessionUpdateSchema = trialSessionSchema.partial();
+const trialSessionBatchSchema = trialSessionSchema
+  .omit({ startsAt: true, endsAt: true })
+  .extend({
+    startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/),
+    timezoneOffsetMinutes: z.number().int().default(-480),
+  });
 
 const registrationSchema = z.object({
   campusId: z.string().uuid().optional(),
@@ -102,6 +112,63 @@ function toPublicInstitution(institution: typeof schema.institutions.$inferSelec
 
 function unprocessable(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 422 });
+}
+
+function parseDateParts(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return { year, month, day };
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(dateKey: string, days: number) {
+  const { year, month, day } = parseDateParts(dateKey);
+  return formatDateKey(new Date(Date.UTC(year, month - 1, day + days)));
+}
+
+function dateKeyToUtcMs(dateKey: string) {
+  const { year, month, day } = parseDateParts(dateKey);
+  return Date.UTC(year, month - 1, day);
+}
+
+function localDateTimeToDate(dateKey: string, time: string, timezoneOffsetMinutes: number) {
+  const { year, month, day } = parseDateParts(dateKey);
+  const [hour, minute] = time.split(':').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hour, minute) + timezoneOffsetMinutes * 60_000);
+}
+
+function dayOfWeek(dateKey: string) {
+  const { year, month, day } = parseDateParts(dateKey);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function datesForTrialBatch(input: z.infer<typeof trialSessionBatchSchema>) {
+  if (dateKeyToUtcMs(input.endsOn) < dateKeyToUtcMs(input.startsOn)) {
+    throw unprocessable('结束日期不能早于开始日期');
+  }
+
+  const weekdays = new Set(input.weekdays);
+  const dates: string[] = [];
+
+  for (let dateKey = input.startsOn; dateKeyToUtcMs(dateKey) <= dateKeyToUtcMs(input.endsOn); ) {
+    if (weekdays.has(dayOfWeek(dateKey))) {
+      dates.push(dateKey);
+    }
+    dateKey = addDays(dateKey, 1);
+  }
+
+  if (dates.length === 0) {
+    throw unprocessable('日期范围内没有匹配的试听日期');
+  }
+  if (dates.length > 120) {
+    throw unprocessable('单次最多生成 120 节试听课');
+  }
+  return dates;
 }
 
 function readSettings(settings: unknown) {
@@ -492,6 +559,9 @@ export const trialModule: AppModule = {
     app.post('/v1/trial-sessions', { preHandler: app.requireAdmin }, async (request) => {
       const body = trialSessionSchema.parse(request.body);
       await catalogRepo.requireCourse(app.db, body.courseId);
+      if (new Date(body.endsAt) <= new Date(body.startsAt)) {
+        throw unprocessable('结束时间必须晚于开始时间');
+      }
 
       const trialSession = await trialRepo.createTrialSession(app.db, {
         campusId: body.campusId,
@@ -509,6 +579,42 @@ export const trialModule: AppModule = {
       return { trialSession };
     });
 
+    app.post('/v1/trial-sessions/batch', { preHandler: app.requireAdmin }, async (request) => {
+      const body = trialSessionBatchSchema.parse(request.body);
+      await catalogRepo.requireCourse(app.db, body.courseId);
+      const dates = datesForTrialBatch(body);
+      const trialSessions: Awaited<ReturnType<typeof trialRepo.createTrialSession>>[] = [];
+
+      for (const dateKey of dates) {
+        const startsAt = localDateTimeToDate(
+          dateKey,
+          body.startTime,
+          body.timezoneOffsetMinutes,
+        );
+        const endsAt = localDateTimeToDate(dateKey, body.endTime, body.timezoneOffsetMinutes);
+        if (endsAt <= startsAt) {
+          throw unprocessable('结束时间必须晚于开始时间');
+        }
+
+        const trialSession = await trialRepo.createTrialSession(app.db, {
+          campusId: body.campusId,
+          courseId: body.courseId,
+          title: body.title,
+          startsAt,
+          endsAt,
+          capacity: body.capacity,
+          reservationFeeAmount: body.reservationFeeAmount,
+          reservationNotice: body.reservationNotice,
+          coverImageUrl: body.coverImageUrl ?? null,
+          status: body.status,
+          bookedCount: 0,
+        });
+        trialSessions.push(trialSession);
+      }
+
+      return { trialSessions };
+    });
+
     app.patch(
       '/v1/trial-sessions/:trialSessionId',
       { preHandler: app.requireAdmin },
@@ -519,6 +625,9 @@ export const trialModule: AppModule = {
         const body = trialSessionUpdateSchema.parse(request.body);
         if (body.courseId) {
           await catalogRepo.requireCourse(app.db, body.courseId);
+        }
+        if (body.startsAt && body.endsAt && new Date(body.endsAt) <= new Date(body.startsAt)) {
+          throw unprocessable('结束时间必须晚于开始时间');
         }
         const trialSession = await trialRepo.updateTrialSession(
           app.db,
