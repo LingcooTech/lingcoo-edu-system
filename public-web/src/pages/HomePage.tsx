@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -118,6 +119,8 @@ export function HomePage() {
   const [heroContentHeight, setHeroContentHeight] = useState<number | null>(null);
   const heroTouchStartX = useRef<number | null>(null);
   const heroContentRef = useRef<HTMLDivElement | null>(null);
+  const courseRailRef = useRef<HTMLDivElement | null>(null);
+  const trialRailRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     loadHome()
@@ -214,6 +217,15 @@ export function HomePage() {
     heroTouchStartX.current = null;
     if (Math.abs(deltaX) < 40) return;
     moveHero(deltaX > 0 ? -1 : 1);
+  }
+
+  function scrollRail(ref: RefObject<HTMLDivElement | null>, direction: -1 | 1) {
+    const element = ref.current;
+    if (!element) return;
+    element.scrollBy({
+      left: direction * Math.max(280, Math.round(element.clientWidth * 0.82)),
+      behavior: 'smooth',
+    });
   }
 
   if (loading && !home) {
@@ -385,17 +397,35 @@ export function HomePage() {
             <div>
               <h2 className="text-ink mt-1 text-xl font-bold">推荐课程</h2>
             </div>
-            <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
-              查看全部
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="pwbtn pwbtn-outline h-9 w-9 px-0 py-0"
+                onClick={() => scrollRail(courseRailRef, -1)}
+                aria-label="上一组推荐课程"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="pwbtn pwbtn-outline h-9 w-9 px-0 py-0"
+                onClick={() => scrollRail(courseRailRef, 1)}
+                aria-label="下一组推荐课程"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <Link to="/courses" className="text-brand inline-flex items-center gap-1 text-sm">
+                查看全部
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-          <div className="mobile-rail md:grid md:grid-cols-3">
+          <div ref={courseRailRef} className="no-scrollbar flex snap-x gap-4 overflow-x-auto pb-2">
             {courses.map((course: Course) => (
               <Link
                 key={course.id}
                 to={`/courses/${course.slug}`}
-                className="pwcard mobile-rail-card mobile-rail-card-sm block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="pwcard block w-[78vw] shrink-0 snap-start overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-[20rem] md:w-[21rem]"
               >
                 {course.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
@@ -435,17 +465,35 @@ export function HomePage() {
             <div>
               <h2 className="text-ink mt-1 text-xl font-bold">本周公开课</h2>
             </div>
-            <Link to="/trials" className="text-brand inline-flex items-center gap-1 text-sm">
-              全部公开课
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="pwbtn pwbtn-outline h-9 w-9 px-0 py-0"
+                onClick={() => scrollRail(trialRailRef, -1)}
+                aria-label="上一组本周公开课"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="pwbtn pwbtn-outline h-9 w-9 px-0 py-0"
+                onClick={() => scrollRail(trialRailRef, 1)}
+                aria-label="下一组本周公开课"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <Link to="/trials" className="text-brand inline-flex items-center gap-1 text-sm">
+                全部公开课
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-          <div className="mobile-rail md:grid md:grid-cols-3">
+          <div ref={trialRailRef} className="no-scrollbar flex snap-x gap-4 overflow-x-auto pb-2">
             {sessions.map((session: TrialSession) => (
               <Link
                 key={session.id}
                 to={`/trials/${session.id}`}
-                className="pwcard mobile-rail-card mobile-rail-card-sm block overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="pwcard block w-[78vw] shrink-0 snap-start overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-[20rem] md:w-[21rem]"
               >
                 {session.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">

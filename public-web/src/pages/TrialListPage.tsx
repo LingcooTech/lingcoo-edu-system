@@ -182,14 +182,16 @@ export function TrialListPage() {
           ) : null}
         </div>
 
-        <div className="border-line bg-surface mt-6 grid gap-3 rounded-2xl border p-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
-          <div className="flex rounded-lg border p-1">
+        <div className="bg-surface/70 mt-6 grid gap-3 rounded-2xl p-3 shadow-sm md:grid-cols-[1.4fr_1fr_1fr_auto]">
+          <div className="bg-paper/70 flex rounded-full p-1">
             {TIME_FILTERS.map((item) => (
               <button
                 key={item.value}
                 type="button"
-                className={`pwbtn flex-1 justify-center px-3 py-2 text-sm ${
-                  timeFilter === item.value ? 'pwbtn-primary' : 'text-ink-soft hover:bg-paper'
+                className={`flex min-h-10 flex-1 items-center justify-center rounded-full px-3 py-2 text-sm font-semibold transition ${
+                  timeFilter === item.value
+                    ? 'bg-brand-soft text-brand'
+                    : 'text-ink-soft hover:bg-surface'
                 }`}
                 onClick={() => setTimeFilter(item.value)}
               >
@@ -258,9 +260,9 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
     : 0;
 
   return (
-    <article className="pwcard flex overflow-hidden">
+    <article className="pwcard overflow-hidden">
       {group.coverImageUrl ? (
-        <div className="bg-brand-soft hidden w-44 shrink-0 overflow-hidden sm:block">
+        <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
           <img
             src={group.coverImageUrl}
             alt={group.title}
@@ -352,9 +354,9 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
 
 function TrialCardSkeleton() {
   return (
-    <div className="pwcard flex overflow-hidden">
-      <div className="skeleton hidden w-44 shrink-0 sm:block" />
-      <div className="flex-1 p-5">
+    <div className="pwcard overflow-hidden">
+      <div className="skeleton aspect-[16/9] rounded-none" />
+      <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="skeleton h-5 w-2/3" />
