@@ -1,17 +1,100 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, CalendarDays } from 'lucide-react';
+import { ArrowRight, CalendarClock, CalendarDays, MapPin } from 'lucide-react';
 
-import { fetchTrialSessions, loadHome, type HomePayload, type TrialSession } from '@/api/client';
+import {
+  fetchTrialSessions,
+  loadHome,
+  type Course,
+  type HomePayload,
+  type TrialSession,
+} from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { getPageCopy } from '@/lib/page-copy';
 import { useSeo } from '@/lib/seo';
 import { formatDateTime, money } from '@/lib/utils';
 
+type TimeFilter = 'this_week' | 'next_week' | 'next_14' | 'all';
+
+const TIME_FILTERS: Array<{ value: TimeFilter; label: string }> = [
+  { value: 'next_14', label: '近14天' },
+  { value: 'this_week', label: '本周' },
+  { value: 'next_week', label: '下周' },
+  { value: 'all', label: '全部可约' },
+];
+
+interface TrialGroup {
+  key: string;
+  title: string;
+  coverImageUrl?: string | null;
+  course?: Course;
+  campus?: { id: string; name: string; address: string | null };
+  reservationFeeAmount: number;
+  sessions: TrialSession[];
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function startOfWeek(date: Date) {
+  const next = startOfDay(date);
+  const day = next.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  next.setDate(next.getDate() + offset);
+  return next;
+}
+
+function endOfWeek(date: Date) {
+  return endOfDay(addDays(startOfWeek(date), 6));
+}
+
+function timeRangeForFilter(filter: TimeFilter, now = new Date()) {
+  if (filter === 'this_week') {
+    return { from: now, to: endOfWeek(now) };
+  }
+  if (filter === 'next_week') {
+    const from = addDays(startOfWeek(now), 7);
+    return { from, to: endOfWeek(from) };
+  }
+  if (filter === 'next_14') {
+    return { from: now, to: endOfDay(addDays(now, 13)) };
+  }
+  return { from: now, to: null };
+}
+
+function formatSessionChip(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
 export function TrialListPage() {
   const [home, setHome] = useState<HomePayload | null>(null);
   const [sessions, setSessions] = useState<TrialSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('next_14');
+  const [courseId, setCourseId] = useState('');
+  const [campusId, setCampusId] = useState('');
+  const [showFull, setShowFull] = useState(false);
 
   useEffect(() => {
     Promise.all([fetchTrialSessions(), loadHome().catch(() => null)])
@@ -31,6 +114,64 @@ export function TrialListPage() {
     brandName: home?.organization.brandName,
   });
 
+  const courses = home?.featuredCourses ?? [];
+  const campuses = home?.campuses ?? [];
+  const courseById = useMemo(
+    () => new Map(courses.map((course) => [course.id, course])),
+    [courses],
+  );
+  const campusById = useMemo(
+    () => new Map(campuses.map((campus) => [campus.id, campus])),
+    [campuses],
+  );
+  const filteredSessions = useMemo(() => {
+    const now = new Date();
+    const range = timeRangeForFilter(timeFilter, now);
+    return sessions
+      .filter((session) => {
+        const startsAt = new Date(session.startsAt);
+        if (startsAt < range.from) return false;
+        if (range.to && startsAt > range.to) return false;
+        if (courseId && session.courseId !== courseId) return false;
+        if (campusId && session.campusId !== campusId) return false;
+        if (!showFull && session.bookedCount >= session.capacity) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  }, [campusId, courseId, sessions, showFull, timeFilter]);
+
+  const trialGroups = useMemo(() => {
+    const groups = new Map<string, TrialGroup>();
+    for (const session of filteredSessions) {
+      const key = [
+        session.courseId,
+        session.campusId,
+        session.title,
+        session.coverImageUrl ?? '',
+        session.reservationFeeAmount,
+      ].join('|');
+      const existing = groups.get(key);
+      if (existing) {
+        existing.sessions.push(session);
+        continue;
+      }
+      groups.set(key, {
+        key,
+        title: session.title,
+        coverImageUrl: session.coverImageUrl,
+        course: courseById.get(session.courseId),
+        campus: campusById.get(session.campusId),
+        reservationFeeAmount: session.reservationFeeAmount,
+        sessions: [session],
+      });
+    }
+    return Array.from(groups.values()).sort(
+      (a, b) =>
+        new Date(a.sessions[0]?.startsAt ?? 0).getTime() -
+        new Date(b.sessions[0]?.startsAt ?? 0).getTime(),
+    );
+  }, [campusById, courseById, filteredSessions]);
+
   return (
     <Layout>
       <section className="container-narrow py-10">
@@ -41,18 +182,67 @@ export function TrialListPage() {
           ) : null}
         </div>
 
+        <div className="border-line bg-surface mt-6 grid gap-3 rounded-2xl border p-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
+          <div className="flex rounded-lg border p-1">
+            {TIME_FILTERS.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                className={`pwbtn flex-1 justify-center px-3 py-2 text-sm ${
+                  timeFilter === item.value ? 'pwbtn-primary' : 'text-ink-soft hover:bg-paper'
+                }`}
+                onClick={() => setTimeFilter(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <select
+            className="pwinput"
+            value={courseId}
+            onChange={(event) => setCourseId(event.target.value)}
+          >
+            <option value="">全部课程</option>
+            {courses.map((course) => (
+              <option key={course.id} value={course.id}>
+                {course.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="pwinput"
+            value={campusId}
+            onChange={(event) => setCampusId(event.target.value)}
+          >
+            <option value="">全部校区</option>
+            {campuses.map((campus) => (
+              <option key={campus.id} value={campus.id}>
+                {campus.name}
+              </option>
+            ))}
+          </select>
+          <label className="text-ink-soft flex items-center gap-2 px-1 text-sm">
+            <input
+              type="checkbox"
+              checked={showFull}
+              onChange={(event) => setShowFull(event.target.checked)}
+            />
+            显示已满
+          </label>
+        </div>
+
         {loading ? (
-          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
+          <div className="mt-7 grid gap-4 lg:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
               <TrialCardSkeleton key={index} />
             ))}
           </div>
-        ) : sessions.length === 0 ? (
+        ) : trialGroups.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {sessions.map((session) => (
-              <TrialCard key={session.id} session={session} />
+          <div className="mt-7 grid gap-4 lg:grid-cols-2">
+            {trialGroups.map((group) => (
+              <TrialGroupCard key={group.key} group={group} />
             ))}
           </div>
         )}
@@ -61,103 +251,125 @@ export function TrialListPage() {
   );
 }
 
-function TrialCard({ session }: { session: TrialSession }) {
-  const remaining = Math.max(0, session.capacity - session.bookedCount);
-  const full = remaining === 0;
-  const pct =
-    session.capacity > 0
-      ? Math.min(100, Math.round((session.bookedCount / session.capacity) * 100))
-      : 0;
-  const almostFull = !full && remaining <= 3;
+function TrialGroupCard({ group }: { group: TrialGroup }) {
+  const firstSession = group.sessions[0];
+  const nextRemaining = firstSession
+    ? Math.max(0, firstSession.capacity - firstSession.bookedCount)
+    : 0;
 
-  const inner = (
-    <>
-      {session.coverImageUrl ? (
-        <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+  return (
+    <article className="pwcard flex overflow-hidden">
+      {group.coverImageUrl ? (
+        <div className="bg-brand-soft hidden w-44 shrink-0 overflow-hidden sm:block">
           <img
-            src={session.coverImageUrl}
-            alt={session.title}
+            src={group.coverImageUrl}
+            alt={group.title}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"
           />
         </div>
       ) : null}
-      <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <div className="text-ink-soft inline-flex items-center gap-1.5 text-sm">
-          <CalendarDays className="text-brand h-4 w-4 shrink-0" />
-          {formatDateTime(session.startsAt)}
+      <div className="min-w-0 flex-1 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-ink line-clamp-2 text-base font-semibold">{group.title}</h2>
+            <div className="text-muted mt-1 text-xs">
+              {group.course?.name ?? '试听课程'}
+              {group.course?.ageRange ? ` · ${group.course.ageRange}` : ''}
+            </div>
+          </div>
+          <span className="text-brand shrink-0 text-sm font-semibold">
+            {group.sessions.length} 场
+          </span>
         </div>
-        <h2 className="text-ink mt-2 text-base font-semibold">{session.title}</h2>
-        {session.reservationFeeAmount > 0 && (
+
+        <div className="text-ink-soft mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          {firstSession ? (
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="text-brand h-4 w-4 shrink-0" />
+              最近 {formatDateTime(firstSession.startsAt)}
+            </span>
+          ) : null}
+          {group.campus ? (
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="text-brand h-4 w-4 shrink-0" />
+              {group.campus.name}
+            </span>
+          ) : null}
+        </div>
+
+        {group.reservationFeeAmount > 0 && (
           <span className="mt-3 inline-flex w-fit items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-            {money(session.reservationFeeAmount)} 席位保留费
+            {money(group.reservationFeeAmount)} 席位保留费
           </span>
         )}
 
-        <div className="mt-auto pt-4 sm:pt-5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted">
-              已报名 {session.bookedCount}/{session.capacity}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {group.sessions.slice(0, 8).map((session) => {
+            const remaining = Math.max(0, session.capacity - session.bookedCount);
+            const full = remaining === 0;
+            return full ? (
+              <span
+                key={session.id}
+                className="border-line bg-paper text-muted rounded-full border px-3 py-2 text-sm"
+              >
+                {formatSessionChip(session.startsAt)} · 已满
+              </span>
+            ) : (
+              <Link
+                key={session.id}
+                to={`/trials/${session.id}`}
+                className="border-brand/25 bg-brand-soft text-brand hover:border-brand/50 hover:bg-surface rounded-full border px-3 py-2 text-sm font-medium transition"
+              >
+                {formatSessionChip(session.startsAt)} · 剩 {remaining}
+              </Link>
+            );
+          })}
+          {group.sessions.length > 8 ? (
+            <span className="text-muted inline-flex items-center px-2 text-sm">
+              还有 {group.sessions.length - 8} 场
             </span>
-            <span
-              className={
-                full
-                  ? 'text-muted'
-                  : almostFull
-                    ? 'font-medium text-amber-700'
-                    : 'text-brand font-medium'
-              }
-            >
-              {full ? '名额已满' : `剩 ${remaining} 席`}
-            </span>
-          </div>
-          <div className="bg-line mt-2 h-1.5 w-full overflow-hidden rounded-full">
-            <div
-              className={full ? 'bg-muted h-full rounded-full' : 'bg-brand h-full rounded-full'}
-              style={{ width: `${full ? 100 : Math.max(pct, 4)}%` }}
-            />
-          </div>
-          {full ? (
-            <div className="text-muted mt-4 text-sm font-medium">名额已满</div>
-          ) : (
-            <div className="text-ink mt-4 inline-flex items-center gap-1 text-sm font-medium">
-              预约这节试听课
-              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-            </div>
-          )}
+          ) : null}
         </div>
-      </div>
-    </>
-  );
 
-  if (full) {
-    return <div className="pwcard flex flex-col overflow-hidden opacity-70">{inner}</div>;
-  }
-  return (
-    <Link
-      to={`/trials/${session.id}`}
-      className="pwcard pwcard-hover group flex flex-col overflow-hidden no-underline"
-    >
-      {inner}
-    </Link>
+        {firstSession && (
+          <Link
+            to={`/trials/${firstSession.id}`}
+            className="text-ink mt-4 inline-flex items-center gap-1 text-sm font-medium"
+          >
+            查看最近场次
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        )}
+        {firstSession ? (
+          <div className="text-muted mt-2 text-xs">最近场次剩余 {nextRemaining} 席</div>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
 function TrialCardSkeleton() {
   return (
-    <div className="pwcard flex flex-col overflow-hidden">
-      <div className="skeleton aspect-[16/9]" />
-      <div className="p-5">
-        <div className="skeleton h-4 w-32" />
-        <div className="skeleton mt-3 h-5 w-2/3" />
-        <div className="mt-8 pt-5">
-          <div className="flex items-center justify-between">
-            <div className="skeleton h-3.5 w-20" />
-            <div className="skeleton h-3.5 w-12" />
+    <div className="pwcard flex overflow-hidden">
+      <div className="skeleton hidden w-44 shrink-0 sm:block" />
+      <div className="flex-1 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="skeleton h-5 w-2/3" />
+            <div className="skeleton mt-2 h-3.5 w-32" />
           </div>
-          <div className="skeleton mt-2 h-1.5 w-full" />
-          <div className="skeleton mt-4 h-4 w-28" />
+          <div className="skeleton h-4 w-10" />
+        </div>
+        <div className="mt-4 flex gap-3">
+          <div className="skeleton h-4 w-36" />
+          <div className="skeleton h-4 w-24" />
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="skeleton h-9 w-32 rounded-full" />
+          ))}
         </div>
       </div>
     </div>

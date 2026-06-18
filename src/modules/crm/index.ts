@@ -206,7 +206,11 @@ async function createLeadFromRegistration(
     trialSessionId: input.trialSessionId,
   });
 
-  if (courseResolution.trialSession && courseResolution.trialSession.status !== 'open') {
+  if (
+    courseResolution.trialSession &&
+    (courseResolution.trialSession.status !== 'open' ||
+      courseResolution.trialSession.startsAt <= new Date())
+  ) {
     throw unprocessable('Trial session is not open');
   }
   if (
@@ -586,7 +590,7 @@ export const crmModule: AppModule = {
       const [channel, organization, openTrialSessions] = await Promise.all([
         crmRepo.findChannel(app.db, campaign.channelId),
         organizationRepo.requireOrganization(app.db),
-        trialRepo.listOpenTrialSessions(app.db),
+        trialRepo.listOpenFutureTrialSessions(app.db, { from: new Date() }),
       ]);
       const course = campaign.courseSlug
         ? await catalogRepo.findPublishedCourseBySlug(app.db, campaign.courseSlug)

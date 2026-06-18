@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gt, lte } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -19,6 +19,27 @@ export async function listOpenTrialSessions(db: Database) {
     .from(schema.trialSessions)
     .where(eq(schema.trialSessions.status, 'open'))
     .orderBy(asc(schema.trialSessions.startsAt));
+}
+
+export async function listOpenFutureTrialSessions(
+  db: Database,
+  input: { from: Date; to?: Date; limit?: number },
+) {
+  const conditions = [
+    eq(schema.trialSessions.status, 'open'),
+    gt(schema.trialSessions.startsAt, input.from),
+  ];
+  if (input.to) {
+    conditions.push(lte(schema.trialSessions.startsAt, input.to));
+  }
+
+  const sessions = await db
+    .select()
+    .from(schema.trialSessions)
+    .where(and(...conditions))
+    .orderBy(asc(schema.trialSessions.startsAt));
+
+  return input.limit ? sessions.slice(0, input.limit) : sessions;
 }
 
 export async function createTrialSession(db: Database, values: NewTrialSession) {
@@ -53,6 +74,14 @@ export async function updateTrialSession(
 
 export async function cancelTrialSession(db: Database, trialSessionId: string) {
   return updateTrialSession(db, trialSessionId, { status: 'cancelled' });
+}
+
+export async function closeExpiredTrialSessions(db: Database, now = new Date()) {
+  return db
+    .update(schema.trialSessions)
+    .set({ status: 'closed', updatedAt: now })
+    .where(and(eq(schema.trialSessions.status, 'open'), lte(schema.trialSessions.endsAt, now)))
+    .returning();
 }
 
 export async function deleteTrialSession(db: Database, trialSessionId: string) {

@@ -36,16 +36,14 @@ const trialSessionSchema = z.object({
 });
 
 const trialSessionUpdateSchema = trialSessionSchema.partial();
-const trialSessionBatchSchema = trialSessionSchema
-  .omit({ startsAt: true, endsAt: true })
-  .extend({
-    startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/),
-    timezoneOffsetMinutes: z.number().int().default(-480),
-  });
+const trialSessionBatchSchema = trialSessionSchema.omit({ startsAt: true, endsAt: true }).extend({
+  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+  timezoneOffsetMinutes: z.number().int().default(-480),
+});
 
 const registrationSchema = z.object({
   campusId: z.string().uuid().optional(),
@@ -112,6 +110,26 @@ function toPublicInstitution(institution: typeof schema.institutions.$inferSelec
 
 function unprocessable(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 422 });
+}
+
+function endOfCurrentWeek(now = new Date()) {
+  const end = new Date(now);
+  const daysUntilSunday = end.getDay() === 0 ? 0 : 7 - end.getDay();
+  end.setDate(end.getDate() + daysUntilSunday);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function ensureTrialSessionOpenAndFuture(
+  trialSession: typeof schema.trialSessions.$inferSelect,
+  now = new Date(),
+) {
+  if (trialSession.status !== 'open') {
+    throw unprocessable('Trial session is not open');
+  }
+  if (trialSession.startsAt <= now) {
+    throw unprocessable('Trial session has already started');
+  }
 }
 
 function parseDateParts(value: string) {
@@ -222,10 +240,15 @@ export const trialModule: AppModule = {
   async register(app) {
     app.get('/public/home', async () => {
       const organization = await organizationRepo.requireOrganization(app.db);
+      const now = new Date();
 
       const [courses, trialSessions, campuses, teachers, contentItems] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db),
-        trialRepo.listOpenTrialSessions(app.db),
+        trialRepo.listOpenFutureTrialSessions(app.db, {
+          from: now,
+          to: endOfCurrentWeek(now),
+          limit: 6,
+        }),
         organizationRepo.listCampuses(app.db),
         teachingRepo.listTeachers(app.db),
         contentRepo.listPublishedContent(app.db, { limit: 3, offset: 0 }),
@@ -269,13 +292,15 @@ export const trialModule: AppModule = {
     });
 
     app.get('/public/trial-sessions', async () => {
-      return { trialSessions: await trialRepo.listOpenTrialSessions(app.db) };
+      return {
+        trialSessions: await trialRepo.listOpenFutureTrialSessions(app.db, { from: new Date() }),
+      };
     });
 
     app.get('/public/trial-sessions/:trialSessionId', async (request) => {
       const { trialSessionId } = request.params as { trialSessionId: string };
       const trialSession = await trialRepo.requireTrialSession(app.db, trialSessionId);
-      if (trialSession.status !== 'open') {
+      if (trialSession.status !== 'open' || trialSession.startsAt <= new Date()) {
         throw notFound('Trial session not found');
       }
       const [course, campuses, organization] = await Promise.all([
@@ -389,9 +414,7 @@ export const trialModule: AppModule = {
 
       if (body.trialSessionId) {
         const trialSession = await trialRepo.requireTrialSession(app.db, body.trialSessionId);
-        if (trialSession.status !== 'open') {
-          throw unprocessable('Trial session is not open');
-        }
+        ensureTrialSessionOpenAndFuture(trialSession);
         if (trialSession.bookedCount >= trialSession.capacity) {
           throw unprocessable('Trial session is full');
         }
@@ -462,9 +485,7 @@ export const trialModule: AppModule = {
       if (!businessModel.seatReservationFeeEnabled) {
         throw unprocessable('Seat reservation fee is not enabled');
       }
-      if (trialSession.status !== 'open') {
-        throw unprocessable('Trial session is not open');
-      }
+      ensureTrialSessionOpenAndFuture(trialSession);
       if (trialSession.bookedCount >= trialSession.capacity) {
         throw unprocessable('Trial session is full');
       }
@@ -586,11 +607,7 @@ export const trialModule: AppModule = {
       const trialSessions: Awaited<ReturnType<typeof trialRepo.createTrialSession>>[] = [];
 
       for (const dateKey of dates) {
-        const startsAt = localDateTimeToDate(
-          dateKey,
-          body.startTime,
-          body.timezoneOffsetMinutes,
-        );
+        const startsAt = localDateTimeToDate(dateKey, body.startTime, body.timezoneOffsetMinutes);
         const endsAt = localDateTimeToDate(dateKey, body.endTime, body.timezoneOffsetMinutes);
         if (endsAt <= startsAt) {
           throw unprocessable('结束时间必须晚于开始时间');

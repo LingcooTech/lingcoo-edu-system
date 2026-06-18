@@ -33,6 +33,7 @@ export interface Course {
 
 export interface TrialSession {
   id: string;
+  campusId: string;
   courseId: string;
   title: string;
   startsAt: string;

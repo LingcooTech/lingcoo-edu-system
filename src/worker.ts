@@ -1,4 +1,5 @@
 import { db, pool } from './db/client.js';
+import * as trialRepo from './db/repositories/trial.js';
 import { loadEnv } from './lib/env.js';
 import { LessonNotificationService } from './modules/notifications/lesson-notification-service.js';
 
@@ -14,8 +15,10 @@ const lessonNotifications = new LessonNotificationService({
 });
 
 const LESSON_REMINDER_INTERVAL_MS = 5 * 60 * 1000;
+const EXPIRED_TRIAL_CLOSE_INTERVAL_MS = 10 * 60 * 1000;
 
 let lessonReminderRunning = false;
+let expiredTrialCloseRunning = false;
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
@@ -58,13 +61,35 @@ async function runLessonReminderTick() {
   }
 }
 
+async function runExpiredTrialCloseTick() {
+  if (expiredTrialCloseRunning) {
+    return;
+  }
+  expiredTrialCloseRunning = true;
+  try {
+    const closedSessions = await trialRepo.closeExpiredTrialSessions(db);
+    if (closedSessions.length > 0) {
+      writeLog('info', 'expired trial sessions closed', { count: closedSessions.length });
+    }
+  } catch (error) {
+    writeLog('error', 'expired trial close job failed', { err: serializeError(error) });
+  } finally {
+    expiredTrialCloseRunning = false;
+  }
+}
+
 writeLog('info', 'fd-edu worker started');
 
 void runLessonReminderTick();
+void runExpiredTrialCloseTick();
 
 const lessonReminderInterval = setInterval(() => {
   void runLessonReminderTick();
 }, LESSON_REMINDER_INTERVAL_MS);
+
+const expiredTrialCloseInterval = setInterval(() => {
+  void runExpiredTrialCloseTick();
+}, EXPIRED_TRIAL_CLOSE_INTERVAL_MS);
 
 const heartbeatInterval = setInterval(() => {
   writeLog('info', 'fd-edu worker heartbeat');
@@ -73,6 +98,7 @@ const heartbeatInterval = setInterval(() => {
 async function shutdown(signal: string) {
   writeLog('info', 'fd-edu worker shutting down', { signal });
   clearInterval(lessonReminderInterval);
+  clearInterval(expiredTrialCloseInterval);
   clearInterval(heartbeatInterval);
   await pool.end();
   process.exit(0);
