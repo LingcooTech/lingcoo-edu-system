@@ -20,6 +20,7 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { ResourceToolbar } from '@/components/shared/ResourceToolbar';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime } from '@/lib/utils';
@@ -94,7 +95,7 @@ function toPayload(form: ContentForm): ContentUpsertInput {
     title: form.title.trim(),
     slug: form.slug.trim(),
     excerpt: form.excerpt.trim(),
-    content: form.content,
+    content: articleContentToHtml(form.content),
     coverUrl: form.coverUrl.trim(),
     authorName: form.authorName.trim(),
     status: form.status,
@@ -102,6 +103,124 @@ function toPayload(form: ContentForm): ContentUpsertInput {
     sourceId: form.sourceId.trim(),
     sourceUrl: form.sourceUrl.trim(),
   };
+}
+
+function looksLikeHtml(value: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(value);
+}
+
+function htmlEscape(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function markdownInlineToHtml(value: string) {
+  return htmlEscape(value)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)]+|\/[^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
+    );
+}
+
+function plainTextToArticleHtml(value: string) {
+  const html: string[] = [];
+  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  let paragraph: string[] = [];
+  let listItems: string[] = [];
+  let quoteLines: string[] = [];
+
+  function flushParagraph() {
+    if (paragraph.length) {
+      html.push(`<p>${markdownInlineToHtml(paragraph.join(' '))}</p>`);
+      paragraph = [];
+    }
+  }
+
+  function flushList() {
+    if (listItems.length) {
+      html.push(
+        `<ul>${listItems.map((item) => `<li>${markdownInlineToHtml(item)}</li>`).join('')}</ul>`,
+      );
+      listItems = [];
+    }
+  }
+
+  function flushQuote() {
+    if (quoteLines.length) {
+      html.push(
+        `<blockquote>${quoteLines.map((line) => `<p>${markdownInlineToHtml(line)}</p>`).join('')}</blockquote>`,
+      );
+      quoteLines = [];
+    }
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      continue;
+    }
+
+    const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (image) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      html.push(
+        `<figure><img src="${htmlEscape(image[2])}" alt="${htmlEscape(image[1])}" /></figure>`,
+      );
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      const level = heading[1].length;
+      html.push(`<h${level}>${markdownInlineToHtml(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const bullet = line.match(/^-\s+(.+)$/);
+    if (bullet) {
+      flushParagraph();
+      flushQuote();
+      listItems.push(bullet[1]);
+      continue;
+    }
+
+    const quote = line.match(/^>\s+(.+)$/);
+    if (quote) {
+      flushParagraph();
+      flushList();
+      quoteLines.push(quote[1]);
+      continue;
+    }
+
+    flushList();
+    flushQuote();
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+  flushQuote();
+  return html.join('\n');
+}
+
+function articleContentToHtml(value: string) {
+  const content = value.trim();
+  if (!content) return '';
+  return looksLikeHtml(content) ? content : plainTextToArticleHtml(content);
 }
 
 export function ContentMarketingPage() {
@@ -650,13 +769,20 @@ export function ContentMarketingPage() {
               onChange={(event) => patchForm({ excerpt: event.target.value })}
             />
           </Field>
-          <Field label="正文内容" hint="可粘贴 HTML 或 Markdown 文本">
-            <textarea
-              className="form-input h-80 font-mono text-sm"
-              value={form.content}
-              onChange={(event) => patchForm({ content: event.target.value })}
-            />
-          </Field>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
+            <div>
+              <span className="form-label">正文内容</span>
+              <RichTextEditor
+                value={form.content}
+                onChange={(content) => patchForm({ content })}
+                prefix="content/body"
+              />
+            </div>
+            <section className="resource-card p-4">
+              <div className="text-muted-foreground mb-3 text-xs font-medium">预览</div>
+              <ArticlePreview content={form.content} />
+            </section>
+          </div>
         </div>
       </Drawer>
       <ConfirmDialog
@@ -671,6 +797,15 @@ export function ContentMarketingPage() {
       />
     </PageFrame>
   );
+}
+
+function ArticlePreview({ content }: { content: string }) {
+  const html = articleContentToHtml(content);
+  if (!html.trim()) {
+    return <div className="text-muted-foreground text-sm">暂无正文</div>;
+  }
+
+  return <div className="admin-article-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function ImportCard({

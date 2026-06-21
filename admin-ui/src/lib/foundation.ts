@@ -86,8 +86,6 @@ export const adminSections = [
         path: '/operations/business-model',
         icon: Settings,
       },
-      { key: 'contracts', label: '正式课程档案', path: '/operations/contracts', icon: FileText },
-      { key: 'lessons', label: '课时账户', path: '/operations/lessons', icon: BarChart3 },
       { key: 'accounts', label: '用户账号', path: '/operations/accounts', icon: ShieldCheck },
     ],
   },
