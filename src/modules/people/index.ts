@@ -119,9 +119,9 @@ export const peopleModule: AppModule = {
 
     app.delete('/v1/students/:studentId', { preHandler: app.requireAdmin }, async (request) => {
       const { studentId } = request.params as { studentId: string };
-      const student = await peopleRepo.deleteStudent(app.db, studentId);
-      if (!student) throw notFound('Student not found');
-      return { student };
+      const result = await peopleRepo.purgeStudent(app.db, studentId);
+      if (!result) throw notFound('Student not found');
+      return result;
     });
   },
 };

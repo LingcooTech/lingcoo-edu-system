@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -76,6 +76,99 @@ export async function deleteStudent(db: Database, studentId: string) {
     .where(eq(schema.students.id, studentId))
     .returning();
   return student ?? null;
+}
+
+export async function purgeStudent(db: Database, studentId: string) {
+  return db.transaction(async (tx) => {
+    const [student] = await tx
+      .select()
+      .from(schema.students)
+      .where(eq(schema.students.id, studentId))
+      .limit(1);
+
+    if (!student) {
+      return null;
+    }
+
+    const studentOrders = await tx
+      .select({ id: schema.orders.id, orderNo: schema.orders.orderNo })
+      .from(schema.orders)
+      .where(eq(schema.orders.studentId, studentId));
+    const orderIds = studentOrders.map((order) => order.id);
+    const orderNos = studentOrders.map((order) => order.orderNo);
+
+    const deletedContracts = await tx
+      .delete(schema.courseContracts)
+      .where(eq(schema.courseContracts.studentId, studentId))
+      .returning({ id: schema.courseContracts.id });
+
+    let deletedSettlementBatchOrderCount = 0;
+    let deletedRefundRequestCount = 0;
+    let deletedPaymentCount = 0;
+    let deletedOrderCount = 0;
+
+    if (orderIds.length > 0) {
+      const deletedSettlementBatchOrders = await tx
+        .delete(schema.settlementBatchOrders)
+        .where(inArray(schema.settlementBatchOrders.orderId, orderIds))
+        .returning({ settlementBatchId: schema.settlementBatchOrders.settlementBatchId });
+      deletedSettlementBatchOrderCount = deletedSettlementBatchOrders.length;
+
+      const affectedSettlementBatchIds = Array.from(
+        new Set(deletedSettlementBatchOrders.map((row) => row.settlementBatchId)),
+      );
+      for (const settlementBatchId of affectedSettlementBatchIds) {
+        const remainingRows = await tx
+          .select({ amount: schema.settlementBatchOrders.amount })
+          .from(schema.settlementBatchOrders)
+          .where(eq(schema.settlementBatchOrders.settlementBatchId, settlementBatchId));
+        await tx
+          .update(schema.settlementBatches)
+          .set({
+            orderCount: remainingRows.length,
+            totalAmount: remainingRows.reduce((sum, row) => sum + row.amount, 0),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.settlementBatches.id, settlementBatchId));
+      }
+
+      const deletedRefundRequests = await tx
+        .delete(schema.refundRequests)
+        .where(inArray(schema.refundRequests.orderId, orderIds))
+        .returning({ id: schema.refundRequests.id });
+      deletedRefundRequestCount = deletedRefundRequests.length;
+
+      if (orderNos.length > 0) {
+        const deletedPayments = await tx
+          .delete(schema.payments)
+          .where(inArray(schema.payments.orderNo, orderNos))
+          .returning({ id: schema.payments.id });
+        deletedPaymentCount = deletedPayments.length;
+      }
+
+      const deletedOrders = await tx
+        .delete(schema.orders)
+        .where(inArray(schema.orders.id, orderIds))
+        .returning({ id: schema.orders.id });
+      deletedOrderCount = deletedOrders.length;
+    }
+
+    const [deletedStudent] = await tx
+      .delete(schema.students)
+      .where(eq(schema.students.id, studentId))
+      .returning();
+
+    return {
+      student: deletedStudent ?? student,
+      deleted: {
+        orders: deletedOrderCount,
+        courseContracts: deletedContracts.length,
+        settlementBatchOrders: deletedSettlementBatchOrderCount,
+        refundRequests: deletedRefundRequestCount,
+        payments: deletedPaymentCount,
+      },
+    };
+  });
 }
 
 export async function requireStudent(db: Database, studentId: string) {

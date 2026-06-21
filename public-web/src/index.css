@@ -108,7 +108,7 @@ body {
   }
 
   .site-header-bar {
-    @apply mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-5 sm:px-6 lg:px-8;
+    @apply mx-auto flex h-12 w-full max-w-6xl items-center gap-3 px-5 sm:px-6 lg:px-8;
   }
 
   .app-brand {
@@ -116,7 +116,7 @@ body {
   }
 
   .app-brand-mark {
-    @apply bg-ink flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold text-white;
+    @apply bg-ink flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white;
   }
 
   .app-brand-name {
@@ -124,7 +124,7 @@ body {
   }
 
   .site-brand-logo {
-    @apply h-8 max-w-36 object-contain sm:max-w-48;
+    @apply h-7 max-w-36 object-contain sm:max-w-48;
   }
 
   .site-nav {
@@ -152,11 +152,11 @@ body {
   }
 
   .site-account-trigger {
-    @apply text-ink hover:bg-paper inline-flex h-10 items-center gap-2 rounded-full border border-transparent bg-transparent py-0.5 pr-2.5 pl-1 text-sm font-medium transition-colors;
+    @apply text-ink hover:bg-paper inline-flex h-9 items-center gap-2 rounded-full border border-transparent bg-transparent py-0.5 pr-2.5 pl-1 text-sm font-medium transition-colors;
   }
 
   .site-avatar {
-    @apply bg-brand flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white;
+    @apply bg-brand flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white;
   }
 
   .site-account-menu {
@@ -373,7 +373,7 @@ body {
     }
 
     .site-header-bar {
-      @apply h-[52px] gap-2 px-3.5;
+      @apply h-12 gap-2 px-3.5;
     }
 
     .app-brand {
@@ -381,7 +381,7 @@ body {
     }
 
     .app-brand-mark {
-      @apply h-7 w-7 rounded-lg text-[11px];
+      @apply h-6 w-6 rounded-lg text-[10px];
     }
 
     .app-brand-name {
@@ -389,7 +389,7 @@ body {
     }
 
     .site-brand-logo {
-      @apply h-7 max-w-[46vw];
+      @apply h-6 max-w-[46vw];
     }
 
     .site-actions {
@@ -398,11 +398,11 @@ body {
 
     .site-icon-btn,
     .site-account-trigger {
-      @apply h-10 w-10 rounded-xl;
+      @apply h-9 w-9 rounded-xl;
     }
 
     .site-avatar {
-      @apply h-8 w-8;
+      @apply h-6 w-6;
     }
 
     .site-account-trigger {
@@ -414,7 +414,7 @@ body {
     }
 
     .site-login-trigger {
-      @apply h-10 w-10 rounded-xl p-0;
+      @apply h-9 w-9 rounded-xl p-0;
     }
 
     .site-login-trigger span {

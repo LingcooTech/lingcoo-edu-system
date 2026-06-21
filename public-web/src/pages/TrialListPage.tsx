@@ -234,15 +234,15 @@ export function TrialListPage() {
         </div>
 
         {loading ? (
-          <div className="mt-7 grid gap-4 lg:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, index) => (
+          <div className="mt-7 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
               <TrialCardSkeleton key={index} />
             ))}
           </div>
         ) : trialGroups.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="mt-7 grid gap-4 lg:grid-cols-2">
+          <div className="mt-7 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {trialGroups.map((group) => (
               <TrialGroupCard key={group.key} group={group} />
             ))}
@@ -258,24 +258,52 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
   const nextRemaining = firstSession
     ? Math.max(0, firstSession.capacity - firstSession.bookedCount)
     : 0;
+  const primaryHref = firstSession ? `/trials/${firstSession.id}` : '';
+  const alternateSessions = group.sessions.slice(1);
+  const visibleAlternateSessions = alternateSessions.slice(0, 5);
+  const additionalAlternateCount = alternateSessions.length - visibleAlternateSessions.length;
 
   return (
     <article className="pwcard overflow-hidden">
       {group.coverImageUrl ? (
-        <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
-          <img
-            src={group.coverImageUrl}
-            alt={group.title}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        </div>
+        primaryHref ? (
+          <Link
+            to={primaryHref}
+            className="bg-brand-soft block aspect-[16/9] overflow-hidden"
+            aria-label={`查看${group.title}最近场次`}
+          >
+            <img
+              src={group.coverImageUrl}
+              alt={group.title}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition duration-200 hover:scale-[1.02]"
+            />
+          </Link>
+        ) : (
+          <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
+            <img
+              src={group.coverImageUrl}
+              alt={group.title}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )
       ) : null}
-      <div className="min-w-0 flex-1 p-4 sm:p-5">
+      <div className="min-w-0 flex-1 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-ink line-clamp-2 text-base font-semibold">{group.title}</h2>
+            <h2 className="text-ink line-clamp-2 text-base leading-snug font-semibold">
+              {primaryHref ? (
+                <Link to={primaryHref} className="hover:text-brand transition-colors">
+                  {group.title}
+                </Link>
+              ) : (
+                group.title
+              )}
+            </h2>
             <div className="text-muted mt-1 text-xs">
               {group.course?.name ?? '试听课程'}
               {group.course?.ageRange ? ` · ${group.course.ageRange}` : ''}
@@ -286,7 +314,7 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
           </span>
         </div>
 
-        <div className="text-ink-soft mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+        <div className="text-ink-soft mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
           {firstSession ? (
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="text-brand h-4 w-4 shrink-0" />
@@ -302,50 +330,57 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
         </div>
 
         {group.reservationFeeAmount > 0 && (
-          <span className="mt-3 inline-flex w-fit items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+          <span className="mt-2.5 inline-flex w-fit items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
             {money(group.reservationFeeAmount)} 席位保留费
           </span>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {group.sessions.slice(0, 8).map((session) => {
-            const remaining = Math.max(0, session.capacity - session.bookedCount);
-            const full = remaining === 0;
-            return full ? (
-              <span
-                key={session.id}
-                className="border-line bg-paper text-muted rounded-full border px-3 py-2 text-sm"
-              >
-                {formatSessionChip(session.startsAt)} · 已满
-              </span>
-            ) : (
-              <Link
-                key={session.id}
-                to={`/trials/${session.id}`}
-                className="border-brand/25 bg-brand-soft text-brand hover:border-brand/50 hover:bg-surface rounded-full border px-3 py-2 text-sm font-medium transition"
-              >
-                {formatSessionChip(session.startsAt)} · 剩 {remaining}
-              </Link>
-            );
-          })}
-          {group.sessions.length > 8 ? (
-            <span className="text-muted inline-flex items-center px-2 text-sm">
-              还有 {group.sessions.length - 8} 场
-            </span>
-          ) : null}
-        </div>
+        {alternateSessions.length > 0 ? (
+          <div className="mt-3">
+            <div className="text-muted mb-1.5 text-xs font-medium">其他时间</div>
+            <div className="flex flex-wrap gap-1.5">
+              {visibleAlternateSessions.map((session) => {
+                const remaining = Math.max(0, session.capacity - session.bookedCount);
+                const full = remaining === 0;
+                return full ? (
+                  <span
+                    key={session.id}
+                    className="border-line bg-paper text-muted rounded-full border px-2.5 py-1.5 text-xs"
+                  >
+                    {formatSessionChip(session.startsAt)} · 已满
+                  </span>
+                ) : (
+                  <Link
+                    key={session.id}
+                    to={`/trials/${session.id}`}
+                    className="border-brand/25 bg-brand-soft text-brand hover:border-brand/50 hover:bg-surface rounded-full border px-2.5 py-1.5 text-xs font-medium transition"
+                  >
+                    {formatSessionChip(session.startsAt)} · 剩 {remaining}
+                  </Link>
+                );
+              })}
+              {additionalAlternateCount > 0 ? (
+                <span className="text-muted inline-flex items-center px-1.5 text-xs">
+                  还有 {additionalAlternateCount} 场
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {firstSession && (
           <Link
             to={`/trials/${firstSession.id}`}
-            className="text-ink mt-4 inline-flex items-center gap-1 text-sm font-medium"
+            className="text-ink mt-3 inline-flex items-center gap-1 text-sm font-medium hover:text-brand"
           >
             查看最近场次
             <ArrowRight className="h-4 w-4" />
           </Link>
         )}
         {firstSession ? (
-          <div className="text-muted mt-2 text-xs">最近场次剩余 {nextRemaining} 席</div>
+          <div className="text-muted mt-1.5 text-xs">
+            {nextRemaining === 0 ? '最近场次已满' : `最近场次剩余 ${nextRemaining} 席`}
+          </div>
         ) : null}
       </div>
     </article>
@@ -356,7 +391,7 @@ function TrialCardSkeleton() {
   return (
     <div className="pwcard overflow-hidden">
       <div className="skeleton aspect-[16/9] rounded-none" />
-      <div className="p-5">
+      <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="skeleton h-5 w-2/3" />
@@ -369,8 +404,8 @@ function TrialCardSkeleton() {
           <div className="skeleton h-4 w-24" />
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="skeleton h-9 w-32 rounded-full" />
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="skeleton h-7 w-28 rounded-full" />
           ))}
         </div>
       </div>

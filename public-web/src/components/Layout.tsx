@@ -57,7 +57,7 @@ function Brand({
   if (loading) {
     return (
       <Link to="/" className="app-brand" aria-label="首页">
-        <span className="skeleton block h-8 w-36 rounded-xl" />
+        <span className="skeleton block h-7 w-36 rounded-xl" />
       </Link>
     );
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, MapPin, UsersRound } from 'lucide-react';
@@ -6,8 +6,10 @@ import { CalendarDays, ChevronLeft, MapPin, UsersRound } from 'lucide-react';
 import {
   createSeatReservation,
   fetchTrialSession,
+  fetchTrialSessions,
   submitTrialRegistration,
   type TrialDetail,
+  type TrialSession,
 } from '@/api/client';
 import { CheckoutModal, type CheckoutTarget } from '@/components/CheckoutModal';
 import { Layout } from '@/components/Layout';
@@ -41,11 +43,33 @@ function readPrefillForm(state: unknown): Partial<TrialForm> {
   };
 }
 
+function compareTrialSessionTime(a: TrialSession, b: TrialSession) {
+  return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+}
+
+function isSameTrialOption(session: TrialSession, current: TrialSession) {
+  return (
+    session.courseId === current.courseId &&
+    session.campusId === current.campusId &&
+    session.title === current.title
+  );
+}
+
+function remainingSeats(session: TrialSession) {
+  return Math.max(0, session.capacity - session.bookedCount);
+}
+
+function trialOptionLabel(session: TrialSession) {
+  const remaining = remainingSeats(session);
+  return `${formatDateTime(session.startsAt)} · ${remaining === 0 ? '已满' : `剩 ${remaining} 席`}`;
+}
+
 export function TrialDetailPage() {
   const { trialId = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [detail, setDetail] = useState<TrialDetail | null>(null);
+  const [sessionOptions, setSessionOptions] = useState<TrialSession[]>([]);
   const [form, setForm] = useState<TrialForm>(() => ({
     ...initialForm,
     ...readPrefillForm(location.state),
@@ -57,11 +81,30 @@ export function TrialDetailPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    fetchTrialSession(trialId)
-      .then(setDetail)
-      .catch(() => setDetail(null))
-      .finally(() => setLoading(false));
+    setError('');
+    setCheckoutTarget(null);
+    setCheckoutOpen(false);
+    Promise.all([fetchTrialSession(trialId), fetchTrialSessions().catch(() => [])])
+      .then(([payload, trialSessions]) => {
+        if (cancelled) return;
+        setDetail(payload);
+        setSessionOptions(trialSessions);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDetail(null);
+        setSessionOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [trialId]);
 
   useSeo({
@@ -69,6 +112,28 @@ export function TrialDetailPage() {
     description: detail?.course.summary,
     brandName: detail?.organization.brandName,
   });
+
+  const trialSessionOptions = useMemo(() => {
+    if (!detail) {
+      return [];
+    }
+    const currentSession = detail.trialSession;
+    const byId = new Map<string, TrialSession>();
+    byId.set(currentSession.id, currentSession);
+    for (const session of sessionOptions) {
+      if (isSameTrialOption(session, currentSession)) {
+        byId.set(session.id, session);
+      }
+    }
+    return Array.from(byId.values()).sort(compareTrialSessionTime);
+  }, [detail, sessionOptions]);
+
+  function changeTrialTime(nextTrialSessionId: string) {
+    if (!nextTrialSessionId || nextTrialSessionId === trialId) {
+      return;
+    }
+    navigate(`/trials/${nextTrialSessionId}`, { state: { trialRegistration: form } });
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -187,7 +252,30 @@ export function TrialDetailPage() {
             <div className="text-ink-soft mt-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
               <div className="bg-paper rounded-2xl p-4">
                 <CalendarDays className="text-brand mb-2 h-5 w-5" />
-                {formatDateTime(detail.trialSession.startsAt)}
+                {trialSessionOptions.length > 1 ? (
+                  <select
+                    className="border-line bg-surface text-ink focus:border-brand focus:ring-brand/25 w-full rounded-xl border px-2.5 py-2 text-xs leading-5 outline-none focus:ring-2"
+                    value={detail.trialSession.id}
+                    onChange={(event) => changeTrialTime(event.target.value)}
+                    aria-label="切换试听时间"
+                  >
+                    {trialSessionOptions.map((session) => {
+                      const remaining = remainingSeats(session);
+                      const full = remaining === 0;
+                      return (
+                        <option
+                          key={session.id}
+                          value={session.id}
+                          disabled={full && session.id !== detail.trialSession.id}
+                        >
+                          {trialOptionLabel(session)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : (
+                  formatDateTime(detail.trialSession.startsAt)
+                )}
               </div>
               <div className="bg-paper rounded-2xl p-4">
                 <MapPin className="text-brand mb-2 h-5 w-5" />

@@ -95,7 +95,7 @@ export function Sidebar({
           {collapsed ? (
             <BrandIcon logoUrl={squareLogoUrl} brandName={brandName} />
           ) : fullLogoUrl ? (
-            <img src={fullLogoUrl} alt={brandName} className="h-7 max-w-[140px] object-contain" />
+            <img src={fullLogoUrl} alt={brandName} className="h-6 max-w-[120px] object-contain" />
           ) : (
             <>
               <BrandIcon logoUrl={squareLogoUrl} brandName={brandName} />
@@ -297,14 +297,14 @@ export function Sidebar({
 function BrandIcon({ logoUrl, brandName }: { logoUrl?: string; brandName: string }) {
   if (logoUrl) {
     return (
-      <span className="bg-card flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+      <span className="bg-card flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
         <img src={logoUrl} alt={brandName} className="h-full w-full object-contain" />
       </span>
     );
   }
 
   return (
-    <span className="from-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br to-blue-500 text-[11px] font-semibold text-white">
+    <span className="from-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br to-blue-500 text-[10px] font-semibold text-white">
       {getInitials(brandName)}
     </span>
   );

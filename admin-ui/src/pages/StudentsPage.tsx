@@ -32,6 +32,17 @@ const emptyForm: StudentForm = {
   status: 'active',
 };
 
+interface StudentDeleteResponse {
+  student: Student;
+  deleted: {
+    orders: number;
+    courseContracts: number;
+    settlementBatchOrders: number;
+    refundRequests: number;
+    payments: number;
+  };
+}
+
 export function StudentsPage() {
   const toast = useToast();
   const { data, setData } = useApiResource<Student>(STUDENTS(), 'students');
@@ -41,6 +52,7 @@ export function StudentsPage() {
   const [form, setForm] = useState<StudentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function openCreate() {
     setEditing(null);
@@ -109,14 +121,18 @@ export function StudentsPage() {
 
   async function deleteStudent() {
     if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const { student } = await apiDelete<{ student: Student }>(`${STUDENTS()}/${deleteTarget.id}`);
-      setData(data.map((item) => (item.id === student.id ? { ...item, ...student } : item)));
+      const targetId = deleteTarget.id;
+      await apiDelete<StudentDeleteResponse>(`${STUDENTS()}/${targetId}`);
+      setData(data.filter((item) => item.id !== targetId));
       setDeleteTarget(null);
-      setSelected((current) => (current?.id === student.id ? { ...current, ...student } : current));
-      toast.success('学员已停用，历史课时、订单和考勤已保留');
+      setSelected((current) => (current?.id === targetId ? null : current));
+      toast.success('学员数据已删除');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -191,7 +207,7 @@ export function StudentsPage() {
                   onClick={() => setDeleteTarget(row)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  停用
+                  删除
                 </button>
               </div>
             ),
@@ -326,10 +342,11 @@ export function StudentsPage() {
       </Drawer>
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="停用学员？"
-        message={`确认停用「${deleteTarget?.name ?? ''}」？历史课时、考勤和订单记录会保留。`}
-        confirmLabel="停用"
+        title="永久删除学员？"
+        message={`确认永久删除「${deleteTarget?.name ?? ''}」？该学员的课时、班级报名、考勤、作业打卡，以及关联订单、合同、退款和结算记录会一并清空。此操作不可恢复。`}
+        confirmLabel="永久删除"
         danger
+        busy={deleting}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={deleteStudent}
       />
