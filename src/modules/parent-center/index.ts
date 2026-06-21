@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
@@ -90,7 +90,12 @@ export const parentCenterModule: AppModule = {
       const students = await app.db
         .select()
         .from(schema.students)
-        .where(eq(schema.students.guardianId, account.guardianId));
+        .where(
+          and(
+            eq(schema.students.guardianId, account.guardianId),
+            ne(schema.students.status, 'archived'),
+          ),
+        );
       return { account, students };
     }
 

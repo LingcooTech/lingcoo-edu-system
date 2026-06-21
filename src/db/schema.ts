@@ -56,7 +56,7 @@ export const seatReservationCheckInStatusEnum = pgEnum('seat_reservation_check_i
   'checked_in',
   'no_show',
 ]);
-export const studentStatusEnum = pgEnum('student_status', ['active', 'inactive']);
+export const studentStatusEnum = pgEnum('student_status', ['active', 'inactive', 'archived']);
 export const classStatusEnum = pgEnum('class_status', [
   'recruiting',
   'active',

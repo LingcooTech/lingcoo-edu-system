@@ -4,6 +4,11 @@ import * as peopleRepo from '../../db/repositories/people.js';
 import * as lessonRepo from '../../db/repositories/lesson.js';
 import type { AppModule } from '../types.js';
 
+const studentStatusSchema = z.enum(['active', 'inactive', 'archived']);
+const studentListQuerySchema = z.object({
+  scope: z.enum(['current', 'archived', 'all']).default('current'),
+});
+
 const studentSchema = z.object({
   guardianId: z.string().uuid().optional(),
   guardianName: z.string().optional(),
@@ -11,7 +16,7 @@ const studentSchema = z.object({
   name: z.string().min(1),
   grade: z.string().min(1),
   school: z.string().optional(),
-  status: z.enum(['active', 'inactive']).default('active'),
+  status: studentStatusSchema.default('active'),
 });
 
 const studentUpdateSchema = studentSchema
@@ -67,9 +72,10 @@ export const peopleModule: AppModule = {
       return { guardian };
     });
 
-    app.get('/v1/students', { preHandler: app.requireAdmin }, async () => {
+    app.get('/v1/students', { preHandler: app.requireAdmin }, async (request) => {
+      const query = studentListQuerySchema.parse(request.query);
       const [students, guardians, accounts] = await Promise.all([
-        peopleRepo.listStudents(app.db),
+        peopleRepo.listStudents(app.db, { scope: query.scope }),
         peopleRepo.listGuardians(app.db),
         lessonRepo.listLessonAccounts(app.db),
       ]);
@@ -119,9 +125,9 @@ export const peopleModule: AppModule = {
 
     app.delete('/v1/students/:studentId', { preHandler: app.requireAdmin }, async (request) => {
       const { studentId } = request.params as { studentId: string };
-      const result = await peopleRepo.purgeStudent(app.db, studentId);
-      if (!result) throw notFound('Student not found');
-      return result;
+      const student = await peopleRepo.archiveStudent(app.db, studentId);
+      if (!student) throw notFound('Student not found');
+      return { student };
     });
   },
 };

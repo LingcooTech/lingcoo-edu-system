@@ -103,6 +103,10 @@ function packageLessonLabel(coursePackage: CoursePackage) {
 }
 
 export function CourseContractsPage() {
+  return <CourseContractsPanel framed />;
+}
+
+export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   const toast = useToast();
   const { data, setData } = useApiResource<CourseContract>(
     '/v1/course-contracts',
@@ -290,34 +294,33 @@ export function CourseContractsPage() {
     }
   }
 
-  return (
-    <PageFrame
-      section="contracts"
-      actions={
-        <div className="flex flex-wrap justify-end gap-2">
-          <select
-            className="form-input w-auto py-1.5"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="all">全部状态</option>
-            <option value="active">进行中</option>
-            <option value="completed">已完成</option>
-            <option value="cancelled">已取消</option>
-          </select>
-          <input
-            className="form-input w-56 py-1.5"
-            placeholder="搜索档案/学员/课程/收款方"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            新增正式课程档案
-          </button>
-        </div>
-      }
-    >
+  const toolbar = (
+    <div className="flex flex-wrap justify-end gap-2">
+      <select
+        className="form-input w-auto py-1.5"
+        value={statusFilter}
+        onChange={(event) => setStatusFilter(event.target.value)}
+      >
+        <option value="all">全部状态</option>
+        <option value="active">进行中</option>
+        <option value="completed">已完成</option>
+        <option value="cancelled">已取消</option>
+      </select>
+      <input
+        className="form-input w-56 py-1.5"
+        placeholder="搜索档案/学员/课程/收款方"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <button type="button" className="btn btn-primary" onClick={openCreate}>
+        <Plus className="h-4 w-4" />
+        新增正式课程档案
+      </button>
+    </div>
+  );
+
+  const content = (
+    <>
       <div className="metric-grid mb-6">
         <MetricCard label="筛选档案" value={filtered.length} hint={`全部 ${data.length} 份`} />
         <MetricCard label="进行中档案" value={summary.activeCount} hint="可继续消课" />
@@ -592,6 +595,21 @@ export function CourseContractsPage() {
           />
         </Field>
       </Drawer>
+    </>
+  );
+
+  if (!framed) {
+    return (
+      <div className="space-y-5">
+        <div className="flex justify-end">{toolbar}</div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <PageFrame section="contracts" actions={toolbar}>
+      {content}
     </PageFrame>
   );
 }

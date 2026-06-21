@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
 
 import * as crmRepo from '../../db/repositories/crm.js';
@@ -144,6 +144,7 @@ export const paymentModule: AppModule = {
             and(
               eq(schema.students.guardianId, guardian.id),
               eq(schema.students.name, body.studentName.trim()),
+              ne(schema.students.status, 'archived'),
             ),
           )
           .limit(1);

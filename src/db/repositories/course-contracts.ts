@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -82,7 +82,11 @@ async function findStudentForGuardian(db: DbOrTx, input: { guardianId: string; n
     .select()
     .from(schema.students)
     .where(
-      and(eq(schema.students.guardianId, input.guardianId), eq(schema.students.name, input.name)),
+      and(
+        eq(schema.students.guardianId, input.guardianId),
+        eq(schema.students.name, input.name),
+        ne(schema.students.status, 'archived'),
+      ),
     )
     .limit(1);
   return student ?? null;

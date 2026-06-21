@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Archive, Eye, Pencil, RotateCcw } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Student } from '@/api/types';
@@ -8,11 +8,22 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
+import { ResourceToolbar } from '@/components/shared/ResourceToolbar';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
+import { CourseContractsPanel } from '@/pages/CourseContractsPage';
+import { LessonAccountsPanel } from '@/pages/LessonsPage';
 
-const STUDENTS = () => '/v1/students';
+const STUDENTS = '/v1/students';
+const ARCHIVED_STUDENTS = '/v1/students?scope=archived';
+const STUDENT_TABS = [
+  { key: 'profiles', label: '学员档案' },
+  { key: 'history', label: '历史档案' },
+  { key: 'lessonAccounts', label: '课时账户' },
+  { key: 'courseContracts', label: '正式课程档案' },
+] as const;
+type StudentTab = (typeof STUDENT_TABS)[number]['key'];
 
 interface StudentForm {
   name: string;
@@ -32,27 +43,26 @@ const emptyForm: StudentForm = {
   status: 'active',
 };
 
-interface StudentDeleteResponse {
+interface StudentMutationResponse {
   student: Student;
-  deleted: {
-    orders: number;
-    courseContracts: number;
-    settlementBatchOrders: number;
-    refundRequests: number;
-    payments: number;
-  };
 }
 
 export function StudentsPage() {
   const toast = useToast();
-  const { data, setData } = useApiResource<Student>(STUDENTS(), 'students');
+  const { data, setData } = useApiResource<Student>(STUDENTS, 'students');
+  const { data: archivedData, setData: setArchivedData } = useApiResource<Student>(
+    ARCHIVED_STUDENTS,
+    'students',
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [selected, setSelected] = useState<Student | null>(null);
   const [form, setForm] = useState<StudentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Student | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<StudentTab>('profiles');
 
   function openCreate() {
     setEditing(null);
@@ -86,7 +96,7 @@ export function StudentsPage() {
     setSaving(true);
     try {
       if (editing) {
-        const { student } = await apiPatch<{ student: Student }>(`${STUDENTS()}/${editing.id}`, {
+        const { student } = await apiPatch<{ student: Student }>(`${STUDENTS}/${editing.id}`, {
           name: form.name.trim(),
           grade: form.grade.trim(),
           school: form.school.trim() || undefined,
@@ -94,7 +104,7 @@ export function StudentsPage() {
         });
         setData(data.map((item) => (item.id === student.id ? { ...item, ...student } : item)));
       } else {
-        const { student } = await apiPost<{ student: Student }>(STUDENTS(), {
+        const { student } = await apiPost<{ student: Student }>(STUDENTS, {
           name: form.name.trim(),
           grade: form.grade.trim(),
           school: form.school.trim() || undefined,
@@ -119,102 +129,206 @@ export function StudentsPage() {
     }
   }
 
-  async function deleteStudent() {
-    if (!deleteTarget) return;
-    setDeleting(true);
+  async function archiveStudent() {
+    if (!archiveTarget) return;
+    setArchiving(true);
     try {
-      const targetId = deleteTarget.id;
-      await apiDelete<StudentDeleteResponse>(`${STUDENTS()}/${targetId}`);
-      setData(data.filter((item) => item.id !== targetId));
-      setDeleteTarget(null);
+      const targetId = archiveTarget.id;
+      const { student } = await apiDelete<StudentMutationResponse>(`${STUDENTS}/${targetId}`);
+      setArchivedData((current) => [
+        { ...archiveTarget, ...student },
+        ...current.filter((item) => item.id !== targetId),
+      ]);
+      setData((current) => current.filter((item) => item.id !== targetId));
+      setArchiveTarget(null);
       setSelected((current) => (current?.id === targetId ? null : current));
-      toast.success('学员数据已删除');
+      toast.success('学员已移入历史档案');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '删除失败');
+      toast.error(err instanceof Error ? err.message : '归档失败');
     } finally {
-      setDeleting(false);
+      setArchiving(false);
+    }
+  }
+
+  async function restoreStudent(studentToRestore: Student) {
+    setRestoringId(studentToRestore.id);
+    try {
+      const { student } = await apiPatch<StudentMutationResponse>(
+        `${STUDENTS}/${studentToRestore.id}`,
+        {
+          status: 'active',
+        },
+      );
+      const restoredStudent = { ...studentToRestore, ...student };
+      setArchivedData((current) => current.filter((item) => item.id !== studentToRestore.id));
+      setData((current) => [
+        restoredStudent,
+        ...current.filter((item) => item.id !== studentToRestore.id),
+      ]);
+      setSelected((current) => (current?.id === studentToRestore.id ? restoredStudent : current));
+      toast.success('学员已恢复到当前档案');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '恢复失败');
+    } finally {
+      setRestoringId(null);
     }
   }
 
   return (
-    <PageFrame
-      section="students"
-      actions={
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          新增学员
-        </button>
-      }
-    >
-      <DataTable
-        columns={[
-          {
-            key: 'name',
-            header: '学员',
-            cell: (row) => (
-              <button
-                type="button"
-                className="cell-stack text-left"
-                onClick={() => setSelected(row)}
-              >
-                <span className="cell-title">{row.name}</span>
-                <span className="cell-subtitle">
-                  {row.grade}
-                  {row.school ? ` · ${row.school}` : ''}
-                </span>
-              </button>
-            ),
-          },
-          {
-            key: 'guardian',
-            header: '家长',
-            cell: (row) => `${row.guardian?.name ?? '-'} ${row.guardian?.phone ?? ''}`,
-          },
-          {
-            key: 'lesson',
-            header: '课时余额',
-            cell: (row) => row.lessonAccounts?.map((account) => account.balance).join(' / ') || '0',
-          },
-          {
-            key: 'status',
-            header: '状态',
-            cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
-          },
-          {
-            key: 'actions',
-            header: '操作',
-            cell: (row) => (
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  className="btn btn-ghost px-2 py-1"
-                  onClick={() => setSelected(row)}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  详情
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost px-2 py-1"
-                  onClick={() => openEdit(row)}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  编辑
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost px-2 py-1 text-red-600"
-                  onClick={() => setDeleteTarget(row)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  删除
-                </button>
-              </div>
-            ),
-          },
-        ]}
-        data={data}
-      />
+    <PageFrame section="students">
+      <div className="space-y-5">
+        <ResourceToolbar
+          tabs={STUDENT_TABS}
+          activeKey={activeTab}
+          onTabChange={setActiveTab}
+          action={activeTab === 'profiles' ? { label: '新增学员', onClick: openCreate } : null}
+        />
+
+        {activeTab === 'profiles' ? (
+          <DataTable
+            columns={[
+              {
+                key: 'name',
+                header: '学员',
+                cell: (row) => (
+                  <button
+                    type="button"
+                    className="cell-stack text-left"
+                    onClick={() => setSelected(row)}
+                  >
+                    <span className="cell-title">{row.name}</span>
+                    <span className="cell-subtitle">
+                      {row.grade}
+                      {row.school ? ` · ${row.school}` : ''}
+                    </span>
+                  </button>
+                ),
+              },
+              {
+                key: 'guardian',
+                header: '家长',
+                cell: (row) => `${row.guardian?.name ?? '-'} ${row.guardian?.phone ?? ''}`,
+              },
+              {
+                key: 'lesson',
+                header: '课时余额',
+                cell: (row) =>
+                  row.lessonAccounts?.map((account) => account.balance).join(' / ') || '0',
+              },
+              {
+                key: 'status',
+                header: '状态',
+                cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+              },
+              {
+                key: 'actions',
+                header: '操作',
+                cell: (row) => (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1"
+                      onClick={() => setSelected(row)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      详情
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1"
+                      onClick={() => openEdit(row)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => setArchiveTarget(row)}
+                    >
+                      <Archive className="h-3.5 w-3.5" />
+                      移入历史
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            data={data}
+            emptyMessage="暂无学员档案"
+            getRowKey={(row) => row.id}
+          />
+        ) : activeTab === 'history' ? (
+          <DataTable
+            columns={[
+              {
+                key: 'name',
+                header: '学员',
+                cell: (row) => (
+                  <button
+                    type="button"
+                    className="cell-stack text-left"
+                    onClick={() => setSelected(row)}
+                  >
+                    <span className="cell-title">{row.name}</span>
+                    <span className="cell-subtitle">
+                      {row.grade}
+                      {row.school ? ` · ${row.school}` : ''}
+                    </span>
+                  </button>
+                ),
+              },
+              {
+                key: 'guardian',
+                header: '家长',
+                cell: (row) => `${row.guardian?.name ?? '-'} ${row.guardian?.phone ?? ''}`,
+              },
+              {
+                key: 'lesson',
+                header: '课时余额',
+                cell: (row) =>
+                  row.lessonAccounts?.map((account) => account.balance).join(' / ') || '0',
+              },
+              {
+                key: 'status',
+                header: '状态',
+                cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+              },
+              {
+                key: 'actions',
+                header: '操作',
+                cell: (row) => (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1"
+                      onClick={() => setSelected(row)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      详情
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1"
+                      disabled={restoringId === row.id}
+                      onClick={() => restoreStudent(row)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {restoringId === row.id ? '恢复中' : '恢复'}
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            data={archivedData}
+            emptyMessage="暂无历史档案"
+            getRowKey={(row) => row.id}
+          />
+        ) : activeTab === 'lessonAccounts' ? (
+          <LessonAccountsPanel />
+        ) : (
+          <CourseContractsPanel />
+        )}
+      </div>
 
       <Drawer
         open={open}
@@ -341,14 +455,14 @@ export function StudentsPage() {
         )}
       </Drawer>
       <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        title="永久删除学员？"
-        message={`确认永久删除「${deleteTarget?.name ?? ''}」？该学员的课时、班级报名、考勤、作业打卡，以及关联订单、合同、退款和结算记录会一并清空。此操作不可恢复。`}
-        confirmLabel="永久删除"
+        open={Boolean(archiveTarget)}
+        title="移入历史档案？"
+        message={`确认将「${archiveTarget?.name ?? ''}」移入历史档案？该学员不会出现在日常学员列表和家长端孩子档案中，课时、班级、考勤、作业、订单、合同等记录会保留。`}
+        confirmLabel="移入历史"
         danger
-        busy={deleting}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={deleteStudent}
+        busy={archiving}
+        onCancel={() => setArchiveTarget(null)}
+        onConfirm={archiveStudent}
       />
     </PageFrame>
   );
