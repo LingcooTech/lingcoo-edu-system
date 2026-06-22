@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Eye, Pencil, RotateCcw } from 'lucide-react';
+import { Archive, Eye, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Student } from '@/api/types';
