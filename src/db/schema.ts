@@ -97,6 +97,14 @@ export const orderTypeEnum = pgEnum('order_type', [
   'manual_package_grant',
 ]);
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'refunded', 'cancelled']);
+export const orderCancelReasonEnum = pgEnum('order_cancel_reason', [
+  'user_cancel',
+  'system_cancel',
+  'admin_invalid',
+  'test_order',
+  'duplicate',
+  'other',
+]);
 export const refundRequestStatusEnum = pgEnum('refund_request_status', [
   'pending',
   'approved',
@@ -735,6 +743,11 @@ export const orders = pgTable(
     paymentMethod: varchar('payment_method', { length: 40 }),
     offlinePaymentNote: text('offline_payment_note'),
     status: orderStatusEnum('status').notNull().default('pending'),
+    cancelReason: orderCancelReasonEnum('cancel_reason'),
+    cancelledByAdminId: uuid('cancelled_by_admin_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     source: varchar('source', { length: 80 }).notNull().default('unknown'),
     channelId: uuid('channel_id').references(() => channels.id, { onDelete: 'set null' }),

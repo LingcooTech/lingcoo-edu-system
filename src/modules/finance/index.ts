@@ -122,6 +122,29 @@ export const financeModule: AppModule = {
       },
     );
 
+    app.patch('/v1/orders/:orderId/cancel', { preHandler: app.requireAdmin }, async (request) => {
+      const { orderId } = request.params as { orderId: string };
+      const body = z
+        .object({
+          reason: z.enum([
+            'user_cancel',
+            'system_cancel',
+            'admin_invalid',
+            'test_order',
+            'duplicate',
+            'other',
+          ]),
+        })
+        .parse(request.body);
+
+      const order = await financeRepo.cancelOrder(app.db, orderId, {
+        reason: body.reason,
+        cancelledByAdminId: (request.user as { id?: string } | undefined)?.id,
+      });
+
+      return { order };
+    });
+
     app.post('/v1/orders', { preHandler: app.requireAdmin }, async (request) => {
       const body = orderSchema.parse(request.body);
       await peopleRepo.requireStudent(app.db, body.studentId);

@@ -371,6 +371,9 @@ export interface Order {
   offlinePaymentNote?: string | null;
   status: string;
   paidAt?: string | null;
+  cancelReason?: 'user_cancel' | 'system_cancel' | 'admin_invalid' | 'test_order' | 'duplicate' | 'other' | null;
+  cancelledByAdminId?: string | null;
+  cancelledAt?: string | null;
   createdAt: string;
   student?: { name: string };
   course?: { name: string };

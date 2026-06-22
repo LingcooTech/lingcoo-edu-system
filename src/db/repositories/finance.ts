@@ -352,3 +352,30 @@ export async function markOrderPaidAndCredit(
     return { order: updated, alreadyPaid: false };
   });
 }
+
+export async function cancelOrder(
+  db: Database,
+  orderId: string,
+  input: {
+    reason: string;
+    cancelledByAdminId?: string;
+  },
+): Promise<Order> {
+  const [order] = await db
+    .update(schema.orders)
+    .set({
+      status: 'cancelled',
+      cancelReason: input.reason as any,
+      cancelledByAdminId: input.cancelledByAdminId || null,
+      cancelledAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.orders.id, orderId))
+    .returning();
+
+  if (!order) {
+    throw httpError(404, 'Order not found');
+  }
+
+  return order;
+}

@@ -26,6 +26,15 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   cancelled: '已取消',
 };
 
+const ORDER_CANCEL_REASON_LABEL: Record<string, string> = {
+  user_cancel: '用户取消',
+  system_cancel: '系统取消',
+  admin_invalid: '管理员标记无效',
+  test_order: '测试订单',
+  duplicate: '重复订单',
+  other: '其他',
+};
+
 const REFUND_STATUS_LABEL: Record<string, string> = {
   pending: '退款待审',
   approved: '退款通过',
@@ -166,6 +175,9 @@ export function OrdersPage() {
   const [syncingOrderNo, setSyncingOrderNo] = useState('');
   const [decidingRefundId, setDecidingRefundId] = useState('');
   const [reloading, setReloading] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [cancelling, setCancelling] = useState(false);
 
   const selectedPackage = activePackages.find((item) => item.id === form.packageId);
   const selectableCourses = selectedPackage?.courseSeriesId
@@ -340,6 +352,30 @@ export function OrdersPage() {
     }
   }
 
+  async function submitCancelOrder() {
+    if (!cancelTarget) return;
+    if (!cancelReason) {
+      toast.error('请选择作废原因');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      await api(`/v1/orders/${encodeURIComponent(cancelTarget.id)}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      await reloadOrders();
+      toast.success('订单已作废');
+      setCancelTarget(null);
+      setCancelReason('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '作废订单失败');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <PageFrame
       section="orders"
@@ -483,6 +519,7 @@ export function OrdersPage() {
             header: '操作',
             cell: (row) => {
               const refund = pendingRefund(row);
+              const canCancel = row.status === 'pending' || row.status === 'paid';
               return (
                 <div className="flex flex-wrap gap-1.5">
                   <button
@@ -516,6 +553,18 @@ export function OrdersPage() {
                       </button>
                     </>
                   ) : null}
+                  {canCancel && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-xs text-red-600"
+                      onClick={() => {
+                        setCancelTarget(row);
+                        setCancelReason('');
+                      }}
+                    >
+                      作废
+                    </button>
+                  )}
                 </div>
               );
             },
@@ -524,6 +573,61 @@ export function OrdersPage() {
         data={filtered}
         emptyMessage="没有符合筛选条件的订单。"
       />
+
+      <Drawer
+        open={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        title="作废订单"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setCancelTarget(null)}
+              disabled={cancelling}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={submitCancelOrder}
+              disabled={!cancelReason || cancelling}
+            >
+              {cancelling ? '作废中...' : '确认作废'}
+            </button>
+          </>
+        }
+      >
+        <Field label="订单号">
+          <input
+            className="form-input"
+            value={cancelTarget?.orderNo || ''}
+            readOnly
+          />
+        </Field>
+        <Field label="学员">
+          <input
+            className="form-input"
+            value={cancelTarget?.student?.name || ''}
+            readOnly
+          />
+        </Field>
+        <Field label="作废原因" required>
+          <select
+            className="form-input"
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+          >
+            <option value="">选择原因...</option>
+            <option value="test_order">测试订单</option>
+            <option value="admin_invalid">管理员标记无效</option>
+            <option value="duplicate">重复订单</option>
+            <option value="system_cancel">系统取消</option>
+            <option value="other">其他</option>
+          </select>
+        </Field>
+      </Drawer>
 
       <Drawer
         open={open}

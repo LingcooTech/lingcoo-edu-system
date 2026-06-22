@@ -218,6 +218,13 @@
       "when": 1782000000000,
       "tag": "0030_student_history_status",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782112188012,
+      "tag": "0031_lonely_amazoness",
+      "breakpoints": true
     }
   ]
 }
