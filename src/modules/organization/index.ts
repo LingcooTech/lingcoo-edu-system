@@ -186,6 +186,7 @@ const businessModelSchema = z
     manualPackageGrantEnabled: z.boolean().optional(),
     packagePriceDisplayEnabled: z.boolean().optional(),
     seatReservationFeeEnabled: z.boolean().optional(),
+    courseContractEditEnabled: z.boolean().optional(),
   })
   .optional();
 
