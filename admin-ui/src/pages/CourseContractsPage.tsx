@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Plus, XCircle, Pencil } from 'lucide-react';
 
-import { apiPatch, apiPost } from '@/api/client';
-import type { ClassGroup, Course, CourseContract, CoursePackage, Student } from '@/api/types';
+import { apiPatch, apiPost, fetchOrganization } from '@/api/client';
+import type { ClassGroup, Course, CourseContract, CoursePackage, Student, OrganizationSettings } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
@@ -122,6 +122,8 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   const [form, setForm] = useState<ContractForm>(emptyForm);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [organization, setOrganization] = useState<OrganizationSettings | null>(null);
 
   const activeStudents = useMemo(
     () => students.filter((student) => student.status !== 'inactive'),
@@ -192,6 +194,15 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       paidYuan: String(effectivePackagePrice(coursePackage) / 100),
     };
   }
+
+  useEffect(() => {
+    fetchOrganization()
+      .then(setOrganization)
+      .catch(() => {
+        // 如果加载失败，默认允许编辑
+        setOrganization({ businessModel: { courseContractEditEnabled: true } } as any);
+      });
+  }, []);
 
   function openCreate() {
     const courseId = courses[0]?.id ?? '';
@@ -267,6 +278,65 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openEdit(contract: CourseContract) {
+    setEditingId(contract.id);
+    setForm({
+      studentId: contract.student?.name ?? '',
+      courseId: contract.course?.name ?? '',
+      classId: contract.class?.id ?? '',
+      packageId: contract.package?.id ?? '',
+      title: contract.title,
+      lessonCount: String(contract.lessonCount),
+      paidYuan: String(contract.paidAmount / 100),
+      paymentMethod: contract.paymentMethod ?? 'wechat_offline',
+      startsAt: contract.startsAt ? new Date(contract.startsAt).toISOString().split('T')[0] : '',
+      endsAt: contract.endsAt ? new Date(contract.endsAt).toISOString().split('T')[0] : '',
+      note: contract.note ?? '',
+    });
+    setOpen(true);
+  }
+
+  async function submitEdit() {
+    if (!editingId) return;
+    const lessonCount = Number(form.lessonCount);
+    if (!Number.isInteger(lessonCount) || lessonCount <= 0) {
+      toast.error('课时数必须大于 0');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { courseContract } = await apiPatch<{ courseContract: CourseContract }>(
+        `/v1/course-contracts/${editingId}`,
+        {
+          title: form.title.trim() || null,
+          lessonCount,
+          paidAmount: Math.round((Number(form.paidYuan) || 0) * 100),
+          paymentMethod: form.paymentMethod,
+          startsAt: toDateTime(form.startsAt),
+          endsAt: toDateTime(form.endsAt),
+          note: form.note.trim() || null,
+        },
+      );
+      setData(
+        data.map((item) =>
+          item.id === editingId
+            ? {
+                ...item,
+                ...courseContract,
+              }
+            : item,
+        ),
+      );
+      toast.success('正式课程档案已更新');
+      setOpen(false);
+      setEditingId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '更新失败');
     } finally {
       setSaving(false);
     }
@@ -403,6 +473,16 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             header: '操作',
             cell: (row) => (
               <div className="flex gap-1">
+                {organization?.businessModel.courseContractEditEnabled && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    onClick={() => openEdit(row)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    编辑
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost px-2 py-1"
@@ -431,16 +511,27 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
 
       <Drawer
         open={open}
-        onClose={() => setOpen(false)}
-        title="新增正式课程档案"
-        description="线下确认收款后，创建档案并为学员添加对应课时。"
+        onClose={() => {
+          setOpen(false);
+          setEditingId(null);
+        }}
+        title={editingId ? '编辑正式课程档案' : '新增正式课程档案'}
+        description={editingId ? '修改课程档案信息，更新会实时同步到系统。' : '线下确认收款后，创建档案并为学员添加对应课时。'}
         footer={
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+            <button type="button" className="btn btn-secondary" onClick={() => {
+              setOpen(false);
+              setEditingId(null);
+            }}>
               取消
             </button>
-            <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
-              {saving ? '创建中...' : '创建档案'}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={editingId ? submitEdit : submit}
+              disabled={saving}
+            >
+              {saving ? (editingId ? '更新中...' : '创建中...') : (editingId ? '更新档案' : '创建档案')}
             </button>
           </>
         }
@@ -451,6 +542,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               className="form-input"
               value={form.studentId}
               onChange={(event) => setForm({ ...form, studentId: event.target.value })}
+              disabled={!!editingId}
             >
               <option value="">选择学员</option>
               {activeStudents.map((student) => (
@@ -465,6 +557,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               className="form-input"
               value={form.courseId}
               onChange={(event) => handleCourseChange(event.target.value)}
+              disabled={!!editingId}
             >
               <option value="">选择课程</option>
               {courses.map((course) => (
