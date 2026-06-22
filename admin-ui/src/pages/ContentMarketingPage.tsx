@@ -769,19 +769,13 @@ export function ContentMarketingPage() {
               onChange={(event) => patchForm({ excerpt: event.target.value })}
             />
           </Field>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
-            <div>
-              <span className="form-label">正文内容</span>
-              <RichTextEditor
-                value={form.content}
-                onChange={(content) => patchForm({ content })}
-                prefix="content/body"
-              />
-            </div>
-            <section className="resource-card p-4">
-              <div className="text-muted-foreground mb-3 text-xs font-medium">预览</div>
-              <ArticlePreview content={form.content} />
-            </section>
+          <div>
+            <span className="form-label">正文内容</span>
+            <RichTextEditor
+              value={form.content}
+              onChange={(content) => patchForm({ content })}
+              prefix="content/body"
+            />
           </div>
         </div>
       </Drawer>

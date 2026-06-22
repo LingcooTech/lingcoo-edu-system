@@ -105,6 +105,42 @@ export async function archiveStudent(db: Database, studentId: string) {
   return student ?? null;
 }
 
+export async function hardDeleteStudent(db: Database, studentId: string) {
+  return db.transaction(async (tx) => {
+    const orders = await tx
+      .select({ id: schema.orders.id })
+      .from(schema.orders)
+      .where(eq(schema.orders.studentId, studentId));
+
+    const courseContracts = await tx
+      .select({ id: schema.courseContracts.id })
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.studentId, studentId));
+
+    for (const order of orders) {
+      await tx.delete(schema.refundRequests).where(eq(schema.refundRequests.orderId, order.id));
+    }
+
+    for (const contract of courseContracts) {
+      await tx
+        .delete(schema.courseContractPaymentRecords)
+        .where(eq(schema.courseContractPaymentRecords.courseContractId, contract.id));
+    }
+
+    await tx.delete(schema.orders).where(eq(schema.orders.studentId, studentId));
+    await tx
+      .delete(schema.courseContracts)
+      .where(eq(schema.courseContracts.studentId, studentId));
+
+    const [student] = await tx
+      .delete(schema.students)
+      .where(eq(schema.students.id, studentId))
+      .returning();
+
+    return student ?? null;
+  });
+}
+
 export async function requireStudent(db: Database, studentId: string) {
   const [student] = await db
     .select()

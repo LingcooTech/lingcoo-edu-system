@@ -61,6 +61,8 @@ export function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<Student | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const [hardDeleteTarget, setHardDeleteTarget] = useState<Student | null>(null);
+  const [hardDeleting, setHardDeleting] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<StudentTab>('profiles');
 
@@ -86,10 +88,6 @@ export function StudentsPage() {
   async function submit() {
     if (!form.name.trim() || !form.grade.trim()) {
       toast.error('学员姓名和年级必填');
-      return;
-    }
-    if (!editing && (!form.guardianName.trim() || !form.guardianPhone.trim())) {
-      toast.error('新建学员时请填写家长姓名和手机号');
       return;
     }
 
@@ -171,6 +169,23 @@ export function StudentsPage() {
       toast.error(err instanceof Error ? err.message : '恢复失败');
     } finally {
       setRestoringId(null);
+    }
+  }
+
+  async function hardDeleteStudent() {
+    if (!hardDeleteTarget) return;
+    setHardDeleting(true);
+    try {
+      const targetId = hardDeleteTarget.id;
+      await apiDelete(`${STUDENTS}/${targetId}/hard`);
+      setArchivedData((current) => current.filter((item) => item.id !== targetId));
+      setHardDeleteTarget(null);
+      setSelected((current) => (current?.id === targetId ? null : current));
+      toast.success('学员已永久删除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setHardDeleting(false);
     }
   }
 
@@ -315,6 +330,14 @@ export function StudentsPage() {
                       <RotateCcw className="h-3.5 w-3.5" />
                       {restoringId === row.id ? '恢复中' : '恢复'}
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => setHardDeleteTarget(row)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      删除
+                    </button>
                   </div>
                 ),
               },
@@ -370,14 +393,14 @@ export function StudentsPage() {
         </Field>
         {!editing && (
           <FieldRow>
-            <Field label="家长姓名" required>
+            <Field label="家长姓名">
               <input
                 className="form-input"
                 value={form.guardianName}
                 onChange={(event) => setForm({ ...form, guardianName: event.target.value })}
               />
             </Field>
-            <Field label="家长手机号" required>
+            <Field label="家长手机号">
               <input
                 className="form-input"
                 value={form.guardianPhone}
@@ -463,6 +486,16 @@ export function StudentsPage() {
         busy={archiving}
         onCancel={() => setArchiveTarget(null)}
         onConfirm={archiveStudent}
+      />
+      <ConfirmDialog
+        open={Boolean(hardDeleteTarget)}
+        title="永久删除学员？"
+        message={`确认永久删除「${hardDeleteTarget?.name ?? ''}」及其全部相关数据？此操作不可撤销，包括订单、课程合约、课时账户等所有数据都将被删除。`}
+        confirmLabel="永久删除"
+        danger
+        busy={hardDeleting}
+        onCancel={() => setHardDeleteTarget(null)}
+        onConfirm={hardDeleteStudent}
       />
     </PageFrame>
   );
