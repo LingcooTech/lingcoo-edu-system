@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Eye } from 'lucide-react';
 
 import { api, apiPost } from '@/api/client';
 import type { Course, CoursePackage, Order, Student } from '@/api/types';
@@ -178,6 +178,7 @@ export function OrdersPage() {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState<string>('');
   const [cancelling, setCancelling] = useState(false);
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
 
   const selectedPackage = activePackages.find((item) => item.id === form.packageId);
   const selectableCourses = selectedPackage?.courseSeriesId
@@ -525,6 +526,14 @@ export function OrdersPage() {
                   <button
                     type="button"
                     className="btn btn-secondary px-2 py-1 text-xs"
+                    onClick={() => setDetailOrder(row)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    详情
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary px-2 py-1 text-xs"
                     onClick={() => void syncPaymentOrder(row)}
                     disabled={!canSyncPayment(row) || syncingOrderNo === row.orderNo}
                   >
@@ -627,6 +636,108 @@ export function OrdersPage() {
             <option value="other">其他</option>
           </select>
         </Field>
+      </Drawer>
+
+      <Drawer
+        open={Boolean(detailOrder)}
+        onClose={() => setDetailOrder(null)}
+        title={`订单详情 - ${detailOrder?.orderNo}`}
+      >
+        {detailOrder && (
+          <div className="space-y-4">
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">基本信息</h3>
+              <div className="grid grid-cols-2 gap-y-3 text-sm">
+                <span className="text-muted-foreground">订单号</span>
+                <span className="font-mono">{detailOrder.orderNo}</span>
+                <span className="text-muted-foreground">订单类型</span>
+                <span>{ORDER_TYPE_LABEL[detailOrder.orderType ?? ''] ?? detailOrder.orderType ?? '-'}</span>
+                <span className="text-muted-foreground">订单状态</span>
+                <span>
+                  <StatusPill tone={statusToTone(detailOrder.status)} label={detailOrder.status} />
+                </span>
+                <span className="text-muted-foreground">创建时间</span>
+                <span>{new Date(detailOrder.createdAt).toLocaleString('zh-CN')}</span>
+              </div>
+            </section>
+
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">学员信息</h3>
+              <div className="grid grid-cols-2 gap-y-3 text-sm">
+                <span className="text-muted-foreground">学员</span>
+                <span>{detailOrder.student?.name ?? '-'}</span>
+                <span className="text-muted-foreground">课程</span>
+                <span>{detailOrder.course?.name ?? '-'}</span>
+              </div>
+            </section>
+
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">课时信息</h3>
+              <div className="grid grid-cols-2 gap-y-3 text-sm">
+                <span className="text-muted-foreground">课时包</span>
+                <span>{detailOrder.package?.name ?? '-'}</span>
+                <span className="text-muted-foreground">课时数</span>
+                <span>{detailOrder.lessonCount} 节</span>
+              </div>
+            </section>
+
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">费用信息</h3>
+              <div className="grid grid-cols-2 gap-y-3 text-sm">
+                <span className="text-muted-foreground">应收金额</span>
+                <span>{money(detailOrder.amount)}</span>
+                <span className="text-muted-foreground">实收金额</span>
+                <span>{money(detailOrder.paidAmount)}</span>
+                <span className="text-muted-foreground">支付方式</span>
+                <span>{paymentChannelLabel(detailOrder)}</span>
+              </div>
+            </section>
+
+            <section className="resource-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">收款方</h3>
+              <div className="grid grid-cols-2 gap-y-3 text-sm">
+                <span className="text-muted-foreground">收款方类型</span>
+                <span>{PAYMENT_RECEIVER_TYPE_LABEL[detailOrder.paymentReceiverType ?? ''] ?? detailOrder.paymentReceiverType ?? '-'}</span>
+                <span className="text-muted-foreground">收款方名称</span>
+                <span>{detailOrder.paymentReceiverName ?? '-'}</span>
+              </div>
+            </section>
+
+            {(detailOrder.status === 'cancelled' && detailOrder.cancelReason) && (
+              <section className="resource-card p-4">
+                <h3 className="mb-3 text-sm font-semibold">作废信息</h3>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <span className="text-muted-foreground">作废原因</span>
+                  <span>{ORDER_CANCEL_REASON_LABEL[detailOrder.cancelReason] ?? detailOrder.cancelReason}</span>
+                  <span className="text-muted-foreground">作废时间</span>
+                  <span>{detailOrder.cancelledAt ? new Date(detailOrder.cancelledAt).toLocaleString('zh-CN') : '-'}</span>
+                </div>
+              </section>
+            )}
+
+            {detailOrder.refundRequests && detailOrder.refundRequests.length > 0 && (
+              <section className="resource-card p-4">
+                <h3 className="mb-3 text-sm font-semibold">退款信息</h3>
+                {detailOrder.refundRequests.map((refund) => (
+                  <div key={refund.id} className="mb-3 space-y-2 rounded-md bg-slate-50 p-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">退款状态</span>
+                      <span>{REFUND_STATUS_LABEL[refund.status] ?? refund.status}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">退款原因</span>
+                      <span>{REFUND_REASON_LABEL[refund.reason] ?? refund.reason}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">退款金额</span>
+                      <span>{money(refund.amount)}</span>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+          </div>
+        )}
       </Drawer>
 
       <Drawer
