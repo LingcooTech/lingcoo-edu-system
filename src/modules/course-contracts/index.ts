@@ -4,10 +4,12 @@ import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as schema from '../../db/schema.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import type { AppModule } from '../types.js';
+import { eq } from 'drizzle-orm';
 
 const paymentMethodSchema = z.enum([
   'cash',
@@ -162,6 +164,37 @@ export const courseContractsModule: AppModule = {
           school: body.school ?? null,
           createdByAccountId: request.account!.id,
         });
+      },
+    );
+
+    app.patch(
+      '/v1/course-contracts/:courseContractId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseContractId } = request.params as { courseContractId: string };
+        const body = courseContractSchema.partial().parse(request.body);
+
+        const updateData: Record<string, unknown> = {};
+
+        if (body.title !== undefined) updateData.title = body.title || null;
+        if (body.lessonCount !== undefined) updateData.lessonCount = body.lessonCount;
+        if (body.paidAmount !== undefined) updateData.paidAmount = body.paidAmount;
+        if (body.paymentMethod !== undefined) updateData.paymentMethod = body.paymentMethod;
+        if (body.startsAt !== undefined) updateData.startsAt = body.startsAt;
+        if (body.endsAt !== undefined) updateData.endsAt = body.endsAt;
+        if (body.note !== undefined) updateData.note = body.note || null;
+
+        const [courseContract] = await app.db
+          .update(schema.courseContracts)
+          .set({ ...updateData, updatedAt: new Date() })
+          .where(eq(schema.courseContracts.id, courseContractId))
+          .returning();
+
+        if (!courseContract) {
+          throw httpError(404, 'Course contract not found');
+        }
+
+        return { courseContract };
       },
     );
 

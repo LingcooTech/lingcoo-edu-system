@@ -549,3 +549,35 @@ export async function updateCourseContractStatus(
 
   return courseContract;
 }
+
+export async function updateCourseContractInfo(
+  db: Database,
+  courseContractId: string,
+  patch: Partial<CourseContractInput>,
+) {
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
+
+  if (patch.title !== undefined) updateData.title = patch.title || null;
+  if (patch.lessonCount !== undefined) updateData.lessonCount = patch.lessonCount;
+  if (patch.paidAmount !== undefined) updateData.paidAmount = patch.paidAmount;
+  if (patch.paymentMethod !== undefined) updateData.paymentMethod = patch.paymentMethod;
+  if (patch.startsAt !== undefined) {
+    updateData.startsAt = patch.startsAt instanceof Date ? patch.startsAt : (patch.startsAt ? new Date(patch.startsAt) : null);
+  }
+  if (patch.endsAt !== undefined) {
+    updateData.endsAt = patch.endsAt instanceof Date ? patch.endsAt : (patch.endsAt ? new Date(patch.endsAt) : null);
+  }
+  if (patch.note !== undefined) updateData.note = patch.note || null;
+
+  const [courseContract] = await db
+    .update(schema.courseContracts)
+    .set(updateData)
+    .where(eq(schema.courseContracts.id, courseContractId))
+    .returning();
+
+  if (!courseContract) {
+    throw httpError(404, 'Course contract not found');
+  }
+
+  return courseContract;
+}

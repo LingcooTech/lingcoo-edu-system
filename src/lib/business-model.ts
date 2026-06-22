@@ -3,6 +3,7 @@ export interface BusinessModelSettings {
   manualPackageGrantEnabled: boolean;
   packagePriceDisplayEnabled: boolean;
   seatReservationFeeEnabled: boolean;
+  courseContractEditEnabled: boolean;
 }
 
 export const defaultBusinessModel: BusinessModelSettings = {
@@ -10,6 +11,7 @@ export const defaultBusinessModel: BusinessModelSettings = {
   manualPackageGrantEnabled: true,
   packagePriceDisplayEnabled: true,
   seatReservationFeeEnabled: false,
+  courseContractEditEnabled: true,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -52,6 +54,10 @@ export function normalizeBusinessModel(input: unknown): BusinessModelSettings {
     seatReservationFeeEnabled: readBool(
       raw.seatReservationFeeEnabled,
       fallback.seatReservationFeeEnabled,
+    ),
+    courseContractEditEnabled: readBool(
+      raw.courseContractEditEnabled,
+      fallback.courseContractEditEnabled,
     ),
   };
 }

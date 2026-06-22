@@ -614,6 +614,7 @@ export interface BusinessModelSettings {
   manualPackageGrantEnabled: boolean;
   packagePriceDisplayEnabled: boolean;
   seatReservationFeeEnabled: boolean;
+  courseContractEditEnabled: boolean;
 }
 
 export interface OrganizationSettings {

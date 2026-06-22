@@ -10,6 +10,7 @@ const DEFAULT_BUSINESS_MODEL: BusinessModelSettings = {
   manualPackageGrantEnabled: true,
   packagePriceDisplayEnabled: true,
   seatReservationFeeEnabled: false,
+  courseContractEditEnabled: true,
 };
 
 export function BusinessModelPage() {
@@ -107,6 +108,19 @@ export function BusinessModelPage() {
                   }
                 />
                 启用试听/公开课占位费
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={businessModel.courseContractEditEnabled}
+                  onChange={(event) =>
+                    setBusinessModel({
+                      ...businessModel,
+                      courseContractEditEnabled: event.target.checked,
+                    })
+                  }
+                />
+                允许编辑已创建的正式课程档案
               </label>
             </div>
             {message && <p className="text-muted-foreground mt-4 text-sm">{message}</p>}
