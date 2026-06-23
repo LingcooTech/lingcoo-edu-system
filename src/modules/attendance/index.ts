@@ -5,8 +5,10 @@ import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as schema from '../../db/schema.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
+import { eq, lte, and } from 'drizzle-orm';
 
 const attendanceSchema = z.object({
   records: z.array(
@@ -156,9 +158,26 @@ export const attendanceModule: AppModule = {
         latestAttendanceRecords.map((record) => record.studentId),
       );
 
+      // Only mark as completed if all students with active course contracts
+      // created before this session have checked in
+      const activeContracts = await app.db
+        .select({ studentId: schema.courseContracts.studentId })
+        .from(schema.courseContracts)
+        .where(
+          and(
+            eq(schema.courseContracts.courseId, context.classGroup.courseId),
+            eq(schema.courseContracts.status, 'active'),
+            lte(schema.courseContracts.createdAt, context.session.startsAt),
+          ),
+        )
+        .distinct();
+
+      const contractStudentIds = new Set(activeContracts.map((c) => c.studentId));
+
+      // Mark complete if all students with valid contracts have checked in
       if (
-        context.enrollments.length > 0 &&
-        context.enrollments.every((enrollment) => checkedInStudentIds.has(enrollment.studentId))
+        contractStudentIds.size > 0 &&
+        Array.from(contractStudentIds).every((studentId) => checkedInStudentIds.has(studentId))
       ) {
         await schedulingRepo.markSessionCompleted(app.db, sessionId);
       }
@@ -310,16 +329,30 @@ export const attendanceModule: AppModule = {
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
 
-        const [enrollments, latestAttendanceRecords] = await Promise.all([
-          schedulingRepo.listEnrollments(app.db, classGroup.id),
+        const [latestAttendanceRecords, activeContracts] = await Promise.all([
           attendanceRepo.listAttendanceForSession(app.db, sessionId),
+          app.db
+            .select({ studentId: schema.courseContracts.studentId })
+            .from(schema.courseContracts)
+            .where(
+              and(
+                eq(schema.courseContracts.courseId, classGroup.courseId),
+                eq(schema.courseContracts.status, 'active'),
+                lte(schema.courseContracts.createdAt, session.startsAt),
+              ),
+            )
+            .distinct(),
         ]);
+
         const checkedInStudentIds = new Set(
           latestAttendanceRecords.map((record) => record.studentId),
         );
+        const contractStudentIds = new Set(activeContracts.map((c) => c.studentId));
+
+        // Mark complete if all students with valid contracts have checked in
         if (
-          enrollments.length > 0 &&
-          enrollments.every((enrollment) => checkedInStudentIds.has(enrollment.studentId))
+          contractStudentIds.size > 0 &&
+          Array.from(contractStudentIds).every((studentId) => checkedInStudentIds.has(studentId))
         ) {
           await schedulingRepo.markSessionCompleted(app.db, sessionId);
         }
