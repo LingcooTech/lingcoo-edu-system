@@ -10,7 +10,7 @@ import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import type { AppModule } from '../types.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 const paymentMethodSchema = z.enum([
   'cash',
@@ -196,7 +196,7 @@ export const courseContractsModule: AppModule = {
         if (body.endsAt !== undefined) updateData.endsAt = normalizeDate(body.endsAt);
         if (body.note !== undefined) updateData.note = body.note || null;
 
-        // Handle lesson count changes in a transaction
+        // Handle lesson count changes: recalculate balance as (new total - consumed)
         const result = await app.db.transaction(async (tx) => {
           const [courseContract] = await tx
             .update(schema.courseContracts)
@@ -208,17 +208,22 @@ export const courseContractsModule: AppModule = {
             throw httpError(404, 'Course contract not found');
           }
 
-          // If lesson count changed, adjust the lesson account
+          // If lesson count changed, recalculate the lesson account balance
           if (body.lessonCount !== undefined && body.lessonCount !== existingContract.lessonCount) {
-            const lessonDelta = body.lessonCount - existingContract.lessonCount;
-            await lessonRepo.applyLessonDelta(tx, {
+            const consumedCount = await lessonRepo.getConsumedLessonCount(tx, {
               studentId: courseContract.studentId,
               courseId: courseContract.courseId,
-              type: lessonDelta > 0 ? 'adjustment' : 'adjustment',
-              amount: lessonDelta,
-              relatedEntityType: 'course_contract',
-              relatedEntityId: courseContract.id,
             });
+            const newBalance = body.lessonCount - consumedCount;
+            await tx
+              .update(schema.lessonAccounts)
+              .set({ balance: newBalance, updatedAt: new Date() })
+              .where(
+                and(
+                  eq(schema.lessonAccounts.studentId, courseContract.studentId),
+                  eq(schema.lessonAccounts.courseId, courseContract.courseId),
+                ),
+              );
           }
 
           return courseContract;

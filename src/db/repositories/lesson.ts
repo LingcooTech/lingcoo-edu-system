@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sum } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -88,4 +88,25 @@ export async function applyLessonDelta(
     .returning();
 
   return { account: updated, transaction };
+}
+
+export async function getConsumedLessonCount(
+  tx: DbOrTx,
+  input: { studentId: string; courseId: string },
+) {
+  const [result] = await tx
+    .select({ total: sum(schema.lessonTransactions.amount).mapWith(Number) })
+    .from(schema.lessonTransactions)
+    .innerJoin(
+      schema.lessonAccounts,
+      eq(schema.lessonTransactions.lessonAccountId, schema.lessonAccounts.id),
+    )
+    .where(
+      and(
+        eq(schema.lessonAccounts.studentId, input.studentId),
+        eq(schema.lessonAccounts.courseId, input.courseId),
+        eq(schema.lessonTransactions.type, 'consume'),
+      ),
+    );
+  return Math.max(0, -(result?.total ?? 0));
 }
