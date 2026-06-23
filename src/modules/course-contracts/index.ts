@@ -180,8 +180,8 @@ export const courseContractsModule: AppModule = {
         if (body.lessonCount !== undefined) updateData.lessonCount = body.lessonCount;
         if (body.paidAmount !== undefined) updateData.paidAmount = body.paidAmount;
         if (body.paymentMethod !== undefined) updateData.paymentMethod = body.paymentMethod;
-        if (body.startsAt !== undefined) updateData.startsAt = body.startsAt;
-        if (body.endsAt !== undefined) updateData.endsAt = body.endsAt;
+        if (body.startsAt !== undefined) updateData.startsAt = normalizeDate(body.startsAt);
+        if (body.endsAt !== undefined) updateData.endsAt = normalizeDate(body.endsAt);
         if (body.note !== undefined) updateData.note = body.note || null;
 
         const [courseContract] = await app.db
