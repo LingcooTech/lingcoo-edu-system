@@ -92,6 +92,10 @@ export function CourseAttendanceSummaryPage() {
 
       {summaryData && (
         <>
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <strong>统计说明：</strong>仅统计有出勤记录的课次和学员。共有 <strong>{summaryData.summary.totalSessions}</strong> 次课完成了签到。
+          </div>
+
           <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="resource-card p-4">
               <div className="text-muted-foreground text-xs">总课次</div>
@@ -298,7 +302,12 @@ export function CourseAttendanceSummaryPage() {
 
       {!loading && !summaryData && courseId && (
         <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
-          该课程没有已完成的课次
+          该课程没有已完成签到的课次。请检查：
+          <div className="mt-2 space-y-1 text-xs">
+            <div>• 该课程是否已排课</div>
+            <div>• 已排课次是否已标记为"已完成"</div>
+            <div>• 已完成课次是否已进行签到</div>
+          </div>
         </div>
       )}
     </PageFrame>

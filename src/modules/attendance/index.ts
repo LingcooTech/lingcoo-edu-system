@@ -204,6 +204,7 @@ export const attendanceModule: AppModule = {
         const students = await peopleRepo.listStudents(app.db);
         const studentById = new Map(students.map((s) => [s.id, s]));
 
+        // 只统计有出勤记录的学员
         const studentStats = new Map<
           string,
           {
@@ -218,7 +219,10 @@ export const attendanceModule: AppModule = {
           }
         >();
 
-        sessionAttendance.forEach(({ session, records }) => {
+        // 只统计有出勤记录的课次
+        const sessionsWithAttendance = sessionAttendance.filter((sa) => sa.records.length > 0);
+
+        sessionsWithAttendance.forEach(({ session, records }) => {
           records.forEach((record) => {
             if (!studentStats.has(record.studentId)) {
               const student = studentById.get(record.studentId);
@@ -239,8 +243,7 @@ export const attendanceModule: AppModule = {
           });
         });
 
-        const sessionRecords = completedSessions.map((session) => {
-          const records = sessionAttendance.find((sa) => sa.session.id === session.id)?.records ?? [];
+        const sessionRecords = sessionsWithAttendance.map(({ session, records }) => {
           const statuses: Record<string, number> = {
             present: 0,
             absent: 0,
@@ -260,11 +263,15 @@ export const attendanceModule: AppModule = {
 
         return {
           course,
-          sessionCount: completedSessions.length,
-          studentStats: Array.from(studentStats.values()),
-          sessionRecords,
+          sessionCount: sessionsWithAttendance.length,
+          studentStats: Array.from(studentStats.values()).sort((a, b) =>
+            a.name.localeCompare(b.name)
+          ),
+          sessionRecords: sessionRecords.sort((a, b) =>
+            new Date(a.session.startsAt).getTime() - new Date(b.session.startsAt).getTime()
+          ),
           summary: {
-            totalSessions: completedSessions.length,
+            totalSessions: sessionsWithAttendance.length,
             totalRecords: sessionAttendance.reduce((sum, item) => sum + item.records.length, 0),
             uniqueStudents: studentStats.size,
           },
