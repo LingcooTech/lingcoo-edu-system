@@ -5,6 +5,7 @@ import * as courseContractsRepo from '../../db/repositories/course-contracts.js'
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
+import * as lessonRepo from '../../db/repositories/lesson.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
@@ -174,6 +175,17 @@ export const courseContractsModule: AppModule = {
         const { courseContractId } = request.params as { courseContractId: string };
         const body = courseContractSchema.partial().parse(request.body);
 
+        // Get the existing contract to check if lessonCount changed
+        const [existingContract] = await app.db
+          .select()
+          .from(schema.courseContracts)
+          .where(eq(schema.courseContracts.id, courseContractId))
+          .limit(1);
+
+        if (!existingContract) {
+          throw httpError(404, 'Course contract not found');
+        }
+
         const updateData: Record<string, unknown> = {};
 
         if (body.title !== undefined) updateData.title = body.title || null;
@@ -184,17 +196,35 @@ export const courseContractsModule: AppModule = {
         if (body.endsAt !== undefined) updateData.endsAt = normalizeDate(body.endsAt);
         if (body.note !== undefined) updateData.note = body.note || null;
 
-        const [courseContract] = await app.db
-          .update(schema.courseContracts)
-          .set({ ...updateData, updatedAt: new Date() })
-          .where(eq(schema.courseContracts.id, courseContractId))
-          .returning();
+        // Handle lesson count changes in a transaction
+        const result = await app.db.transaction(async (tx) => {
+          const [courseContract] = await tx
+            .update(schema.courseContracts)
+            .set({ ...updateData, updatedAt: new Date() })
+            .where(eq(schema.courseContracts.id, courseContractId))
+            .returning();
 
-        if (!courseContract) {
-          throw httpError(404, 'Course contract not found');
-        }
+          if (!courseContract) {
+            throw httpError(404, 'Course contract not found');
+          }
 
-        return { courseContract };
+          // If lesson count changed, adjust the lesson account
+          if (body.lessonCount !== undefined && body.lessonCount !== existingContract.lessonCount) {
+            const lessonDelta = body.lessonCount - existingContract.lessonCount;
+            await lessonRepo.applyLessonDelta(tx, {
+              studentId: courseContract.studentId,
+              courseId: courseContract.courseId,
+              type: lessonDelta > 0 ? 'adjustment' : 'adjustment',
+              amount: lessonDelta,
+              relatedEntityType: 'course_contract',
+              relatedEntityId: courseContract.id,
+            });
+          }
+
+          return courseContract;
+        });
+
+        return { courseContract: result };
       },
     );
 
