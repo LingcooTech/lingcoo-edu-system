@@ -110,3 +110,38 @@ export async function getConsumedLessonCount(
     );
   return Math.max(0, -(result?.total ?? 0));
 }
+
+export async function checkAndCompleteCourseContract(
+  db: Database,
+  input: { studentId: string; courseId: string; contractId: string },
+) {
+  return db.transaction(async (tx) => {
+    const [account] = await tx
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, input.studentId),
+          eq(schema.lessonAccounts.courseId, input.courseId),
+        ),
+      )
+      .limit(1);
+
+    // If balance is 0 (all lessons consumed), mark contract as completed
+    if (account && account.balance === 0) {
+      const [contract] = await tx
+        .update(schema.courseContracts)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.courseContracts.id, input.contractId),
+            eq(schema.courseContracts.status, 'active'),
+          ),
+        )
+        .returning();
+      return contract;
+    }
+
+    return null;
+  });
+}

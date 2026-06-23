@@ -146,6 +146,30 @@ export const attendanceModule: AppModule = {
         records: [{ studentId: body.studentId, status: 'present', note: '家长扫码签到' }],
         completeSession: false,
       });
+
+      // Check and auto-complete course contract if all lessons are consumed
+      for (const record of attendanceRecords) {
+        const [contract] = await app.db
+          .select()
+          .from(schema.courseContracts)
+          .where(
+            and(
+              eq(schema.courseContracts.studentId, record.studentId),
+              eq(schema.courseContracts.courseId, context.classGroup.courseId),
+              eq(schema.courseContracts.status, 'active'),
+            ),
+          )
+          .limit(1);
+
+        if (contract) {
+          await lessonRepo.checkAndCompleteCourseContract(app.db, {
+            studentId: record.studentId,
+            courseId: context.classGroup.courseId,
+            contractId: contract.id,
+          });
+        }
+      }
+
       await lessonNotifications.notifyLessonConsumedForAttendance({
         sessionId,
         records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
@@ -324,6 +348,30 @@ export const attendanceModule: AppModule = {
           records: body.records,
           completeSession: false,
         });
+
+        // Check and auto-complete course contracts if all lessons are consumed
+        for (const record of attendanceRecords) {
+          const [contract] = await app.db
+            .select()
+            .from(schema.courseContracts)
+            .where(
+              and(
+                eq(schema.courseContracts.studentId, record.studentId),
+                eq(schema.courseContracts.courseId, classGroup.courseId),
+                eq(schema.courseContracts.status, 'active'),
+              ),
+            )
+            .limit(1);
+
+          if (contract) {
+            await lessonRepo.checkAndCompleteCourseContract(app.db, {
+              studentId: record.studentId,
+              courseId: classGroup.courseId,
+              contractId: contract.id,
+            });
+          }
+        }
+
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
