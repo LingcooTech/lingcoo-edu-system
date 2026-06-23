@@ -201,15 +201,30 @@ export const attendanceModule: AppModule = {
           })),
         );
 
+        const students = await peopleRepo.listStudents(app.db);
+        const studentById = new Map(students.map((s) => [s.id, s]));
+
         const studentStats = new Map<
           string,
-          { name?: string; total: number; present: number; absent: number; leave: number; makeup: number; trial: number }
+          {
+            studentId: string;
+            name: string;
+            total: number;
+            present: number;
+            absent: number;
+            leave: number;
+            makeup: number;
+            trial: number;
+          }
         >();
 
         sessionAttendance.forEach(({ session, records }) => {
           records.forEach((record) => {
             if (!studentStats.has(record.studentId)) {
+              const student = studentById.get(record.studentId);
               studentStats.set(record.studentId, {
+                studentId: record.studentId,
+                name: student?.name ?? '未知学员',
                 total: 0,
                 present: 0,
                 absent: 0,
@@ -224,14 +239,30 @@ export const attendanceModule: AppModule = {
           });
         });
 
+        const sessionRecords = completedSessions.map((session) => {
+          const records = sessionAttendance.find((sa) => sa.session.id === session.id)?.records ?? [];
+          const statuses: Record<string, number> = {
+            present: 0,
+            absent: 0,
+            leave: 0,
+            makeup: 0,
+            trial: 0,
+            total: records.length,
+          };
+          records.forEach((record) => {
+            statuses[record.status]++;
+          });
+          return {
+            session,
+            ...statuses,
+          };
+        });
+
         return {
           course,
-          sessions: completedSessions,
           sessionCount: completedSessions.length,
-          studentStats: Array.from(studentStats.entries()).map(([studentId, stat]) => ({
-            studentId,
-            ...stat,
-          })),
+          studentStats: Array.from(studentStats.values()),
+          sessionRecords,
           summary: {
             totalSessions: completedSessions.length,
             totalRecords: sessionAttendance.reduce((sum, item) => sum + item.records.length, 0),

@@ -7,9 +7,21 @@ import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
+import { formatDateTime } from '@/lib/utils';
 
 interface StudentAttendanceStat {
   studentId: string;
+  name: string;
+  total: number;
+  present: number;
+  absent: number;
+  leave: number;
+  makeup: number;
+  trial: number;
+}
+
+interface SessionRecord {
+  session: { id: string; topic: string; startsAt: string; status: string };
   total: number;
   present: number;
   absent: number;
@@ -20,9 +32,9 @@ interface StudentAttendanceStat {
 
 interface CourseAttendanceSummary {
   course: Course;
-  sessions: Array<{ id: string; topic: string; startsAt: string; status: string }>;
   sessionCount: number;
   studentStats: StudentAttendanceStat[];
+  sessionRecords: SessionRecord[];
   summary: {
     totalSessions: number;
     totalRecords: number;
@@ -30,12 +42,15 @@ interface CourseAttendanceSummary {
   };
 }
 
+type TabType = 'sessions' | 'students';
+
 export function CourseAttendanceSummaryPage() {
   const toast = useToast();
   const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
   const [courseId, setCourseId] = useState('');
   const [summaryData, setSummaryData] = useState<CourseAttendanceSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('sessions');
 
   const filteredCourses = useMemo(() => {
     return courses.filter((course) => course.status !== 'archived');
@@ -112,30 +127,116 @@ export function CourseAttendanceSummaryPage() {
 
           <div className="resource-card">
             <div className="border-b px-4 py-3">
-              <div className="text-sm font-semibold">学员出勤详情</div>
-              <div className="text-muted-foreground mt-1 text-xs">
-                共 {summaryData.summary.totalSessions} 次课，统计学员出勤情况
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium ${
+                    activeTab === 'sessions'
+                      ? 'border-b-2 border-primary text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setActiveTab('sessions')}
+                >
+                  课程进度 ({summaryData.summary.totalSessions} 次课)
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium ${
+                    activeTab === 'students'
+                      ? 'border-b-2 border-primary text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setActiveTab('students')}
+                >
+                  学员出勤 ({summaryData.summary.uniqueStudents} 人)
+                </button>
               </div>
             </div>
+
             {loading ? (
               <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 加载中...
               </div>
+            ) : activeTab === 'sessions' ? (
+              <DataTable
+                columns={[
+                  {
+                    key: 'session',
+                    header: '课次信息',
+                    cell: (row: SessionRecord) => (
+                      <div className="cell-stack">
+                        <span className="cell-title">{row.session.topic}</span>
+                        <span className="cell-subtitle">{formatDateTime(row.session.startsAt)}</span>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'total',
+                    header: '到课人数',
+                    cell: (row: SessionRecord) => (
+                      <div className="text-center">
+                        <span className="text-lg font-semibold text-green-600">{row.present}</span>
+                        <span className="text-muted-foreground text-xs">/ {row.total}</span>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'absent',
+                    header: '缺勤',
+                    cell: (row: SessionRecord) => (
+                      <span className="text-red-600 font-medium">{row.absent}</span>
+                    ),
+                  },
+                  {
+                    key: 'leave',
+                    header: '请假',
+                    cell: (row: SessionRecord) => (
+                      <span className="text-amber-600 font-medium">{row.leave}</span>
+                    ),
+                  },
+                  {
+                    key: 'makeup',
+                    header: '补课',
+                    cell: (row: SessionRecord) => (
+                      <span className="text-purple-600 font-medium">{row.makeup}</span>
+                    ),
+                  },
+                  {
+                    key: 'trial',
+                    header: '试听',
+                    cell: (row: SessionRecord) => (
+                      <span className="text-gray-600 font-medium">{row.trial}</span>
+                    ),
+                  },
+                  {
+                    key: 'rate',
+                    header: '出勤率',
+                    cell: (row: SessionRecord) => (
+                      <span className="font-medium">
+                        {row.total > 0 ? ((row.present / row.total) * 100 | 0) : 0}%
+                      </span>
+                    ),
+                  },
+                ]}
+                data={summaryData.sessionRecords}
+              />
             ) : (
               <DataTable
                 columns={[
                   {
-                    key: 'studentId',
-                    header: '学员 ID',
-                    cell: (row) => row.studentId.slice(0, 8),
+                    key: 'name',
+                    header: '学员姓名',
+                    cell: (row: StudentAttendanceStat) => (
+                      <span className="font-medium">{row.name}</span>
+                    ),
                   },
                   {
                     key: 'total',
                     header: '总签到',
                     cell: (row: StudentAttendanceStat) => (
-                      <div className="flex items-center gap-1">
-                        <span>{row.total}</span>
+                      <div className="text-center">
+                        <span className="text-lg font-semibold text-blue-600">{row.total}</span>
                         <span className="text-muted-foreground text-xs">/ {summaryData.summary.totalSessions}</span>
                       </div>
                     ),
@@ -144,35 +245,47 @@ export function CourseAttendanceSummaryPage() {
                     key: 'present',
                     header: '到课',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-green-600">{row.present}</span>
+                      <span className="text-green-600 font-medium">{row.present}</span>
                     ),
                   },
                   {
                     key: 'absent',
                     header: '缺勤',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-red-600">{row.absent}</span>
+                      <span className="text-red-600 font-medium">{row.absent}</span>
                     ),
                   },
                   {
                     key: 'leave',
                     header: '请假',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-amber-600">{row.leave}</span>
+                      <span className="text-amber-600 font-medium">{row.leave}</span>
                     ),
                   },
                   {
                     key: 'makeup',
                     header: '补课',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-purple-600">{row.makeup}</span>
+                      <span className="text-purple-600 font-medium">{row.makeup}</span>
                     ),
                   },
                   {
                     key: 'trial',
                     header: '试听',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-gray-600">{row.trial}</span>
+                      <span className="text-gray-600 font-medium">{row.trial}</span>
+                    ),
+                  },
+                  {
+                    key: 'rate',
+                    header: '出勤率',
+                    cell: (row: StudentAttendanceStat) => (
+                      <span className="font-medium">
+                        {summaryData.summary.totalSessions > 0
+                          ? ((row.total / summaryData.summary.totalSessions) * 100 | 0)
+                          : 0}
+                        %
+                      </span>
                     ),
                   },
                 ]}
