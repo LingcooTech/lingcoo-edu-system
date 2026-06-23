@@ -5,6 +5,7 @@ import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as schema from '../../db/schema.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
@@ -184,7 +185,7 @@ export const attendanceModule: AppModule = {
 
       // Only mark as completed if all students with active course contracts
       // with startDate on or before this session have checked in
-      const activeContracts = await app.db
+      const contractRows = await app.db
         .select({ studentId: schema.courseContracts.studentId })
         .from(schema.courseContracts)
         .where(
@@ -193,10 +194,9 @@ export const attendanceModule: AppModule = {
             eq(schema.courseContracts.status, 'active'),
             lte(schema.courseContracts.startsAt, context.session.startsAt),
           ),
-        )
-        .distinct();
+        );
 
-      const contractStudentIds = new Set(activeContracts.map((c) => c.studentId));
+      const contractStudentIds = new Set(contractRows.map((row) => row.studentId));
 
       // Mark complete if all students with valid contracts have checked in
       if (
@@ -377,7 +377,7 @@ export const attendanceModule: AppModule = {
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
 
-        const [latestAttendanceRecords, activeContracts] = await Promise.all([
+        const [latestAttendanceRecords, contractRows] = await Promise.all([
           attendanceRepo.listAttendanceForSession(app.db, sessionId),
           app.db
             .select({ studentId: schema.courseContracts.studentId })
@@ -388,14 +388,13 @@ export const attendanceModule: AppModule = {
                 eq(schema.courseContracts.status, 'active'),
                 lte(schema.courseContracts.startsAt, session.startsAt),
               ),
-            )
-            .distinct(),
+            ),
         ]);
 
         const checkedInStudentIds = new Set(
           latestAttendanceRecords.map((record) => record.studentId),
         );
-        const contractStudentIds = new Set(activeContracts.map((c) => c.studentId));
+        const contractStudentIds = new Set(contractRows.map((row) => row.studentId));
 
         // Mark complete if all students with valid contracts have checked in
         if (
