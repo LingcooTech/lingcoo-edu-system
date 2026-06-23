@@ -663,7 +663,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           </Field>
         </FieldRow>
         <FieldRow>
-          <Field label="开始日期">
+          <Field label="课程开始日期" hint="学员从这个日期开始计算课时、核销出勤">
             <input
               className="form-input"
               type="date"
@@ -671,7 +671,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
             />
           </Field>
-          <Field label="结束日期">
+          <Field label="课程结束日期">
             <input
               className="form-input"
               type="date"

@@ -159,7 +159,7 @@ export const attendanceModule: AppModule = {
       );
 
       // Only mark as completed if all students with active course contracts
-      // created before this session have checked in
+      // with startDate on or before this session have checked in
       const activeContracts = await app.db
         .select({ studentId: schema.courseContracts.studentId })
         .from(schema.courseContracts)
@@ -167,7 +167,7 @@ export const attendanceModule: AppModule = {
           and(
             eq(schema.courseContracts.courseId, context.classGroup.courseId),
             eq(schema.courseContracts.status, 'active'),
-            lte(schema.courseContracts.createdAt, context.session.startsAt),
+            lte(schema.courseContracts.startsAt, context.session.startsAt),
           ),
         )
         .distinct();
@@ -338,7 +338,7 @@ export const attendanceModule: AppModule = {
               and(
                 eq(schema.courseContracts.courseId, classGroup.courseId),
                 eq(schema.courseContracts.status, 'active'),
-                lte(schema.courseContracts.createdAt, session.startsAt),
+                lte(schema.courseContracts.startsAt, session.startsAt),
               ),
             )
             .distinct(),
