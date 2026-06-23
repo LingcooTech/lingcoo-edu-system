@@ -63,6 +63,23 @@ export function AttendancePage() {
     [records],
   );
 
+  const attendanceSummary = useMemo(() => {
+    const total = enrollments.length;
+    const signed = records.length;
+    const statuses: Record<AttendanceStatus, number> = {
+      present: 0,
+      leave: 0,
+      absent: 0,
+      makeup: 0,
+      trial: 0,
+    };
+    records.forEach((record) => {
+      statuses[record.status]++;
+    });
+    const lessonDeducted = statuses.present + statuses.absent + statuses.makeup;
+    return { total, signed, statuses, lessonDeducted };
+  }, [enrollments, records]);
+
   useEffect(() => {
     if (!sessionId && sessions.length > 0) {
       setSessionId(
@@ -186,6 +203,33 @@ export function AttendancePage() {
           </div>
         )}
       </div>
+
+      {selectedSession && (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="resource-card p-4">
+            <div className="text-muted-foreground text-xs">总学员数</div>
+            <div className="mt-2 text-2xl font-semibold">{attendanceSummary.total}</div>
+          </div>
+          <div className="resource-card p-4">
+            <div className="text-muted-foreground text-xs">已签到</div>
+            <div className="mt-2 text-2xl font-semibold text-blue-600">{attendanceSummary.signed}</div>
+          </div>
+          <div className="resource-card p-4">
+            <div className="text-muted-foreground text-xs">到课</div>
+            <div className="mt-2 text-2xl font-semibold text-green-600">{attendanceSummary.statuses.present}</div>
+          </div>
+          <div className="resource-card p-4">
+            <div className="text-muted-foreground text-xs">缺勤</div>
+            <div className="mt-2 text-2xl font-semibold text-red-600">{attendanceSummary.statuses.absent}</div>
+          </div>
+          <div className="resource-card p-4">
+            <div className="text-muted-foreground text-xs">请假 / 补课 / 试听</div>
+            <div className="mt-2 text-2xl font-semibold text-amber-600">
+              {attendanceSummary.statuses.leave + attendanceSummary.statuses.makeup + attendanceSummary.statuses.trial}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="resource-card">
         <div className="border-b px-4 py-3">
