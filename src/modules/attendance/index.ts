@@ -191,11 +191,13 @@ export const attendanceModule: AppModule = {
       async (request) => {
         const { courseId } = request.params as { courseId: string };
         const course = await catalogRepo.requireCourse(app.db, courseId);
-        const sessions = await schedulingRepo.listSessionsForCourse(app.db, courseId);
-        const completedSessions = sessions.filter((session) => session.status === 'completed');
 
+        // Get ALL sessions for this course (not filtering by status yet)
+        const sessions = await schedulingRepo.listSessionsForCourse(app.db, courseId);
+
+        // Get attendance records for all sessions
         const sessionAttendance = await Promise.all(
-          completedSessions.map(async (session) => ({
+          sessions.map(async (session) => ({
             session,
             records: await attendanceRepo.listAttendanceForSession(app.db, session.id),
           })),
@@ -204,7 +206,7 @@ export const attendanceModule: AppModule = {
         const students = await peopleRepo.listStudents(app.db);
         const studentById = new Map(students.map((s) => [s.id, s]));
 
-        // 只统计有出勤记录的学员
+        // Only count sessions that have attendance records (regardless of session status)
         const studentStats = new Map<
           string,
           {
@@ -219,7 +221,6 @@ export const attendanceModule: AppModule = {
           }
         >();
 
-        // 只统计有出勤记录的课次
         const sessionsWithAttendance = sessionAttendance.filter((sa) => sa.records.length > 0);
 
         sessionsWithAttendance.forEach(({ session, records }) => {
@@ -272,7 +273,7 @@ export const attendanceModule: AppModule = {
           ),
           summary: {
             totalSessions: sessionsWithAttendance.length,
-            totalRecords: sessionAttendance.reduce((sum, item) => sum + item.records.length, 0),
+            totalRecords: sessionsWithAttendance.reduce((sum, item) => sum + item.records.length, 0),
             uniqueStudents: studentStats.size,
           },
         };
