@@ -47,6 +47,16 @@ export async function listClassSessions(db: Database) {
   return db.select().from(schema.classSessions).orderBy(asc(schema.classSessions.startsAt));
 }
 
+export async function listSessionsForCourse(db: Database, courseId: string) {
+  return db
+    .select({ session: schema.classSessions })
+    .from(schema.classSessions)
+    .innerJoin(schema.classes, eq(schema.classes.id, schema.classSessions.classId))
+    .where(eq(schema.classes.courseId, courseId))
+    .orderBy(asc(schema.classSessions.startsAt))
+    .then((rows) => rows.map((row) => row.session));
+}
+
 function lessonNotificationTargetSelect() {
   return {
     sessionId: schema.classSessions.id,

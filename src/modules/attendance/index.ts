@@ -185,6 +185,62 @@ export const attendanceModule: AppModule = {
       },
     );
 
+    app.get(
+      '/v1/courses/:courseId/attendance-summary',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseId } = request.params as { courseId: string };
+        const course = await catalogRepo.requireCourse(app.db, courseId);
+        const sessions = await schedulingRepo.listSessionsForCourse(app.db, courseId);
+        const completedSessions = sessions.filter((session) => session.status === 'completed');
+
+        const sessionAttendance = await Promise.all(
+          completedSessions.map(async (session) => ({
+            session,
+            records: await attendanceRepo.listAttendanceForSession(app.db, session.id),
+          })),
+        );
+
+        const studentStats = new Map<
+          string,
+          { name?: string; total: number; present: number; absent: number; leave: number; makeup: number; trial: number }
+        >();
+
+        sessionAttendance.forEach(({ session, records }) => {
+          records.forEach((record) => {
+            if (!studentStats.has(record.studentId)) {
+              studentStats.set(record.studentId, {
+                total: 0,
+                present: 0,
+                absent: 0,
+                leave: 0,
+                makeup: 0,
+                trial: 0,
+              });
+            }
+            const stat = studentStats.get(record.studentId)!;
+            stat.total++;
+            stat[record.status]++;
+          });
+        });
+
+        return {
+          course,
+          sessions: completedSessions,
+          sessionCount: completedSessions.length,
+          studentStats: Array.from(studentStats.entries()).map(([studentId, stat]) => ({
+            studentId,
+            ...stat,
+          })),
+          summary: {
+            totalSessions: completedSessions.length,
+            totalRecords: sessionAttendance.reduce((sum, item) => sum + item.records.length, 0),
+            uniqueStudents: studentStats.size,
+          },
+        };
+      },
+    );
+
     app.post(
       '/v1/class-sessions/:sessionId/attendance',
       { preHandler: app.requireAdmin },

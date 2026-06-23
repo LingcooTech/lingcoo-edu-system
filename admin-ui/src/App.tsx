@@ -10,6 +10,7 @@ import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
 import { ContentMarketingPage } from '@/pages/ContentMarketingPage';
+import { CourseAttendanceSummaryPage } from '@/pages/CourseAttendanceSummaryPage';
 import { CourseContractsPage } from '@/pages/CourseContractsPage';
 import { CourseResourcesPage } from '@/pages/CourseResourcesPage';
 import { CoursesPage } from '@/pages/CoursesPage';
@@ -105,6 +106,7 @@ const router = createBrowserRouter(
         { path: 'academic/classes', element: <ClassesPage /> },
         { path: 'academic/schedule', element: <SchedulePage /> },
         { path: 'academic/attendance', element: <AttendancePage /> },
+        { path: 'academic/course-attendance', element: <CourseAttendanceSummaryPage /> },
         // 运营管理
         { path: 'operations/orders', element: <OrdersPage /> },
         { path: 'operations/business-model', element: <BusinessModelPage /> },
