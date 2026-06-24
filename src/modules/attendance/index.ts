@@ -15,7 +15,7 @@ const attendanceSchema = z.object({
   records: z.array(
     z.object({
       studentId: z.string(),
-      status: z.enum(['present', 'leave', 'absent', 'makeup', 'trial']),
+      status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
       note: z.string().optional(),
     }),
   ),
@@ -257,6 +257,7 @@ export const attendanceModule: AppModule = {
             name: string;
             total: number;
             present: number;
+            late: number;
             absent: number;
             leave: number;
             makeup: number;
@@ -275,6 +276,7 @@ export const attendanceModule: AppModule = {
                 name: student?.name ?? '未知学员',
                 total: 0,
                 present: 0,
+                late: 0,
                 absent: 0,
                 leave: 0,
                 makeup: 0,
@@ -290,6 +292,7 @@ export const attendanceModule: AppModule = {
         const sessionRecords = sessionsWithAttendance.map(({ session, records }) => {
           const statuses: Record<string, number> = {
             present: 0,
+            late: 0,
             absent: 0,
             leave: 0,
             makeup: 0,
@@ -309,14 +312,18 @@ export const attendanceModule: AppModule = {
           course,
           sessionCount: sessionsWithAttendance.length,
           studentStats: Array.from(studentStats.values()).sort((a, b) =>
-            a.name.localeCompare(b.name)
+            a.name.localeCompare(b.name),
           ),
-          sessionRecords: sessionRecords.sort((a, b) =>
-            new Date(a.session.startsAt).getTime() - new Date(b.session.startsAt).getTime()
+          sessionRecords: sessionRecords.sort(
+            (a, b) =>
+              new Date(a.session.startsAt).getTime() - new Date(b.session.startsAt).getTime(),
           ),
           summary: {
             totalSessions: sessionsWithAttendance.length,
-            totalRecords: sessionsWithAttendance.reduce((sum, item) => sum + item.records.length, 0),
+            totalRecords: sessionsWithAttendance.reduce(
+              (sum, item) => sum + item.records.length,
+              0,
+            ),
             uniqueStudents: studentStats.size,
           },
         };

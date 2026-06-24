@@ -7,7 +7,7 @@ import { applyLessonDelta } from './lesson.js';
 type AttendanceStatus = (typeof schema.attendanceStatusEnum.enumValues)[number];
 
 function lessonDeltaForStatus(status: AttendanceStatus): number {
-  if (status === 'present' || status === 'absent' || status === 'makeup') {
+  if (status === 'present' || status === 'late' || status === 'absent' || status === 'makeup') {
     return -1;
   }
   return 0;

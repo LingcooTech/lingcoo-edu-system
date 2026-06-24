@@ -75,6 +75,7 @@ export const teachingResourceStatusEnum = pgEnum('teaching_resource_status', [
 ]);
 export const attendanceStatusEnum = pgEnum('attendance_status', [
   'present',
+  'late',
   'leave',
   'absent',
   'makeup',
@@ -664,6 +665,38 @@ export const homeworkCheckIns = pgTable(
     studentIdx: index('homework_checkins_student_idx').on(table.studentId, table.createdAt),
     courseIdx: index('homework_checkins_course_idx').on(table.courseId, table.createdAt),
     sessionIdx: index('homework_checkins_session_idx').on(table.classSessionId),
+  }),
+);
+
+export const lessonFeedbacks = pgTable(
+  'lesson_feedbacks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    classSessionId: uuid('class_session_id')
+      .notNull()
+      .references(() => classSessions.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+    content: text('content').notNull().default(''),
+    imageUrls: jsonb('image_urls')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionStudentUnique: uniqueIndex('lesson_feedbacks_session_student_idx').on(
+      table.classSessionId,
+      table.studentId,
+    ),
+    studentIdx: index('lesson_feedbacks_student_idx').on(table.studentId, table.createdAt),
+    teacherIdx: index('lesson_feedbacks_teacher_idx').on(table.teacherId, table.createdAt),
+    sessionIdx: index('lesson_feedbacks_session_idx').on(table.classSessionId),
   }),
 );
 

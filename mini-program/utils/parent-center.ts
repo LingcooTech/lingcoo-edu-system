@@ -112,6 +112,7 @@ export function orderTitle(order: ParentOrder): string {
 export function attendanceStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     present: '到课',
+    late: '迟到',
     leave: '请假',
     absent: '缺勤',
     makeup: '补课',

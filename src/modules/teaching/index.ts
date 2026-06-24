@@ -73,7 +73,7 @@ const teacherAttendanceSchema = z.object({
   records: z.array(
     z.object({
       studentId: z.string(),
-      status: z.enum(['present', 'leave', 'absent', 'makeup', 'trial']),
+      status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
       note: z.string().optional(),
     }),
   ),
@@ -92,6 +92,22 @@ function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, t
 const teacherHomeworkReviewSchema = z.object({
   reviewStatus: z.enum(['reviewed', 'needs_revision']).default('reviewed'),
   teacherFeedback: z.string().trim().max(2000).default(''),
+});
+
+const teacherLessonFeedbackSchema = z.object({
+  items: z
+    .array(
+      z
+        .object({
+          studentId: z.string().uuid(),
+          content: z.string().trim().max(2000).default(''),
+          imageUrls: z.array(z.string().trim().url().max(500)).max(9).default([]),
+        })
+        .refine((value) => value.content || value.imageUrls.length > 0, {
+          message: '请填写点评内容或图片',
+        }),
+    )
+    .min(1),
 });
 
 function notFound(message: string): Error {
@@ -116,22 +132,29 @@ export const teachingModule: AppModule = {
           throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
         }
 
-        const [sessions, classes, courses, classrooms, students] = await Promise.all([
-          schedulingRepo.listClassSessions(app.db),
-          schedulingRepo.listClasses(app.db),
-          catalogRepo.listCourses(app.db),
-          teachingRepo.listClassrooms(app.db),
-          peopleRepo.listStudents(app.db),
-        ]);
+        const [sessions, classes, courses, classrooms, students, attendanceRecords] =
+          await Promise.all([
+            schedulingRepo.listClassSessions(app.db),
+            schedulingRepo.listClasses(app.db),
+            catalogRepo.listCourses(app.db),
+            teachingRepo.listClassrooms(app.db),
+            peopleRepo.listStudents(app.db),
+            app.db.select().from(schema.attendanceRecords),
+          ]);
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
         const studentById = new Map(students.map((item) => [item.id, item]));
         const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
+        const enrollmentsByClassId = new Map<
+          string,
+          Awaited<ReturnType<typeof schedulingRepo.listEnrollments>>
+        >();
 
         const classCards = await Promise.all(
           myClasses.map(async (classGroup) => {
             const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
+            enrollmentsByClassId.set(classGroup.id, enrollments);
             return {
               ...classGroup,
               course: courseById.get(classGroup.courseId),
@@ -158,6 +181,12 @@ export const teachingModule: AppModule = {
                 class: classGroup ? { name: classGroup.name } : undefined,
                 course: classGroup ? courseById.get(classGroup.courseId) : undefined,
                 classroom: classroomById.get(session.classroomId),
+                rosterCount: classGroup
+                  ? (enrollmentsByClassId.get(classGroup.id)?.length ?? 0)
+                  : 0,
+                attendanceCount: attendanceRecords.filter(
+                  (record) => record.classSessionId === session.id,
+                ).length,
               };
             }),
           classes: classCards,
@@ -177,15 +206,29 @@ export const teachingModule: AppModule = {
         const from = query.from ? new Date(query.from) : undefined;
         const to = query.to ? new Date(query.to) : undefined;
 
-        const [sessions, classes, courses, classrooms] = await Promise.all([
+        const [sessions, classes, courses, classrooms, attendanceRecords] = await Promise.all([
           schedulingRepo.listClassSessions(app.db),
           schedulingRepo.listClasses(app.db),
           catalogRepo.listCourses(app.db),
           teachingRepo.listClassrooms(app.db),
+          app.db.select().from(schema.attendanceRecords),
         ]);
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+        const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
+        const enrollments = (
+          await Promise.all(
+            myClasses.map((classGroup) => schedulingRepo.listEnrollments(app.db, classGroup.id)),
+          )
+        ).flat();
+        const rosterCountByClassId = new Map<string, number>();
+        for (const enrollment of enrollments) {
+          rosterCountByClassId.set(
+            enrollment.classId,
+            (rosterCountByClassId.get(enrollment.classId) ?? 0) + 1,
+          );
+        }
 
         return {
           events: sessions
@@ -207,6 +250,10 @@ export const teachingModule: AppModule = {
                 class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
                 course: course ? { id: course.id, name: course.name } : null,
                 classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
+                rosterCount: classGroup ? (rosterCountByClassId.get(classGroup.id) ?? 0) : 0,
+                attendanceCount: attendanceRecords.filter(
+                  (record) => record.classSessionId === session.id,
+                ).length,
               };
             }),
         };
@@ -329,6 +376,42 @@ export const teachingModule: AppModule = {
       });
     }
 
+    function canAccessLessonFeedback(
+      scope: TeacherHomeworkScope,
+      item: typeof schema.lessonFeedbacks.$inferSelect,
+    ) {
+      if (!scope.studentIds.has(item.studentId)) {
+        return false;
+      }
+      const session = scope.sessionById.get(item.classSessionId);
+      return Boolean(session && scope.classIds.has(session.classId));
+    }
+
+    function enrichTeacherLessonFeedbacks(
+      scope: TeacherHomeworkScope,
+      items: (typeof schema.lessonFeedbacks.$inferSelect)[],
+    ) {
+      return items.map((item) => {
+        const session = scope.sessionById.get(item.classSessionId) ?? null;
+        const classGroup = session ? (scope.classById.get(session.classId) ?? null) : null;
+        const teacher = item.teacherId ? (scope.teacherById.get(item.teacherId) ?? null) : null;
+        return {
+          ...item,
+          student: scope.studentById.get(item.studentId)
+            ? {
+                id: item.studentId,
+                name: scope.studentById.get(item.studentId)!.name,
+                grade: scope.studentById.get(item.studentId)!.grade,
+              }
+            : null,
+          course: item.courseId ? (scope.courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+        };
+      });
+    }
+
     app.get(
       '/public/teacher/sessions/:sessionId/attendance',
       { preHandler: app.requireRole('teacher') },
@@ -386,6 +469,86 @@ export const teachingModule: AppModule = {
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
         });
         return { attendanceRecords };
+      },
+    );
+
+    app.get(
+      '/public/teacher/lesson-feedbacks',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        const studentIds = Array.from(scope.studentIds);
+        if (studentIds.length === 0) {
+          return { lessonFeedbacks: [] };
+        }
+
+        const items = await app.db
+          .select()
+          .from(schema.lessonFeedbacks)
+          .where(inArray(schema.lessonFeedbacks.studentId, studentIds))
+          .orderBy(desc(schema.lessonFeedbacks.createdAt));
+
+        return {
+          lessonFeedbacks: enrichTeacherLessonFeedbacks(
+            scope,
+            items.filter((item) => canAccessLessonFeedback(scope, item)),
+          ),
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/sessions/:sessionId/feedbacks',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const { account, session } = await requireOwnedSession(request.account!.id, sessionId);
+        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        if (!classGroup) {
+          throw notFound('Class not found');
+        }
+
+        const body = teacherLessonFeedbackSchema.parse(request.body);
+        const enrollments = await schedulingRepo.listEnrollments(app.db, session.classId);
+        const rosterStudentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
+        const invalidItem = body.items.find((item) => !rosterStudentIds.has(item.studentId));
+        if (invalidItem) {
+          throw Object.assign(new Error('只能点评本班正式学员'), { statusCode: 400 });
+        }
+
+        const updatedItems = [];
+        for (const item of body.items) {
+          const [updated] = await app.db
+            .insert(schema.lessonFeedbacks)
+            .values({
+              classSessionId: sessionId,
+              studentId: item.studentId,
+              teacherId: account.teacherId,
+              courseId: classGroup.courseId,
+              classId: classGroup.id,
+              content: item.content,
+              imageUrls: item.imageUrls,
+              updatedAt: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: [schema.lessonFeedbacks.classSessionId, schema.lessonFeedbacks.studentId],
+              set: {
+                teacherId: account.teacherId,
+                courseId: classGroup.courseId,
+                classId: classGroup.id,
+                content: item.content,
+                imageUrls: item.imageUrls,
+                updatedAt: new Date(),
+              },
+            })
+            .returning();
+          updatedItems.push(updated);
+        }
+
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        return {
+          lessonFeedbacks: enrichTeacherLessonFeedbacks(scope, updatedItems),
+        };
       },
     );
 

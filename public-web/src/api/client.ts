@@ -698,10 +698,38 @@ export interface TeacherHomeworkCheckIn extends ParentHomeworkCheckIn {
   reviewer?: { id: string; name: string } | null;
 }
 
+export interface ParentLessonFeedback {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  teacherId?: string | null;
+  courseId?: string | null;
+  classId?: string | null;
+  content: string;
+  imageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string } | null;
+  course?: Course | null;
+  session?: TeacherClassSession | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+}
+
+export interface TeacherLessonFeedback extends ParentLessonFeedback {
+  student?: { id: string; name: string; grade: string } | null;
+}
+
 export async function fetchParentHomeworkCheckIns() {
   return (
     await publicApi<{ homeworkCheckIns: ParentHomeworkCheckIn[] }>('/public/me/homework-check-ins')
   ).homeworkCheckIns;
+}
+
+export async function fetchParentLessonFeedbacks() {
+  return (
+    await publicApi<{ lessonFeedbacks: ParentLessonFeedback[] }>('/public/me/lesson-feedbacks')
+  ).lessonFeedbacks;
 }
 
 export async function createParentHomeworkCheckIn(input: {
@@ -724,6 +752,24 @@ export async function fetchTeacherHomeworkCheckIns() {
       '/public/teacher/homework-check-ins',
     )
   ).homeworkCheckIns;
+}
+
+export async function fetchTeacherLessonFeedbacks() {
+  return (
+    await publicApi<{ lessonFeedbacks: TeacherLessonFeedback[] }>(
+      '/public/teacher/lesson-feedbacks',
+    )
+  ).lessonFeedbacks;
+}
+
+export async function saveTeacherSessionFeedbacks(
+  sessionId: string,
+  items: Array<{ studentId: string; content: string; imageUrls?: string[] }>,
+) {
+  return publicApi<{ lessonFeedbacks: TeacherLessonFeedback[] }>(
+    `/public/teacher/sessions/${sessionId}/feedbacks`,
+    { method: 'POST', body: JSON.stringify({ items }) },
+  );
 }
 
 export async function reviewTeacherHomeworkCheckIn(
@@ -925,6 +971,8 @@ export interface TeacherClassSession {
   class?: { name: string };
   course?: { name: string };
   classroom?: { name: string };
+  rosterCount?: number;
+  attendanceCount?: number;
 }
 
 export interface TeacherClass {
@@ -944,7 +992,7 @@ export async function fetchTeacherDashboard() {
   }>('/public/teacher/dashboard');
 }
 
-export type AttendanceStatus = 'present' | 'leave' | 'absent' | 'makeup' | 'trial';
+export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent' | 'makeup' | 'trial';
 
 export interface SessionAttendanceRecord {
   id: string;
@@ -982,6 +1030,8 @@ export interface TeacherCalendarEvent {
   class: { id: string; name: string } | null;
   course: { id: string; name: string } | null;
   classroom: { id: string; name: string } | null;
+  rosterCount: number;
+  attendanceCount: number;
 }
 
 export async function fetchTeacherCalendar(params: { from?: string; to?: string } = {}) {

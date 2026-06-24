@@ -14,6 +14,7 @@ interface StudentAttendanceStat {
   name: string;
   total: number;
   present: number;
+  late: number;
   absent: number;
   leave: number;
   makeup: number;
@@ -24,6 +25,7 @@ interface SessionRecord {
   session: { id: string; topic: string; startsAt: string; status: string };
   total: number;
   present: number;
+  late: number;
   absent: number;
   leave: number;
   makeup: number;
@@ -93,7 +95,8 @@ export function CourseAttendanceSummaryPage() {
       {summaryData && (
         <>
           <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            <strong>统计说明：</strong>仅统计有出勤记录的课次和学员。共有 <strong>{summaryData.summary.totalSessions}</strong> 次课完成了签到。
+            <strong>统计说明：</strong>仅统计有出勤记录的课次和学员。共有{' '}
+            <strong>{summaryData.summary.totalSessions}</strong> 次课完成了签到。
           </div>
 
           <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -136,7 +139,7 @@ export function CourseAttendanceSummaryPage() {
                   type="button"
                   className={`px-4 py-2 text-sm font-medium ${
                     activeTab === 'sessions'
-                      ? 'border-b-2 border-primary text-foreground'
+                      ? 'border-primary text-foreground border-b-2'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                   onClick={() => setActiveTab('sessions')}
@@ -147,7 +150,7 @@ export function CourseAttendanceSummaryPage() {
                   type="button"
                   className={`px-4 py-2 text-sm font-medium ${
                     activeTab === 'students'
-                      ? 'border-b-2 border-primary text-foreground'
+                      ? 'border-primary text-foreground border-b-2'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                   onClick={() => setActiveTab('students')}
@@ -171,7 +174,9 @@ export function CourseAttendanceSummaryPage() {
                     cell: (row: SessionRecord) => (
                       <div className="cell-stack">
                         <span className="cell-title">{row.session.topic}</span>
-                        <span className="cell-subtitle">{formatDateTime(row.session.startsAt)}</span>
+                        <span className="cell-subtitle">
+                          {formatDateTime(row.session.startsAt)}
+                        </span>
                       </div>
                     ),
                   },
@@ -186,31 +191,38 @@ export function CourseAttendanceSummaryPage() {
                     ),
                   },
                   {
+                    key: 'late',
+                    header: '迟到',
+                    cell: (row: SessionRecord) => (
+                      <span className="font-medium text-orange-600">{row.late}</span>
+                    ),
+                  },
+                  {
                     key: 'absent',
                     header: '缺勤',
                     cell: (row: SessionRecord) => (
-                      <span className="text-red-600 font-medium">{row.absent}</span>
+                      <span className="font-medium text-red-600">{row.absent}</span>
                     ),
                   },
                   {
                     key: 'leave',
                     header: '请假',
                     cell: (row: SessionRecord) => (
-                      <span className="text-amber-600 font-medium">{row.leave}</span>
+                      <span className="font-medium text-amber-600">{row.leave}</span>
                     ),
                   },
                   {
                     key: 'makeup',
                     header: '补课',
                     cell: (row: SessionRecord) => (
-                      <span className="text-purple-600 font-medium">{row.makeup}</span>
+                      <span className="font-medium text-purple-600">{row.makeup}</span>
                     ),
                   },
                   {
                     key: 'trial',
                     header: '试听',
                     cell: (row: SessionRecord) => (
-                      <span className="text-gray-600 font-medium">{row.trial}</span>
+                      <span className="font-medium text-gray-600">{row.trial}</span>
                     ),
                   },
                   {
@@ -218,7 +230,7 @@ export function CourseAttendanceSummaryPage() {
                     header: '出勤率',
                     cell: (row: SessionRecord) => (
                       <span className="font-medium">
-                        {row.total > 0 ? ((row.present / row.total) * 100 | 0) : 0}%
+                        {row.total > 0 ? (((row.present + row.late) / row.total) * 100) | 0 : 0}%
                       </span>
                     ),
                   },
@@ -241,7 +253,9 @@ export function CourseAttendanceSummaryPage() {
                     cell: (row: StudentAttendanceStat) => (
                       <div className="text-center">
                         <span className="text-lg font-semibold text-blue-600">{row.total}</span>
-                        <span className="text-muted-foreground text-xs">/ {summaryData.summary.totalSessions}</span>
+                        <span className="text-muted-foreground text-xs">
+                          / {summaryData.summary.totalSessions}
+                        </span>
                       </div>
                     ),
                   },
@@ -249,35 +263,42 @@ export function CourseAttendanceSummaryPage() {
                     key: 'present',
                     header: '到课',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-green-600 font-medium">{row.present}</span>
+                      <span className="font-medium text-green-600">{row.present}</span>
+                    ),
+                  },
+                  {
+                    key: 'late',
+                    header: '迟到',
+                    cell: (row: StudentAttendanceStat) => (
+                      <span className="font-medium text-orange-600">{row.late}</span>
                     ),
                   },
                   {
                     key: 'absent',
                     header: '缺勤',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-red-600 font-medium">{row.absent}</span>
+                      <span className="font-medium text-red-600">{row.absent}</span>
                     ),
                   },
                   {
                     key: 'leave',
                     header: '请假',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-amber-600 font-medium">{row.leave}</span>
+                      <span className="font-medium text-amber-600">{row.leave}</span>
                     ),
                   },
                   {
                     key: 'makeup',
                     header: '补课',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-purple-600 font-medium">{row.makeup}</span>
+                      <span className="font-medium text-purple-600">{row.makeup}</span>
                     ),
                   },
                   {
                     key: 'trial',
                     header: '试听',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="text-gray-600 font-medium">{row.trial}</span>
+                      <span className="font-medium text-gray-600">{row.trial}</span>
                     ),
                   },
                   {
@@ -286,7 +307,7 @@ export function CourseAttendanceSummaryPage() {
                     cell: (row: StudentAttendanceStat) => (
                       <span className="font-medium">
                         {summaryData.summary.totalSessions > 0
-                          ? ((row.total / summaryData.summary.totalSessions) * 100 | 0)
+                          ? ((row.total / summaryData.summary.totalSessions) * 100) | 0
                           : 0}
                         %
                       </span>

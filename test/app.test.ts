@@ -2360,6 +2360,39 @@ test('lets a parent check in for class and submit homework from parent center', 
     assert.equal(review.json().homeworkCheckIn.reviewStatus, 'needs_revision');
     assert.equal(review.json().homeworkCheckIn.reviewer.id, fixture.teacher.id);
 
+    const feedback = await app.inject({
+      method: 'POST',
+      url: `/public/teacher/sessions/${fixture.session.id}/feedbacks`,
+      headers: { authorization: `Bearer ${teacherToken}` },
+      payload: {
+        items: [
+          {
+            studentId: fixture.student.id,
+            content: '课堂专注度很好，横画稳定性继续保持。',
+            imageUrls: ['https://cdn.example.com/feedback/sample.jpg'],
+          },
+        ],
+      },
+    });
+    assert.equal(feedback.statusCode, 200, feedback.body);
+    assert.equal(feedback.json().lessonFeedbacks.length, 1);
+    assert.equal(feedback.json().lessonFeedbacks[0].teacher.id, fixture.teacher.id);
+
+    const teacherFeedbackList = await app.inject({
+      method: 'GET',
+      url: '/public/teacher/lesson-feedbacks',
+      headers: { authorization: `Bearer ${teacherToken}` },
+    });
+    assert.equal(teacherFeedbackList.statusCode, 200, teacherFeedbackList.body);
+    assert.ok(
+      teacherFeedbackList
+        .json()
+        .lessonFeedbacks.some(
+          (item: { classSessionId: string; student: { id: string } }) =>
+            item.classSessionId === fixture.session.id && item.student.id === fixture.student.id,
+        ),
+    );
+
     const homeworkList = await app.inject({
       method: 'GET',
       url: '/public/me/homework-check-ins',
@@ -2369,6 +2402,17 @@ test('lets a parent check in for class and submit homework from parent center', 
     assert.equal(homeworkList.json().homeworkCheckIns.length, 1);
     assert.equal(homeworkList.json().homeworkCheckIns[0].reviewStatus, 'needs_revision');
     assert.match(homeworkList.json().homeworkCheckIns[0].teacherFeedback, /第三行/);
+
+    const parentFeedbackList = await app.inject({
+      method: 'GET',
+      url: '/public/me/lesson-feedbacks',
+      headers: { authorization: `Bearer ${parentToken}` },
+    });
+    assert.equal(parentFeedbackList.statusCode, 200, parentFeedbackList.body);
+    assert.equal(parentFeedbackList.json().lessonFeedbacks.length, 1);
+    assert.equal(parentFeedbackList.json().lessonFeedbacks[0].student.id, fixture.student.id);
+    assert.equal(parentFeedbackList.json().lessonFeedbacks[0].class.id, fixture.classGroup.id);
+    assert.match(parentFeedbackList.json().lessonFeedbacks[0].content, /横画稳定/);
   } finally {
     await app.close();
   }

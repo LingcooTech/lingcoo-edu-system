@@ -22,6 +22,7 @@ interface AttendanceDraft {
 
 const STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
   { value: 'present', label: '到课' },
+  { value: 'late', label: '迟到' },
   { value: 'leave', label: '请假' },
   { value: 'absent', label: '缺勤' },
   { value: 'makeup', label: '补课' },
@@ -30,6 +31,7 @@ const STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
 
 const STATUS_LABEL: Record<AttendanceStatus, string> = {
   present: '到课',
+  late: '迟到',
   leave: '请假',
   absent: '缺勤',
   makeup: '补课',
@@ -68,6 +70,7 @@ export function AttendancePage() {
     const signed = records.length;
     const statuses: Record<AttendanceStatus, number> = {
       present: 0,
+      late: 0,
       leave: 0,
       absent: 0,
       makeup: 0,
@@ -76,7 +79,7 @@ export function AttendancePage() {
     records.forEach((record) => {
       statuses[record.status]++;
     });
-    const lessonDeducted = statuses.present + statuses.absent + statuses.makeup;
+    const lessonDeducted = statuses.present + statuses.late + statuses.absent + statuses.makeup;
     return { total, signed, statuses, lessonDeducted };
   }, [enrollments, records]);
 
@@ -212,20 +215,28 @@ export function AttendancePage() {
           </div>
           <div className="resource-card p-4">
             <div className="text-muted-foreground text-xs">已签到</div>
-            <div className="mt-2 text-2xl font-semibold text-blue-600">{attendanceSummary.signed}</div>
+            <div className="mt-2 text-2xl font-semibold text-blue-600">
+              {attendanceSummary.signed}
+            </div>
           </div>
           <div className="resource-card p-4">
             <div className="text-muted-foreground text-xs">到课</div>
-            <div className="mt-2 text-2xl font-semibold text-green-600">{attendanceSummary.statuses.present}</div>
+            <div className="mt-2 text-2xl font-semibold text-green-600">
+              {attendanceSummary.statuses.present}
+            </div>
           </div>
           <div className="resource-card p-4">
             <div className="text-muted-foreground text-xs">缺勤</div>
-            <div className="mt-2 text-2xl font-semibold text-red-600">{attendanceSummary.statuses.absent}</div>
+            <div className="mt-2 text-2xl font-semibold text-red-600">
+              {attendanceSummary.statuses.absent}
+            </div>
           </div>
           <div className="resource-card p-4">
             <div className="text-muted-foreground text-xs">请假 / 补课 / 试听</div>
             <div className="mt-2 text-2xl font-semibold text-amber-600">
-              {attendanceSummary.statuses.leave + attendanceSummary.statuses.makeup + attendanceSummary.statuses.trial}
+              {attendanceSummary.statuses.leave +
+                attendanceSummary.statuses.makeup +
+                attendanceSummary.statuses.trial}
             </div>
           </div>
         </div>
@@ -235,7 +246,7 @@ export function AttendancePage() {
         <div className="border-b px-4 py-3">
           <div className="text-sm font-semibold">后台补签与核销</div>
           <div className="text-muted-foreground mt-1 text-xs">
-            老师端用于老师到岗打卡，家长端用于学员到课确认；后台用于总览、补签和异常核销。到课、缺勤、补课会扣
+            老师端用于老师到岗打卡，家长端用于学员到课确认；后台用于总览、补签和异常核销。到课、迟到、缺勤、补课会扣
             1 课时；请假和试听不扣课时。
           </div>
         </div>

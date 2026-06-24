@@ -336,7 +336,7 @@ export interface CalendarEvent {
   classroom?: { id: string; name: string } | null;
 }
 
-export type AttendanceStatus = 'present' | 'leave' | 'absent' | 'makeup' | 'trial';
+export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent' | 'makeup' | 'trial';
 
 export interface AttendanceRecord {
   id: string;

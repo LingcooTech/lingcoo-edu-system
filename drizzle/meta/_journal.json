@@ -232,6 +232,20 @@
       "when": 1782345600000,
       "tag": "0032_course_contract_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782432000000,
+      "tag": "0033_attendance_late_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782518400000,
+      "tag": "0034_lesson_feedbacks",
+      "breakpoints": true
     }
   ]
 }

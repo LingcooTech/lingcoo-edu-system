@@ -46,6 +46,7 @@ const statusLabels: Record<string, string> = {
   course_delivery: '课程交付',
   invalid: '无效',
   present: '到课',
+  late: '迟到',
   leave: '请假',
   absent: '缺勤',
   makeup: '补课',

@@ -11,7 +11,9 @@ import {
   LogOut,
   PenLine,
   Receipt,
+  Search,
   Shield,
+  Sparkles,
   UsersRound,
   Wallet,
 } from 'lucide-react';
@@ -25,16 +27,19 @@ import {
   fetchParentCheckInSessions,
   fetchParentHomeworkCheckIns,
   fetchParentLessonAccounts,
+  fetchParentLessonFeedbacks,
   fetchParentOrders,
   fetchParentSeatReservations,
   fetchTeacherDashboard,
   fetchTeacherCalendar,
   fetchTeacherHomeworkCheckIns,
+  fetchTeacherLessonFeedbacks,
   fetchTeacherSessionAttendance,
   publicApi,
   recordTeacherAttendance,
   reviewTeacherHomeworkCheckIn,
   rescheduleParentSeatReservation,
+  saveTeacherSessionFeedbacks,
   submitParentCheckIn,
   type AttendanceStatus,
   type AuthAccount,
@@ -44,12 +49,15 @@ import {
   type ParentCheckInSession,
   type ParentHomeworkCheckIn,
   type ParentLessonAccount,
+  type ParentLessonFeedback,
   type ParentOrder,
   type ParentSeatReservation,
   type TeacherClass,
   type TeacherCalendarEvent,
   type TeacherClassSession,
   type TeacherHomeworkCheckIn,
+  type TeacherLessonFeedback,
+  type TeacherRosterStudent,
 } from '@/api/client';
 import { Layout } from '@/components/Layout';
 import { Modal } from '@/components/Modal';
@@ -86,10 +94,18 @@ const SESSION_STATUS_LABEL: Record<string, string> = {
 
 const ATTENDANCE_STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
   { value: 'present', label: '到课' },
+  { value: 'late', label: '迟到' },
   { value: 'leave', label: '请假' },
   { value: 'absent', label: '缺勤' },
   { value: 'makeup', label: '补课' },
   { value: 'trial', label: '试听' },
+];
+
+const TEACHER_ROLL_CALL_STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
+  { value: 'present', label: '到课' },
+  { value: 'late', label: '迟到' },
+  { value: 'leave', label: '请假' },
+  { value: 'absent', label: '未到' },
 ];
 
 const ATTENDANCE_STATUS_LABEL: Record<string, string> = Object.fromEntries(
@@ -150,6 +166,45 @@ function dateKey(value: string) {
 function dateLabel(value: string) {
   const date = new Date(value);
   return `${date.getMonth() + 1}月${date.getDate()}日 周${'日一二三四五六'[date.getDay()]}`;
+}
+
+function monthYearLabel(value: Date) {
+  return `${value.getMonth() + 1}月/${value.getFullYear()}年`;
+}
+
+function sameDate(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function startOfDay(value: Date) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function weekDaysAround(value: Date) {
+  const base = startOfDay(value);
+  const day = base.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = addDays(base, mondayOffset);
+  return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+}
+
+function isRollCallPending(event: {
+  status: string;
+  rosterCount?: number;
+  attendanceCount?: number;
+}) {
+  return (
+    event.status !== 'cancelled' &&
+    event.status !== 'completed' &&
+    (event.rosterCount ?? 0) > 0 &&
+    (event.attendanceCount ?? 0) < (event.rosterCount ?? 0)
+  );
 }
 
 function timeRange(startsAt: string, endsAt: string) {
@@ -306,6 +361,7 @@ function ParentView({ account }: { account: AuthAccount }) {
   const [checkInSessions, setCheckInSessions] = useState<ParentCheckInSession[]>([]);
   const [attendance, setAttendance] = useState<ParentAttendanceRecord[]>([]);
   const [homeworkCheckIns, setHomeworkCheckIns] = useState<ParentHomeworkCheckIn[]>([]);
+  const [lessonFeedbacks, setLessonFeedbacks] = useState<ParentLessonFeedback[]>([]);
   const [rescheduleTarget, setRescheduleTarget] = useState<ParentSeatReservation | null>(null);
   const [rescheduleSessionId, setRescheduleSessionId] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
@@ -351,6 +407,12 @@ function ParentView({ account }: { account: AuthAccount }) {
       .catch(() => undefined);
   }, []);
 
+  const reloadLessonFeedbacks = useCallback(() => {
+    fetchParentLessonFeedbacks()
+      .then(setLessonFeedbacks)
+      .catch(() => undefined);
+  }, []);
+
   const reloadOrders = useCallback(() => {
     fetchParentOrders()
       .then(setOrders)
@@ -372,10 +434,12 @@ function ParentView({ account }: { account: AuthAccount }) {
       .then(setAttendance)
       .catch(() => undefined);
     reloadHomeworkCheckIns();
+    reloadLessonFeedbacks();
   }, [
     reloadCalendar,
     reloadCheckInSessions,
     reloadHomeworkCheckIns,
+    reloadLessonFeedbacks,
     reloadOrders,
     reloadSeatReservations,
   ]);
@@ -836,6 +900,57 @@ function ParentView({ account }: { account: AuthAccount }) {
       </section>
 
       <section className="mt-6">
+        <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>课后点评</SectionHeading>
+        {lessonFeedbacks.length === 0 ? (
+          <EmptyCard>暂无课后点评。</EmptyCard>
+        ) : (
+          <div className="grid gap-2">
+            {lessonFeedbacks.map((item) => (
+              <div key={item.id} className="pwcard p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-ink text-sm font-semibold">
+                      {item.student?.name ?? '学员'} · {item.course?.name ?? '课程'}
+                    </div>
+                    <div className="text-muted mt-1 text-xs">
+                      {item.session
+                        ? formatDateTime(item.session.startsAt)
+                        : formatDateTime(item.createdAt)}
+                      {item.class?.name ? ` · ${item.class.name}` : ''}
+                    </div>
+                  </div>
+                  {item.teacher?.name ? (
+                    <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                      {item.teacher.name}
+                    </span>
+                  ) : null}
+                </div>
+                {item.content ? (
+                  <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
+                    {item.content}
+                  </p>
+                ) : null}
+                {item.imageUrls.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {item.imageUrls.map((url) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt="课后点评"
+                        loading="lazy"
+                        decoding="async"
+                        className="aspect-square rounded-xl object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6">
         <SectionHeading icon={<Wallet className="text-brand h-4 w-4" />}>
           课时包 / 余额
         </SectionHeading>
@@ -906,7 +1021,8 @@ function ParentView({ account }: { account: AuthAccount }) {
                       : ''}
                   </div>
                 ) : null}
-                {order.status === 'paid' && !order.refundRequests?.some((item) => item.status === 'pending') ? (
+                {order.status === 'paid' &&
+                !order.refundRequests?.some((item) => item.status === 'pending') ? (
                   <button
                     type="button"
                     className="border-line text-ink hover:bg-paper mt-3 inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
@@ -1017,9 +1133,7 @@ function ParentView({ account }: { account: AuthAccount }) {
               <select
                 className="border-line rounded-xl border bg-white px-3 py-2"
                 value={refundReason}
-                onChange={(event) =>
-                  setRefundReason(event.target.value as typeof refundReason)
-                }
+                onChange={(event) => setRefundReason(event.target.value as typeof refundReason)}
               >
                 {REFUND_REASON_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1041,9 +1155,7 @@ function ParentView({ account }: { account: AuthAccount }) {
               退款通过后，课时包订单会自动扣回未消耗课时；试听席位会释放名额。
             </p>
             {refundMessage && (
-              <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
-                {refundMessage}
-              </div>
+              <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{refundMessage}</div>
             )}
           </div>
         ) : null}
@@ -1058,7 +1170,10 @@ function TeacherView() {
   const [calendarEvents, setCalendarEvents] = useState<TeacherCalendarEvent[]>([]);
   const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [homeworkCheckIns, setHomeworkCheckIns] = useState<TeacherHomeworkCheckIn[]>([]);
+  const [lessonFeedbacks, setLessonFeedbacks] = useState<TeacherLessonFeedback[]>([]);
   const [rollCallSession, setRollCallSession] = useState<TeacherClassSession | null>(null);
+  const [feedbackSession, setFeedbackSession] = useState<TeacherCalendarEvent | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [reviewTarget, setReviewTarget] = useState<TeacherHomeworkCheckIn | null>(null);
   const [reviewStatus, setReviewStatus] = useState<'reviewed' | 'needs_revision'>('reviewed');
   const [teacherFeedback, setTeacherFeedback] = useState('');
@@ -1076,6 +1191,9 @@ function TeacherView() {
       .catch(() => undefined);
     fetchTeacherHomeworkCheckIns()
       .then(setHomeworkCheckIns)
+      .catch(() => undefined);
+    fetchTeacherLessonFeedbacks()
+      .then(setLessonFeedbacks)
       .catch(() => undefined);
   }, []);
 
@@ -1112,82 +1230,244 @@ function TeacherView() {
   }
 
   const calendarGroups = useMemo(() => groupEventsByDate(calendarEvents), [calendarEvents]);
+  const today = startOfDay(new Date());
+  const selectedDateKey = dateKey(selectedDate.toISOString());
+  const selectedEvents = useMemo(
+    () =>
+      calendarEvents
+        .filter((event) => dateKey(event.startsAt) === selectedDateKey)
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [calendarEvents, selectedDateKey],
+  );
+  const todayPendingEvents = useMemo(
+    () =>
+      calendarEvents
+        .filter((event) => sameDate(new Date(event.startsAt), today) && isRollCallPending(event))
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [calendarEvents, today],
+  );
+  const overduePendingCount = useMemo(
+    () =>
+      calendarEvents.filter(
+        (event) => new Date(event.endsAt).getTime() < Date.now() && isRollCallPending(event),
+      ).length,
+    [calendarEvents],
+  );
+  const pendingHomeworkCount = homeworkCheckIns.filter(
+    (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
+  ).length;
+  const feedbackCountBySessionId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const feedback of lessonFeedbacks) {
+      counts.set(feedback.classSessionId, (counts.get(feedback.classSessionId) ?? 0) + 1);
+    }
+    return counts;
+  }, [lessonFeedbacks]);
+  const feedbackEvents = useMemo(
+    () =>
+      calendarEvents
+        .filter((event) => event.status !== 'cancelled')
+        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+        .slice(0, 10),
+    [calendarEvents],
+  );
+  const weekDays = weekDaysAround(selectedDate);
+
+  function openRollCall(event: TeacherCalendarEvent | TeacherClassSession) {
+    setRollCallSession({
+      id: event.id,
+      startsAt: event.startsAt,
+      endsAt: event.endsAt,
+      topic: 'title' in event ? event.title : event.topic,
+      status: event.status,
+      class: event.class ? { name: event.class.name } : undefined,
+      course: event.course ? { name: event.course.name } : undefined,
+      classroom: event.classroom ? { name: event.classroom.name } : undefined,
+      rosterCount: 'rosterCount' in event ? event.rosterCount : undefined,
+      attendanceCount: 'attendanceCount' in event ? event.attendanceCount : undefined,
+    });
+  }
+
+  function scrollToSection(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   return (
     <>
-      <section className="mt-6">
-        <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
-          我的课表
+      <section className="mt-6 overflow-hidden rounded-3xl bg-[#ff9f1c] text-white shadow-sm">
+        <div className="flex items-start justify-between gap-3 px-5 pt-5">
+          <div>
+            <p className="text-sm text-white/80">老师工作台</p>
+            <h2 className="mt-1 text-xl font-bold">今日授课与点名</h2>
+          </div>
+          <button
+            type="button"
+            className="rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold backdrop-blur"
+            onClick={() => setSelectedDate(today)}
+          >
+            回到今天
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 px-5 py-5">
+          <div>
+            <div className="text-3xl font-semibold">{todayPendingEvents.length}</div>
+            <div className="mt-1 text-xs text-white/80">今日待点名</div>
+          </div>
+          <div>
+            <div className="text-3xl font-semibold">{overduePendingCount}</div>
+            <div className="mt-1 text-xs text-white/80">超时未点</div>
+          </div>
+          <div>
+            <div className="text-3xl font-semibold">{pendingHomeworkCount}</div>
+            <div className="mt-1 text-xs text-white/80">待批阅</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-5 grid grid-cols-4 gap-2 sm:grid-cols-7">
+        {[
+          { label: '学员', icon: UsersRound, sectionId: 'teacher-classes' },
+          { label: '班级', icon: UsersRound, sectionId: 'teacher-classes' },
+          { label: '课表', icon: CalendarDays, sectionId: 'teacher-calendar' },
+          { label: '点名', icon: ClipboardList, sectionId: 'teacher-roll-call' },
+          { label: '上课记录', icon: CheckSquare, sectionId: 'teacher-calendar' },
+          { label: '学习计划', icon: BookOpen, sectionId: 'teacher-classes' },
+          { label: '课后点评', icon: PenLine, sectionId: 'teacher-feedbacks' },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              className="pwcard hover:bg-paper flex min-h-20 flex-col items-center justify-center gap-2 p-2 text-center text-xs font-medium transition-colors"
+              onClick={() => scrollToSection(item.sectionId)}
+            >
+              <Icon className="text-brand h-5 w-5" />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </section>
+
+      <section id="teacher-roll-call" className="mt-6 scroll-mt-4">
+        <SectionHeading icon={<ClipboardList className="text-brand h-4 w-4" />}>
+          今日待点名
         </SectionHeading>
-        {calendarGroups.length === 0 ? (
-          <EmptyCard>近 30 天暂无排课。</EmptyCard>
+        {todayPendingEvents.length === 0 ? (
+          <EmptyCard>今天没有待点名课次。</EmptyCard>
         ) : (
           <div className="grid gap-3">
-            {calendarGroups.map(([day, events]) => (
-              <div key={day} className="pwcard overflow-hidden">
-                <div className="bg-paper text-ink flex items-center justify-between px-4 py-2 text-sm font-semibold">
-                  <span>{dateLabel(events[0].startsAt)}</span>
-                  <span className="text-muted text-xs">{events.length} 节</span>
-                </div>
-                <div className="divide-line divide-y">
-                  {events.map((event) => (
-                    <div key={event.id} className="p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div className="text-ink text-sm font-semibold">
-                            {event.class?.name ?? '班级'} · {event.title}
-                          </div>
-                          <div className="text-muted mt-1 text-xs">
-                            {event.course?.name ?? '课程'} · {event.classroom?.name ?? '教室'}
-                          </div>
-                        </div>
-                        <span className="bg-paper text-ink-soft rounded-full px-2.5 py-1 text-xs">
-                          {SESSION_STATUS_LABEL[event.status] ?? event.status}
-                        </span>
-                      </div>
-                      <div className="text-ink-soft mt-3 flex items-center justify-between gap-3 text-sm">
-                        <span>{timeRange(event.startsAt, event.endsAt)}</span>
-                        {event.status !== 'cancelled' ? (
-                          <button
-                            type="button"
-                            className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
-                            onClick={() =>
-                              setRollCallSession({
-                                id: event.id,
-                                startsAt: event.startsAt,
-                                endsAt: event.endsAt,
-                                topic: event.title,
-                                status: event.status,
-                                class: event.class ? { name: event.class.name } : undefined,
-                                course: event.course ? { name: event.course.name } : undefined,
-                                classroom: event.classroom
-                                  ? { name: event.classroom.name }
-                                  : undefined,
-                              })
-                            }
-                          >
-                            <ClipboardList className="h-3.5 w-3.5" />
-                            点名
-                          </button>
-                        ) : null}
-                      </div>
+            {todayPendingEvents.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                className="pwcard hover:border-brand/40 w-full p-4 text-left transition-colors"
+                onClick={() => openRollCall(event)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-ink text-lg font-semibold">
+                      {timeRange(event.startsAt, event.endsAt)}
                     </div>
-                  ))}
+                    <div className="text-muted mt-1 text-xs">
+                      {event.class?.name ?? '班级'} · {event.classroom?.name ?? '未设置教室'}
+                    </div>
+                  </div>
+                  <span className="bg-brand-soft text-brand rounded-full px-3 py-1 text-xs font-semibold">
+                    未点名
+                  </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </section>
 
-      <section className="mt-6">
+      <section id="teacher-calendar" className="mt-6 scroll-mt-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
+            点名课表
+          </SectionHeading>
+          <span className="text-muted text-xs">{monthYearLabel(selectedDate)}</span>
+        </div>
+        <div className="pwcard overflow-hidden">
+          <div className="border-line grid grid-cols-7 border-b">
+            {weekDays.map((day) => {
+              const hasSession = calendarEvents.some((event) =>
+                sameDate(new Date(event.startsAt), day),
+              );
+              const selected = sameDate(day, selectedDate);
+              return (
+                <button
+                  key={day.toISOString()}
+                  type="button"
+                  className={`flex min-h-20 flex-col items-center justify-center gap-1 text-sm transition-colors ${
+                    selected ? 'bg-brand-soft text-brand' : 'hover:bg-paper text-ink'
+                  }`}
+                  onClick={() => setSelectedDate(day)}
+                >
+                  <span className="text-muted text-xs">周{'日一二三四五六'[day.getDay()]}</span>
+                  <span className="text-lg font-semibold">{day.getDate()}</span>
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${hasSession ? 'bg-brand' : 'bg-transparent'}`}
+                  />
+                </button>
+              );
+            })}
+          </div>
+          <div className="divide-line divide-y">
+            {selectedEvents.length === 0 ? (
+              <div className="text-muted p-4 text-sm">当天暂无排课。</div>
+            ) : (
+              selectedEvents.map((event) => (
+                <div key={event.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-ink text-xl font-semibold">
+                        {timeRange(event.startsAt, event.endsAt)}
+                      </div>
+                      <div className="text-ink mt-1 text-sm font-medium">
+                        {event.class?.name ?? '班级'}
+                      </div>
+                      <div className="text-muted mt-1 text-xs">
+                        {event.classroom?.name ?? '未设置教室'} · {event.title || '未设置上课内容'}
+                      </div>
+                    </div>
+                    <span className="text-ink-soft text-sm">
+                      {isRollCallPending(event)
+                        ? '未点名'
+                        : (SESSION_STATUS_LABEL[event.status] ?? event.status)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-muted text-xs">
+                      已点 {event.attendanceCount}/{event.rosterCount}
+                    </span>
+                    {event.status !== 'cancelled' ? (
+                      <button
+                        type="button"
+                        className="pwbtn pwbtn-outline px-4 py-2 text-xs"
+                        onClick={() => openRollCall(event)}
+                      >
+                        点名
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section id="teacher-classes" className="mt-6 scroll-mt-4">
         <SectionHeading icon={<UsersRound className="text-brand h-4 w-4" />}>
           我的班级
         </SectionHeading>
         {classes.length === 0 ? (
           <EmptyCard>暂无班级。</EmptyCard>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {classes.map((item) => (
               <div key={item.id} className="pwcard p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1203,7 +1483,7 @@ function TeacherView() {
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {item.students.map((student) => (
+                  {item.students.slice(0, 8).map((student) => (
                     <span
                       key={student.id}
                       className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs"
@@ -1211,12 +1491,57 @@ function TeacherView() {
                       {student.name} · {student.grade}
                     </span>
                   ))}
+                  {item.students.length > 8 ? (
+                    <span className="text-muted text-xs">+{item.students.length - 8}</span>
+                  ) : null}
                   {item.students.length === 0 && (
                     <span className="text-muted text-xs">暂无学员</span>
                   )}
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section id="teacher-feedbacks" className="mt-6 scroll-mt-4">
+        <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>课后点评</SectionHeading>
+        {feedbackEvents.length === 0 ? (
+          <EmptyCard>暂无可点评课次。</EmptyCard>
+        ) : (
+          <div className="grid gap-3">
+            {feedbackEvents.map((event) => {
+              const feedbackCount = feedbackCountBySessionId.get(event.id) ?? 0;
+              return (
+                <div key={event.id} className="pwcard p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-ink text-sm font-semibold">
+                        {event.class?.name ?? '班级'} · {event.title || '上课内容'}
+                      </div>
+                      <div className="text-muted mt-1 text-xs">
+                        {formatDateTime(event.startsAt)} · {event.course?.name ?? '课程'}
+                      </div>
+                    </div>
+                    <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                      已评 {feedbackCount}/{event.rosterCount}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-muted text-xs">
+                      {event.classroom?.name ?? '未设置教室'}
+                    </span>
+                    <button
+                      type="button"
+                      className="pwbtn pwbtn-outline px-4 py-2 text-xs"
+                      onClick={() => setFeedbackSession(event)}
+                    >
+                      写点评
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
@@ -1293,6 +1618,18 @@ function TeacherView() {
         />
       ) : null}
 
+      {feedbackSession ? (
+        <LessonFeedbackModal
+          session={feedbackSession}
+          feedbacks={lessonFeedbacks.filter((item) => item.classSessionId === feedbackSession.id)}
+          onClose={() => setFeedbackSession(null)}
+          onSaved={() => {
+            setFeedbackSession(null);
+            reload();
+          }}
+        />
+      ) : null}
+
       <Modal
         open={Boolean(reviewTarget)}
         onClose={() => setReviewTarget(null)}
@@ -1364,6 +1701,162 @@ function TeacherView() {
   );
 }
 
+function LessonFeedbackModal({
+  session,
+  feedbacks,
+  onClose,
+  onSaved,
+}: {
+  session: TeacherCalendarEvent;
+  feedbacks: TeacherLessonFeedback[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [roster, setRoster] = useState<TeacherRosterStudent[]>([]);
+  const [draft, setDraft] = useState<Record<string, { content: string; imageUrls: string }>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetchTeacherSessionAttendance(session.id)
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+        const feedbackByStudentId = new Map(feedbacks.map((item) => [item.studentId, item]));
+        const nextDraft: Record<string, { content: string; imageUrls: string }> = {};
+        for (const student of data.roster) {
+          const item = feedbackByStudentId.get(student.id);
+          nextDraft[student.id] = {
+            content: item?.content ?? '',
+            imageUrls: item?.imageUrls.join('\n') ?? '',
+          };
+        }
+        setRoster(data.roster);
+        setDraft(nextDraft);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : '加载失败'))
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [session.id, feedbacks]);
+
+  function updateDraft(studentId: string, field: 'content' | 'imageUrls', value: string) {
+    setDraft((current) => ({
+      ...current,
+      [studentId]: {
+        content: current[studentId]?.content ?? '',
+        imageUrls: current[studentId]?.imageUrls ?? '',
+        [field]: value,
+      },
+    }));
+  }
+
+  async function submit() {
+    const items = roster
+      .map((student) => {
+        const item = draft[student.id] ?? { content: '', imageUrls: '' };
+        return {
+          studentId: student.id,
+          content: item.content.trim(),
+          imageUrls: parseImageUrls(item.imageUrls),
+        };
+      })
+      .filter((item) => item.content || item.imageUrls.length > 0);
+
+    if (items.length === 0) {
+      setError('请至少填写一位学员的点评内容或图片');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await saveTeacherSessionFeedbacks(session.id, items);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="课后点评"
+      panelClassName="max-w-3xl"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="pwbtn pwbtn-outline px-4 py-2" onClick={onClose}>
+            取消
+          </button>
+          <button
+            type="button"
+            className="pwbtn pwbtn-primary px-4 py-2"
+            onClick={submit}
+            disabled={saving || loading}
+          >
+            {saving ? '保存中...' : '保存点评'}
+          </button>
+        </div>
+      }
+    >
+      <div className="bg-brand-soft rounded-2xl p-4">
+        <div className="text-ink text-sm font-semibold">
+          {session.class?.name ?? '班级'} · {session.title || '上课内容'}
+        </div>
+        <div className="text-muted mt-1 text-xs">
+          {formatDateTime(session.startsAt)} · {session.course?.name ?? '课程'}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-muted mt-4 text-sm">正在加载花名册...</div>
+      ) : roster.length === 0 ? (
+        <EmptyCard>本课次暂无正式学员。</EmptyCard>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {roster.map((student) => (
+            <div key={student.id} className="border-line rounded-2xl border p-3">
+              <div className="text-ink text-sm font-semibold">
+                {student.name} · {student.grade}
+              </div>
+              <label className="mt-3 grid gap-1 text-sm">
+                <span className="text-ink font-medium">点评内容</span>
+                <textarea
+                  className="border-line min-h-24 rounded-xl border px-3 py-2"
+                  value={draft[student.id]?.content ?? ''}
+                  onChange={(event) => updateDraft(student.id, 'content', event.target.value)}
+                  placeholder="课堂表现、掌握情况、课后建议"
+                />
+              </label>
+              <label className="mt-3 grid gap-1 text-sm">
+                <span className="text-ink font-medium">图片链接</span>
+                <textarea
+                  className="border-line min-h-16 rounded-xl border px-3 py-2"
+                  value={draft[student.id]?.imageUrls ?? ''}
+                  onChange={(event) => updateDraft(student.id, 'imageUrls', event.target.value)}
+                  placeholder="每行一个图片链接，可选"
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+    </Modal>
+  );
+}
+
 // Teacher roll-call (点名): loads the roster + any existing attendance, lets the
 // teacher set a status per not-yet-recorded student, and submits. Recording is
 // idempotent on the server — already-recorded students are never re-deducted.
@@ -1379,6 +1872,7 @@ function RollCallModal({
   const [roster, setRoster] = useState<Array<{ id: string; name: string; grade: string }>>([]);
   const [recordedStatus, setRecordedStatus] = useState<Record<string, AttendanceStatus>>({});
   const [draft, setDraft] = useState<Record<string, AttendanceStatus>>({});
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1416,6 +1910,22 @@ function RollCallModal({
   }, [session.id]);
 
   const pending = roster.filter((student) => !recordedStatus[student.id]);
+  const visibleRoster = roster.filter((student) => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return true;
+    return `${student.name} ${student.grade}`.toLowerCase().includes(normalized);
+  });
+  const summary = roster.reduce(
+    (acc, student) => {
+      const status = recordedStatus[student.id] ?? draft[student.id] ?? 'present';
+      if (status === 'present') acc.present += 1;
+      if (status === 'late') acc.late += 1;
+      if (status === 'leave') acc.leave += 1;
+      if (status === 'absent') acc.absent += 1;
+      return acc;
+    },
+    { present: 0, late: 0, leave: 0, absent: 0 },
+  );
 
   async function submit() {
     setSaving(true);
@@ -1439,68 +1949,112 @@ function RollCallModal({
     <Modal
       open
       onClose={onClose}
-      title={`点名 · ${session.class?.name ?? '班级'}`}
+      title="点名"
+      panelClassName="max-w-3xl"
       footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="pwbtn pwbtn-outline px-4 py-2" onClick={onClose}>
-            取消
-          </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-ink text-sm">
+            到课<span className="text-brand font-semibold">{summary.present}</span> 迟到
+            <span className="text-brand font-semibold">{summary.late}</span> 请假
+            <span className="text-brand font-semibold">{summary.leave}</span> 未到
+            <span className="text-brand font-semibold">{summary.absent}</span>
+          </div>
           <button
             type="button"
-            className="pwbtn pwbtn-primary px-4 py-2"
+            className="pwbtn pwbtn-primary w-full px-5 py-3 sm:w-auto"
             onClick={submit}
             disabled={saving || loading || pending.length === 0}
           >
-            {saving ? '保存中...' : '提交点名'}
+            {saving ? '保存中...' : pending.length === 0 ? '已完成点名' : '完成点名'}
           </button>
         </div>
       }
     >
-      <p className="text-muted mb-3 text-xs">
-        {session.topic} · {formatDateTime(session.startsAt)}
-      </p>
+      <div className="bg-brand-soft text-brand rounded-2xl p-4 text-center">
+        <div className="text-sm">{dateLabel(session.startsAt)}</div>
+        <div className="text-ink mt-2 text-3xl font-semibold">
+          {timeRange(session.startsAt, session.endsAt)}
+        </div>
+        <div className="text-ink-soft mt-2 text-sm">{session.class?.name ?? '班级'}</div>
+        <div className="text-muted mt-1 text-xs">
+          {session.course?.name ?? '课程'} / {session.classroom?.name ?? '未设置教室'}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-ink text-sm font-semibold">本次授课课时</div>
+          <div className="text-muted mt-1 text-xs">当前版本固定扣 1 课时</div>
+        </div>
+        <div className="border-line flex h-9 overflow-hidden rounded-xl border text-sm">
+          <button type="button" className="text-muted w-10" disabled>
+            -
+          </button>
+          <div className="border-line flex w-10 items-center justify-center border-x">1</div>
+          <button type="button" className="text-muted w-10" disabled>
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="text-muted mt-4 grid grid-cols-[1fr_repeat(4,56px)] items-center gap-2 text-center text-sm">
+        <div className="text-left">学员姓名</div>
+        {TEACHER_ROLL_CALL_STATUS_OPTIONS.map((option) => (
+          <div key={option.value}>{option.label}</div>
+        ))}
+      </div>
+      <label className="relative mt-3 block">
+        <Search className="text-muted pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+        <input
+          className="pwinput pl-10"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索学员姓名快速定位"
+        />
+      </label>
       {loading ? (
         <div className="text-muted py-6 text-center text-sm">加载中...</div>
       ) : roster.length === 0 ? (
         <div className="text-muted py-6 text-center text-sm">本班暂无学员。</div>
       ) : (
-        <div className="grid max-h-[50vh] gap-2 overflow-y-auto">
-          {roster.map((student) => {
+        <div className="mt-3 grid max-h-[50vh] overflow-y-auto">
+          {visibleRoster.map((student) => {
             const recorded = recordedStatus[student.id];
+            const currentStatus = recorded ?? draft[student.id] ?? 'present';
             return (
               <div
                 key={student.id}
-                className="border-line flex items-center justify-between gap-3 rounded-xl border px-3 py-2"
+                className="border-line grid grid-cols-[1fr_repeat(4,56px)] items-center gap-2 border-b py-4 text-center"
               >
-                <div>
+                <div className="min-w-0 text-left">
                   <div className="text-ink text-sm font-medium">{student.name}</div>
-                  <div className="text-muted text-xs">{student.grade}</div>
+                  <div className="text-muted mt-1 text-xs">{student.grade} · 本次扣 1 课时</div>
                 </div>
-                {recorded ? (
-                  <span className="bg-paper text-ink-soft rounded-full px-2.5 py-1 text-xs">
-                    已记录 · {ATTENDANCE_STATUS_LABEL[recorded] ?? recorded}
-                  </span>
-                ) : (
-                  <select
-                    className="border-line rounded-lg border px-2 py-1.5 text-sm"
-                    value={draft[student.id] ?? 'present'}
-                    onChange={(event) =>
+                {TEACHER_ROLL_CALL_STATUS_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`mx-auto h-8 w-8 rounded-full border transition-colors ${
+                      currentStatus === option.value
+                        ? 'border-brand bg-brand shadow-sm'
+                        : 'border-line bg-surface'
+                    } ${recorded ? 'opacity-70' : ''}`}
+                    aria-label={`${student.name}${option.label}`}
+                    disabled={Boolean(recorded)}
+                    onClick={() =>
                       setDraft((prev) => ({
                         ...prev,
-                        [student.id]: event.target.value as AttendanceStatus,
+                        [student.id]: option.value,
                       }))
                     }
-                  >
-                    {ATTENDANCE_STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                  />
+                ))}
               </div>
             );
           })}
+          {visibleRoster.length === 0 ? (
+            <div className="text-muted py-6 text-center text-sm">没有匹配的学员。</div>
+          ) : null}
         </div>
       )}
       {error && <div className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-600">{error}</div>}

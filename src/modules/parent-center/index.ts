@@ -192,6 +192,42 @@ export const parentCenterModule: AppModule = {
       });
     }
 
+    async function enrichLessonFeedbacks(
+      students: (typeof schema.students.$inferSelect)[],
+      items: (typeof schema.lessonFeedbacks.$inferSelect)[],
+    ) {
+      if (items.length === 0) {
+        return [];
+      }
+      const [courses, sessions, classes, teachers] = await Promise.all([
+        catalogRepo.listCourses(app.db),
+        schedulingRepo.listClassSessions(app.db),
+        schedulingRepo.listClasses(app.db),
+        teachingRepo.listTeachers(app.db),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const sessionById = new Map(sessions.map((session) => [session.id, session]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+
+      return items.map((item) => {
+        const session = sessionById.get(item.classSessionId) ?? null;
+        const classGroup = session ? (classById.get(session.classId) ?? null) : null;
+        const teacher = item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null;
+        return {
+          ...item,
+          student: studentById.get(item.studentId)
+            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+            : null,
+          course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+        };
+      });
+    }
+
     app.get('/public/me/children', { preHandler: app.requireParent }, async (request) => {
       const { students } = await resolveChildren(request.account!.id);
       return { children: students };
@@ -623,6 +659,20 @@ export const parentCenterModule: AppModule = {
         .where(inArray(schema.homeworkCheckIns.studentId, studentIds))
         .orderBy(desc(schema.homeworkCheckIns.createdAt));
       return { homeworkCheckIns: await enrichHomeworkCheckIns(students, items) };
+    });
+
+    app.get('/public/me/lesson-feedbacks', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = students.map((student) => student.id);
+      if (studentIds.length === 0) {
+        return { lessonFeedbacks: [] };
+      }
+      const items = await app.db
+        .select()
+        .from(schema.lessonFeedbacks)
+        .where(inArray(schema.lessonFeedbacks.studentId, studentIds))
+        .orderBy(desc(schema.lessonFeedbacks.createdAt));
+      return { lessonFeedbacks: await enrichLessonFeedbacks(students, items) };
     });
 
     app.post(
