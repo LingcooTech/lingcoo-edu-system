@@ -834,6 +834,44 @@ export const courseContractPaymentRecords = pgTable(
   }),
 );
 
+export const courseContractGifts = pgTable(
+  'course_contract_gifts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    courseContractId: uuid('course_contract_id')
+      .notNull()
+      .references(() => courseContracts.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'restrict' }),
+    courseId: uuid('course_id')
+      .notNull()
+      .references(() => courses.id, { onDelete: 'restrict' }),
+    classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+    title: varchar('title', { length: 200 }).notNull(),
+    lessonCount: integer('lesson_count').notNull(),
+    reason: varchar('reason', { length: 80 }).notNull().default('other'),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    status: courseContractStatusEnum('status').notNull().default('active'),
+    note: text('note'),
+    createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    contractIdx: index('course_contract_gifts_contract_idx').on(table.courseContractId),
+    studentCourseIdx: index('course_contract_gifts_student_course_idx').on(
+      table.studentId,
+      table.courseId,
+    ),
+    classIdx: index('course_contract_gifts_class_idx').on(table.classId),
+    statusIdx: index('course_contract_gifts_status_idx').on(table.status),
+  }),
+);
+
 export const seatReservations = pgTable(
   'seat_reservations',
   {

@@ -225,6 +225,13 @@
       "when": 1782112188012,
       "tag": "0031_orders_cancel_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782345600000,
+      "tag": "0032_course_contract_gifts",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, XCircle, Pencil } from 'lucide-react';
+import { CheckCircle2, Plus, XCircle, Pencil, Trash2 } from 'lucide-react';
 
 import { apiPatch, apiPost, fetchOrganization } from '@/api/client';
-import type { ClassGroup, Course, CourseContract, CoursePackage, Student, OrganizationSettings } from '@/api/types';
+import type {
+  ClassGroup,
+  Course,
+  CourseContract,
+  CoursePackage,
+  Student,
+  OrganizationSettings,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
@@ -33,6 +40,24 @@ const CONTRACT_STATUS_LABEL: Record<string, string> = {
   cancelled: '已取消',
 };
 
+const GIFT_REASON_LABEL: Record<string, string> = {
+  group_signup: '组团报名',
+  negotiation: '价格谈判',
+  retention: '续费赠课',
+  other: '其他',
+};
+
+interface GiftForm {
+  courseId: string;
+  classId: string;
+  title: string;
+  lessonCount: string;
+  reason: string;
+  startsAt: string;
+  endsAt: string;
+  note: string;
+}
+
 interface ContractForm {
   studentId: string;
   courseId: string;
@@ -45,6 +70,7 @@ interface ContractForm {
   startsAt: string;
   endsAt: string;
   note: string;
+  gifts: GiftForm[];
 }
 
 const emptyForm: ContractForm = {
@@ -59,6 +85,7 @@ const emptyForm: ContractForm = {
   startsAt: '',
   endsAt: '',
   note: '',
+  gifts: [],
 };
 
 function toDateTime(value: string) {
@@ -100,6 +127,12 @@ function packageLessonLabel(coursePackage: CoursePackage) {
   return coursePackage.giftedLessonCount
     ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
     : `${coursePackage.lessonCount} 节`;
+}
+
+function giftSummary(contract: CourseContract) {
+  const gifts = contract.gifts ?? [];
+  if (gifts.length === 0) return '-';
+  return gifts.map((gift) => `${gift.course?.name ?? '赠课'} ${gift.lessonCount} 节`).join('；');
 }
 
 export function CourseContractsPage() {
@@ -164,6 +197,10 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
     [classes, form.courseId],
   );
   const selectedPackage = selectedCoursePackages.find((item) => item.id === form.packageId);
+  const activeGiftCourses = useMemo(
+    () => courses.filter((course) => course.status !== 'archived'),
+    [courses],
+  );
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -193,6 +230,49 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       lessonCount: String(effectivePackageLessonCount(coursePackage)),
       paidYuan: String(effectivePackagePrice(coursePackage) / 100),
     };
+  }
+
+  function giftClasses(courseId: string) {
+    return classes.filter(
+      (classGroup) =>
+        classGroup.courseId === courseId && !['archived', 'completed'].includes(classGroup.status),
+    );
+  }
+
+  function createEmptyGift(): GiftForm {
+    const courseId = form.courseId || activeGiftCourses[0]?.id || '';
+    const firstClass = giftClasses(courseId)[0];
+    return {
+      courseId,
+      classId: firstClass?.id ?? '',
+      title: '',
+      lessonCount: '1',
+      reason: 'other',
+      startsAt: form.startsAt,
+      endsAt: form.endsAt,
+      note: '',
+    };
+  }
+
+  function updateGift(index: number, patch: Partial<GiftForm>) {
+    setForm((current) => ({
+      ...current,
+      gifts: current.gifts.map((gift, giftIndex) =>
+        giftIndex === index ? { ...gift, ...patch } : gift,
+      ),
+    }));
+  }
+
+  function handleGiftCourseChange(index: number, courseId: string) {
+    const firstClass = giftClasses(courseId)[0];
+    updateGift(index, { courseId, classId: firstClass?.id ?? '' });
+  }
+
+  function removeGift(index: number) {
+    setForm((current) => ({
+      ...current,
+      gifts: current.gifts.filter((_, giftIndex) => giftIndex !== index),
+    }));
   }
 
   useEffect(() => {
@@ -255,6 +335,18 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       toast.error('课时数必须大于 0');
       return;
     }
+    const gifts = form.gifts.map((gift) => ({
+      ...gift,
+      lessonCount: Number(gift.lessonCount),
+    }));
+    if (
+      gifts.some(
+        (gift) => !gift.courseId || !Number.isInteger(gift.lessonCount) || gift.lessonCount <= 0,
+      )
+    ) {
+      toast.error('请完整填写赠课课程和课时数');
+      return;
+    }
     setSaving(true);
     try {
       const { courseContract } = await apiPost<{ courseContract: CourseContract }>(
@@ -271,6 +363,16 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
           note: form.note.trim() || null,
+          gifts: gifts.map((gift) => ({
+            courseId: gift.courseId,
+            classId: gift.classId || null,
+            title: gift.title.trim() || null,
+            lessonCount: gift.lessonCount,
+            reason: gift.reason,
+            startsAt: toDateTime(gift.startsAt),
+            endsAt: toDateTime(gift.endsAt),
+            note: gift.note.trim() || null,
+          })),
         },
       );
       setData([courseContract, ...data]);
@@ -297,6 +399,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       startsAt: contract.startsAt ? new Date(contract.startsAt).toISOString().split('T')[0] : '',
       endsAt: contract.endsAt ? new Date(contract.endsAt).toISOString().split('T')[0] : '',
       note: contract.note ?? '',
+      gifts: [],
     });
     setOpen(true);
   }
@@ -436,6 +539,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             ),
           },
           { key: 'lessons', header: '课时', cell: (row) => `${row.lessonCount} 节` },
+          { key: 'gifts', header: '赠课', cell: (row) => giftSummary(row) },
           { key: 'paid', header: '实收', cell: (row) => money(row.paidAmount) },
           {
             key: 'receiver',
@@ -516,13 +620,21 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           setEditingId(null);
         }}
         title={editingId ? '编辑正式课程档案' : '新增正式课程档案'}
-        description={editingId ? '修改课程档案信息，更新会实时同步到系统。' : '线下确认收款后，创建档案并为学员添加对应课时。'}
+        description={
+          editingId
+            ? '修改课程档案信息，更新会实时同步到系统。'
+            : '线下确认收款后，创建档案并为学员添加对应课时。'
+        }
         footer={
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => {
-              setOpen(false);
-              setEditingId(null);
-            }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setOpen(false);
+                setEditingId(null);
+              }}
+            >
               取消
             </button>
             <button
@@ -531,7 +643,13 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               onClick={editingId ? submitEdit : submit}
               disabled={saving}
             >
-              {saving ? (editingId ? '更新中...' : '创建中...') : (editingId ? '更新档案' : '创建档案')}
+              {saving
+                ? editingId
+                  ? '更新中...'
+                  : '创建中...'
+                : editingId
+                  ? '更新档案'
+                  : '创建档案'}
             </button>
           </>
         }
@@ -680,6 +798,130 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             />
           </Field>
         </FieldRow>
+        {!editingId && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-900">赠课</div>
+                <div className="text-muted-foreground text-xs">
+                  赠课会直接进入对应课程的课时账户，可赠送同课程或其他课程。
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary px-3 py-1.5"
+                onClick={() => setForm({ ...form, gifts: [...form.gifts, createEmptyGift()] })}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                添加赠课
+              </button>
+            </div>
+            {form.gifts.map((gift, index) => {
+              const classesForGift = giftClasses(gift.courseId);
+              return (
+                <div key={index} className="space-y-3 rounded-md border border-slate-200 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-slate-900">赠课 {index + 1}</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => removeGift(index)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      删除
+                    </button>
+                  </div>
+                  <FieldRow>
+                    <Field label="赠送课程" required>
+                      <select
+                        className="form-input"
+                        value={gift.courseId}
+                        onChange={(event) => handleGiftCourseChange(index, event.target.value)}
+                      >
+                        <option value="">选择课程</option>
+                        {activeGiftCourses.map((course) => (
+                          <option key={course.id} value={course.id}>
+                            {course.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="赠送课时" required>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min={1}
+                        value={gift.lessonCount}
+                        onChange={(event) => updateGift(index, { lessonCount: event.target.value })}
+                      />
+                    </Field>
+                  </FieldRow>
+                  <FieldRow>
+                    <Field label="赠课班级">
+                      <select
+                        className="form-input"
+                        value={gift.classId}
+                        onChange={(event) => updateGift(index, { classId: event.target.value })}
+                      >
+                        <option value="">暂不入班</option>
+                        {classesForGift.map((classGroup) => (
+                          <option key={classGroup.id} value={classGroup.id}>
+                            {classGroup.name} · {classGroup.enrolledCount}/{classGroup.capacity}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="赠课原因">
+                      <select
+                        className="form-input"
+                        value={gift.reason}
+                        onChange={(event) => updateGift(index, { reason: event.target.value })}
+                      >
+                        {Object.entries(GIFT_REASON_LABEL).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </FieldRow>
+                  <Field label="赠课标题">
+                    <input
+                      className="form-input"
+                      value={gift.title}
+                      onChange={(event) => updateGift(index, { title: event.target.value })}
+                    />
+                  </Field>
+                  <FieldRow>
+                    <Field label="赠课开始日期">
+                      <input
+                        className="form-input"
+                        type="date"
+                        value={gift.startsAt}
+                        onChange={(event) => updateGift(index, { startsAt: event.target.value })}
+                      />
+                    </Field>
+                    <Field label="赠课结束日期">
+                      <input
+                        className="form-input"
+                        type="date"
+                        value={gift.endsAt}
+                        onChange={(event) => updateGift(index, { endsAt: event.target.value })}
+                      />
+                    </Field>
+                  </FieldRow>
+                  <Field label="赠课备注">
+                    <textarea
+                      className="form-input h-16"
+                      value={gift.note}
+                      onChange={(event) => updateGift(index, { note: event.target.value })}
+                    />
+                  </Field>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <Field label="备注">
           <textarea
             className="form-input h-20"

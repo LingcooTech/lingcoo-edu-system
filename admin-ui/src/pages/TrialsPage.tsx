@@ -74,6 +74,16 @@ interface ContractForm {
   paymentMethod: string;
   school: string;
   note: string;
+  gifts: GiftForm[];
+}
+
+interface GiftForm {
+  courseId: string;
+  classId: string;
+  title: string;
+  lessonCount: string;
+  reason: string;
+  note: string;
 }
 
 type ContractTarget =
@@ -90,6 +100,14 @@ const emptyContractForm: ContractForm = {
   paymentMethod: 'wechat_offline',
   school: '',
   note: '',
+  gifts: [],
+};
+
+const GIFT_REASON_LABEL: Record<string, string> = {
+  group_signup: '组团报名',
+  negotiation: '价格谈判',
+  retention: '续费赠课',
+  other: '其他',
 };
 
 const WEEKDAYS = [
@@ -307,6 +325,41 @@ export function TrialsPage() {
     );
   }
 
+  function createEmptyGift(): GiftForm {
+    const courseId =
+      contractForm.courseId || courses.find((course) => course.status !== 'archived')?.id || '';
+    const firstClass = availableClasses(courseId)[0];
+    return {
+      courseId,
+      classId: firstClass?.id ?? '',
+      title: '',
+      lessonCount: '1',
+      reason: 'other',
+      note: '',
+    };
+  }
+
+  function updateGift(index: number, patch: Partial<GiftForm>) {
+    setContractForm((current) => ({
+      ...current,
+      gifts: current.gifts.map((gift, giftIndex) =>
+        giftIndex === index ? { ...gift, ...patch } : gift,
+      ),
+    }));
+  }
+
+  function handleGiftCourseChange(index: number, courseId: string) {
+    const firstClass = availableClasses(courseId)[0];
+    updateGift(index, { courseId, classId: firstClass?.id ?? '' });
+  }
+
+  function removeGift(index: number) {
+    setContractForm((current) => ({
+      ...current,
+      gifts: current.gifts.filter((_, giftIndex) => giftIndex !== index),
+    }));
+  }
+
   function applyContractPackage(next: ContractForm, coursePackage?: CoursePackage): ContractForm {
     if (!coursePackage) return next;
     return {
@@ -393,6 +446,18 @@ export function TrialsPage() {
       toast.error('课时数必须大于 0');
       return;
     }
+    const gifts = contractForm.gifts.map((gift) => ({
+      ...gift,
+      lessonCount: Number(gift.lessonCount),
+    }));
+    if (
+      gifts.some(
+        (gift) => !gift.courseId || !Number.isInteger(gift.lessonCount) || gift.lessonCount <= 0,
+      )
+    ) {
+      toast.error('请完整填写赠课课程和课时数');
+      return;
+    }
 
     const path =
       contractTarget.type === 'seat'
@@ -413,6 +478,14 @@ export function TrialsPage() {
         paymentMethod: contractForm.paymentMethod,
         school: contractForm.school.trim() || null,
         note: contractForm.note.trim() || null,
+        gifts: gifts.map((gift) => ({
+          courseId: gift.courseId,
+          classId: gift.classId || null,
+          title: gift.title.trim() || null,
+          lessonCount: gift.lessonCount,
+          reason: gift.reason,
+          note: gift.note.trim() || null,
+        })),
       });
       if (payload.lead) {
         patchRegistrationLead(payload.lead);
@@ -1347,6 +1420,114 @@ export function TrialsPage() {
               </select>
             </Field>
           </FieldRow>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-900">赠课</div>
+                <div className="text-muted-foreground text-xs">
+                  赠课会直接进入对应课程的课时账户。
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary px-3 py-1.5"
+                onClick={() =>
+                  setContractForm({
+                    ...contractForm,
+                    gifts: [...contractForm.gifts, createEmptyGift()],
+                  })
+                }
+              >
+                <Plus className="h-3.5 w-3.5" />
+                添加赠课
+              </button>
+            </div>
+            {contractForm.gifts.map((gift, index) => (
+              <div key={index} className="space-y-3 rounded-md border border-slate-200 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-slate-900">赠课 {index + 1}</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1 text-red-600"
+                    onClick={() => removeGift(index)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    删除
+                  </button>
+                </div>
+                <FieldRow>
+                  <Field label="赠送课程" required>
+                    <select
+                      className="form-input"
+                      value={gift.courseId}
+                      onChange={(event) => handleGiftCourseChange(index, event.target.value)}
+                    >
+                      <option value="">选择课程</option>
+                      {courses
+                        .filter((course) => course.status !== 'archived')
+                        .map((course) => (
+                          <option key={course.id} value={course.id}>
+                            {course.name}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  <Field label="赠送课时" required>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={1}
+                      value={gift.lessonCount}
+                      onChange={(event) => updateGift(index, { lessonCount: event.target.value })}
+                    />
+                  </Field>
+                </FieldRow>
+                <FieldRow>
+                  <Field label="赠课班级">
+                    <select
+                      className="form-input"
+                      value={gift.classId}
+                      onChange={(event) => updateGift(index, { classId: event.target.value })}
+                    >
+                      <option value="">暂不入班</option>
+                      {availableClasses(gift.courseId).map((classGroup) => (
+                        <option key={classGroup.id} value={classGroup.id}>
+                          {classGroup.name} · {classGroup.enrolledCount}/{classGroup.capacity}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="赠课原因">
+                    <select
+                      className="form-input"
+                      value={gift.reason}
+                      onChange={(event) => updateGift(index, { reason: event.target.value })}
+                    >
+                      {Object.entries(GIFT_REASON_LABEL).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </FieldRow>
+                <Field label="赠课标题">
+                  <input
+                    className="form-input"
+                    value={gift.title}
+                    onChange={(event) => updateGift(index, { title: event.target.value })}
+                  />
+                </Field>
+                <Field label="赠课备注">
+                  <textarea
+                    className="form-input h-16"
+                    value={gift.note}
+                    onChange={(event) => updateGift(index, { note: event.target.value })}
+                  />
+                </Field>
+              </div>
+            ))}
+          </div>
           <Field label="学校(可选)">
             <input
               className="form-input"

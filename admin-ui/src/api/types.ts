@@ -371,7 +371,14 @@ export interface Order {
   offlinePaymentNote?: string | null;
   status: string;
   paidAt?: string | null;
-  cancelReason?: 'user_cancel' | 'system_cancel' | 'admin_invalid' | 'test_order' | 'duplicate' | 'other' | null;
+  cancelReason?:
+    | 'user_cancel'
+    | 'system_cancel'
+    | 'admin_invalid'
+    | 'test_order'
+    | 'duplicate'
+    | 'other'
+    | null;
   cancelledByAdminId?: string | null;
   cancelledAt?: string | null;
   createdAt: string;
@@ -421,6 +428,26 @@ export interface CourseContractPaymentRecord {
   createdAt: string;
 }
 
+export interface CourseContractGift {
+  id: string;
+  courseContractId: string;
+  studentId: string;
+  courseId: string;
+  classId?: string | null;
+  title: string;
+  lessonCount: number;
+  reason: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  status: 'active' | 'completed' | 'cancelled' | string;
+  note?: string | null;
+  createdByAccountId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  course?: Course;
+  class?: ClassGroup;
+}
+
 export interface CourseContract {
   id: string;
   studentId: string;
@@ -449,6 +476,7 @@ export interface CourseContract {
   package?: CoursePackage;
   order?: Order;
   paymentRecords: CourseContractPaymentRecord[];
+  gifts?: CourseContractGift[];
 }
 
 export interface SettlementBatchOrder {

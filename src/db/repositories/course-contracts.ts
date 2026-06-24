@@ -13,6 +13,17 @@ type DbOrTx = Database | Tx;
 type PaymentReceiverType = (typeof schema.paymentReceiverTypeEnum.enumValues)[number];
 type CourseContractStatus = (typeof schema.courseContractStatusEnum.enumValues)[number];
 
+type CourseContractGiftInput = {
+  courseId: string;
+  classId?: string | null;
+  title?: string | null;
+  lessonCount: number;
+  reason?: string | null;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+  note?: string | null;
+};
+
 type CourseContractInput = {
   studentId: string;
   courseId: string;
@@ -29,6 +40,7 @@ type CourseContractInput = {
   endsAt?: Date | null;
   note?: string | null;
   createdByAccountId?: string | null;
+  gifts?: CourseContractGiftInput[];
 };
 
 type LeadContractInput = Omit<CourseContractInput, 'studentId'> & {
@@ -368,6 +380,65 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
     });
   }
 
+  const gifts = [];
+  for (const giftInput of input.gifts ?? []) {
+    const giftCourse = await findCourse(tx, giftInput.courseId);
+    if (!giftCourse) {
+      throw httpError(404, 'Gift course not found');
+    }
+
+    let giftClass: typeof schema.classes.$inferSelect | null = null;
+    let giftEnrollment: typeof schema.classEnrollments.$inferSelect | null = null;
+    if (giftInput.classId) {
+      giftClass = await findClassForUpdate(tx, giftInput.classId);
+      if (!giftClass) {
+        throw httpError(404, 'Gift class not found');
+      }
+      if (giftClass.courseId !== giftInput.courseId) {
+        throw httpError(422, '赠课班级与赠课课程不匹配');
+      }
+      giftEnrollment = await upsertClassEnrollment(tx, {
+        classId: giftClass.id,
+        studentId: input.studentId,
+        capacity: giftClass.capacity,
+      });
+    }
+
+    const [gift] = await tx
+      .insert(schema.courseContractGifts)
+      .values({
+        courseContractId: contract.id,
+        studentId: input.studentId,
+        courseId: giftInput.courseId,
+        classId: giftInput.classId ?? null,
+        title: giftInput.title?.trim() || `${giftCourse.name}赠课`,
+        lessonCount: giftInput.lessonCount,
+        reason: giftInput.reason ?? 'other',
+        startsAt: giftInput.startsAt ?? null,
+        endsAt: giftInput.endsAt ?? null,
+        status: 'active',
+        note: giftInput.note ?? null,
+        createdByAccountId: input.createdByAccountId ?? null,
+      })
+      .returning();
+
+    await applyLessonDelta(tx, {
+      studentId: input.studentId,
+      courseId: giftInput.courseId,
+      type: 'adjustment',
+      amount: giftInput.lessonCount,
+      relatedEntityType: 'course_contract_gift',
+      relatedEntityId: gift.id,
+    });
+
+    gifts.push({
+      ...gift,
+      course: giftCourse,
+      class: giftClass ?? undefined,
+      enrollment: giftEnrollment ?? undefined,
+    });
+  }
+
   return {
     courseContract: {
       ...contract,
@@ -377,21 +448,27 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
       package: coursePackage ?? undefined,
       order,
       paymentRecords: [paymentRecord],
+      gifts,
     },
     order,
     paymentRecord,
     enrollment,
+    gifts,
   };
 }
 
 export async function listCourseContracts(db: Database) {
-  const [contracts, paymentRecords, students, courses, classes, packages, orders] =
+  const [contracts, paymentRecords, gifts, students, courses, classes, packages, orders] =
     await Promise.all([
       db.select().from(schema.courseContracts).orderBy(desc(schema.courseContracts.createdAt)),
       db
         .select()
         .from(schema.courseContractPaymentRecords)
         .orderBy(desc(schema.courseContractPaymentRecords.createdAt)),
+      db
+        .select()
+        .from(schema.courseContractGifts)
+        .orderBy(desc(schema.courseContractGifts.createdAt)),
       db.select().from(schema.students),
       db.select().from(schema.courses),
       db.select().from(schema.classes),
@@ -408,11 +485,30 @@ export async function listCourseContracts(db: Database) {
     string,
     (typeof schema.courseContractPaymentRecords.$inferSelect)[]
   >();
+  const giftsByContractId = new Map<
+    string,
+    Array<
+      typeof schema.courseContractGifts.$inferSelect & {
+        course?: typeof schema.courses.$inferSelect;
+        class?: typeof schema.classes.$inferSelect;
+      }
+    >
+  >();
 
   for (const record of paymentRecords) {
     paymentRecordsByContractId.set(record.courseContractId, [
       ...(paymentRecordsByContractId.get(record.courseContractId) ?? []),
       record,
+    ]);
+  }
+  for (const gift of gifts) {
+    giftsByContractId.set(gift.courseContractId, [
+      ...(giftsByContractId.get(gift.courseContractId) ?? []),
+      {
+        ...gift,
+        course: courseById.get(gift.courseId),
+        class: gift.classId ? classById.get(gift.classId) : undefined,
+      },
     ]);
   }
 
@@ -424,6 +520,7 @@ export async function listCourseContracts(db: Database) {
     package: contract.packageId ? packageById.get(contract.packageId) : undefined,
     order: contract.orderId ? orderById.get(contract.orderId) : undefined,
     paymentRecords: paymentRecordsByContractId.get(contract.id) ?? [],
+    gifts: giftsByContractId.get(contract.id) ?? [],
   }));
 }
 
@@ -562,10 +659,16 @@ export async function updateCourseContractInfo(
   if (patch.paidAmount !== undefined) updateData.paidAmount = patch.paidAmount;
   if (patch.paymentMethod !== undefined) updateData.paymentMethod = patch.paymentMethod;
   if (patch.startsAt !== undefined) {
-    updateData.startsAt = patch.startsAt instanceof Date ? patch.startsAt : (patch.startsAt ? new Date(patch.startsAt) : null);
+    updateData.startsAt =
+      patch.startsAt instanceof Date
+        ? patch.startsAt
+        : patch.startsAt
+          ? new Date(patch.startsAt)
+          : null;
   }
   if (patch.endsAt !== undefined) {
-    updateData.endsAt = patch.endsAt instanceof Date ? patch.endsAt : (patch.endsAt ? new Date(patch.endsAt) : null);
+    updateData.endsAt =
+      patch.endsAt instanceof Date ? patch.endsAt : patch.endsAt ? new Date(patch.endsAt) : null;
   }
   if (patch.note !== undefined) updateData.note = patch.note || null;
 

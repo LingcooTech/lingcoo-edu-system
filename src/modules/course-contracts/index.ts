@@ -10,7 +10,7 @@ import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import type { AppModule } from '../types.js';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const paymentMethodSchema = z.enum([
   'cash',
@@ -19,6 +19,17 @@ const paymentMethodSchema = z.enum([
   'alipay_offline',
   'offline_other',
 ]);
+
+const courseContractGiftSchema = z.object({
+  courseId: z.string().uuid(),
+  classId: z.string().uuid().nullable().optional(),
+  title: z.string().max(200).nullable().optional(),
+  lessonCount: z.number().int().positive(),
+  reason: z.string().max(80).nullable().optional(),
+  startsAt: z.string().datetime({ offset: true }).nullable().optional(),
+  endsAt: z.string().datetime({ offset: true }).nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
+});
 
 const courseContractSchema = z.object({
   studentId: z.string().uuid(),
@@ -35,6 +46,7 @@ const courseContractSchema = z.object({
   startsAt: z.string().datetime({ offset: true }).nullable().optional(),
   endsAt: z.string().datetime({ offset: true }).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
+  gifts: z.array(courseContractGiftSchema).max(20).optional(),
 });
 
 const courseContractConversionSchema = courseContractSchema.omit({ studentId: true }).extend({
@@ -109,6 +121,16 @@ export const courseContractsModule: AppModule = {
         startsAt: normalizeDate(body.startsAt),
         endsAt: normalizeDate(body.endsAt),
         note: body.note ?? null,
+        gifts: (body.gifts ?? []).map((gift) => ({
+          courseId: gift.courseId,
+          classId: gift.classId ?? null,
+          title: gift.title ?? null,
+          lessonCount: gift.lessonCount,
+          reason: gift.reason ?? 'other',
+          startsAt: normalizeDate(gift.startsAt),
+          endsAt: normalizeDate(gift.endsAt),
+          note: gift.note ?? null,
+        })),
       };
     }
 
@@ -208,22 +230,20 @@ export const courseContractsModule: AppModule = {
             throw httpError(404, 'Course contract not found');
           }
 
-          // If lesson count changed, recalculate the lesson account balance
+          // Lesson accounts can have multiple sources (renewals and gifts), so
+          // contract edits must append a delta instead of replacing the balance.
           if (body.lessonCount !== undefined && body.lessonCount !== existingContract.lessonCount) {
-            const consumedCount = await lessonRepo.getConsumedLessonCount(tx, {
-              studentId: courseContract.studentId,
-              courseId: courseContract.courseId,
-            });
-            const newBalance = body.lessonCount - consumedCount;
-            await tx
-              .update(schema.lessonAccounts)
-              .set({ balance: newBalance, updatedAt: new Date() })
-              .where(
-                and(
-                  eq(schema.lessonAccounts.studentId, courseContract.studentId),
-                  eq(schema.lessonAccounts.courseId, courseContract.courseId),
-                ),
-              );
+            const amount = body.lessonCount - existingContract.lessonCount;
+            if (amount !== 0) {
+              await lessonRepo.applyLessonDelta(tx, {
+                studentId: courseContract.studentId,
+                courseId: courseContract.courseId,
+                type: 'adjustment',
+                amount,
+                relatedEntityType: 'course_contract',
+                relatedEntityId: courseContract.id,
+              });
+            }
           }
 
           return courseContract;

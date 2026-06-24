@@ -1047,6 +1047,20 @@ test('creates a course contract with offline payment, lesson credit and class en
         status: 'published',
       })
       .returning();
+    const [giftCourse] = await app.db
+      .insert(schema.courses)
+      .values({
+        campusId: campus.id,
+        slug: `contract-gift-course-${suffix}`,
+        name: 'Contract Gift Course',
+        category: '书法',
+        ageRange: '6-9 岁',
+        durationMinutes: 60,
+        summary: 'Contract gift course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
     const [coursePackage] = await app.db
       .insert(schema.coursePackages)
       .values({
@@ -1083,6 +1097,18 @@ test('creates a course contract with offline payment, lesson credit and class en
         status: 'active',
       })
       .returning();
+    const [giftClass] = await app.db
+      .insert(schema.classes)
+      .values({
+        campusId: campus.id,
+        courseId: giftCourse.id,
+        teacherId: teacher.id,
+        classroomId: classroom.id,
+        name: `Contract Gift Class ${suffix.slice(0, 8)}`,
+        capacity: 8,
+        status: 'active',
+      })
+      .returning();
 
     const created = await app.inject({
       method: 'POST',
@@ -1098,6 +1124,15 @@ test('creates a course contract with offline payment, lesson credit and class en
         paymentMethod: 'wechat_offline',
         startsAt: futureDateFromSuffix(suffix, 2040).toISOString(),
         note: '线下优惠收款',
+        gifts: [
+          {
+            courseId: giftCourse.id,
+            classId: giftClass.id,
+            lessonCount: 3,
+            reason: 'group_signup',
+            note: '组团报名赠软笔',
+          },
+        ],
       },
     });
     assert.equal(created.statusCode, 200, created.body);
@@ -1112,6 +1147,8 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(createdPayload.courseContract.order.paidAmount, 158000);
     assert.equal(createdPayload.courseContract.order.paymentReceiverType, 'provider');
     assert.equal(createdPayload.courseContract.order.paymentReceiverName, institution.name);
+    assert.equal(createdPayload.courseContract.gifts.length, 1);
+    assert.equal(createdPayload.courseContract.gifts[0].course.id, giftCourse.id);
     assert.equal(createdPayload.paymentRecord.paidAmount, 158000);
     assert.equal(createdPayload.enrollment.classId, classGroup.id);
 
@@ -1128,6 +1165,19 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.ok(lessonAccount);
     assert.equal(lessonAccount.balance, coursePackage.lessonCount);
 
+    const [giftLessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, student.id),
+          eq(schema.lessonAccounts.courseId, giftCourse.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(giftLessonAccount);
+    assert.equal(giftLessonAccount.balance, 3);
+
     const [lessonTransaction] = await app.db
       .select()
       .from(schema.lessonTransactions)
@@ -1141,6 +1191,20 @@ test('creates a course contract with offline payment, lesson credit and class en
       .limit(1);
     assert.ok(lessonTransaction);
     assert.equal(lessonTransaction.amount, coursePackage.lessonCount);
+
+    const [giftTransaction] = await app.db
+      .select()
+      .from(schema.lessonTransactions)
+      .where(
+        and(
+          eq(schema.lessonTransactions.studentId, student.id),
+          eq(schema.lessonTransactions.relatedEntityType, 'course_contract_gift'),
+          eq(schema.lessonTransactions.relatedEntityId, createdPayload.courseContract.gifts[0].id),
+        ),
+      )
+      .limit(1);
+    assert.ok(giftTransaction);
+    assert.equal(giftTransaction.amount, 3);
 
     const [enrollment] = await app.db
       .select()
@@ -1168,6 +1232,42 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(listedContract.student.name, student.name);
     assert.equal(listedContract.class.name, classGroup.name);
     assert.equal(listedContract.paymentRecords.length, 1);
+    assert.equal(listedContract.gifts.length, 1);
+    assert.equal(listedContract.gifts[0].course.name, giftCourse.name);
+
+    const edited = await app.inject({
+      method: 'PATCH',
+      url: `/v1/course-contracts/${createdPayload.courseContract.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { lessonCount: coursePackage.lessonCount + 2 },
+    });
+    assert.equal(edited.statusCode, 200, edited.body);
+
+    const [editedLessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, student.id),
+          eq(schema.lessonAccounts.courseId, course.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(editedLessonAccount);
+    assert.equal(editedLessonAccount.balance, coursePackage.lessonCount + 2);
+
+    const [unchangedGiftLessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, student.id),
+          eq(schema.lessonAccounts.courseId, giftCourse.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(unchangedGiftLessonAccount);
+    assert.equal(unchangedGiftLessonAccount.balance, 3);
 
     const completed = await app.inject({
       method: 'PATCH',
