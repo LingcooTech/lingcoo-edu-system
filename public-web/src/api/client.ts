@@ -973,6 +973,16 @@ export interface TeacherClassSession {
   classroom?: { name: string };
   rosterCount?: number;
   attendanceCount?: number;
+  attendanceSummary?: AttendanceSummary;
+}
+
+export interface AttendanceSummary {
+  present: number;
+  late: number;
+  leave: number;
+  absent: number;
+  makeup: number;
+  trial: number;
 }
 
 export interface TeacherClass {
@@ -980,9 +990,16 @@ export interface TeacherClass {
   name: string;
   status: string;
   capacity: number;
-  course?: { name: string };
+  course?: { id: string; name: string };
   classroom?: { name: string };
-  students: Array<{ id: string; name: string; grade: string }>;
+  students: Array<{
+    id: string;
+    name: string;
+    grade: string;
+    school?: string | null;
+    status?: string;
+    lessonBalance?: number | null;
+  }>;
 }
 
 export async function fetchTeacherDashboard() {
@@ -1032,6 +1049,7 @@ export interface TeacherCalendarEvent {
   classroom: { id: string; name: string } | null;
   rosterCount: number;
   attendanceCount: number;
+  attendanceSummary?: AttendanceSummary;
 }
 
 export async function fetchTeacherCalendar(params: { from?: string; to?: string } = {}) {

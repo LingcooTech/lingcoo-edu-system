@@ -1166,6 +1166,17 @@ function ParentView({ account }: { account: AuthAccount }) {
 
 // --- Teacher: schedule (with 点名) + classes ---
 
+type TeacherWorkspaceView = 'schedule' | 'classes' | 'students' | 'feedbacks' | 'homework';
+type TeacherMetricScope = 'today' | 'week';
+
+const TEACHER_CLASS_STATUS_LABEL: Record<string, string> = {
+  recruiting: '招生中',
+  active: '开课中',
+  completed: '已结课',
+  paused: '暂停',
+  archived: '已归档',
+};
+
 function TeacherView() {
   const [calendarEvents, setCalendarEvents] = useState<TeacherCalendarEvent[]>([]);
   const [classes, setClasses] = useState<TeacherClass[]>([]);
@@ -1173,6 +1184,8 @@ function TeacherView() {
   const [lessonFeedbacks, setLessonFeedbacks] = useState<TeacherLessonFeedback[]>([]);
   const [rollCallSession, setRollCallSession] = useState<TeacherClassSession | null>(null);
   const [feedbackSession, setFeedbackSession] = useState<TeacherCalendarEvent | null>(null);
+  const [activeView, setActiveView] = useState<TeacherWorkspaceView>('schedule');
+  const [metricScope, setMetricScope] = useState<TeacherMetricScope>('today');
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [reviewTarget, setReviewTarget] = useState<TeacherHomeworkCheckIn | null>(null);
   const [reviewStatus, setReviewStatus] = useState<'reviewed' | 'needs_revision'>('reviewed');
@@ -1229,8 +1242,10 @@ function TeacherView() {
     }
   }
 
-  const calendarGroups = useMemo(() => groupEventsByDate(calendarEvents), [calendarEvents]);
   const today = startOfDay(new Date());
+  const currentWeekDays = weekDaysAround(today);
+  const weekStart = currentWeekDays[0];
+  const weekEnd = addDays(currentWeekDays[6], 1);
   const selectedDateKey = dateKey(selectedDate.toISOString());
   const selectedEvents = useMemo(
     () =>
@@ -1256,6 +1271,21 @@ function TeacherView() {
   const pendingHomeworkCount = homeworkCheckIns.filter(
     (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
   ).length;
+  const metricEvents = useMemo(() => {
+    if (metricScope === 'today') {
+      return calendarEvents.filter((event) => sameDate(new Date(event.startsAt), today));
+    }
+    return calendarEvents.filter((event) => {
+      const startsAt = new Date(event.startsAt);
+      return startsAt >= weekStart && startsAt < weekEnd;
+    });
+  }, [calendarEvents, metricScope, today, weekEnd, weekStart]);
+  const metricCourseCount = metricEvents.filter((event) => event.status !== 'cancelled').length;
+  const metricPendingRollCallCount = metricEvents.filter(isRollCallPending).length;
+  const metricLeaveMessageCount = metricEvents.reduce(
+    (count, event) => count + (event.attendanceSummary?.leave ?? 0),
+    0,
+  );
   const feedbackCountBySessionId = useMemo(() => {
     const counts = new Map<string, number>();
     for (const feedback of lessonFeedbacks) {
@@ -1271,6 +1301,45 @@ function TeacherView() {
         .slice(0, 10),
     [calendarEvents],
   );
+  const studentRows = useMemo(() => {
+    const rows = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        grade: string;
+        school?: string | null;
+        status?: string;
+        classes: string[];
+        courses: string[];
+        lessonBalances: Array<{ courseName: string; balance: number | null }>;
+      }
+    >();
+    for (const classGroup of classes) {
+      for (const student of classGroup.students) {
+        const current = rows.get(student.id) ?? {
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          school: student.school,
+          status: student.status,
+          classes: [],
+          courses: [],
+          lessonBalances: [],
+        };
+        current.classes.push(classGroup.name);
+        if (classGroup.course?.name) {
+          current.courses.push(classGroup.course.name);
+          current.lessonBalances.push({
+            courseName: classGroup.course.name,
+            balance: student.lessonBalance ?? null,
+          });
+        }
+        rows.set(student.id, current);
+      }
+    }
+    return Array.from(rows.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  }, [classes]);
   const weekDays = weekDaysAround(selectedDate);
 
   function openRollCall(event: TeacherCalendarEvent | TeacherClassSession) {
@@ -1288,324 +1357,434 @@ function TeacherView() {
     });
   }
 
-  function scrollToSection(sectionId: string) {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
   return (
     <>
-      <section className="mt-6 overflow-hidden rounded-3xl bg-[#ff9f1c] text-white shadow-sm">
+      <section className="border-line bg-surface mt-6 overflow-hidden rounded-3xl border shadow-sm">
         <div className="flex items-start justify-between gap-3 px-5 pt-5">
           <div>
-            <p className="text-sm text-white/80">老师工作台</p>
-            <h2 className="mt-1 text-xl font-bold">今日授课与点名</h2>
+            <p className="text-muted text-sm">老师工作台</p>
+            <h2 className="text-ink mt-1 text-xl font-bold">
+              {metricScope === 'today' ? '今日授课' : '本周授课'}
+            </h2>
           </div>
-          <button
-            type="button"
-            className="rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold backdrop-blur"
-            onClick={() => setSelectedDate(today)}
-          >
-            回到今天
-          </button>
+          <div className="bg-paper border-line flex rounded-full border p-1">
+            {[
+              { value: 'today', label: '今天' },
+              { value: 'week', label: '本周' },
+            ].map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  metricScope === item.value
+                    ? 'bg-ink text-white'
+                    : 'text-ink-soft hover:bg-surface'
+                }`}
+                onClick={() => setMetricScope(item.value as TeacherMetricScope)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2 px-5 py-5">
+        <div className="grid grid-cols-2 gap-3 px-5 py-5 sm:grid-cols-4">
           <div>
-            <div className="text-3xl font-semibold">{todayPendingEvents.length}</div>
-            <div className="mt-1 text-xs text-white/80">今日待点名</div>
+            <div className="text-ink text-3xl font-semibold">{metricCourseCount}</div>
+            <div className="text-muted mt-1 text-xs">课程数</div>
           </div>
           <div>
-            <div className="text-3xl font-semibold">{overduePendingCount}</div>
-            <div className="mt-1 text-xs text-white/80">超时未点</div>
+            <div className="text-ink text-3xl font-semibold">{metricPendingRollCallCount}</div>
+            <div className="text-muted mt-1 text-xs">待点名</div>
           </div>
           <div>
-            <div className="text-3xl font-semibold">{pendingHomeworkCount}</div>
-            <div className="mt-1 text-xs text-white/80">待批阅</div>
+            <div className="text-ink text-3xl font-semibold">{metricLeaveMessageCount}</div>
+            <div className="text-muted mt-1 text-xs">请假消息</div>
+          </div>
+          <div>
+            <div className="text-ink text-3xl font-semibold">{pendingHomeworkCount}</div>
+            <div className="text-muted mt-1 text-xs">待批阅</div>
           </div>
         </div>
       </section>
 
-      <section className="mt-5 grid grid-cols-4 gap-2 sm:grid-cols-7">
+      <section className="mt-5 grid grid-cols-5 gap-2">
         {[
-          { label: '学员', icon: UsersRound, sectionId: 'teacher-classes' },
-          { label: '班级', icon: UsersRound, sectionId: 'teacher-classes' },
-          { label: '课表', icon: CalendarDays, sectionId: 'teacher-calendar' },
-          { label: '点名', icon: ClipboardList, sectionId: 'teacher-roll-call' },
-          { label: '上课记录', icon: CheckSquare, sectionId: 'teacher-calendar' },
-          { label: '学习计划', icon: BookOpen, sectionId: 'teacher-classes' },
-          { label: '课后点评', icon: PenLine, sectionId: 'teacher-feedbacks' },
+          { label: '课表', icon: CalendarDays, view: 'schedule' },
+          { label: '班级', icon: UsersRound, view: 'classes' },
+          { label: '学员', icon: UsersRound, view: 'students' },
+          { label: '课后点评', icon: PenLine, view: 'feedbacks' },
+          { label: '作业批阅', icon: ClipboardList, view: 'homework' },
         ].map((item) => {
           const Icon = item.icon;
+          const active = activeView === item.view;
           return (
             <button
               key={item.label}
               type="button"
-              className="pwcard hover:bg-paper flex min-h-20 flex-col items-center justify-center gap-2 p-2 text-center text-xs font-medium transition-colors"
-              onClick={() => scrollToSection(item.sectionId)}
+              className={`border-line flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border p-2 text-center text-xs font-medium transition-colors ${
+                active ? 'bg-ink text-white' : 'bg-surface text-ink hover:bg-paper'
+              }`}
+              onClick={() => setActiveView(item.view as TeacherWorkspaceView)}
             >
-              <Icon className="text-brand h-5 w-5" />
+              <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-brand'}`} />
               <span>{item.label}</span>
             </button>
           );
         })}
       </section>
 
-      <section id="teacher-roll-call" className="mt-6 scroll-mt-4">
-        <SectionHeading icon={<ClipboardList className="text-brand h-4 w-4" />}>
-          今日待点名
-        </SectionHeading>
-        {todayPendingEvents.length === 0 ? (
-          <EmptyCard>今天没有待点名课次。</EmptyCard>
-        ) : (
-          <div className="grid gap-3">
-            {todayPendingEvents.map((event) => (
-              <button
-                key={event.id}
-                type="button"
-                className="pwcard hover:border-brand/40 w-full p-4 text-left transition-colors"
-                onClick={() => openRollCall(event)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-ink text-lg font-semibold">
-                      {timeRange(event.startsAt, event.endsAt)}
-                    </div>
-                    <div className="text-muted mt-1 text-xs">
-                      {event.class?.name ?? '班级'} · {event.classroom?.name ?? '未设置教室'}
-                    </div>
-                  </div>
-                  <span className="bg-brand-soft text-brand rounded-full px-3 py-1 text-xs font-semibold">
-                    未点名
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section id="teacher-calendar" className="mt-6 scroll-mt-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
-            点名课表
-          </SectionHeading>
-          <span className="text-muted text-xs">{monthYearLabel(selectedDate)}</span>
-        </div>
-        <div className="pwcard overflow-hidden">
-          <div className="border-line grid grid-cols-7 border-b">
-            {weekDays.map((day) => {
-              const hasSession = calendarEvents.some((event) =>
-                sameDate(new Date(event.startsAt), day),
-              );
-              const selected = sameDate(day, selectedDate);
-              return (
-                <button
-                  key={day.toISOString()}
-                  type="button"
-                  className={`flex min-h-20 flex-col items-center justify-center gap-1 text-sm transition-colors ${
-                    selected ? 'bg-brand-soft text-brand' : 'hover:bg-paper text-ink'
-                  }`}
-                  onClick={() => setSelectedDate(day)}
-                >
-                  <span className="text-muted text-xs">周{'日一二三四五六'[day.getDay()]}</span>
-                  <span className="text-lg font-semibold">{day.getDate()}</span>
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${hasSession ? 'bg-brand' : 'bg-transparent'}`}
-                  />
-                </button>
-              );
-            })}
-          </div>
-          <div className="divide-line divide-y">
-            {selectedEvents.length === 0 ? (
-              <div className="text-muted p-4 text-sm">当天暂无排课。</div>
+      {activeView === 'schedule' ? (
+        <>
+          <section className="mt-6">
+            <SectionHeading icon={<ClipboardList className="text-brand h-4 w-4" />}>
+              今日待点名
+            </SectionHeading>
+            {todayPendingEvents.length === 0 ? (
+              <EmptyCard>今天没有待点名课次。</EmptyCard>
             ) : (
-              selectedEvents.map((event) => (
-                <div key={event.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-ink text-xl font-semibold">
-                        {timeRange(event.startsAt, event.endsAt)}
+              <div className="grid gap-3">
+                {todayPendingEvents.map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className="pwcard hover:border-brand/40 w-full p-4 text-left transition-colors"
+                    onClick={() => openRollCall(event)}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-ink text-lg font-semibold">
+                          {timeRange(event.startsAt, event.endsAt)}
+                        </div>
+                        <div className="text-muted mt-1 text-xs">
+                          {event.class?.name ?? '班级'} · {event.classroom?.name ?? '未设置教室'}
+                        </div>
                       </div>
-                      <div className="text-ink mt-1 text-sm font-medium">
-                        {event.class?.name ?? '班级'}
-                      </div>
-                      <div className="text-muted mt-1 text-xs">
-                        {event.classroom?.name ?? '未设置教室'} · {event.title || '未设置上课内容'}
-                      </div>
+                      <span className="bg-brand-soft text-brand rounded-full px-3 py-1 text-xs font-semibold">
+                        未点名
+                      </span>
                     </div>
-                    <span className="text-ink-soft text-sm">
-                      {isRollCallPending(event)
-                        ? '未点名'
-                        : (SESSION_STATUS_LABEL[event.status] ?? event.status)}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="text-muted text-xs">
-                      已点 {event.attendanceCount}/{event.rosterCount}
-                    </span>
-                    {event.status !== 'cancelled' ? (
-                      <button
-                        type="button"
-                        className="pwbtn pwbtn-outline px-4 py-2 text-xs"
-                        onClick={() => openRollCall(event)}
-                      >
-                        点名
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section id="teacher-classes" className="mt-6 scroll-mt-4">
-        <SectionHeading icon={<UsersRound className="text-brand h-4 w-4" />}>
-          我的班级
-        </SectionHeading>
-        {classes.length === 0 ? (
-          <EmptyCard>暂无班级。</EmptyCard>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {classes.map((item) => (
-              <div key={item.id} className="pwcard p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-ink text-sm font-semibold">{item.name}</div>
-                    <div className="text-muted mt-1 text-xs">
-                      {item.course?.name ?? '课程'} · {item.classroom?.name ?? '教室'} ·{' '}
-                      {item.students.length}/{item.capacity}
-                    </div>
-                  </div>
-                  <span className="bg-paper text-ink-soft rounded-full px-2.5 py-1 text-xs">
-                    {item.status}
-                  </span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {item.students.slice(0, 8).map((student) => (
-                    <span
-                      key={student.id}
-                      className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs"
-                    >
-                      {student.name} · {student.grade}
-                    </span>
-                  ))}
-                  {item.students.length > 8 ? (
-                    <span className="text-muted text-xs">+{item.students.length - 8}</span>
-                  ) : null}
-                  {item.students.length === 0 && (
-                    <span className="text-muted text-xs">暂无学员</span>
-                  )}
-                </div>
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      <section id="teacher-feedbacks" className="mt-6 scroll-mt-4">
-        <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>课后点评</SectionHeading>
-        {feedbackEvents.length === 0 ? (
-          <EmptyCard>暂无可点评课次。</EmptyCard>
-        ) : (
-          <div className="grid gap-3">
-            {feedbackEvents.map((event) => {
-              const feedbackCount = feedbackCountBySessionId.get(event.id) ?? 0;
-              return (
-                <div key={event.id} className="pwcard p-4">
+          <section className="mt-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
+                课表
+              </SectionHeading>
+              <span className="text-muted text-xs">{monthYearLabel(selectedDate)}</span>
+            </div>
+            <div className="pwcard overflow-hidden">
+              <div className="border-line grid grid-cols-7 border-b">
+                {weekDays.map((day) => {
+                  const hasSession = calendarEvents.some((event) =>
+                    sameDate(new Date(event.startsAt), day),
+                  );
+                  const selected = sameDate(day, selectedDate);
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      type="button"
+                      className={`flex min-h-20 flex-col items-center justify-center gap-1 text-sm transition-colors ${
+                        selected ? 'bg-brand-soft text-brand' : 'hover:bg-paper text-ink'
+                      }`}
+                      onClick={() => setSelectedDate(day)}
+                    >
+                      <span className="text-muted text-xs">周{'日一二三四五六'[day.getDay()]}</span>
+                      <span className="text-lg font-semibold">{day.getDate()}</span>
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${hasSession ? 'bg-brand' : 'bg-transparent'}`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="divide-line divide-y">
+                {selectedEvents.length === 0 ? (
+                  <div className="text-muted p-4 text-sm">当天暂无排课。</div>
+                ) : (
+                  selectedEvents.map((event) => (
+                    <div key={event.id} className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-ink text-xl font-semibold">
+                            {timeRange(event.startsAt, event.endsAt)}
+                          </div>
+                          <div className="text-ink mt-1 text-sm font-medium">
+                            {event.class?.name ?? '班级'}
+                          </div>
+                          <div className="text-muted mt-1 text-xs">
+                            {event.classroom?.name ?? '未设置教室'} ·{' '}
+                            {event.title || '未设置上课内容'}
+                          </div>
+                        </div>
+                        <span className="text-ink-soft text-sm">
+                          {isRollCallPending(event)
+                            ? '未点名'
+                            : (SESSION_STATUS_LABEL[event.status] ?? event.status)}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <span className="text-muted text-xs">
+                          已点 {event.attendanceCount}/{event.rosterCount}
+                          {event.attendanceSummary?.leave
+                            ? ` · 请假 ${event.attendanceSummary.leave}`
+                            : ''}
+                        </span>
+                        {event.status !== 'cancelled' ? (
+                          <button
+                            type="button"
+                            className="pwbtn pwbtn-outline px-4 py-2 text-xs"
+                            onClick={() => openRollCall(event)}
+                          >
+                            点名
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {activeView === 'classes' ? (
+        <section className="mt-6">
+          <SectionHeading icon={<UsersRound className="text-brand h-4 w-4" />}>
+            我的班级
+          </SectionHeading>
+          {classes.length === 0 ? (
+            <EmptyCard>暂无班级。</EmptyCard>
+          ) : (
+            <div className="grid gap-3">
+              {classes.map((item) => (
+                <div key={item.id} className="pwcard p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <div className="text-ink text-sm font-semibold">
-                        {event.class?.name ?? '班级'} · {event.title || '上课内容'}
-                      </div>
+                      <div className="text-ink text-base font-semibold">{item.name}</div>
                       <div className="text-muted mt-1 text-xs">
-                        {formatDateTime(event.startsAt)} · {event.course?.name ?? '课程'}
+                        {item.course?.name ?? '课程'} · {item.classroom?.name ?? '教室待确认'}
+                      </div>
+                    </div>
+                    <span className="bg-paper text-ink-soft rounded-full px-2.5 py-1 text-xs">
+                      {TEACHER_CLASS_STATUS_LABEL[item.status] ?? item.status}
+                    </span>
+                  </div>
+                  <div className="border-line mt-4 grid grid-cols-3 gap-2 border-y py-3 text-center">
+                    <div>
+                      <div className="text-ink text-lg font-semibold">{item.students.length}</div>
+                      <div className="text-muted mt-1 text-xs">学员</div>
+                    </div>
+                    <div>
+                      <div className="text-ink text-lg font-semibold">{item.capacity}</div>
+                      <div className="text-muted mt-1 text-xs">容量</div>
+                    </div>
+                    <div>
+                      <div className="text-ink text-lg font-semibold">
+                        {Math.max(item.capacity - item.students.length, 0)}
+                      </div>
+                      <div className="text-muted mt-1 text-xs">余位</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {item.students.length === 0 ? (
+                      <div className="text-muted text-sm">暂无学员</div>
+                    ) : (
+                      item.students.map((student) => (
+                        <div
+                          key={student.id}
+                          className="bg-paper flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+                        >
+                          <div>
+                            <div className="text-ink text-sm font-medium">{student.name}</div>
+                            <div className="text-muted mt-0.5 text-xs">
+                              {student.grade}
+                              {student.school ? ` · ${student.school}` : ''}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-ink text-sm font-semibold">
+                              {student.lessonBalance ?? '-'}
+                            </div>
+                            <div className="text-muted mt-0.5 text-xs">课时</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {activeView === 'students' ? (
+        <section className="mt-6">
+          <SectionHeading icon={<UsersRound className="text-brand h-4 w-4" />}>学员</SectionHeading>
+          {studentRows.length === 0 ? (
+            <EmptyCard>暂无学员。</EmptyCard>
+          ) : (
+            <div className="grid gap-3">
+              {studentRows.map((student) => (
+                <div key={student.id} className="pwcard p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-ink text-base font-semibold">{student.name}</div>
+                      <div className="text-muted mt-1 text-xs">
+                        {student.grade}
+                        {student.school ? ` · ${student.school}` : ''}
                       </div>
                     </div>
                     <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                      已评 {feedbackCount}/{event.rosterCount}
+                      {student.classes.length} 个班
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="text-muted text-xs">
-                      {event.classroom?.name ?? '未设置教室'}
+                  <div className="text-ink-soft mt-3 flex flex-wrap gap-2 text-xs">
+                    {Array.from(new Set(student.classes)).map((className) => (
+                      <span key={className} className="bg-paper rounded-full px-2.5 py-1">
+                        {className}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {student.lessonBalances.length === 0 ? (
+                      <div className="text-muted text-sm">暂无课时账户</div>
+                    ) : (
+                      student.lessonBalances.map((item) => (
+                        <div
+                          key={`${student.id}:${item.courseName}`}
+                          className="border-line flex items-center justify-between rounded-xl border px-3 py-2"
+                        >
+                          <span className="text-ink-soft text-sm">{item.courseName}</span>
+                          <span className="text-ink text-sm font-semibold">
+                            {item.balance ?? '-'} 课时
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {activeView === 'feedbacks' ? (
+        <section className="mt-6">
+          <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>
+            课后点评
+          </SectionHeading>
+          {feedbackEvents.length === 0 ? (
+            <EmptyCard>暂无可点评课次。</EmptyCard>
+          ) : (
+            <div className="grid gap-3">
+              {feedbackEvents.map((event) => {
+                const feedbackCount = feedbackCountBySessionId.get(event.id) ?? 0;
+                return (
+                  <div key={event.id} className="pwcard p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="text-ink text-sm font-semibold">
+                          {event.class?.name ?? '班级'} · {event.title || '上课内容'}
+                        </div>
+                        <div className="text-muted mt-1 text-xs">
+                          {formatDateTime(event.startsAt)} · {event.course?.name ?? '课程'}
+                        </div>
+                      </div>
+                      <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                        已评 {feedbackCount}/{event.rosterCount}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-muted text-xs">
+                        {event.classroom?.name ?? '未设置教室'}
+                      </span>
+                      <button
+                        type="button"
+                        className="pwbtn pwbtn-outline px-4 py-2 text-xs"
+                        onClick={() => setFeedbackSession(event)}
+                      >
+                        写点评
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {activeView === 'homework' ? (
+        <section className="mt-6">
+          <SectionHeading icon={<PenLine className="text-brand h-4 w-4" />}>
+            作业打卡
+          </SectionHeading>
+          {homeworkCheckIns.length === 0 ? (
+            <EmptyCard>暂无作业打卡。</EmptyCard>
+          ) : (
+            <div className="grid gap-3">
+              {homeworkCheckIns.map((item) => (
+                <div key={item.id} className="pwcard p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-ink text-sm font-semibold">
+                        {item.student?.name ?? '学员'} · {item.course?.name ?? item.title}
+                      </div>
+                      <div className="text-muted mt-1 text-xs">
+                        {item.class?.name ?? '班级'} · {formatDateTime(item.createdAt)}
+                      </div>
+                    </div>
+                    <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                      {HOMEWORK_REVIEW_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus}
                     </span>
+                  </div>
+                  {item.content ? (
+                    <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
+                      {item.content}
+                    </p>
+                  ) : null}
+                  {item.imageUrls.length > 0 ? (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {item.imageUrls.map((url) => (
+                        <img
+                          key={url}
+                          src={url}
+                          alt="作业打卡"
+                          loading="lazy"
+                          decoding="async"
+                          className="aspect-square rounded-xl object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {item.teacherFeedback ? (
+                    <div className="bg-paper text-ink-soft mt-3 rounded-xl p-3 text-sm leading-6">
+                      {item.teacherFeedback}
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex justify-end">
                     <button
                       type="button"
-                      className="pwbtn pwbtn-outline px-4 py-2 text-xs"
-                      onClick={() => setFeedbackSession(event)}
+                      className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                      onClick={() => openReview(item)}
                     >
-                      写点评
+                      <PenLine className="h-3.5 w-3.5" />
+                      批阅
                     </button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading icon={<PenLine className="text-brand h-4 w-4" />}>作业打卡</SectionHeading>
-        {homeworkCheckIns.length === 0 ? (
-          <EmptyCard>暂无作业打卡。</EmptyCard>
-        ) : (
-          <div className="grid gap-3">
-            {homeworkCheckIns.map((item) => (
-              <div key={item.id} className="pwcard p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-ink text-sm font-semibold">
-                      {item.student?.name ?? '学员'} · {item.course?.name ?? item.title}
-                    </div>
-                    <div className="text-muted mt-1 text-xs">
-                      {item.class?.name ?? '班级'} · {formatDateTime(item.createdAt)}
-                    </div>
-                  </div>
-                  <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                    {HOMEWORK_REVIEW_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus}
-                  </span>
-                </div>
-                {item.content ? (
-                  <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
-                    {item.content}
-                  </p>
-                ) : null}
-                {item.imageUrls.length > 0 ? (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {item.imageUrls.map((url) => (
-                      <img
-                        key={url}
-                        src={url}
-                        alt="作业打卡"
-                        loading="lazy"
-                        decoding="async"
-                        className="aspect-square rounded-xl object-cover"
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                {item.teacherFeedback ? (
-                  <div className="bg-paper text-ink-soft mt-3 rounded-xl p-3 text-sm leading-6">
-                    {item.teacherFeedback}
-                  </div>
-                ) : null}
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
-                    onClick={() => openReview(item)}
-                  >
-                    <PenLine className="h-3.5 w-3.5" />
-                    批阅
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       {rollCallSession ? (
         <RollCallModal

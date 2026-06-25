@@ -89,6 +89,16 @@ function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, t
   return true;
 }
 
+function summarizeAttendance(records: Array<{ status: string }>) {
+  return records.reduce(
+    (summary, record) => ({
+      ...summary,
+      [record.status]: (summary[record.status as keyof typeof summary] ?? 0) + 1,
+    }),
+    { present: 0, late: 0, leave: 0, absent: 0, makeup: 0, trial: 0 },
+  );
+}
+
 const teacherHomeworkReviewSchema = z.object({
   reviewStatus: z.enum(['reviewed', 'needs_revision']).default('reviewed'),
   teacherFeedback: z.string().trim().max(2000).default(''),
@@ -132,19 +142,30 @@ export const teachingModule: AppModule = {
           throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
         }
 
-        const [sessions, classes, courses, classrooms, students, attendanceRecords] =
-          await Promise.all([
-            schedulingRepo.listClassSessions(app.db),
-            schedulingRepo.listClasses(app.db),
-            catalogRepo.listCourses(app.db),
-            teachingRepo.listClassrooms(app.db),
-            peopleRepo.listStudents(app.db),
-            app.db.select().from(schema.attendanceRecords),
-          ]);
+        const [
+          sessions,
+          classes,
+          courses,
+          classrooms,
+          students,
+          attendanceRecords,
+          lessonAccounts,
+        ] = await Promise.all([
+          schedulingRepo.listClassSessions(app.db),
+          schedulingRepo.listClasses(app.db),
+          catalogRepo.listCourses(app.db),
+          teachingRepo.listClassrooms(app.db),
+          peopleRepo.listStudents(app.db),
+          app.db.select().from(schema.attendanceRecords),
+          app.db.select().from(schema.lessonAccounts),
+        ]);
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
         const studentById = new Map(students.map((item) => [item.id, item]));
+        const lessonAccountByStudentCourse = new Map(
+          lessonAccounts.map((item) => [`${item.studentId}:${item.courseId}`, item]),
+        );
         const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
         const enrollmentsByClassId = new Map<
           string,
@@ -166,6 +187,11 @@ export const teachingModule: AppModule = {
                   id: student!.id,
                   name: student!.name,
                   grade: student!.grade,
+                  school: student!.school,
+                  status: student!.status,
+                  lessonBalance:
+                    lessonAccountByStudentCourse.get(`${student!.id}:${classGroup.courseId}`)
+                      ?.balance ?? null,
                 })),
             };
           }),
@@ -176,6 +202,9 @@ export const teachingModule: AppModule = {
             .filter((session) => session.teacherId === account.teacherId)
             .map((session) => {
               const classGroup = classById.get(session.classId);
+              const sessionAttendance = attendanceRecords.filter(
+                (record) => record.classSessionId === session.id,
+              );
               return {
                 ...session,
                 class: classGroup ? { name: classGroup.name } : undefined,
@@ -184,9 +213,8 @@ export const teachingModule: AppModule = {
                 rosterCount: classGroup
                   ? (enrollmentsByClassId.get(classGroup.id)?.length ?? 0)
                   : 0,
-                attendanceCount: attendanceRecords.filter(
-                  (record) => record.classSessionId === session.id,
-                ).length,
+                attendanceCount: sessionAttendance.length,
+                attendanceSummary: summarizeAttendance(sessionAttendance),
               };
             }),
           classes: classCards,
@@ -240,6 +268,9 @@ export const teachingModule: AppModule = {
               const classGroup = classById.get(session.classId);
               const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
               const classroom = classroomById.get(session.classroomId);
+              const sessionAttendance = attendanceRecords.filter(
+                (record) => record.classSessionId === session.id,
+              );
               return {
                 id: session.id,
                 type: 'class_session',
@@ -251,9 +282,8 @@ export const teachingModule: AppModule = {
                 course: course ? { id: course.id, name: course.name } : null,
                 classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
                 rosterCount: classGroup ? (rosterCountByClassId.get(classGroup.id) ?? 0) : 0,
-                attendanceCount: attendanceRecords.filter(
-                  (record) => record.classSessionId === session.id,
-                ).length,
+                attendanceCount: sessionAttendance.length,
+                attendanceSummary: summarizeAttendance(sessionAttendance),
               };
             }),
         };
