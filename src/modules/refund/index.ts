@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { and, eq, ne } from 'drizzle-orm';
 
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as refundsRepo from '../../db/repositories/refunds.js';
+import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
 import { NotificationsService } from '../notifications/service.js';
 import type { AppModule } from '../types.js';
@@ -40,6 +42,40 @@ const REFUND_REASON_LABEL: Record<z.infer<typeof refundReasonSchema>, string> = 
 export const refundModule: AppModule = {
   name: 'refund',
   async register(app) {
+    async function canAccountAccessOrder(
+      accountId: string,
+      order: typeof schema.orders.$inferSelect,
+    ) {
+      if (order.accountId === accountId) {
+        return true;
+      }
+      if (!order.studentId) {
+        return false;
+      }
+
+      const [account] = await app.db
+        .select({ guardianId: schema.accounts.guardianId })
+        .from(schema.accounts)
+        .where(eq(schema.accounts.id, accountId))
+        .limit(1);
+      if (!account?.guardianId) {
+        return false;
+      }
+
+      const [student] = await app.db
+        .select({ id: schema.students.id })
+        .from(schema.students)
+        .where(
+          and(
+            eq(schema.students.id, order.studentId),
+            eq(schema.students.guardianId, account.guardianId),
+            ne(schema.students.status, 'archived'),
+          ),
+        )
+        .limit(1);
+      return Boolean(student);
+    }
+
     app.post(
       '/public/me/orders/:orderNo/refund',
       { preHandler: app.requireParent },
@@ -48,12 +84,13 @@ export const refundModule: AppModule = {
         const body = refundCreateSchema.parse(request.body);
         const order = await financeRepo.findOrderByOrderNo(app.db, orderNo);
 
-        if (!order || order.accountId !== request.account!.id) {
+        if (!order || !(await canAccountAccessOrder(request.account!.id, order))) {
           throw httpError(404, 'Order not found');
         }
 
         const refund = await refundsRepo.createRefundRequest(app.db, {
           order,
+          accountId: request.account!.id,
           reason: body.reason,
           buyerNote: body.buyerNote,
         });
@@ -110,7 +147,8 @@ export const refundModule: AppModule = {
               };
 
         const refund = outcome.refund;
-        const order = outcome.order ?? (await financeRepo.findOrderByOrderNo(app.db, refund.orderNo));
+        const order =
+          outcome.order ?? (await financeRepo.findOrderByOrderNo(app.db, refund.orderNo));
         if (refund.accountId && order) {
           const reasonLabel = REFUND_REASON_LABEL[refund.reason] ?? '其他原因';
           await new NotificationsService(app.db).create({

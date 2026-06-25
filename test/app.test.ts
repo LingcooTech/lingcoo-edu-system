@@ -2333,6 +2333,111 @@ test('lets a parent check in for class and submit homework from parent center', 
       { sub: fixture.account.id, role: 'parent' },
       { expiresIn: '1h' },
     );
+    const offlineOrderNo = `OFFLINE${suffix.replaceAll('-', '').slice(0, 12)}`;
+    const [offlineOrder] = await app.db
+      .insert(schema.orders)
+      .values({
+        studentId: fixture.student.id,
+        courseId: fixture.course.id,
+        orderNo: offlineOrderNo,
+        orderType: 'manual_package_grant',
+        amount: 128000,
+        paidAmount: 128000,
+        lessonCount: 8,
+        paymentMethod: 'bank_transfer',
+        status: 'paid',
+        paidAt: new Date(),
+        source: 'offline',
+      })
+      .returning();
+    const seatOrderNo = `PSEAT${suffix.replaceAll('-', '').slice(0, 14)}`;
+    const [seatOrder] = await app.db
+      .insert(schema.orders)
+      .values({
+        studentId: fixture.student.id,
+        courseId: fixture.course.id,
+        orderNo: seatOrderNo,
+        orderType: 'seat_reservation',
+        amount: 990,
+        paidAmount: 990,
+        lessonCount: 0,
+        status: 'paid',
+        paidAt: new Date(),
+        source: 'offline',
+      })
+      .returning();
+    const [seatReservation] = await app.db
+      .insert(schema.seatReservations)
+      .values({
+        orderId: seatOrder.id,
+        orderNo: seatOrder.orderNo,
+        campusId: fixture.campus.id,
+        courseId: fixture.course.id,
+        guardianName: fixture.guardian.name,
+        phone: fixture.guardian.phone,
+        studentName: fixture.student.name,
+        grade: fixture.student.grade,
+        reservationFeeAmount: seatOrder.paidAmount,
+        reservationStatus: 'reserved',
+        paymentStatus: 'paid',
+        checkInStatus: 'pending',
+        source: 'offline',
+      })
+      .returning();
+
+    const parentOrders = await app.inject({
+      method: 'GET',
+      url: '/public/me/orders',
+      headers: { authorization: `Bearer ${parentToken}` },
+    });
+    assert.equal(parentOrders.statusCode, 200, parentOrders.body);
+    const parentOrderPayload = parentOrders.json();
+    assert.ok(
+      parentOrderPayload.orders.some(
+        (order: { id: string; accountId: string | null; student: { id: string } | null }) =>
+          order.id === offlineOrder.id &&
+          order.accountId === null &&
+          order.student?.id === fixture.student.id,
+      ),
+    );
+
+    const parentSeatReservations = await app.inject({
+      method: 'GET',
+      url: '/public/me/seat-reservations',
+      headers: { authorization: `Bearer ${parentToken}` },
+    });
+    assert.equal(parentSeatReservations.statusCode, 200, parentSeatReservations.body);
+    assert.ok(
+      parentSeatReservations
+        .json()
+        .seatReservations.some(
+          (reservation: { id: string }) => reservation.id === seatReservation.id,
+        ),
+    );
+
+    const offlineRefund = await app.inject({
+      method: 'POST',
+      url: `/public/me/orders/${offlineOrder.orderNo}/refund`,
+      headers: { authorization: `Bearer ${parentToken}` },
+      payload: { reason: 'other', buyerNote: '线下补录订单退款测试' },
+    });
+    assert.equal(offlineRefund.statusCode, 200, offlineRefund.body);
+    assert.equal(offlineRefund.json().refund.accountId, fixture.account.id);
+
+    const parentRefunds = await app.inject({
+      method: 'GET',
+      url: '/public/me/refunds',
+      headers: { authorization: `Bearer ${parentToken}` },
+    });
+    assert.equal(parentRefunds.statusCode, 200, parentRefunds.body);
+    assert.ok(
+      parentRefunds
+        .json()
+        .refunds.some(
+          (refund: { orderId: string; accountId: string | null }) =>
+            refund.orderId === offlineOrder.id && refund.accountId === fixture.account.id,
+        ),
+    );
 
     const checkInList = await app.inject({
       method: 'GET',

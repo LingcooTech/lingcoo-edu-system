@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, or } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
@@ -100,6 +100,8 @@ export const parentCenterModule: AppModule = {
     }
 
     async function requireSeatReservationForAccount(accountId: string, seatReservationId: string) {
+      const { students } = await resolveChildren(accountId);
+      const studentIds = students.map((student) => student.id);
       const [row] = await app.db
         .select({ seatReservation: schema.seatReservations })
         .from(schema.seatReservations)
@@ -107,7 +109,12 @@ export const parentCenterModule: AppModule = {
         .where(
           and(
             eq(schema.seatReservations.id, seatReservationId),
-            eq(schema.orders.accountId, accountId),
+            studentIds.length > 0
+              ? or(
+                  eq(schema.orders.accountId, accountId),
+                  inArray(schema.orders.studentId, studentIds),
+                )
+              : eq(schema.orders.accountId, accountId),
           ),
         )
         .limit(1);
@@ -258,11 +265,20 @@ export const parentCenterModule: AppModule = {
     });
 
     app.get('/public/me/orders', { preHandler: app.requireParent }, async (request) => {
+      const { students: ownedStudents } = await resolveChildren(request.account!.id);
+      const ownedStudentIds = ownedStudents.map((student) => student.id);
+      const orderVisibilityCondition =
+        ownedStudentIds.length > 0
+          ? or(
+              eq(schema.orders.accountId, request.account!.id),
+              inArray(schema.orders.studentId, ownedStudentIds),
+            )
+          : eq(schema.orders.accountId, request.account!.id);
       const [orders, students, courses, packages] = await Promise.all([
         app.db
           .select()
           .from(schema.orders)
-          .where(eq(schema.orders.accountId, request.account!.id))
+          .where(orderVisibilityCondition)
           .orderBy(desc(schema.orders.createdAt)),
         peopleRepo.listStudents(app.db),
         catalogRepo.listCourses(app.db),
@@ -295,11 +311,20 @@ export const parentCenterModule: AppModule = {
     });
 
     app.get('/public/me/seat-reservations', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = students.map((student) => student.id);
       const rows = await app.db
         .select({ seatReservation: schema.seatReservations })
         .from(schema.seatReservations)
         .innerJoin(schema.orders, eq(schema.seatReservations.orderId, schema.orders.id))
-        .where(eq(schema.orders.accountId, request.account!.id))
+        .where(
+          studentIds.length > 0
+            ? or(
+                eq(schema.orders.accountId, request.account!.id),
+                inArray(schema.orders.studentId, studentIds),
+              )
+            : eq(schema.orders.accountId, request.account!.id),
+        )
         .orderBy(desc(schema.seatReservations.createdAt));
 
       if (rows.length === 0) {

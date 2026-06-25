@@ -39,6 +39,7 @@ export async function createRefundRequest(
   db: Database,
   input: {
     order: typeof schema.orders.$inferSelect;
+    accountId?: string | null;
     reason: RefundReason;
     buyerNote?: string | null;
   },
@@ -57,7 +58,7 @@ export async function createRefundRequest(
     .values({
       orderId: input.order.id,
       orderNo: input.order.orderNo,
-      accountId: input.order.accountId ?? null,
+      accountId: input.accountId ?? input.order.accountId ?? null,
       amount: input.order.paidAmount || input.order.amount,
       reason: input.reason,
       buyerNote: input.buyerNote?.trim() || null,
@@ -153,12 +154,7 @@ export async function rejectRefundRequest(
       decidedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(schema.refundRequests.id, input.id),
-        eq(schema.refundRequests.status, 'pending'),
-      ),
-    )
+    .where(and(eq(schema.refundRequests.id, input.id), eq(schema.refundRequests.status, 'pending')))
     .returning();
 
   if (!updated) {
