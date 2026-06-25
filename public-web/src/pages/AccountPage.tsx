@@ -352,6 +352,8 @@ function AdminView() {
 
 // --- Parent: children / lesson balances / orders / attendance ---
 
+type ParentWorkspaceView = 'overview' | 'schedule' | 'growth' | 'homework' | 'orders';
+
 function ParentView({ account }: { account: AuthAccount }) {
   const [children, setChildren] = useState<ChildStudent[]>([]);
   const [accounts, setAccounts] = useState<ParentLessonAccount[]>([]);
@@ -382,6 +384,7 @@ function ParentView({ account }: { account: AuthAccount }) {
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyMessage, setVerifyMessage] = useState('');
   const [emailVerified, setEmailVerified] = useState(account.emailVerified);
+  const [activeView, setActiveView] = useState<ParentWorkspaceView>('overview');
 
   const reloadSeatReservations = useCallback(() => {
     fetchParentSeatReservations()
@@ -587,6 +590,28 @@ function ParentView({ account }: { account: AuthAccount }) {
   const homeworkAccountTargets = accounts.filter((item) => item.student?.id);
   const homeworkChildTargets = homeworkAccountTargets.length === 0 ? children : [];
   const calendarGroups = useMemo(() => groupEventsByDate(calendarEvents), [calendarEvents]);
+  const totalLessonBalance = accounts.reduce((sum, item) => sum + item.balance, 0);
+  const pendingCheckInSessions = checkInSessions.filter((item) => item.canCheckIn);
+  const upcomingEvents = useMemo(
+    () =>
+      calendarEvents
+        .filter((event) => new Date(event.endsAt).getTime() >= Date.now())
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [calendarEvents],
+  );
+  const nextEvent = upcomingEvents[0] ?? null;
+  const latestFeedback = lessonFeedbacks[0] ?? null;
+  const pendingOrderCount = orders.filter((item) => item.status === 'pending').length;
+  const pendingReservationCount = seatReservations.filter(
+    (item) => item.paymentStatus === 'unpaid' || item.reservationStatus === 'pending_payment',
+  ).length;
+  const parentTabs: Array<{ label: string; icon: typeof BookOpen; view: ParentWorkspaceView }> = [
+    { label: '总览', icon: BookOpen, view: 'overview' },
+    { label: '课程', icon: CalendarDays, view: 'schedule' },
+    { label: '反馈', icon: Sparkles, view: 'growth' },
+    { label: '作业', icon: PenLine, view: 'homework' },
+    { label: '订单', icon: Receipt, view: 'orders' },
+  ];
 
   return (
     <>
@@ -614,428 +639,623 @@ function ParentView({ account }: { account: AuthAccount }) {
         </div>
       )}
 
-      <section className="mt-6">
-        <SectionHeading icon={<BookOpen className="text-brand h-4 w-4" />}>我的孩子</SectionHeading>
-        {children.length === 0 ? (
-          <EmptyCard>暂未关联孩子。请联系机构，将您的账号与学员档案关联。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {children.map((child) => (
-              <div key={child.id} className="pwcard p-4">
-                <div className="text-ink text-sm font-semibold">{child.name}</div>
-                <div className="text-muted mt-1 text-xs">
-                  {child.grade}
-                  {child.school ? ` · ${child.school}` : ''}
-                </div>
-              </div>
-            ))}
+      <section className="border-line bg-surface mt-6 overflow-hidden rounded-3xl border shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-5">
+          <div>
+            <p className="text-muted text-sm">家长中心</p>
+            <h2 className="text-ink mt-1 text-xl font-bold">
+              {children[0]?.name ? `${children[0].name} 的学习近况` : '学习近况'}
+            </h2>
           </div>
-        )}
+          <div className="bg-brand-soft text-brand rounded-full px-3 py-1.5 text-xs font-semibold">
+            {account.displayName || account.phone || '家长'}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 px-5 py-5 sm:grid-cols-4">
+          <div>
+            <div className="text-ink text-3xl font-semibold">{children.length}</div>
+            <div className="text-muted mt-1 text-xs">孩子</div>
+          </div>
+          <div>
+            <div className="text-ink text-3xl font-semibold">{totalLessonBalance}</div>
+            <div className="text-muted mt-1 text-xs">剩余课时</div>
+          </div>
+          <div>
+            <div className="text-ink text-3xl font-semibold">{pendingCheckInSessions.length}</div>
+            <div className="text-muted mt-1 text-xs">待签到</div>
+          </div>
+          <div>
+            <div className="text-ink text-3xl font-semibold">
+              {pendingOrderCount + pendingReservationCount}
+            </div>
+            <div className="text-muted mt-1 text-xs">待处理</div>
+          </div>
+        </div>
       </section>
 
-      <section className="mt-6">
-        <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
-          课程表
-        </SectionHeading>
-        {calendarGroups.length === 0 ? (
-          <EmptyCard>近 30 天暂无正式课程安排。</EmptyCard>
-        ) : (
-          <div className="grid gap-3">
-            {calendarGroups.map(([day, events]) => (
-              <div key={day} className="pwcard overflow-hidden">
-                <div className="bg-paper text-ink flex items-center justify-between px-4 py-2 text-sm font-semibold">
-                  <span>{dateLabel(events[0].startsAt)}</span>
-                  <span className="text-muted text-xs">{events.length} 节</span>
+      <section className="mt-5 grid grid-cols-5 gap-2">
+        {parentTabs.map((item) => {
+          const Icon = item.icon;
+          const active = activeView === item.view;
+          return (
+            <button
+              key={item.view}
+              type="button"
+              className={`border-line flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border p-2 text-center text-xs font-medium transition-colors ${
+                active ? 'bg-ink text-white' : 'bg-surface text-ink hover:bg-paper'
+              }`}
+              onClick={() => setActiveView(item.view)}
+            >
+              <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-brand'}`} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </section>
+
+      {activeView === 'overview' ? (
+        <>
+          <section className="mt-6 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="pwcard p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <SectionHeading icon={<BookOpen className="text-brand h-4 w-4" />}>
+                  孩子与课时
+                </SectionHeading>
+                <span className="text-muted text-xs">共 {totalLessonBalance} 课时</span>
+              </div>
+              {children.length === 0 ? (
+                <EmptyCard>暂未关联孩子。请联系机构，将您的账号与学员档案关联。</EmptyCard>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {children.map((child) => {
+                    const childAccounts = accounts.filter((item) => item.studentId === child.id);
+                    const childBalance = childAccounts.reduce((sum, item) => sum + item.balance, 0);
+                    return (
+                      <div key={child.id} className="border-line rounded-2xl border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-ink text-base font-semibold">{child.name}</div>
+                            <div className="text-muted mt-1 text-xs">
+                              {child.grade}
+                              {child.school ? ` · ${child.school}` : ''}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-ink text-2xl font-semibold">{childBalance}</div>
+                            <div className="text-muted text-xs">课时</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          {childAccounts.length === 0 ? (
+                            <div className="text-muted text-xs">暂无课时账户</div>
+                          ) : (
+                            childAccounts.map((item) => (
+                              <div
+                                key={item.id}
+                                className="bg-paper flex items-center justify-between rounded-xl px-3 py-2 text-xs"
+                              >
+                                <span className="text-ink-soft">{item.course?.name ?? '课程'}</span>
+                                <span className="text-ink font-semibold">{item.balance} 课时</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="divide-line divide-y">
-                  {events.map((event) => (
-                    <div key={event.id} className="p-4">
+              )}
+            </div>
+
+            <div className="pwcard p-4">
+              <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
+                下一节课
+              </SectionHeading>
+              {nextEvent ? (
+                <div>
+                  <div className="text-ink text-2xl font-semibold">
+                    {timeRange(nextEvent.startsAt, nextEvent.endsAt)}
+                  </div>
+                  <div className="text-muted mt-2 text-sm">
+                    {dateLabel(nextEvent.startsAt)} · {nextEvent.student.name}
+                  </div>
+                  <div className="text-ink-soft mt-3 text-sm">
+                    {nextEvent.course?.name ?? '课程'} · {nextEvent.class.name} ·{' '}
+                    {nextEvent.classroom?.name ?? '教室待确认'}
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      className="pwbtn pwbtn-outline px-4 py-2 text-xs"
+                      onClick={() => setActiveView('schedule')}
+                    >
+                      查看课程
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <EmptyCard>近期暂无正式课程安排。</EmptyCard>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-6 grid gap-3 lg:grid-cols-2">
+            <div className="pwcard p-4">
+              <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>
+                最新反馈
+              </SectionHeading>
+              {latestFeedback ? (
+                <div>
+                  <div className="text-ink text-sm font-semibold">
+                    {latestFeedback.student?.name ?? '学员'} ·{' '}
+                    {latestFeedback.course?.name ?? '课程'}
+                  </div>
+                  <p className="text-ink-soft mt-3 line-clamp-4 text-sm leading-6 whitespace-pre-wrap">
+                    {latestFeedback.content}
+                  </p>
+                  <button
+                    type="button"
+                    className="border-line text-ink hover:bg-paper mt-4 inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                    onClick={() => setActiveView('growth')}
+                  >
+                    查看全部反馈
+                  </button>
+                </div>
+              ) : (
+                <EmptyCard>暂无课后点评。</EmptyCard>
+              )}
+            </div>
+            <div className="pwcard p-4">
+              <SectionHeading icon={<FileCheck2 className="text-brand h-4 w-4" />}>
+                待办
+              </SectionHeading>
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  className="bg-paper flex items-center justify-between rounded-xl px-3 py-3 text-left"
+                  onClick={() => setActiveView('schedule')}
+                >
+                  <span className="text-ink text-sm font-medium">待签到课程</span>
+                  <span className="text-brand text-sm font-semibold">
+                    {pendingCheckInSessions.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="bg-paper flex items-center justify-between rounded-xl px-3 py-3 text-left"
+                  onClick={() => setActiveView('homework')}
+                >
+                  <span className="text-ink text-sm font-medium">作业记录</span>
+                  <span className="text-brand text-sm font-semibold">
+                    {homeworkCheckIns.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="bg-paper flex items-center justify-between rounded-xl px-3 py-3 text-left"
+                  onClick={() => setActiveView('orders')}
+                >
+                  <span className="text-ink text-sm font-medium">待付款 / 待处理</span>
+                  <span className="text-brand text-sm font-semibold">
+                    {pendingOrderCount + pendingReservationCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {activeView === 'schedule' ? (
+        <>
+          <section className="mt-6">
+            <SectionHeading icon={<FileCheck2 className="text-brand h-4 w-4" />}>
+              上课签到
+            </SectionHeading>
+            {checkInMessage && (
+              <div className="mb-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+                {checkInMessage}
+              </div>
+            )}
+            {checkInSessions.length === 0 ? (
+              <EmptyCard>暂无可签到课次。</EmptyCard>
+            ) : (
+              <div className="grid gap-2">
+                {checkInSessions.map((item) => {
+                  const key = checkInKey(item);
+                  return (
+                    <div key={key} className="pwcard p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="text-ink text-sm font-semibold">
-                            {event.course?.name ?? '课程'} · {event.title}
+                            {item.course?.name ?? '课程'} · {item.topic}
                           </div>
                           <div className="text-muted mt-1 text-xs">
-                            {event.student.name} · {event.class.name}
+                            {item.student.name} · {item.class.name}
                           </div>
                         </div>
-                        <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                          {event.checkedIn
-                            ? (ATTENDANCE_STATUS_LABEL[event.attendanceStatus ?? 'present'] ??
-                              '已签到')
-                            : (SESSION_STATUS_LABEL[event.status] ?? event.status)}
-                        </span>
+                        {item.checkedIn ? (
+                          <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                            {ATTENDANCE_STATUS_LABEL[item.attendanceStatus ?? 'present'] ??
+                              '已签到'}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="pwbtn pwbtn-primary px-3 py-1.5 text-xs"
+                            disabled={!item.canCheckIn || checkingInKey === key}
+                            onClick={() => void submitCheckIn(item)}
+                          >
+                            {checkingInKey === key ? '签到中...' : '签到'}
+                          </button>
+                        )}
                       </div>
                       <div className="text-ink-soft mt-3 text-xs">
-                        {timeRange(event.startsAt, event.endsAt)} ·{' '}
-                        {event.classroom?.name ?? '教室待确认'}
+                        {formatDateTime(item.startsAt)} · {item.classroom?.name ?? '教室待确认'}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      <section className="mt-6">
-        <SectionHeading icon={<CalendarClock className="text-brand h-4 w-4" />}>
-          试听席位
-        </SectionHeading>
-        {seatReservations.length === 0 ? (
-          <EmptyCard>暂无试听席位预约。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {seatReservations.map((reservation) => {
-              const canOpenReschedule =
-                reservation.canReschedule && reservation.rescheduleOptions.length > 0;
-              return (
-                <div key={reservation.id} className="pwcard p-4">
+          <section className="mt-6">
+            <SectionHeading icon={<CalendarDays className="text-brand h-4 w-4" />}>
+              课程表
+            </SectionHeading>
+            {calendarGroups.length === 0 ? (
+              <EmptyCard>近 30 天暂无正式课程安排。</EmptyCard>
+            ) : (
+              <div className="grid gap-3">
+                {calendarGroups.map(([day, events]) => (
+                  <div key={day} className="pwcard overflow-hidden">
+                    <div className="bg-paper text-ink flex items-center justify-between px-4 py-2 text-sm font-semibold">
+                      <span>{dateLabel(events[0].startsAt)}</span>
+                      <span className="text-muted text-xs">{events.length} 节</span>
+                    </div>
+                    <div className="divide-line divide-y">
+                      {events.map((event) => (
+                        <div key={event.id} className="p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-ink text-sm font-semibold">
+                                {event.course?.name ?? '课程'} · {event.title}
+                              </div>
+                              <div className="text-muted mt-1 text-xs">
+                                {event.student.name} · {event.class.name}
+                              </div>
+                            </div>
+                            <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                              {event.checkedIn
+                                ? (ATTENDANCE_STATUS_LABEL[event.attendanceStatus ?? 'present'] ??
+                                  '已签到')
+                                : (SESSION_STATUS_LABEL[event.status] ?? event.status)}
+                            </span>
+                          </div>
+                          <div className="text-ink-soft mt-3 text-xs">
+                            {timeRange(event.startsAt, event.endsAt)} ·{' '}
+                            {event.classroom?.name ?? '教室待确认'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
+      {activeView === 'growth' ? (
+        <>
+          <section className="mt-6">
+            <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>
+              课后点评
+            </SectionHeading>
+            {lessonFeedbacks.length === 0 ? (
+              <EmptyCard>暂无课后点评。</EmptyCard>
+            ) : (
+              <div className="grid gap-2">
+                {lessonFeedbacks.map((item) => (
+                  <div key={item.id} className="pwcard p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="text-ink text-sm font-semibold">
+                          {item.student?.name ?? '学员'} · {item.course?.name ?? '课程'}
+                        </div>
+                        <div className="text-muted mt-1 text-xs">
+                          {item.session
+                            ? formatDateTime(item.session.startsAt)
+                            : formatDateTime(item.createdAt)}
+                          {item.class?.name ? ` · ${item.class.name}` : ''}
+                        </div>
+                      </div>
+                      {item.teacher?.name ? (
+                        <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                          {item.teacher.name}
+                        </span>
+                      ) : null}
+                    </div>
+                    {item.content ? (
+                      <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
+                        {item.content}
+                      </p>
+                    ) : null}
+                    {item.imageUrls.length > 0 ? (
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {item.imageUrls.map((url) => (
+                          <img
+                            key={url}
+                            src={url}
+                            alt="课后点评"
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-square rounded-xl object-cover"
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="mt-6">
+            <SectionHeading icon={<CheckSquare className="text-brand h-4 w-4" />}>
+              签到记录
+            </SectionHeading>
+            {attendance.length === 0 ? (
+              <EmptyCard>暂无签到记录。</EmptyCard>
+            ) : (
+              <div className="grid gap-2">
+                {attendance.map((record) => (
+                  <div key={record.id} className="pwcard p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-ink text-sm font-semibold">
+                        {record.courseName} · {record.topic}
+                      </div>
+                      <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                        {ATTENDANCE_STATUS_LABEL[record.status] ?? record.status}
+                      </span>
+                    </div>
+                    <div className="text-muted mt-1 text-xs">
+                      {record.student?.name ?? '学员'} · {formatDateTime(record.startsAt)}
+                      {record.lessonDelta !== 0 ? ` · 消课 ${Math.abs(record.lessonDelta)}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
+      {activeView === 'homework' ? (
+        <section className="mt-6">
+          <SectionHeading icon={<PenLine className="text-brand h-4 w-4" />}>
+            作业打卡
+          </SectionHeading>
+          <form className="pwcard grid gap-3 p-4" onSubmit={submitHomework}>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink font-medium">学员 / 课程</span>
+              <select
+                className="border-line rounded-xl border bg-white px-3 py-2"
+                value={homeworkTargetId}
+                onChange={(event) => setHomeworkTargetId(event.target.value)}
+                disabled={homeworkAccountTargets.length === 0 && homeworkChildTargets.length === 0}
+              >
+                {homeworkAccountTargets.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.student?.name ?? '学员'} · {item.course?.name ?? '未关联课程'}
+                  </option>
+                ))}
+                {homeworkChildTargets.map((child) => (
+                  <option key={child.id} value={`child:${child.id}`}>
+                    {child.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink font-medium">打卡内容</span>
+              <textarea
+                className="border-line min-h-24 rounded-xl border px-3 py-2"
+                value={homeworkContent}
+                onChange={(event) => setHomeworkContent(event.target.value)}
+                placeholder="完成内容、练习情况或需要老师关注的问题"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-ink font-medium">图片链接</span>
+              <textarea
+                className="border-line min-h-20 rounded-xl border px-3 py-2"
+                value={homeworkImageUrls}
+                onChange={(event) => setHomeworkImageUrls(event.target.value)}
+                placeholder="每行一个图片链接，可选"
+              />
+            </label>
+            {homeworkMessage && (
+              <div className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+                {homeworkMessage}
+              </div>
+            )}
+            <button
+              type="submit"
+              className="pwbtn pwbtn-primary w-fit px-4"
+              disabled={
+                homeworkSubmitting ||
+                (homeworkAccountTargets.length === 0 && homeworkChildTargets.length === 0)
+              }
+            >
+              {homeworkSubmitting ? '提交中...' : '提交打卡'}
+            </button>
+          </form>
+          {homeworkCheckIns.length === 0 ? (
+            <EmptyCard>暂无作业打卡。</EmptyCard>
+          ) : (
+            <div className="mt-3 grid gap-2">
+              {homeworkCheckIns.map((item) => (
+                <div key={item.id} className="pwcard p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <div className="text-ink text-sm font-semibold">
-                        {reservation.trialSession?.title ?? '试听预约'}
+                        {item.student?.name ?? '学员'} · {item.course?.name ?? item.title}
                       </div>
                       <div className="text-muted mt-1 text-xs">
-                        {reservation.course?.name ?? '课程待确认'} · {reservation.studentName}
+                        {formatDateTime(item.createdAt)}
                       </div>
                     </div>
                     <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                      {RESERVATION_STATUS_LABEL[reservation.reservationStatus] ??
-                        reservation.reservationStatus}
+                      {HOMEWORK_REVIEW_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus}
                     </span>
                   </div>
-                  <div className="text-ink-soft mt-3 grid gap-1 text-xs">
-                    <span>
-                      {reservation.trialSession
-                        ? formatDateTime(reservation.trialSession.startsAt)
-                        : '时间待确认'}
-                    </span>
-                    <span>
-                      {reservation.campus?.name ?? '地点待确认'} ·{' '}
-                      {money(reservation.reservationFeeAmount)}
-                    </span>
-                    <span>
-                      {ORDER_STATUS_LABEL[reservation.paymentStatus] ?? reservation.paymentStatus} ·{' '}
-                      {CHECK_IN_STATUS_LABEL[reservation.checkInStatus] ??
-                        reservation.checkInStatus}{' '}
-                      · 改期 {reservation.rescheduleCount}/1
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {canOpenReschedule ? (
-                      <button
-                        type="button"
-                        className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
-                        onClick={() => openReschedule(reservation)}
-                      >
-                        <CalendarClock className="h-3.5 w-3.5" />
-                        改期
-                      </button>
-                    ) : reservation.canReschedule ? (
-                      <span className="text-muted text-xs">暂无可改期场次</span>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading icon={<FileCheck2 className="text-brand h-4 w-4" />}>
-          上课签到
-        </SectionHeading>
-        {checkInMessage && (
-          <div className="mb-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
-            {checkInMessage}
-          </div>
-        )}
-        {checkInSessions.length === 0 ? (
-          <EmptyCard>暂无可签到课次。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {checkInSessions.map((item) => {
-              const key = checkInKey(item);
-              return (
-                <div key={key} className="pwcard p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-ink text-sm font-semibold">
-                        {item.course?.name ?? '课程'} · {item.topic}
-                      </div>
-                      <div className="text-muted mt-1 text-xs">
-                        {item.student.name} · {item.class.name}
-                      </div>
+                  {item.content ? (
+                    <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
+                      {item.content}
+                    </p>
+                  ) : null}
+                  {item.imageUrls.length > 0 ? (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {item.imageUrls.map((url) => (
+                        <img
+                          key={url}
+                          src={url}
+                          alt="作业打卡"
+                          loading="lazy"
+                          decoding="async"
+                          className="aspect-square rounded-xl object-cover"
+                        />
+                      ))}
                     </div>
-                    {item.checkedIn ? (
-                      <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                        {ATTENDANCE_STATUS_LABEL[item.attendanceStatus ?? 'present'] ?? '已签到'}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="pwbtn pwbtn-primary px-3 py-1.5 text-xs"
-                        disabled={!item.canCheckIn || checkingInKey === key}
-                        onClick={() => void submitCheckIn(item)}
-                      >
-                        {checkingInKey === key ? '签到中...' : '签到'}
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-ink-soft mt-3 text-xs">
-                    {formatDateTime(item.startsAt)} · {item.classroom?.name ?? '教室待确认'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading icon={<PenLine className="text-brand h-4 w-4" />}>作业打卡</SectionHeading>
-        <form className="pwcard grid gap-3 p-4" onSubmit={submitHomework}>
-          <label className="grid gap-1 text-sm">
-            <span className="text-ink font-medium">学员 / 课程</span>
-            <select
-              className="border-line rounded-xl border bg-white px-3 py-2"
-              value={homeworkTargetId}
-              onChange={(event) => setHomeworkTargetId(event.target.value)}
-              disabled={homeworkAccountTargets.length === 0 && homeworkChildTargets.length === 0}
-            >
-              {homeworkAccountTargets.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.student?.name ?? '学员'} · {item.course?.name ?? '未关联课程'}
-                </option>
-              ))}
-              {homeworkChildTargets.map((child) => (
-                <option key={child.id} value={`child:${child.id}`}>
-                  {child.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-ink font-medium">打卡内容</span>
-            <textarea
-              className="border-line min-h-24 rounded-xl border px-3 py-2"
-              value={homeworkContent}
-              onChange={(event) => setHomeworkContent(event.target.value)}
-              placeholder="完成内容、练习情况或需要老师关注的问题"
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-ink font-medium">图片链接</span>
-            <textarea
-              className="border-line min-h-20 rounded-xl border px-3 py-2"
-              value={homeworkImageUrls}
-              onChange={(event) => setHomeworkImageUrls(event.target.value)}
-              placeholder="每行一个图片链接，可选"
-            />
-          </label>
-          {homeworkMessage && (
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
-              {homeworkMessage}
-            </div>
-          )}
-          <button
-            type="submit"
-            className="pwbtn pwbtn-primary w-fit px-4"
-            disabled={
-              homeworkSubmitting ||
-              (homeworkAccountTargets.length === 0 && homeworkChildTargets.length === 0)
-            }
-          >
-            {homeworkSubmitting ? '提交中...' : '提交打卡'}
-          </button>
-        </form>
-        {homeworkCheckIns.length === 0 ? (
-          <EmptyCard>暂无作业打卡。</EmptyCard>
-        ) : (
-          <div className="mt-3 grid gap-2">
-            {homeworkCheckIns.map((item) => (
-              <div key={item.id} className="pwcard p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-ink text-sm font-semibold">
-                      {item.student?.name ?? '学员'} · {item.course?.name ?? item.title}
+                  ) : null}
+                  {item.teacherFeedback ? (
+                    <div className="bg-paper text-ink-soft mt-3 rounded-xl p-3 text-sm leading-6">
+                      {item.teacherFeedback}
                     </div>
-                    <div className="text-muted mt-1 text-xs">{formatDateTime(item.createdAt)}</div>
-                  </div>
-                  <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                    {HOMEWORK_REVIEW_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus}
-                  </span>
-                </div>
-                {item.content ? (
-                  <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
-                    {item.content}
-                  </p>
-                ) : null}
-                {item.imageUrls.length > 0 ? (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {item.imageUrls.map((url) => (
-                      <img
-                        key={url}
-                        src={url}
-                        alt="作业打卡"
-                        loading="lazy"
-                        decoding="async"
-                        className="aspect-square rounded-xl object-cover"
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                {item.teacherFeedback ? (
-                  <div className="bg-paper text-ink-soft mt-3 rounded-xl p-3 text-sm leading-6">
-                    {item.teacherFeedback}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading icon={<Sparkles className="text-brand h-4 w-4" />}>课后点评</SectionHeading>
-        {lessonFeedbacks.length === 0 ? (
-          <EmptyCard>暂无课后点评。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {lessonFeedbacks.map((item) => (
-              <div key={item.id} className="pwcard p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-ink text-sm font-semibold">
-                      {item.student?.name ?? '学员'} · {item.course?.name ?? '课程'}
-                    </div>
-                    <div className="text-muted mt-1 text-xs">
-                      {item.session
-                        ? formatDateTime(item.session.startsAt)
-                        : formatDateTime(item.createdAt)}
-                      {item.class?.name ? ` · ${item.class.name}` : ''}
-                    </div>
-                  </div>
-                  {item.teacher?.name ? (
-                    <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                      {item.teacher.name}
-                    </span>
                   ) : null}
                 </div>
-                {item.content ? (
-                  <p className="text-ink-soft mt-3 text-sm leading-6 whitespace-pre-wrap">
-                    {item.content}
-                  </p>
-                ) : null}
-                {item.imageUrls.length > 0 ? (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {item.imageUrls.map((url) => (
-                      <img
-                        key={url}
-                        src={url}
-                        alt="课后点评"
-                        loading="lazy"
-                        decoding="async"
-                        className="aspect-square rounded-xl object-cover"
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
-      <section className="mt-6">
-        <SectionHeading icon={<Wallet className="text-brand h-4 w-4" />}>
-          课时包 / 余额
-        </SectionHeading>
-        {accounts.length === 0 ? (
-          <EmptyCard>暂无课时账户。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {accounts.map((item) => (
-              <div key={item.id} className="pwcard flex items-center justify-between p-4">
-                <div className="text-ink text-sm font-semibold">{item.student?.name ?? '学员'}</div>
-                <div className="text-brand text-sm font-semibold">剩余 {item.balance} 课时</div>
+      {activeView === 'orders' ? (
+        <>
+          <section className="mt-6">
+            <SectionHeading icon={<CalendarClock className="text-brand h-4 w-4" />}>
+              试听席位
+            </SectionHeading>
+            {seatReservations.length === 0 ? (
+              <EmptyCard>暂无试听席位预约。</EmptyCard>
+            ) : (
+              <div className="grid gap-2">
+                {seatReservations.map((reservation) => {
+                  const canOpenReschedule =
+                    reservation.canReschedule && reservation.rescheduleOptions.length > 0;
+                  return (
+                    <div key={reservation.id} className="pwcard p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="text-ink text-sm font-semibold">
+                            {reservation.trialSession?.title ?? '试听预约'}
+                          </div>
+                          <div className="text-muted mt-1 text-xs">
+                            {reservation.course?.name ?? '课程待确认'} · {reservation.studentName}
+                          </div>
+                        </div>
+                        <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
+                          {RESERVATION_STATUS_LABEL[reservation.reservationStatus] ??
+                            reservation.reservationStatus}
+                        </span>
+                      </div>
+                      <div className="text-ink-soft mt-3 grid gap-1 text-xs">
+                        <span>
+                          {reservation.trialSession
+                            ? formatDateTime(reservation.trialSession.startsAt)
+                            : '时间待确认'}
+                        </span>
+                        <span>
+                          {reservation.campus?.name ?? '地点待确认'} ·{' '}
+                          {money(reservation.reservationFeeAmount)}
+                        </span>
+                        <span>
+                          {ORDER_STATUS_LABEL[reservation.paymentStatus] ??
+                            reservation.paymentStatus}{' '}
+                          ·{' '}
+                          {CHECK_IN_STATUS_LABEL[reservation.checkInStatus] ??
+                            reservation.checkInStatus}{' '}
+                          · 改期 {reservation.rescheduleCount}/1
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {canOpenReschedule ? (
+                          <button
+                            type="button"
+                            className="border-line text-ink hover:bg-paper inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                            onClick={() => openReschedule(reservation)}
+                          >
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            改期
+                          </button>
+                        ) : reservation.canReschedule ? (
+                          <span className="text-muted text-xs">暂无可改期场次</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      <section className="mt-6">
-        <SectionHeading icon={<CheckSquare className="text-brand h-4 w-4" />}>
-          签到记录
-        </SectionHeading>
-        {attendance.length === 0 ? (
-          <EmptyCard>暂无签到记录。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {attendance.map((record) => (
-              <div key={record.id} className="pwcard p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-ink text-sm font-semibold">
-                    {record.courseName} · {record.topic}
+          <section className="mt-6">
+            <SectionHeading icon={<Receipt className="text-brand h-4 w-4" />}>
+              我的订单
+            </SectionHeading>
+            {orders.length === 0 ? (
+              <EmptyCard>暂无订单。</EmptyCard>
+            ) : (
+              <div className="grid gap-2">
+                {orders.map((order) => (
+                  <div key={order.id} className="pwcard p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-ink text-sm font-semibold">{orderTitle(order)}</div>
+                      <div className="text-ink text-sm font-semibold">{money(order.amount)}</div>
+                    </div>
+                    <div className="text-muted mt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span>{orderMeta(order)}</span>
+                      <span>{ORDER_STATUS_LABEL[order.status] ?? order.status}</span>
+                    </div>
+                    {order.refundRequests?.length ? (
+                      <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        {REFUND_STATUS_LABEL[order.refundRequests[0].status] ??
+                          order.refundRequests[0].status}
+                        {order.refundRequests[0].adminNote
+                          ? `：${order.refundRequests[0].adminNote}`
+                          : ''}
+                      </div>
+                    ) : null}
+                    {order.status === 'paid' &&
+                    !order.refundRequests?.some((item) => item.status === 'pending') ? (
+                      <button
+                        type="button"
+                        className="border-line text-ink hover:bg-paper mt-3 inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+                        onClick={() => openRefund(order)}
+                      >
+                        申请退款
+                      </button>
+                    ) : null}
                   </div>
-                  <span className="bg-brand-soft text-brand rounded-full px-2.5 py-1 text-xs font-medium">
-                    {ATTENDANCE_STATUS_LABEL[record.status] ?? record.status}
-                  </span>
-                </div>
-                <div className="text-muted mt-1 text-xs">
-                  {record.student?.name ?? '学员'} · {formatDateTime(record.startsAt)}
-                  {record.lessonDelta !== 0 ? ` · 消课 ${Math.abs(record.lessonDelta)}` : ''}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading icon={<Receipt className="text-brand h-4 w-4" />}>我的订单</SectionHeading>
-        {orders.length === 0 ? (
-          <EmptyCard>暂无订单。</EmptyCard>
-        ) : (
-          <div className="grid gap-2">
-            {orders.map((order) => (
-              <div key={order.id} className="pwcard p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-ink text-sm font-semibold">{orderTitle(order)}</div>
-                  <div className="text-ink text-sm font-semibold">{money(order.amount)}</div>
-                </div>
-                <div className="text-muted mt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span>{orderMeta(order)}</span>
-                  <span>{ORDER_STATUS_LABEL[order.status] ?? order.status}</span>
-                </div>
-                {order.refundRequests?.length ? (
-                  <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    {REFUND_STATUS_LABEL[order.refundRequests[0].status] ??
-                      order.refundRequests[0].status}
-                    {order.refundRequests[0].adminNote
-                      ? `：${order.refundRequests[0].adminNote}`
-                      : ''}
-                  </div>
-                ) : null}
-                {order.status === 'paid' &&
-                !order.refundRequests?.some((item) => item.status === 'pending') ? (
-                  <button
-                    type="button"
-                    className="border-line text-ink hover:bg-paper mt-3 inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
-                    onClick={() => openRefund(order)}
-                  >
-                    申请退款
-                  </button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
+        </>
+      ) : null}
 
       <Modal
         open={Boolean(rescheduleTarget)}
