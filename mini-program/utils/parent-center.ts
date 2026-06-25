@@ -3,10 +3,12 @@
 // labels and shapes without duplicating the mapping logic.
 import {
   type ParentAttendance,
+  type ParentCalendarEvent,
   type ParentCheckInSession,
   type ParentChild,
   type ParentHomeworkCheckIn,
   type ParentLessonAccount,
+  type ParentLessonFeedback,
   type ParentNotification,
   type ParentOrder,
   type ParentSeatReservation,
@@ -42,11 +44,24 @@ export type CheckInItem = ParentCheckInSession & {
   attendanceStatusLabel: string;
 };
 
+export type CalendarEventItem = ParentCalendarEvent & {
+  startsAtLabel: string;
+  courseName: string;
+  classroomName: string;
+};
+
 export type HomeworkItem = ParentHomeworkCheckIn & {
   createdAtLabel: string;
   studentName: string;
   courseName: string;
   reviewStatusLabel: string;
+};
+
+export type LessonFeedbackItem = ParentLessonFeedback & {
+  createdAtLabel: string;
+  studentName: string;
+  courseName: string;
+  teacherName: string;
 };
 
 export type SeatReservationItem = ParentSeatReservation & {
@@ -197,6 +212,15 @@ export function toCheckInItem(item: ParentCheckInSession): CheckInItem {
   };
 }
 
+export function toCalendarEventItem(item: ParentCalendarEvent): CalendarEventItem {
+  return {
+    ...item,
+    startsAtLabel: formatDateTime(item.startsAt),
+    courseName: item.course?.name || '课程',
+    classroomName: item.classroom?.name || '教室待确认',
+  };
+}
+
 export function toHomeworkItem(item: ParentHomeworkCheckIn): HomeworkItem {
   return {
     ...item,
@@ -204,6 +228,16 @@ export function toHomeworkItem(item: ParentHomeworkCheckIn): HomeworkItem {
     studentName: item.student?.name || '未知学员',
     courseName: item.course?.name || item.title,
     reviewStatusLabel: homeworkReviewStatusLabel(item.reviewStatus),
+  };
+}
+
+export function toLessonFeedbackItem(item: ParentLessonFeedback): LessonFeedbackItem {
+  return {
+    ...item,
+    createdAtLabel: formatDateTime(item.createdAt),
+    studentName: item.student?.name || '未知学员',
+    courseName: item.course?.name || '课程',
+    teacherName: item.teacher?.name || '老师',
   };
 }
 

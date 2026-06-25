@@ -1,0 +1,45 @@
+.feedback-list {
+  display: grid;
+  gap: 18rpx;
+  margin-top: 24rpx;
+}
+
+.feedback-card {
+  overflow: hidden;
+}
+
+.feedback-class {
+  max-width: 160rpx;
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #f1e9e1;
+  color: #9a6a4b;
+  font-size: 22rpx;
+  font-weight: 800;
+  padding: 8rpx 14rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedback-content {
+  margin-top: 20rpx;
+  color: #57534e;
+  font-size: 27rpx;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.feedback-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.feedback-image {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 14rpx;
+  background: #eef1ee;
+}

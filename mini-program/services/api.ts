@@ -468,6 +468,22 @@ export interface ParentCheckInSession {
   canCheckIn: boolean;
 }
 
+export interface ParentCalendarEvent {
+  id: string;
+  sessionId: string;
+  type: 'class_session';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  student: { id: string; name: string; grade: string };
+  class: { id: string; name: string };
+  course: Course | null;
+  classroom: { id: string; name: string } | null;
+  checkedIn: boolean;
+  attendanceStatus: string | null;
+}
+
 export interface ParentHomeworkCheckIn {
   id: string;
   accountId?: string | null;
@@ -493,6 +509,30 @@ export interface ParentHomeworkCheckIn {
     status: string;
   } | null;
   class?: { id: string; name: string } | null;
+}
+
+export interface ParentLessonFeedback {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  teacherId?: string | null;
+  courseId?: string | null;
+  classId?: string | null;
+  content: string;
+  imageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string } | null;
+  course?: Course | null;
+  session?: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    topic: string;
+    status: string;
+  } | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
 }
 
 export interface ParentNotification {
@@ -858,6 +898,24 @@ export async function fetchParentCheckInSessions(): Promise<ParentCheckInSession
   ).checkInSessions;
 }
 
+export async function fetchParentCalendar(
+  params: {
+    from?: string;
+    to?: string;
+    studentId?: string;
+  } = {},
+): Promise<ParentCalendarEvent[]> {
+  const query = Object.entries(params)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&');
+  return (
+    await request<{ events: ParentCalendarEvent[] }>(
+      `/public/me/calendar${query ? `?${query}` : ''}`,
+    )
+  ).events;
+}
+
 export function submitParentCheckIn(
   sessionId: string,
   studentId: string,
@@ -872,6 +930,11 @@ export async function fetchParentHomeworkCheckIns(): Promise<ParentHomeworkCheck
   return (
     await request<{ homeworkCheckIns: ParentHomeworkCheckIn[] }>('/public/me/homework-check-ins')
   ).homeworkCheckIns;
+}
+
+export async function fetchParentLessonFeedbacks(): Promise<ParentLessonFeedback[]> {
+  return (await request<{ lessonFeedbacks: ParentLessonFeedback[] }>('/public/me/lesson-feedbacks'))
+    .lessonFeedbacks;
 }
 
 export function createParentHomeworkCheckIn(input: {

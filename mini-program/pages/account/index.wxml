@@ -1,57 +1,131 @@
 <view class="page">
   <skeleton wx:if="{{booting}}" variant="hub" />
   <block wx:elif="{{account}}">
-    <view class="card profile-card">
-      <view class="profile-avatar">{{avatarText}}</view>
-      <view class="profile-body">
-        <view class="profile-name">{{account.displayName || '家长'}}</view>
-        <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
-        <view wx:else class="profile-phone muted">已用微信登录</view>
+    <view class="card hub-card">
+      <view class="hub-top">
+        <view>
+          <view class="hub-eyebrow">家长中心</view>
+          <view class="hub-title">
+            {{childSummaries[0] ? childSummaries[0].name + ' 的学习近况' : '学习近况'}}
+          </view>
+        </view>
+        <view class="profile-pill">
+          <view class="profile-avatar">{{avatarText}}</view>
+          <view class="profile-info">
+            <view class="profile-name">{{account.displayName || '家长'}}</view>
+            <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
+            <view wx:else class="profile-phone muted">微信登录</view>
+          </view>
+        </view>
       </view>
-      <button class="mini-button" bindtap="onLogout">退出</button>
+
+      <view class="hero-metrics">
+        <navigator class="hero-metric" url="/pages/account-students/index" hover-class="metric-hover">
+          <view class="metric-value">{{stats.childCount}}</view>
+          <view class="metric-label">孩子</view>
+        </navigator>
+        <navigator class="hero-metric" url="/pages/account-students/index" hover-class="metric-hover">
+          <view class="metric-value">{{stats.totalBalance}}</view>
+          <view class="metric-label">剩余课时</view>
+        </navigator>
+        <navigator class="hero-metric" url="/pages/account-attendance/index" hover-class="metric-hover">
+          <view class="metric-value">{{stats.pendingCheckIns}}</view>
+          <view class="metric-label">待签到</view>
+        </navigator>
+        <navigator class="hero-metric" url="/pages/account-orders/index" hover-class="metric-hover">
+          <view class="metric-value">{{stats.pendingTasks}}</view>
+          <view class="metric-label">待处理</view>
+        </navigator>
+      </view>
     </view>
 
     <view wx:if="{{defaultPassword}}" class="password-note">
       初始密码：{{defaultPassword}}。手机号账号已同步创建。
     </view>
 
-    <view class="capsule-grid">
-      <navigator class="capsule" url="/pages/account-students/index" hover-class="capsule-hover">
-        <view class="capsule-value">{{stats.childCount}}</view>
-        <view class="capsule-label">孩子</view>
-      </navigator>
-      <navigator class="capsule" url="/pages/account-students/index" hover-class="capsule-hover">
-        <view class="capsule-value">{{stats.totalBalance}}</view>
-        <view class="capsule-label">课时</view>
-      </navigator>
-      <navigator class="capsule" url="/pages/account-orders/index" hover-class="capsule-hover">
-        <view class="capsule-value">{{stats.pendingOrders}}</view>
-        <view class="capsule-label">待付</view>
-      </navigator>
-      <navigator class="capsule" url="/pages/account-notifications/index" hover-class="capsule-hover">
-        <view class="capsule-value">{{stats.unreadNotifications}}</view>
-        <view class="capsule-label">未读</view>
-      </navigator>
-    </view>
-
-    <view class="card entry-list">
+    <view class="quick-grid">
       <navigator
         wx:for="{{entries}}"
         wx:key="key"
-        class="entry-row"
+        class="quick-card"
         url="{{item.url}}"
-        hover-class="entry-row-hover"
+        hover-class="quick-card-hover"
       >
-        <view class="entry-icon">{{item.icon}}</view>
-        <view class="entry-text">
-          <view class="entry-label">{{item.label}}</view>
-          <view class="entry-desc">{{item.desc}}</view>
+        <view class="quick-symbol">{{item.symbol}}</view>
+        <view class="quick-text">
+          <view class="quick-label">{{item.label}}</view>
+          <view class="quick-desc">{{item.desc}}</view>
         </view>
-        <view wx:if="{{item.key == 'notifications' && stats.unreadNotifications}}" class="entry-badge">
-          {{stats.unreadNotifications}}
-        </view>
-        <view class="entry-arrow">›</view>
+        <view wx:if="{{item.badge}}" class="quick-badge">{{item.badge}}</view>
       </navigator>
+    </view>
+
+    <view class="section card panel">
+      <view class="section-head">
+        <view class="section-title">孩子与课时</view>
+        <navigator class="section-link" url="/pages/account-students/index">全部</navigator>
+      </view>
+      <view wx:if="{{childSummaries.length}}" class="child-list">
+        <view wx:for="{{childSummaries}}" wx:key="id" class="child-row">
+          <view>
+            <view class="child-name">{{item.name}}</view>
+            <view class="child-meta">{{item.meta}}</view>
+          </view>
+          <view class="child-balance">
+            <view class="child-balance-value">{{item.balance}}</view>
+            <view class="child-balance-label">课时</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂未关联孩子，请联系机构绑定学员档案。</view>
+    </view>
+
+    <view class="section overview-grid">
+      <view class="card panel overview-card">
+        <view class="section-title">下一节课</view>
+        <block wx:if="{{nextLesson}}">
+          <view class="next-time">{{nextLesson.startsAtLabel}}</view>
+          <view class="next-title">{{nextLesson.courseName}} · {{nextLesson.title}}</view>
+          <view class="next-meta">
+            {{nextLesson.student.name}} · {{nextLesson.class.name}} · {{nextLesson.classroomName}}
+          </view>
+          <navigator class="inline-action" url="/pages/account-attendance/index">查看课程</navigator>
+        </block>
+        <view wx:else class="empty compact-empty">近期暂无正式课程安排</view>
+      </view>
+
+      <view class="card panel overview-card">
+        <view class="section-title">待办</view>
+        <navigator
+          wx:for="{{todoItems}}"
+          wx:key="key"
+          class="todo-row"
+          url="{{item.url}}"
+          hover-class="todo-hover"
+        >
+          <view class="todo-label">{{item.label}}</view>
+          <view class="todo-value">{{item.value}}</view>
+        </navigator>
+      </view>
+    </view>
+
+    <view class="section card panel">
+      <view class="section-head">
+        <view class="section-title">最新点评</view>
+        <navigator class="section-link" url="/pages/account-feedbacks/index">全部</navigator>
+      </view>
+      <block wx:if="{{latestFeedback}}">
+        <view class="feedback-title">
+          {{latestFeedback.studentName}} · {{latestFeedback.courseName}}
+        </view>
+        <view class="feedback-meta">{{latestFeedback.teacherName}} · {{latestFeedback.createdAtLabel}}</view>
+        <view class="feedback-content">{{latestFeedback.content}}</view>
+      </block>
+      <view wx:else class="empty compact-empty">暂无课后点评</view>
+    </view>
+
+    <view class="logout-wrap">
+      <button class="mini-button logout-button" bindtap="onLogout">退出登录</button>
     </view>
   </block>
 
