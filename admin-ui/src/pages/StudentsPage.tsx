@@ -31,6 +31,7 @@ interface StudentForm {
   school: string;
   guardianName: string;
   guardianPhone: string;
+  createParentAccount: boolean;
   status: 'active' | 'inactive';
 }
 
@@ -40,11 +41,14 @@ const emptyForm: StudentForm = {
   school: '',
   guardianName: '',
   guardianPhone: '',
+  createParentAccount: false,
   status: 'active',
 };
 
 interface StudentMutationResponse {
   student: Student;
+  parentAccountCreated?: boolean;
+  defaultPassword?: string;
 }
 
 export function StudentsPage() {
@@ -80,6 +84,7 @@ export function StudentsPage() {
       school: student.school ?? '',
       guardianName: student.guardian?.name ?? '',
       guardianPhone: student.guardian?.phone ?? '',
+      createParentAccount: false,
       status: student.status as StudentForm['status'],
     });
     setOpen(true);
@@ -94,29 +99,38 @@ export function StudentsPage() {
     setSaving(true);
     try {
       if (editing) {
-        const { student } = await apiPatch<{ student: Student }>(`${STUDENTS}/${editing.id}`, {
-          name: form.name.trim(),
-          grade: form.grade.trim(),
-          school: form.school.trim() || undefined,
-          status: form.status,
-        });
+        const { student, parentAccountCreated, defaultPassword } =
+          await apiPatch<StudentMutationResponse>(`${STUDENTS}/${editing.id}`, {
+            name: form.name.trim(),
+            grade: form.grade.trim(),
+            school: form.school.trim() || undefined,
+            guardianName: form.guardianName.trim() || undefined,
+            guardianPhone: form.guardianPhone.trim() || undefined,
+            createParentAccount: form.createParentAccount,
+            status: form.status,
+          });
         setData(data.map((item) => (item.id === student.id ? { ...item, ...student } : item)));
+        setSelected((current) =>
+          current?.id === student.id ? { ...current, ...student } : current,
+        );
+        if (parentAccountCreated && defaultPassword) {
+          toast.success(`家长账号已创建，默认密码：${defaultPassword}`);
+        }
       } else {
-        const { student } = await apiPost<{ student: Student }>(STUDENTS, {
-          name: form.name.trim(),
-          grade: form.grade.trim(),
-          school: form.school.trim() || undefined,
-          guardianName: form.guardianName.trim(),
-          guardianPhone: form.guardianPhone.trim(),
-          status: form.status,
-        });
-        setData([
-          {
-            ...student,
-            guardian: { name: form.guardianName.trim(), phone: form.guardianPhone.trim() },
-          },
-          ...data,
-        ]);
+        const { student, parentAccountCreated, defaultPassword } =
+          await apiPost<StudentMutationResponse>(STUDENTS, {
+            name: form.name.trim(),
+            grade: form.grade.trim(),
+            school: form.school.trim() || undefined,
+            guardianName: form.guardianName.trim(),
+            guardianPhone: form.guardianPhone.trim(),
+            createParentAccount: form.createParentAccount,
+            status: form.status,
+          });
+        setData([student, ...data]);
+        if (parentAccountCreated && defaultPassword) {
+          toast.success(`家长账号已创建，默认密码：${defaultPassword}`);
+        }
       }
       toast.success('学员已保存');
       setOpen(false);
@@ -391,24 +405,44 @@ export function StudentsPage() {
             onChange={(event) => setForm({ ...form, school: event.target.value })}
           />
         </Field>
-        {!editing && (
-          <FieldRow>
-            <Field label="家长姓名">
-              <input
-                className="form-input"
-                value={form.guardianName}
-                onChange={(event) => setForm({ ...form, guardianName: event.target.value })}
-              />
-            </Field>
-            <Field label="家长手机号">
-              <input
-                className="form-input"
-                value={form.guardianPhone}
-                onChange={(event) => setForm({ ...form, guardianPhone: event.target.value })}
-              />
-            </Field>
-          </FieldRow>
-        )}
+        <FieldRow>
+          <Field label="家长姓名">
+            <input
+              className="form-input"
+              value={form.guardianName}
+              onChange={(event) => setForm({ ...form, guardianName: event.target.value })}
+            />
+          </Field>
+          <Field
+            label={
+              <span className="flex items-center justify-between gap-3">
+                <span>家长手机号</span>
+                <label className="text-muted-foreground flex items-center gap-1 text-xs font-normal">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5"
+                    checked={form.createParentAccount}
+                    onChange={(event) =>
+                      setForm({ ...form, createParentAccount: event.target.checked })
+                    }
+                  />
+                  创建家长账号
+                </label>
+              </span>
+            }
+          >
+            <input
+              className="form-input"
+              value={form.guardianPhone}
+              onChange={(event) => setForm({ ...form, guardianPhone: event.target.value })}
+            />
+          </Field>
+        </FieldRow>
+        {form.createParentAccount ? (
+          <p className="text-muted-foreground -mt-2 text-xs">
+            创建成功后默认密码为手机号后 6 位，家长首次登录需修改密码。
+          </p>
+        ) : null}
         <Field label="状态">
           <select
             className="form-input"

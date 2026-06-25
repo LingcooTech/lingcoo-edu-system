@@ -25,12 +25,48 @@ function emptyStats(): HubStats {
 }
 
 const ENTRIES = [
-  { key: 'students', icon: '👶', label: '学员与课时', desc: '孩子档案与课时余额', url: '/pages/account-students/index' },
-  { key: 'orders', icon: '🧾', label: '订单', desc: '购买与支付记录', url: '/pages/account-orders/index' },
-  { key: 'trials', icon: '🎟', label: '试听席位', desc: '预约、改期与到课', url: '/pages/account-trials/index' },
-  { key: 'attendance', icon: '✅', label: '上课签到', desc: '签到与到课记录', url: '/pages/account-attendance/index' },
-  { key: 'homework', icon: '📷', label: '作业打卡', desc: '上传作业、查看批阅', url: '/pages/account-homework/index' },
-  { key: 'notifications', icon: '🔔', label: '消息通知', desc: '提醒订阅与站内消息', url: '/pages/account-notifications/index' },
+  {
+    key: 'students',
+    icon: '👶',
+    label: '学员与课时',
+    desc: '孩子档案与课时余额',
+    url: '/pages/account-students/index',
+  },
+  {
+    key: 'orders',
+    icon: '🧾',
+    label: '订单',
+    desc: '购买与支付记录',
+    url: '/pages/account-orders/index',
+  },
+  {
+    key: 'trials',
+    icon: '🎟',
+    label: '试听席位',
+    desc: '预约、改期与到课',
+    url: '/pages/account-trials/index',
+  },
+  {
+    key: 'attendance',
+    icon: '✅',
+    label: '上课签到',
+    desc: '签到与到课记录',
+    url: '/pages/account-attendance/index',
+  },
+  {
+    key: 'homework',
+    icon: '📷',
+    label: '作业打卡',
+    desc: '上传作业、查看批阅',
+    url: '/pages/account-homework/index',
+  },
+  {
+    key: 'notifications',
+    icon: '🔔',
+    label: '消息通知',
+    desc: '提醒订阅与站内消息',
+    url: '/pages/account-notifications/index',
+  },
 ];
 
 const ACCOUNT_TAB_INDEX = 2;
@@ -70,7 +106,17 @@ Page({
     this.setData({ refreshing: true });
     try {
       const payload = await fetchMe();
-      if (!payload.account || payload.account.role !== 'parent') {
+      if (!payload.account) {
+        clearToken();
+        this.resetAccountState();
+        return;
+      }
+      if (payload.account.role === 'teacher') {
+        this.setData({ refreshing: false, booting: false });
+        wx.navigateTo({ url: '/pages/teacher-workbench/index' });
+        return;
+      }
+      if (payload.account.role !== 'parent') {
         clearToken();
         this.resetAccountState();
         return;
@@ -155,6 +201,10 @@ Page({
           const payload = await wechatMiniLogin(result.code);
           if (payload.bound) {
             setToken(payload.token);
+            if (payload.account.role === 'teacher') {
+              wx.navigateTo({ url: '/pages/teacher-workbench/index' });
+              return;
+            }
             this.applyAccount(payload.account);
             this.setData({ defaultPassword: '' });
             await this.loadSummary();

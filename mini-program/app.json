@@ -13,7 +13,8 @@
     "pages/account-trials/index",
     "pages/account-attendance/index",
     "pages/account-homework/index",
-    "pages/account-notifications/index"
+    "pages/account-notifications/index",
+    "pages/teacher-workbench/index"
   ],
   "window": {
     "navigationBarTitleText": "成长教室",

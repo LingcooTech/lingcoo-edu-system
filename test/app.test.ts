@@ -7,7 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { buildApp } from '../src/app.js';
 import * as schema from '../src/db/schema.js';
 import type { AppEnv } from '../src/lib/env.js';
-import { hashPassword } from '../src/lib/password.js';
+import { hashPassword, verifyPassword } from '../src/lib/password.js';
 import { LessonNotificationService } from '../src/modules/notifications/lesson-notification-service.js';
 
 const testEnv: AppEnv = {
@@ -981,6 +981,85 @@ test('creates, voids, and recreates settlement batches for paid receiver orders'
     });
     assert.equal(recreated.statusCode, 200, recreated.body);
     assert.equal(recreated.json().settlementBatch.orderCount, 2);
+  } finally {
+    await app.close();
+  }
+});
+
+test('creates and links parent accounts from student profiles', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+
+  try {
+    const [admin] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'admin',
+        email: `student-admin-${suffix}@example.com`,
+        passwordHash: hashPassword('test-password'),
+        displayName: 'Student Admin',
+      })
+      .returning();
+    const adminToken = await app.jwt.sign({ sub: admin.id, role: 'admin' }, { expiresIn: '1h' });
+
+    const createPhone = phoneFromSuffix(suffix, '135');
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/students',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        name: `Student Create ${suffix.slice(0, 8)}`,
+        grade: '一年级',
+        guardianName: `Guardian Create ${suffix.slice(0, 8)}`,
+        guardianPhone: createPhone,
+        createParentAccount: true,
+        status: 'active',
+      },
+    });
+    assert.equal(createResponse.statusCode, 200, createResponse.body);
+    assert.equal(createResponse.json().parentAccountCreated, true);
+    assert.equal(createResponse.json().defaultPassword, createPhone.slice(-6));
+
+    const [createdAccount] = await app.db
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.phone, createPhone))
+      .limit(1);
+    assert.equal(createdAccount.role, 'parent');
+    assert.equal(createdAccount.guardianId, createResponse.json().student.guardianId);
+    assert.equal(verifyPassword(createPhone.slice(-6), createdAccount.passwordHash), true);
+
+    const [bareStudent] = await app.db
+      .insert(schema.students)
+      .values({
+        name: `Student Edit ${suffix.slice(0, 8)}`,
+        grade: '二年级',
+        status: 'active',
+      })
+      .returning();
+    const editPhone = phoneFromSuffix(randomUUID(), '134');
+    const editResponse = await app.inject({
+      method: 'PATCH',
+      url: `/v1/students/${bareStudent.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        guardianName: `Guardian Edit ${suffix.slice(0, 8)}`,
+        guardianPhone: editPhone,
+        createParentAccount: true,
+      },
+    });
+    assert.equal(editResponse.statusCode, 200, editResponse.body);
+    assert.equal(editResponse.json().parentAccountCreated, true);
+    assert.equal(editResponse.json().student.guardian.phone, editPhone);
+
+    const [editedAccount] = await app.db
+      .select()
+      .from(schema.accounts)
+      .where(eq(schema.accounts.phone, editPhone))
+      .limit(1);
+    assert.equal(editedAccount.role, 'parent');
+    assert.equal(editedAccount.guardianId, editResponse.json().student.guardianId);
+    assert.equal(verifyPassword(editPhone.slice(-6), editedAccount.passwordHash), true);
   } finally {
     await app.close();
   }

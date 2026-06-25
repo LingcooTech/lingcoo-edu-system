@@ -508,6 +508,101 @@ export interface ParentNotification {
   updatedAt: string;
 }
 
+export interface AttendanceSummary {
+  present: number;
+  late: number;
+  leave: number;
+  absent: number;
+  makeup: number;
+  trial: number;
+}
+
+export interface TeacherClassSession {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  topic: string;
+  status: string;
+  class?: { name: string };
+  course?: { name: string };
+  classroom?: { name: string };
+  rosterCount?: number;
+  attendanceCount?: number;
+  attendanceSummary?: AttendanceSummary;
+}
+
+export interface TeacherClass {
+  id: string;
+  name: string;
+  status: string;
+  capacity: number;
+  course?: { id: string; name: string };
+  classroom?: { name: string };
+  students: Array<{
+    id: string;
+    name: string;
+    grade: string;
+    school?: string | null;
+    status?: string;
+    lessonBalance?: number | null;
+  }>;
+}
+
+export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent' | 'makeup' | 'trial';
+
+export interface SessionAttendanceRecord {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  lessonDelta: number;
+  note: string | null;
+}
+
+export interface TeacherRosterStudent {
+  id: string;
+  name: string;
+  grade: string;
+}
+
+export interface TeacherCalendarEvent {
+  id: string;
+  type: 'class_session';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  class: { id: string; name: string } | null;
+  course: { id: string; name: string } | null;
+  classroom: { id: string; name: string } | null;
+  rosterCount: number;
+  attendanceCount: number;
+  attendanceSummary?: AttendanceSummary;
+}
+
+export interface TeacherHomeworkCheckIn extends ParentHomeworkCheckIn {
+  student?: { id: string; name: string; grade: string } | null;
+  reviewer?: { id: string; name: string } | null;
+}
+
+export interface TeacherLessonFeedback {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  teacherId?: string | null;
+  courseId?: string | null;
+  classId?: string | null;
+  content: string;
+  imageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string; grade: string } | null;
+  course?: Course | null;
+  session?: TeacherClassSession | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+}
+
 interface ApiErrorPayload {
   message?: string;
 }
@@ -822,4 +917,39 @@ export function createParentUploadToken(filename: string): Promise<ParentUploadT
     method: 'POST',
     data: { filename },
   });
+}
+
+export async function fetchTeacherDashboard(): Promise<{
+  sessions: TeacherClassSession[];
+  classes: TeacherClass[];
+}> {
+  return request('/public/teacher/dashboard');
+}
+
+export async function fetchTeacherCalendar(params: { from?: string; to?: string } = {}) {
+  const query = [
+    params.from ? `from=${encodeURIComponent(params.from)}` : '',
+    params.to ? `to=${encodeURIComponent(params.to)}` : '',
+  ]
+    .filter(Boolean)
+    .join('&');
+  return (
+    await request<{ events: TeacherCalendarEvent[] }>(
+      `/public/teacher/calendar${query ? `?${query}` : ''}`,
+    )
+  ).events;
+}
+
+export async function fetchTeacherHomeworkCheckIns(): Promise<TeacherHomeworkCheckIn[]> {
+  return (
+    await request<{ homeworkCheckIns: TeacherHomeworkCheckIn[] }>(
+      '/public/teacher/homework-check-ins',
+    )
+  ).homeworkCheckIns;
+}
+
+export async function fetchTeacherLessonFeedbacks(): Promise<TeacherLessonFeedback[]> {
+  return (
+    await request<{ lessonFeedbacks: TeacherLessonFeedback[] }>('/public/teacher/lesson-feedbacks')
+  ).lessonFeedbacks;
 }

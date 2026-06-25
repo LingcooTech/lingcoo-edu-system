@@ -1,0 +1,310 @@
+.summary-card {
+  padding: 32rpx;
+}
+
+.summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.summary-eyebrow {
+  color: #8b857c;
+  font-size: 25rpx;
+}
+
+.summary-title {
+  margin-top: 8rpx;
+  color: #211f1c;
+  font-size: 40rpx;
+  font-weight: 900;
+}
+
+.scope-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border: 1rpx solid rgba(33, 31, 28, 0.1);
+  border-radius: 999rpx;
+  background: #f6f4f0;
+  padding: 6rpx;
+}
+
+.scope {
+  min-height: 52rpx;
+  border-radius: 999rpx;
+  background: transparent;
+  color: #57534e;
+  font-size: 23rpx;
+  font-weight: 800;
+  line-height: 52rpx;
+  padding: 0 22rpx;
+}
+
+.scope::after,
+.tab::after,
+.day::after {
+  border: 0;
+}
+
+.scope-active {
+  background: #211f1c;
+  color: #fff;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12rpx;
+  margin-top: 34rpx;
+}
+
+.summary-value {
+  color: #211f1c;
+  font-size: 48rpx;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.summary-label {
+  margin-top: 8rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10rpx;
+  margin-top: 22rpx;
+}
+
+.tab {
+  min-height: 86rpx;
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
+  border-radius: 22rpx;
+  background: #fff;
+  color: #211f1c;
+  font-size: 23rpx;
+  font-weight: 800;
+  line-height: 1.25;
+  padding: 0 6rpx;
+}
+
+.tab-active {
+  border-color: #211f1c;
+  background: #211f1c;
+  color: #fff;
+}
+
+.section-title {
+  margin: 34rpx 0 18rpx;
+  color: #211f1c;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.schedule-title {
+  margin-top: 38rpx;
+}
+
+.list {
+  display: grid;
+  gap: 18rpx;
+}
+
+.compact-card,
+.class-card,
+.student-card {
+  padding: 28rpx;
+}
+
+.card-title {
+  color: #211f1c;
+  font-size: 29rpx;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.card-meta {
+  margin-top: 6rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.pill {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #f1e9e1;
+  color: #9a6a4b;
+  font-size: 22rpx;
+  font-weight: 800;
+  padding: 8rpx 16rpx;
+}
+
+.pill.subtle {
+  background: #f6f4f0;
+  color: #57534e;
+}
+
+.empty-card {
+  padding: 34rpx;
+  color: #8b857c;
+  font-size: 26rpx;
+}
+
+.calendar-card {
+  overflow: hidden;
+}
+
+.week-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1rpx solid rgba(33, 31, 28, 0.08);
+}
+
+.day {
+  min-height: 104rpx;
+  border-radius: 0;
+  background: transparent;
+  color: #211f1c;
+  font-size: 24rpx;
+  line-height: 1.2;
+  padding: 0;
+}
+
+.day-active {
+  background: #f1e9e1;
+  color: #9a6a4b;
+}
+
+.day-has .day-num::after,
+.day-active .day-num::after {
+  display: block;
+  width: 8rpx;
+  height: 8rpx;
+  margin: 8rpx auto 0;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  content: '';
+}
+
+.day-label {
+  color: #8b857c;
+  font-size: 20rpx;
+}
+
+.day-num {
+  margin-top: 6rpx;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.session-row {
+  padding: 28rpx;
+  border-bottom: 1rpx solid rgba(33, 31, 28, 0.08);
+}
+
+.session-row:last-child {
+  border-bottom: 0;
+}
+
+.session-time {
+  color: #211f1c;
+  font-size: 36rpx;
+  font-weight: 900;
+}
+
+.session-class {
+  margin-top: 6rpx;
+  color: #211f1c;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.status-text {
+  color: #57534e;
+  font-size: 24rpx;
+}
+
+.session-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.class-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+  margin-top: 24rpx;
+  padding: 20rpx 0;
+  border-top: 1rpx solid rgba(33, 31, 28, 0.08);
+  border-bottom: 1rpx solid rgba(33, 31, 28, 0.08);
+  text-align: center;
+}
+
+.stat-num {
+  color: #211f1c;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+
+.stat-label {
+  margin-top: 4rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+}
+
+.student-mini-list {
+  display: grid;
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.student-mini,
+.balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  border-radius: 18rpx;
+  background: #f6f4f0;
+  padding: 18rpx 20rpx;
+}
+
+.student-name {
+  color: #211f1c;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.balance {
+  flex-shrink: 0;
+  color: #211f1c;
+  font-size: 25rpx;
+  font-weight: 850;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 20rpx;
+}
+
+.balance-list {
+  display: grid;
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.content-text {
+  margin-top: 20rpx;
+  color: #57534e;
+  font-size: 25rpx;
+  line-height: 1.7;
+}
