@@ -171,6 +171,29 @@ export const courseContractsModule: AppModule = {
       return result;
     });
 
+    app.post(
+      '/v1/course-contracts/:courseContractId/gifts',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseContractId } = request.params as { courseContractId: string };
+        const body = courseContractGiftSchema.parse(request.body);
+        return courseContractsRepo.addCourseContractGift(app.db, {
+          courseContractId,
+          gift: {
+            courseId: body.courseId,
+            classId: body.classId ?? null,
+            title: body.title ?? null,
+            lessonCount: body.lessonCount,
+            reason: body.reason ?? 'other',
+            startsAt: normalizeDate(body.startsAt),
+            endsAt: normalizeDate(body.endsAt),
+            note: body.note ?? null,
+          },
+          createdByAccountId: request.account!.id,
+        });
+      },
+    );
+
     registerLeadContractRoute('/v1');
     registerLeadContractRoute('/v1/crm');
 

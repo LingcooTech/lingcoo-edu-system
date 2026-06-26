@@ -13,7 +13,7 @@ type DbOrTx = Database | Tx;
 type PaymentReceiverType = (typeof schema.paymentReceiverTypeEnum.enumValues)[number];
 type CourseContractStatus = (typeof schema.courseContractStatusEnum.enumValues)[number];
 
-type CourseContractGiftInput = {
+export type CourseContractGiftInput = {
   courseId: string;
   classId?: string | null;
   title?: string | null;
@@ -382,61 +382,13 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
 
   const gifts = [];
   for (const giftInput of input.gifts ?? []) {
-    const giftCourse = await findCourse(tx, giftInput.courseId);
-    if (!giftCourse) {
-      throw httpError(404, 'Gift course not found');
-    }
-
-    let giftClass: typeof schema.classes.$inferSelect | null = null;
-    let giftEnrollment: typeof schema.classEnrollments.$inferSelect | null = null;
-    if (giftInput.classId) {
-      giftClass = await findClassForUpdate(tx, giftInput.classId);
-      if (!giftClass) {
-        throw httpError(404, 'Gift class not found');
-      }
-      if (giftClass.courseId !== giftInput.courseId) {
-        throw httpError(422, '赠课班级与赠课课程不匹配');
-      }
-      giftEnrollment = await upsertClassEnrollment(tx, {
-        classId: giftClass.id,
-        studentId: input.studentId,
-        capacity: giftClass.capacity,
-      });
-    }
-
-    const [gift] = await tx
-      .insert(schema.courseContractGifts)
-      .values({
-        courseContractId: contract.id,
-        studentId: input.studentId,
-        courseId: giftInput.courseId,
-        classId: giftInput.classId ?? null,
-        title: giftInput.title?.trim() || `${giftCourse.name}赠课`,
-        lessonCount: giftInput.lessonCount,
-        reason: giftInput.reason ?? 'other',
-        startsAt: giftInput.startsAt ?? null,
-        endsAt: giftInput.endsAt ?? null,
-        status: 'active',
-        note: giftInput.note ?? null,
-        createdByAccountId: input.createdByAccountId ?? null,
-      })
-      .returning();
-
-    await applyLessonDelta(tx, {
-      studentId: input.studentId,
-      courseId: giftInput.courseId,
-      type: 'adjustment',
-      amount: giftInput.lessonCount,
-      relatedEntityType: 'course_contract_gift',
-      relatedEntityId: gift.id,
-    });
-
-    gifts.push({
-      ...gift,
-      course: giftCourse,
-      class: giftClass ?? undefined,
-      enrollment: giftEnrollment ?? undefined,
-    });
+    gifts.push(
+      await createCourseContractGiftInTx(tx, {
+        contract,
+        gift: giftInput,
+        createdByAccountId: input.createdByAccountId,
+      }),
+    );
   }
 
   return {
@@ -454,6 +406,71 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
     paymentRecord,
     enrollment,
     gifts,
+  };
+}
+
+async function createCourseContractGiftInTx(
+  tx: Tx,
+  input: {
+    contract: typeof schema.courseContracts.$inferSelect;
+    gift: CourseContractGiftInput;
+    createdByAccountId?: string | null;
+  },
+) {
+  const giftCourse = await findCourse(tx, input.gift.courseId);
+  if (!giftCourse) {
+    throw httpError(404, 'Gift course not found');
+  }
+
+  let giftClass: typeof schema.classes.$inferSelect | null = null;
+  let giftEnrollment: typeof schema.classEnrollments.$inferSelect | null = null;
+  if (input.gift.classId) {
+    giftClass = await findClassForUpdate(tx, input.gift.classId);
+    if (!giftClass) {
+      throw httpError(404, 'Gift class not found');
+    }
+    if (giftClass.courseId !== input.gift.courseId) {
+      throw httpError(422, '赠课班级与赠课课程不匹配');
+    }
+    giftEnrollment = await upsertClassEnrollment(tx, {
+      classId: giftClass.id,
+      studentId: input.contract.studentId,
+      capacity: giftClass.capacity,
+    });
+  }
+
+  const [gift] = await tx
+    .insert(schema.courseContractGifts)
+    .values({
+      courseContractId: input.contract.id,
+      studentId: input.contract.studentId,
+      courseId: input.gift.courseId,
+      classId: input.gift.classId ?? null,
+      title: input.gift.title?.trim() || `${giftCourse.name}赠课`,
+      lessonCount: input.gift.lessonCount,
+      reason: input.gift.reason ?? 'other',
+      startsAt: input.gift.startsAt ?? null,
+      endsAt: input.gift.endsAt ?? null,
+      status: 'active',
+      note: input.gift.note ?? null,
+      createdByAccountId: input.createdByAccountId ?? null,
+    })
+    .returning();
+
+  await applyLessonDelta(tx, {
+    studentId: input.contract.studentId,
+    courseId: input.gift.courseId,
+    type: 'adjustment',
+    amount: input.gift.lessonCount,
+    relatedEntityType: 'course_contract_gift',
+    relatedEntityId: gift.id,
+  });
+
+  return {
+    ...gift,
+    course: giftCourse,
+    class: giftClass ?? undefined,
+    enrollment: giftEnrollment ?? undefined,
   };
 }
 
@@ -526,6 +543,43 @@ export async function listCourseContracts(db: Database) {
 
 export async function createCourseContract(db: Database, input: CourseContractInput) {
   return db.transaction(async (tx) => createCourseContractInTx(tx, input));
+}
+
+export async function addCourseContractGift(
+  db: Database,
+  input: {
+    courseContractId: string;
+    gift: CourseContractGiftInput;
+    createdByAccountId?: string | null;
+  },
+) {
+  return db.transaction(async (tx) => {
+    const [contract] = await tx
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, input.courseContractId))
+      .limit(1)
+      .for('update');
+    if (!contract) {
+      throw httpError(404, 'Course contract not found');
+    }
+    if (contract.status !== 'active') {
+      throw httpError(422, '只能为进行中的正式课程档案补赠课');
+    }
+
+    const gift = await createCourseContractGiftInTx(tx, {
+      contract,
+      gift: input.gift,
+      createdByAccountId: input.createdByAccountId,
+    });
+
+    await tx
+      .update(schema.courseContracts)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.courseContracts.id, contract.id));
+
+    return { gift };
+  });
 }
 
 export async function createCourseContractFromLead(db: Database, input: LeadContractInput) {

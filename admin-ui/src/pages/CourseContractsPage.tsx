@@ -153,10 +153,16 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ContractForm>(emptyForm);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [giftTarget, setGiftTarget] = useState<CourseContract | null>(null);
+  const [giftForm, setGiftForm] = useState<GiftForm | null>(null);
+  const [giftSaving, setGiftSaving] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [organization, setOrganization] = useState<OrganizationSettings | null>(null);
+  const [organization, setOrganization] = useState<{
+    businessModel: Pick<OrganizationSettings['businessModel'], 'courseContractEditEnabled'>;
+  } | null>(null);
 
   const activeStudents = useMemo(
     () => students.filter((student) => student.status !== 'inactive'),
@@ -239,8 +245,8 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
     );
   }
 
-  function createEmptyGift(): GiftForm {
-    const courseId = form.courseId || activeGiftCourses[0]?.id || '';
+  function createGiftForm(baseCourseId?: string, startsAt = '', endsAt = ''): GiftForm {
+    const courseId = baseCourseId || activeGiftCourses[0]?.id || '';
     const firstClass = giftClasses(courseId)[0];
     return {
       courseId,
@@ -248,10 +254,14 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       title: '',
       lessonCount: '1',
       reason: 'other',
-      startsAt: form.startsAt,
-      endsAt: form.endsAt,
+      startsAt,
+      endsAt,
       note: '',
     };
+  }
+
+  function createEmptyGift(): GiftForm {
+    return createGiftForm(form.courseId, form.startsAt, form.endsAt);
   }
 
   function updateGift(index: number, patch: Partial<GiftForm>) {
@@ -280,7 +290,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       .then(setOrganization)
       .catch(() => {
         // 如果加载失败，默认允许编辑
-        setOrganization({ businessModel: { courseContractEditEnabled: true } } as any);
+        setOrganization({ businessModel: { courseContractEditEnabled: true } });
       });
   }, []);
 
@@ -445,6 +455,71 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
     }
   }
 
+  function openSupplementGift(contract: CourseContract) {
+    setGiftTarget(contract);
+    setGiftForm(
+      createGiftForm(
+        contract.courseId,
+        contract.startsAt ? new Date(contract.startsAt).toISOString().split('T')[0] : '',
+        contract.endsAt ? new Date(contract.endsAt).toISOString().split('T')[0] : '',
+      ),
+    );
+    setGiftOpen(true);
+  }
+
+  function updateSupplementGift(patch: Partial<GiftForm>) {
+    setGiftForm((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  function handleSupplementGiftCourseChange(courseId: string) {
+    const firstClass = giftClasses(courseId)[0];
+    updateSupplementGift({ courseId, classId: firstClass?.id ?? '' });
+  }
+
+  async function submitSupplementGift() {
+    if (!giftTarget || !giftForm) return;
+    const lessonCount = Number(giftForm.lessonCount);
+    if (!giftForm.courseId || !Number.isInteger(lessonCount) || lessonCount <= 0) {
+      toast.error('请完整填写赠课课程和课时数');
+      return;
+    }
+
+    setGiftSaving(true);
+    try {
+      const { gift } = await apiPost<{ gift: NonNullable<CourseContract['gifts']>[number] }>(
+        `/v1/course-contracts/${giftTarget.id}/gifts`,
+        {
+          courseId: giftForm.courseId,
+          classId: giftForm.classId || null,
+          title: giftForm.title.trim() || null,
+          lessonCount,
+          reason: giftForm.reason,
+          startsAt: toDateTime(giftForm.startsAt),
+          endsAt: toDateTime(giftForm.endsAt),
+          note: giftForm.note.trim() || null,
+        },
+      );
+      setData(
+        data.map((item) =>
+          item.id === giftTarget.id
+            ? {
+                ...item,
+                gifts: [...(item.gifts ?? []), gift],
+              }
+            : item,
+        ),
+      );
+      toast.success('补赠课已添加，课时余额已更新');
+      setGiftOpen(false);
+      setGiftTarget(null);
+      setGiftForm(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '补赠课失败');
+    } finally {
+      setGiftSaving(false);
+    }
+  }
+
   async function updateStatus(contract: CourseContract, status: 'completed' | 'cancelled') {
     try {
       const { courseContract } = await apiPatch<{ courseContract: CourseContract }>(
@@ -587,6 +662,15 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
                     编辑
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  disabled={row.status !== 'active'}
+                  onClick={() => openSupplementGift(row)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  补赠课
+                </button>
                 <button
                   type="button"
                   className="btn btn-ghost px-2 py-1"
@@ -929,6 +1013,138 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             onChange={(event) => setForm({ ...form, note: event.target.value })}
           />
         </Field>
+      </Drawer>
+
+      <Drawer
+        open={giftOpen}
+        onClose={() => {
+          setGiftOpen(false);
+          setGiftTarget(null);
+          setGiftForm(null);
+        }}
+        title="补赠课"
+        description={
+          giftTarget
+            ? `为「${giftTarget.student?.name ?? '学员'}」的「${giftTarget.title}」追加赠课。`
+            : '为正式课程档案追加赠课。'
+        }
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setGiftOpen(false);
+                setGiftTarget(null);
+                setGiftForm(null);
+              }}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={submitSupplementGift}
+              disabled={giftSaving || !giftForm}
+            >
+              {giftSaving ? '添加中...' : '添加补赠课'}
+            </button>
+          </>
+        }
+      >
+        {giftForm && (
+          <div className="space-y-3">
+            <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
+              补赠课不会创建新的正式课程档案，会直接进入所选课程的课时账户。
+            </div>
+            <FieldRow>
+              <Field label="赠送课程" required>
+                <select
+                  className="form-input"
+                  value={giftForm.courseId}
+                  onChange={(event) => handleSupplementGiftCourseChange(event.target.value)}
+                >
+                  <option value="">选择课程</option>
+                  {activeGiftCourses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      {course.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="赠送课时" required>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={1}
+                  value={giftForm.lessonCount}
+                  onChange={(event) => updateSupplementGift({ lessonCount: event.target.value })}
+                />
+              </Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label="赠课班级">
+                <select
+                  className="form-input"
+                  value={giftForm.classId}
+                  onChange={(event) => updateSupplementGift({ classId: event.target.value })}
+                >
+                  <option value="">暂不入班</option>
+                  {giftClasses(giftForm.courseId).map((classGroup) => (
+                    <option key={classGroup.id} value={classGroup.id}>
+                      {classGroup.name} · {classGroup.enrolledCount}/{classGroup.capacity}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="赠课原因">
+                <select
+                  className="form-input"
+                  value={giftForm.reason}
+                  onChange={(event) => updateSupplementGift({ reason: event.target.value })}
+                >
+                  {Object.entries(GIFT_REASON_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </FieldRow>
+            <Field label="赠课标题">
+              <input
+                className="form-input"
+                value={giftForm.title}
+                onChange={(event) => updateSupplementGift({ title: event.target.value })}
+              />
+            </Field>
+            <FieldRow>
+              <Field label="赠课开始日期">
+                <input
+                  className="form-input"
+                  type="date"
+                  value={giftForm.startsAt}
+                  onChange={(event) => updateSupplementGift({ startsAt: event.target.value })}
+                />
+              </Field>
+              <Field label="赠课结束日期">
+                <input
+                  className="form-input"
+                  type="date"
+                  value={giftForm.endsAt}
+                  onChange={(event) => updateSupplementGift({ endsAt: event.target.value })}
+                />
+              </Field>
+            </FieldRow>
+            <Field label="赠课备注">
+              <textarea
+                className="form-input h-20"
+                value={giftForm.note}
+                onChange={(event) => updateSupplementGift({ note: event.target.value })}
+              />
+            </Field>
+          </div>
+        )}
       </Drawer>
     </>
   );

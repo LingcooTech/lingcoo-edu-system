@@ -1348,6 +1348,60 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.ok(unchangedGiftLessonAccount);
     assert.equal(unchangedGiftLessonAccount.balance, 3);
 
+    const addedGift = await app.inject({
+      method: 'POST',
+      url: `/v1/course-contracts/${createdPayload.courseContract.id}/gifts`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        courseId: giftCourse.id,
+        lessonCount: 2,
+        reason: 'retention',
+        note: '创建档案后补赠课',
+      },
+    });
+    assert.equal(addedGift.statusCode, 200, addedGift.body);
+    assert.equal(addedGift.json().gift.course.id, giftCourse.id);
+    assert.equal(addedGift.json().gift.lessonCount, 2);
+
+    const [supplementGiftLessonAccount] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, student.id),
+          eq(schema.lessonAccounts.courseId, giftCourse.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(supplementGiftLessonAccount);
+    assert.equal(supplementGiftLessonAccount.balance, 5);
+
+    const [supplementGiftTransaction] = await app.db
+      .select()
+      .from(schema.lessonTransactions)
+      .where(
+        and(
+          eq(schema.lessonTransactions.studentId, student.id),
+          eq(schema.lessonTransactions.relatedEntityType, 'course_contract_gift'),
+          eq(schema.lessonTransactions.relatedEntityId, addedGift.json().gift.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(supplementGiftTransaction);
+    assert.equal(supplementGiftTransaction.amount, 2);
+
+    const listedAfterSupplementGift = await app.inject({
+      method: 'GET',
+      url: '/v1/course-contracts',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(listedAfterSupplementGift.statusCode, 200, listedAfterSupplementGift.body);
+    const supplementedContract = listedAfterSupplementGift
+      .json()
+      .courseContracts.find((item: { id: string }) => item.id === createdPayload.courseContract.id);
+    assert.ok(supplementedContract);
+    assert.equal(supplementedContract.gifts.length, 2);
+
     const completed = await app.inject({
       method: 'PATCH',
       url: `/v1/course-contracts/${createdPayload.courseContract.id}/status`,
