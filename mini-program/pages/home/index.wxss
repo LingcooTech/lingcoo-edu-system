@@ -76,8 +76,8 @@
 
 .quick-panel {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10rpx;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8rpx;
   margin-top: 22rpx;
   border-radius: 28rpx;
   background: #fff;
@@ -88,7 +88,7 @@
 .quick-action {
   display: flex;
   width: 100%;
-  min-height: 136rpx;
+  min-height: 126rpx;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -114,8 +114,8 @@
 
 .quick-icon-wrap {
   display: flex;
-  width: 58rpx;
-  height: 58rpx;
+  width: 54rpx;
+  height: 54rpx;
   align-items: center;
   justify-content: center;
   border-radius: 18rpx;
@@ -123,14 +123,14 @@
 }
 
 .quick-icon {
-  width: 38rpx;
-  height: 38rpx;
+  width: 36rpx;
+  height: 36rpx;
 }
 
 .quick-label {
-  margin-top: 12rpx;
+  margin-top: 10rpx;
   color: #211f1c;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 800;
 }
 
@@ -191,6 +191,51 @@
 
 .intro-section-text {
   margin-top: 14rpx;
+  white-space: pre-line;
+}
+
+.institution-list {
+  display: grid;
+  gap: 16rpx;
+  margin-top: 22rpx;
+}
+
+.institution-card {
+  display: flex;
+  gap: 18rpx;
+  border-top: 1rpx solid rgba(33, 31, 28, 0.08);
+  padding-top: 18rpx;
+}
+
+.institution-logo {
+  width: 96rpx;
+  height: 96rpx;
+  flex: 0 0 96rpx;
+  border-radius: 16rpx;
+  background: #f7f3ee;
+}
+
+.institution-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.institution-name {
+  color: #211f1c;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.institution-intro {
+  margin-top: 8rpx;
+  white-space: pre-line;
+}
+
+.institution-contact {
+  margin-top: 8rpx;
+  color: #8b857c;
+  font-size: 24rpx;
+  line-height: 1.5;
   white-space: pre-line;
 }
 

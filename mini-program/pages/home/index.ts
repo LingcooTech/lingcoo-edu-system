@@ -1,9 +1,11 @@
 import {
+  fetchPublicInstitutions,
   fetchStories,
   loadHome,
   type ContentItem,
   type Course,
   type HomePayload,
+  type PublicInstitution,
   type PublicProfileHighlight,
   type PublicTeacher,
   type TrialSession,
@@ -43,6 +45,14 @@ interface HomeCampusCard {
   imageUrls: string[];
 }
 
+interface HomeInstitutionCard {
+  id: string;
+  name: string;
+  logoUrl: string;
+  intro: string;
+  contact: string;
+}
+
 interface GrowthLoopStepCard {
   title: string;
   indexLabel: string;
@@ -72,6 +82,7 @@ interface HomeState {
   aboutTeachingTitle: string;
   aboutTeachingIntro: string;
   aboutBlocks: Block[];
+  institutions: HomeInstitutionCard[];
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImages: string[];
@@ -115,6 +126,7 @@ const initialState: HomeState = {
   aboutTeachingTitle: '',
   aboutTeachingIntro: '',
   aboutBlocks: [],
+  institutions: [],
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
@@ -142,6 +154,7 @@ const initialState: HomeState = {
 
 const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
   { key: 'intro', label: '品牌介绍', iconUrl: '/assets/nav/brand.png' },
+  { key: 'advantages', label: '核心优势', iconUrl: '/assets/nav/course.png' },
   { key: 'campuses', label: '校区环境', iconUrl: '/assets/nav/campus.png' },
   { key: 'teachers', label: '师资团队', iconUrl: '/assets/nav/teacher.png' },
   { key: 'stories', label: '成长故事', iconUrl: '/assets/nav/story.png' },
@@ -193,6 +206,16 @@ function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
   };
 }
 
+function toInstitutionCard(item: PublicInstitution): HomeInstitutionCard {
+  return {
+    id: item.id,
+    name: item.name,
+    logoUrl: item.logoUrl || '',
+    intro: item.intro?.trim() || '机构介绍待补充',
+    contact: item.contact?.trim() || '',
+  };
+}
+
 function platformTitleFor(brandName: string, configuredTitle?: string) {
   const raw = configuredTitle?.trim();
   const legacyDefaults = ['运营方介绍', '预约平台', '美智成长空间预约平台'];
@@ -208,7 +231,11 @@ function platformIntroFallbackFor(brandName: string) {
   return `${subject}负责线上课程展示、试听预约、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排。`;
 }
 
-function toState(home: HomePayload, storyItems: ContentItem[] = home.contentItems ?? []): HomeState {
+function toState(
+  home: HomePayload,
+  storyItems: ContentItem[] = home.contentItems ?? [],
+  institutions: PublicInstitution[] = [],
+): HomeState {
   const profile = home.organization.publicProfile;
   const about = home.organization.publicSite?.aboutPage;
   const bannerImages = Array.from(
@@ -247,6 +274,7 @@ function toState(home: HomePayload, storyItems: ContentItem[] = home.contentItem
       about?.brandCooperation ||
       '教学机构负责课程研发、师资安排、课堂交付与课后反馈。家长可结合课程详情、教师团队和成长故事，判断课程是否适合孩子当前阶段。',
     aboutBlocks: about?.bodyBlocks || [],
+    institutions: institutions.map(toInstitutionCard),
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
@@ -328,9 +356,13 @@ Page({
   async load() {
     this.setData({ loading: true });
     try {
-      const [home, stories] = await Promise.all([loadHome(), fetchStories({ limit: 20, offset: 0 })]);
+      const [home, stories, institutions] = await Promise.all([
+        loadHome(),
+        fetchStories({ limit: 20, offset: 0 }),
+        fetchPublicInstitutions(),
+      ]);
       wx.setNavigationBarTitle({ title: home.organization.brandName || '成长教室' });
-      this.setData(toState(home, stories.items));
+      this.setData(toState(home, stories.items, institutions));
     } catch (error) {
       this.setData({ loading: false });
       wx.showToast({

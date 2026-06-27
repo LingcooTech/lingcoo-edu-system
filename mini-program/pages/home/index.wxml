@@ -60,8 +60,21 @@
         <view class="intro-section">
           <view class="intro-section-title">{{aboutTeachingTitle}}</view>
           <view class="body-text intro-section-text">{{aboutTeachingIntro}}</view>
+          <view wx:if="{{institutions.length}}" class="institution-list">
+            <view wx:for="{{institutions}}" wx:key="id" class="institution-card">
+              <image wx:if="{{item.logoUrl}}" class="institution-logo" src="{{item.logoUrl}}" mode="aspectFit" />
+              <view class="institution-body">
+                <view class="institution-name">{{item.name}}</view>
+                <view class="body-text institution-intro">{{item.intro}}</view>
+                <view wx:if="{{item.contact}}" class="institution-contact">{{item.contact}}</view>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
+    </view>
+
+    <view wx:if="{{activeHomeTab == 'advantages'}}" class="tab-content">
       <view wx:if="{{stats.length}}" class="section stats">
         <view wx:for="{{stats}}" wx:key="*this" class="stat-card">{{item}}</view>
       </view>
@@ -79,6 +92,20 @@
           </view>
         </view>
       </view>
+
+      <view wx:if="{{growthLoopTitle}}" class="section contact-card">
+        <view class="contact-title">{{growthLoopTitle}}</view>
+        <view wx:if="{{growthLoopSummary}}" class="contact-copy">{{growthLoopSummary}}</view>
+        <view class="contact-steps">
+          <view wx:for="{{growthLoopSteps}}" wx:key="title" class="contact-step">
+            <view class="contact-step-index">{{item.indexLabel}}</view>
+            <view>{{item.title}}</view>
+          </view>
+        </view>
+        <button class="btn contact-btn" bindtap="onGrowthPrimaryCta">{{growthLoopPrimaryCtaText}}</button>
+      </view>
+
+      <view wx:if="{{!stats.length && !highlights.length && !growthLoopTitle}}" class="empty compact-empty">核心优势整理中</view>
     </view>
 
     <view wx:if="{{activeHomeTab == 'teachers'}}" class="tab-content teacher-section">
@@ -150,16 +177,5 @@
       <view wx:else class="empty compact-empty">成长故事整理中</view>
     </view>
 
-    <view wx:if="{{growthLoopTitle}}" class="section contact-card">
-      <view class="contact-title">{{growthLoopTitle}}</view>
-      <view wx:if="{{growthLoopSummary}}" class="contact-copy">{{growthLoopSummary}}</view>
-      <view class="contact-steps">
-        <view wx:for="{{growthLoopSteps}}" wx:key="title" class="contact-step">
-          <view class="contact-step-index">{{item.indexLabel}}</view>
-          <view>{{item.title}}</view>
-        </view>
-      </view>
-      <button class="btn contact-btn" bindtap="onGrowthPrimaryCta">{{growthLoopPrimaryCtaText}}</button>
-    </view>
   </block>
 </view>
