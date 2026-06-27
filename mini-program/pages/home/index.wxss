@@ -82,20 +82,22 @@
 }
 
 .quick-panel {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12rpx;
+  display: flex;
+  flex-wrap: nowrap;
   margin-top: 22rpx;
   border-radius: 28rpx;
   background: #fff;
-  padding: 20rpx 16rpx;
+  padding: 18rpx 6rpx;
   box-shadow: 0 12rpx 32rpx rgba(33, 31, 28, 0.06);
 }
 
 .quick-action {
   display: flex;
-  width: 100%;
-  min-height: 126rpx;
+  width: 20%;
+  min-width: 0;
+  max-width: 20%;
+  min-height: 118rpx;
+  flex: 0 0 20%;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -103,7 +105,7 @@
   border-radius: 20rpx;
   background: transparent;
   margin: 0;
-  padding: 10rpx 6rpx;
+  padding: 10rpx 2rpx;
   line-height: 1.2;
 }
 
@@ -121,8 +123,8 @@
 
 .quick-icon-wrap {
   display: flex;
-  width: 54rpx;
-  height: 54rpx;
+  width: 50rpx;
+  height: 50rpx;
   align-items: center;
   justify-content: center;
   border-radius: 18rpx;
@@ -130,15 +132,18 @@
 }
 
 .quick-icon {
-  width: 36rpx;
-  height: 36rpx;
+  width: 34rpx;
+  height: 34rpx;
 }
 
 .quick-label {
   margin-top: 10rpx;
   color: #211f1c;
-  font-size: 22rpx;
+  font-size: 21rpx;
   font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .quick-action.active .quick-label {
