@@ -15,12 +15,16 @@ import { useApiResource } from '@/lib/useApiResource';
 interface CampusForm {
   name: string;
   address: string;
+  latitude: string;
+  longitude: string;
   environmentImages: string;
 }
 
 const emptyForm: CampusForm = {
   name: '',
   address: '',
+  latitude: '',
+  longitude: '',
   environmentImages: '',
 };
 
@@ -28,6 +32,8 @@ function campusToForm(campus: Campus): CampusForm {
   return {
     name: campus.name,
     address: campus.address ?? '',
+    latitude: campus.latitude == null ? '' : String(campus.latitude),
+    longitude: campus.longitude == null ? '' : String(campus.longitude),
     environmentImages: (campus.environmentImageUrls ?? []).join('\n'),
   };
 }
@@ -37,6 +43,13 @@ function imageLines(value: string) {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function optionalNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
 interface EmbeddedCreateAction {
@@ -82,11 +95,27 @@ export function CampusesPage({
       toast.error('校区名称必填');
       return;
     }
+    const latitude = optionalNumber(form.latitude);
+    const longitude = optionalNumber(form.longitude);
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+      toast.error('经纬度必须填写数字');
+      return;
+    }
+    if (latitude != null && (latitude < -90 || latitude > 90)) {
+      toast.error('纬度范围应在 -90 到 90 之间');
+      return;
+    }
+    if (longitude != null && (longitude < -180 || longitude > 180)) {
+      toast.error('经度范围应在 -180 到 180 之间');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         name: form.name.trim(),
         address: form.address.trim() || null,
+        latitude,
+        longitude,
         environmentImageUrls: imageLines(form.environmentImages),
       };
       if (editing) {
@@ -127,6 +156,14 @@ export function CampusesPage({
         columns={[
           { key: 'name', header: '校区', cell: (row) => row.name },
           { key: 'address', header: '地址', cell: (row) => row.address ?? '-' },
+          {
+            key: 'location',
+            header: '地图位置',
+            cell: (row) =>
+              row.latitude != null && row.longitude != null
+                ? `${row.latitude}, ${row.longitude}`
+                : '-',
+          },
           {
             key: 'environment',
             header: '环境图',
@@ -189,6 +226,24 @@ export function CampusesPage({
             onChange={(event) => setForm({ ...form, address: event.target.value })}
           />
         </Field>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="纬度" hint="用于小程序点击地址打开地图，例如 31.2304">
+            <input
+              className="form-input"
+              inputMode="decimal"
+              value={form.latitude}
+              onChange={(event) => setForm({ ...form, latitude: event.target.value })}
+            />
+          </Field>
+          <Field label="经度" hint="例如 121.4737">
+            <input
+              className="form-input"
+              inputMode="decimal"
+              value={form.longitude}
+              onChange={(event) => setForm({ ...form, longitude: event.target.value })}
+            />
+          </Field>
+        </div>
         <QiniuGalleryField
           label="校区环境图片"
           hint="用于小程序首页「校区环境」展示。每行一个图片地址，也可以上传后自动追加。"

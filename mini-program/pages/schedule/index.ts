@@ -1,5 +1,4 @@
 import { fetchParentCalendar, hasToken } from '../../services/api';
-import { createChromeState } from '../../utils/chrome';
 import { toCalendarEventItem, type CalendarEventItem } from '../../utils/parent-center';
 import { shareCard, timelineCard } from '../../utils/share';
 
@@ -80,11 +79,9 @@ Page({
     weekDays: [] as WeekDayItem[],
     events: [] as CalendarEventItem[],
     selectedEvents: [] as CalendarEventItem[],
-    heroStyle: createChromeState(18).heroStyle,
   },
 
   onLoad() {
-    this.setData({ heroStyle: createChromeState(18).heroStyle });
     this.resetWeek(new Date());
   },
 

@@ -146,6 +146,7 @@ export interface HomePayload {
       highlightsTitle: string;
       highlights: PublicProfileHighlight[];
       bannerImages: string[];
+      miniBannerImages: string[];
       bannerImageUrl: string;
       bannerTitle: string;
       bannerSubtitle: string;

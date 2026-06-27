@@ -92,6 +92,8 @@ export interface Campus {
   id: string;
   name: string;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   environmentImageUrls: string[];
 }
 
@@ -566,6 +568,7 @@ export interface PublicProfile {
   highlightsTitle: string;
   highlights: PublicProfileHighlight[];
   bannerImages: string[];
+  miniBannerImages: string[];
   bannerImageUrl: string;
   bannerTitle: string;
   bannerSubtitle: string;

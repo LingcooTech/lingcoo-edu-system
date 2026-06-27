@@ -1,0 +1,17 @@
+<view class="tabbar">
+  <view class="tabbar-safe-area" style="{{safeAreaStyle}}"></view>
+  <view class="tabbar-items">
+    <view
+      wx:for="{{items}}"
+      wx:key="pagePath"
+      class="tabbar-item {{item.active ? 'active' : ''}}"
+      data-path="{{item.pagePath}}"
+      bindtap="onTabChange"
+    >
+      <view class="tabbar-icon">
+        <image src="{{item.active ? item.activeIcon : item.icon}}" mode="aspectFit" />
+      </view>
+      <view class="tabbar-label">{{item.text}}</view>
+    </view>
+  </view>
+</view>

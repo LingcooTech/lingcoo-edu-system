@@ -1,3 +1,4 @@
+<custom-navbar title="老师详情" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
@@ -7,8 +8,6 @@
   </view>
 
   <block wx:else>
-    <button class="back-button" bindtap="goTeachers">‹ 教师团队</button>
-
     <view class="header card">
       <view class="header-main">
         <view class="teacher-head">

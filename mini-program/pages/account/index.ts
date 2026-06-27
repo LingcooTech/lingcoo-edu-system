@@ -25,7 +25,6 @@ import {
   type LessonAccountItem,
   type LessonFeedbackItem,
 } from '../../utils/parent-center';
-import { createChromeState } from '../../utils/chrome';
 
 type HubStats = {
   childCount: number;
@@ -164,15 +163,9 @@ Page({
     nextLesson: null as CalendarEventItem | null,
     latestFeedback: null as LessonFeedbackItem | null,
     todoItems: [] as TodoItem[],
-    heroStyle: createChromeState(28).heroStyle,
-  },
-
-  onLoad() {
-    this.setData({ heroStyle: createChromeState(28).heroStyle });
   },
 
   onShow() {
-    this.setData(createChromeState(28));
     if (hasToken()) {
       this.setData({ booting: !this.data.account });
       this.loadSession();

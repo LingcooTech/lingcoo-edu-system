@@ -1,5 +1,6 @@
+<custom-navbar title="课程" />
 <view class="page courses-page">
-  <view class="courses-hero" style="{{heroStyle}}">
+  <view class="courses-hero">
     <view class="courses-eyebrow">课程</view>
     <view class="courses-title">选择适合孩子的课程</view>
     <view class="courses-subtitle">了解课程方向、适合年龄和试听安排。</view>
@@ -20,3 +21,4 @@
   </view>
   <view wx:else class="empty">课程即将上线</view>
 </view>
+<tabbar />

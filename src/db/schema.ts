@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -185,6 +186,8 @@ export const campuses = pgTable('campuses', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 120 }).notNull(),
   address: varchar('address', { length: 255 }),
+  latitude: doublePrecision('latitude'),
+  longitude: doublePrecision('longitude'),
   environmentImageUrls: jsonb('environment_image_urls')
     .$type<string[]>()
     .notNull()

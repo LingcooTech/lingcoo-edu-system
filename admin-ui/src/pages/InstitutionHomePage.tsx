@@ -25,6 +25,7 @@ interface HomeForm {
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImagesText: string;
+  miniBannerImagesText: string;
   ctaText: string;
   ctaLink: string;
   secondaryCtaText: string;
@@ -197,6 +198,7 @@ function profileToForm(profile: PublicProfile): HomeForm {
     )
       .filter(Boolean)
       .join('\n'),
+    miniBannerImagesText: (profile.miniBannerImages ?? []).filter(Boolean).join('\n'),
     ctaText: profile.ctaText,
     ctaLink: profile.ctaLink,
     secondaryCtaText: profile.secondaryCtaText,
@@ -410,6 +412,7 @@ function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAct
   const save = useCallback(async () => {
     if (!form || saving) return;
     const bannerImages = linesToList(form.bannerImagesText);
+    const miniBannerImages = linesToList(form.miniBannerImagesText);
     setSaving(true);
     try {
       const updated = await saveOrganization({
@@ -417,6 +420,7 @@ function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAct
           eyebrow: '',
           highlightsTitle: form.highlightsTitle,
           bannerImages,
+          miniBannerImages,
           bannerImageUrl: bannerImages[0] ?? '',
           bannerTitle: form.bannerTitle,
           bannerSubtitle: form.bannerSubtitle,
@@ -478,10 +482,17 @@ function HomeContentEditor({ onSaveActionChange }: { onSaveActionChange: SaveAct
         </Field>
         <QiniuGalleryField
           label="首屏轮播图"
-          hint="可上传或从素材库勾选多张图片"
+          hint="Web 端首页使用，建议使用宽幅横图。"
           value={form.bannerImagesText}
           onChange={(value) => update('bannerImagesText', value)}
           prefix="homepage/banner"
+        />
+        <QiniuGalleryField
+          label="小程序首屏轮播图"
+          hint="可选；小程序优先使用这里的图片，未设置时自动使用上方 Web 端轮播图。建议 750x620 或 1500x1240。"
+          value={form.miniBannerImagesText}
+          onChange={(value) => update('miniBannerImagesText', value)}
+          prefix="homepage/mini-banner"
         />
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="主按钮文字">

@@ -1,6 +1,6 @@
-<view class="schedule-page">
-  <view class="schedule-hero" style="{{heroStyle}}">
-    <view class="schedule-title">课表</view>
+<custom-navbar title="课表" />
+<view class="page schedule-page">
+  <view class="schedule-hero">
     <view class="week-grid">
       <button
         wx:for="{{weekDays}}"
@@ -41,3 +41,4 @@
     </view>
   </view>
 </view>
+<tabbar />

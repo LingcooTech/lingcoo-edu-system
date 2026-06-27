@@ -1,6 +1,5 @@
 import { loadHome, type TrialSession } from '../../services/api';
 import { formatDateTime, money } from '../../utils/format';
-import { createChromeState } from '../../utils/chrome';
 import { shareCard, timelineCard } from '../../utils/share';
 
 type TrialListItem = TrialSession & {
@@ -26,11 +25,9 @@ Page({
     loading: true,
     trials: [] as TrialListItem[],
     bannerImageUrl: '',
-    heroStyle: createChromeState(22).heroStyle,
   },
 
   onLoad() {
-    this.setData({ heroStyle: createChromeState(22).heroStyle });
     this.load();
   },
 

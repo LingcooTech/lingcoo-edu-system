@@ -29,6 +29,7 @@
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
+    "custom": true,
     "color": "#8b857c",
     "selectedColor": "#9a6a4b",
     "backgroundColor": "#ffffff",
@@ -36,33 +37,23 @@
     "list": [
       {
         "pagePath": "pages/home/index",
-        "text": "首页",
-        "iconPath": "assets/tab/home.png",
-        "selectedIconPath": "assets/tab/home-active.png"
+        "text": "首页"
       },
       {
         "pagePath": "pages/courses/index",
-        "text": "课程",
-        "iconPath": "assets/tab/courses.png",
-        "selectedIconPath": "assets/tab/courses-active.png"
+        "text": "课程"
       },
       {
         "pagePath": "pages/trials/index",
-        "text": "试听",
-        "iconPath": "assets/tab/trial-tab.png",
-        "selectedIconPath": "assets/tab/trial-tab-active.png"
+        "text": "试听"
       },
       {
         "pagePath": "pages/schedule/index",
-        "text": "课表",
-        "iconPath": "assets/tab/schedule-tab.png",
-        "selectedIconPath": "assets/tab/schedule-tab-active.png"
+        "text": "课表"
       },
       {
         "pagePath": "pages/account/index",
-        "text": "我的",
-        "iconPath": "assets/tab/account.png",
-        "selectedIconPath": "assets/tab/account-active.png"
+        "text": "我的"
       }
     ]
   },
@@ -70,6 +61,8 @@
   "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json",
   "usingComponents": {
-    "skeleton": "/components/skeleton/index"
+    "skeleton": "/components/skeleton/index",
+    "custom-navbar": "/components/custom-navbar/index",
+    "tabbar": "/components/tabbar/index"
   }
 }

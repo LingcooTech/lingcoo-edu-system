@@ -57,6 +57,14 @@ declare const wx: {
   }) => void;
   setNavigationBarTitle(options: { title: string }): void;
   previewImage(options: { urls: string[]; current?: string; fail?: (error: { errMsg: string }) => void }): void;
+  openLocation(options: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+    scale?: number;
+    fail?: (error: { errMsg: string }) => void;
+  }): void;
   showToast(options: { title: string; icon?: 'success' | 'error' | 'loading' | 'none'; duration?: number }): void;
   showModal(options: {
     title: string;
@@ -111,6 +119,7 @@ declare const wx: {
 declare function App(options: Record<string, unknown>): void;
 declare function Page(options: Record<string, unknown>): void;
 declare function Component(options: Record<string, unknown>): void;
+declare function getCurrentPages(): Array<{ route: string }>;
 
 interface IAppOption {
   globalData: {

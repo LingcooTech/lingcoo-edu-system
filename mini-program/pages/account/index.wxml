@@ -1,7 +1,8 @@
+<custom-navbar title="我的" />
 <view class="page account-page">
   <skeleton wx:if="{{booting}}" variant="hub" />
   <block wx:elif="{{account}}">
-    <view class="hub-card" style="{{heroStyle}}">
+    <view class="hub-card">
       <view class="hub-top">
         <view>
           <view class="hub-eyebrow">我的</view>
@@ -131,7 +132,7 @@
   </block>
 
   <block wx:else>
-    <view class="guest-card" style="{{heroStyle}}">
+    <view class="guest-card">
       <view class="guest-avatar">我</view>
       <view class="guest-title">登录家长中心</view>
       <view class="guest-desc">查看孩子课表、课时余额、订单、点评和通知。</view>
@@ -183,3 +184,4 @@
     </view>
   </view>
 </view>
+<tabbar />

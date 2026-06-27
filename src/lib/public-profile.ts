@@ -42,6 +42,7 @@ export interface PublicProfile {
   highlightsTitle: string;
   highlights: PublicProfileHighlight[];
   bannerImages: string[];
+  miniBannerImages: string[];
   bannerImageUrl: string;
   bannerTitle: string;
   bannerSubtitle: string;
@@ -104,6 +105,7 @@ export const defaultPublicProfile: PublicProfile = {
   bannerImages: [
     'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1600&q=80',
   ],
+  miniBannerImages: [],
   bannerImageUrl:
     'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1600&q=80',
   bannerTitle: '在社区里，给孩子一个稳定成长的课堂',
@@ -322,12 +324,14 @@ export function readPublicProfile(settings: unknown): PublicProfile {
       : defaultPublicProfile.bannerImages,
     12,
   );
+  const miniBannerImages = normalizeStringList(raw.miniBannerImages, [], 12);
 
   return {
     eyebrow: '',
     highlightsTitle: normalizeString(raw.highlightsTitle) || defaultPublicProfile.highlightsTitle,
     highlights: normalizeHighlights(raw.highlights, defaultPublicProfile.highlights, 6),
     bannerImages,
+    miniBannerImages,
     bannerImageUrl: bannerImages[0] || defaultPublicProfile.bannerImageUrl,
     bannerTitle: normalizeString(raw.bannerTitle) || defaultPublicProfile.bannerTitle,
     bannerSubtitle: normalizeString(raw.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,
@@ -355,6 +359,7 @@ export function normalizePublicProfile(input: PublicProfileInput) {
       : defaultPublicProfile.bannerImages,
     12,
   );
+  const miniBannerImages = normalizeStringList(input.miniBannerImages, [], 12);
 
   return {
     eyebrow: '',
@@ -362,6 +367,7 @@ export function normalizePublicProfile(input: PublicProfileInput) {
       normalizeString(input.highlightsTitle) || defaultPublicProfile.highlightsTitle,
     highlights: normalizeHighlights(input.highlights, defaultPublicProfile.highlights, 6),
     bannerImages,
+    miniBannerImages,
     bannerImageUrl: bannerImages[0] || defaultPublicProfile.bannerImageUrl,
     bannerTitle: normalizeString(input.bannerTitle) || defaultPublicProfile.bannerTitle,
     bannerSubtitle: normalizeString(input.bannerSubtitle) || defaultPublicProfile.bannerSubtitle,

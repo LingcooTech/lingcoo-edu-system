@@ -43,6 +43,9 @@ interface HomeCampusCard {
   id: string;
   name: string;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
+  hasLocation: boolean;
   imageUrls: string[];
 }
 
@@ -51,6 +54,7 @@ interface HomeInstitutionCard {
   name: string;
   logoUrl: string;
   intro: string;
+  introParagraphs: string[];
   contact: string;
 }
 
@@ -63,6 +67,7 @@ interface HomeQuickAction {
   key: string;
   label: string;
   iconUrl: string;
+  activeIconUrl: string;
 }
 
 interface HomeState {
@@ -81,10 +86,13 @@ interface HomeState {
   aboutHeroImageUrl: string;
   aboutPlatformTitle: string;
   aboutPlatformIntro: string;
+  aboutPlatformIntroParagraphs: string[];
   aboutTeachingTitle: string;
   aboutTeachingIntro: string;
+  aboutTeachingIntroParagraphs: string[];
   aboutBlocks: Block[];
   institutions: HomeInstitutionCard[];
+  currentBannerIndex: number;
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImages: string[];
@@ -118,18 +126,21 @@ const initialState: HomeState = {
   logoInitial: '成',
   customNavStyle: 'height: 88px; padding-top: 48px; padding-right: 100px;',
   customNavInnerStyle: 'height: 32px;',
-  heroStyle: 'padding-top: 96px;',
-  navLogoStyle: 'width: 128px; height: 25px;',
+  heroStyle: 'padding-top: 0;',
+  navLogoStyle: 'height: 25px; max-width: 168px;',
   activeHomeTab: 'intro',
   aboutTitle: '',
   aboutSubtitle: '',
   aboutHeroImageUrl: '',
   aboutPlatformTitle: '',
   aboutPlatformIntro: '',
+  aboutPlatformIntroParagraphs: [],
   aboutTeachingTitle: '',
   aboutTeachingIntro: '',
+  aboutTeachingIntroParagraphs: [],
   aboutBlocks: [],
   institutions: [],
+  currentBannerIndex: 0,
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
@@ -156,12 +167,19 @@ const initialState: HomeState = {
 };
 
 const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
-  { key: 'intro', label: '品牌介绍', iconUrl: HOME_QUICK_ACTIONS_ICONS.intro },
-  { key: 'advantages', label: '核心优势', iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages },
-  { key: 'campuses', label: '校区环境', iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses },
-  { key: 'teachers', label: '师资团队', iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers },
-  { key: 'stories', label: '成长故事', iconUrl: HOME_QUICK_ACTIONS_ICONS.stories },
+  { key: 'intro', label: '品牌介绍', iconUrl: HOME_QUICK_ACTIONS_ICONS.intro, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.introActive },
+  { key: 'advantages', label: '核心优势', iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.advantagesActive },
+  { key: 'campuses', label: '校区环境', iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.campusesActive },
+  { key: 'teachers', label: '师资团队', iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.teachersActive },
+  { key: 'stories', label: '成长故事', iconUrl: HOME_QUICK_ACTIONS_ICONS.stories, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.storiesActive },
 ];
+
+function createHomeChromeState() {
+  return {
+    ...createChromeState(6),
+    heroStyle: 'padding-top: 0;',
+  };
+}
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
@@ -210,13 +228,22 @@ function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
 }
 
 function toInstitutionCard(item: PublicInstitution): HomeInstitutionCard {
+  const intro = item.intro?.trim() || '机构介绍待补充';
   return {
     id: item.id,
     name: item.name,
     logoUrl: item.logoUrl || '',
-    intro: item.intro?.trim() || '机构介绍待补充',
+    intro,
+    introParagraphs: toParagraphs(intro),
     contact: item.contact?.trim() || '',
   };
+}
+
+function toParagraphs(value: string) {
+  return value
+    .split(/\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
 }
 
 function platformTitleFor(brandName: string, configuredTitle?: string) {
@@ -241,18 +268,25 @@ function toState(
 ): HomeState {
   const profile = home.organization.publicProfile;
   const about = home.organization.publicSite?.aboutPage;
-  const bannerImages = Array.from(
+  const webBannerImages = Array.from(
     new Set(
       (profile.bannerImages?.length ? profile.bannerImages : [profile.bannerImageUrl]).filter(
         Boolean,
       ),
     ),
   );
+  const miniBannerImages = Array.from(new Set((profile.miniBannerImages ?? []).filter(Boolean)));
+  const bannerImages = miniBannerImages.length ? miniBannerImages : webBannerImages;
   const teachers = home.teachers ?? [];
   const trustTeachers = teachers.slice(0, 6).map(toTeacherCard);
+  const aboutPlatformIntro =
+    about?.operatorIntro || platformIntroFallbackFor(home.organization.brandName);
+  const aboutTeachingIntro =
+    about?.brandCooperation ||
+    '教学机构负责课程研发、师资安排、课堂交付与课后反馈。家长可结合课程详情、教师团队和成长故事，判断课程是否适合孩子当前阶段。';
 
   return {
-    ...createChromeState(16),
+    ...createHomeChromeState(),
     loading: false,
     organizationName: home.organization.name,
     brandName: home.organization.brandName,
@@ -268,16 +302,17 @@ function toState(
     aboutSubtitle: about?.subtitle || home.organization.publicProfile.bannerSubtitle,
     aboutHeroImageUrl: about?.heroImageUrl || '',
     aboutPlatformTitle: platformTitleFor(home.organization.brandName, about?.operatorIntroTitle),
-    aboutPlatformIntro: about?.operatorIntro || platformIntroFallbackFor(home.organization.brandName),
+    aboutPlatformIntro,
+    aboutPlatformIntroParagraphs: toParagraphs(aboutPlatformIntro),
     aboutTeachingTitle:
       about?.brandCooperationTitle && about.brandCooperationTitle !== '品牌合作'
         ? about.brandCooperationTitle
         : '教学机构',
-    aboutTeachingIntro:
-      about?.brandCooperation ||
-      '教学机构负责课程研发、师资安排、课堂交付与课后反馈。家长可结合课程详情、教师团队和成长故事，判断课程是否适合孩子当前阶段。',
+    aboutTeachingIntro,
+    aboutTeachingIntroParagraphs: toParagraphs(aboutTeachingIntro),
     aboutBlocks: about?.bodyBlocks || [],
     institutions: institutions.map(toInstitutionCard),
+    currentBannerIndex: 0,
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
@@ -294,6 +329,9 @@ function toState(
       id: campus.id,
       name: campus.name,
       address: campus.address ?? '',
+      latitude: campus.latitude ?? null,
+      longitude: campus.longitude ?? null,
+      hasLocation: campus.latitude != null && campus.longitude != null,
       imageUrls: campus.environmentImageUrls ?? [],
     })),
     growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
@@ -331,7 +369,7 @@ Page({
   data: initialState,
 
   onLoad() {
-    this.setData(createChromeState(16));
+    this.setData(createHomeChromeState());
     this.load();
   },
 
@@ -397,10 +435,39 @@ Page({
     this.setData({ activeHomeTab: key });
   },
 
+  onBannerChange(event: { detail: { current?: number } }) {
+    this.setData({ currentBannerIndex: event.detail.current ?? 0 });
+  },
+
   onPreviewCampusImage(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
     const { url, urls } = event.currentTarget.dataset;
     if (url && Array.isArray(urls) && urls.length) {
       wx.previewImage({ urls, current: url });
     }
+  },
+
+  onOpenCampusLocation(event: {
+    currentTarget: {
+      dataset: {
+        name?: string;
+        address?: string;
+        latitude?: number | string;
+        longitude?: number | string;
+      };
+    };
+  }) {
+    const { name, address } = event.currentTarget.dataset;
+    const latitude = Number(event.currentTarget.dataset.latitude);
+    const longitude = Number(event.currentTarget.dataset.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return;
+    }
+    wx.openLocation({
+      latitude,
+      longitude,
+      name: name || address || '校区位置',
+      address: address || '',
+      scale: 16,
+    });
   },
 });

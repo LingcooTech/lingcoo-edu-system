@@ -1,0 +1,6 @@
+<view class="custom-navbar" style="{{navStyle}}">
+  <view class="custom-navbar-inner" style="{{navInnerStyle}}">
+    <button wx:if="{{showBack}}" class="navbar-back" bindtap="onBack">‹</button>
+    <view class="navbar-title {{showBack ? 'with-back' : ''}}">{{title}}</view>
+  </view>
+</view>

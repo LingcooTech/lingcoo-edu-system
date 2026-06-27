@@ -253,6 +253,13 @@
       "when": 1782604800000,
       "tag": "0035_campus_environment_images",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1782691200000,
+      "tag": "0036_campus_geo",
+      "breakpoints": true
     }
   ]
 }

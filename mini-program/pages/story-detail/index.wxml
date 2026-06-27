@@ -1,3 +1,4 @@
+<custom-navbar title="成长故事" show-back="{{true}}" />
 <view class="page story-detail-page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
@@ -7,8 +8,6 @@
   </view>
 
   <block wx:else>
-    <button class="back-button" bindtap="goBack">‹ 成长故事</button>
-
     <view class="story-header card">
       <image wx:if="{{story.coverUrl}}" class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
       <view class="story-copy">

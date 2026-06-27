@@ -36,6 +36,7 @@ const publicProfileSchema = z.object({
     .max(6)
     .optional(),
   bannerImages: z.array(z.string().min(1).max(500)).max(12).optional(),
+  miniBannerImages: z.array(z.string().min(1).max(500)).max(12).optional(),
   bannerImageUrl: z.string().max(500).optional(),
   bannerTitle: z.string().max(120).optional(),
   bannerSubtitle: z.string().max(240).optional(),
@@ -204,6 +205,8 @@ const organizationSchema = z.object({
 const campusSchema = z.object({
   name: z.string().min(1).max(120),
   address: z.string().max(255).optional().nullable(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
   environmentImageUrls: z.array(z.string().trim().url().max(500)).max(30).optional(),
 });
 
@@ -280,6 +283,8 @@ export const organizationModule: AppModule = {
       const campus = await organizationRepo.createCampus(app.db, {
         name: body.name.trim(),
         address: body.address?.trim() || null,
+        latitude: body.latitude ?? null,
+        longitude: body.longitude ?? null,
         environmentImageUrls: body.environmentImageUrls ?? [],
       });
       return { campus };
@@ -291,6 +296,8 @@ export const organizationModule: AppModule = {
       const campus = await organizationRepo.updateCampus(app.db, campusId, {
         name: body.name?.trim(),
         address: body.address === undefined ? undefined : body.address?.trim() || null,
+        latitude: body.latitude,
+        longitude: body.longitude,
         environmentImageUrls: body.environmentImageUrls,
       });
       if (!campus) {

@@ -5,23 +5,31 @@
     <view class="hero" style="{{heroStyle}}">
       <view class="custom-nav" style="{{customNavStyle}}">
         <view class="custom-nav-inner" style="{{customNavInnerStyle}}">
-          <image wx:if="{{logoUrl}}" class="nav-logo" style="{{navLogoStyle}}" src="{{logoUrl}}" mode="aspectFit" />
+          <image wx:if="{{logoUrl}}" class="nav-logo" style="{{navLogoStyle}}" src="{{logoUrl}}" mode="heightFix" />
           <view wx:else class="nav-logo-text">{{brandName || organizationName || logoInitial}}</view>
         </view>
       </view>
-      <swiper
-        wx:if="{{bannerImages.length}}"
-        class="hero-swiper"
-        autoplay="{{bannerImages.length > 1}}"
-        circular="{{bannerImages.length > 1}}"
-        indicator-dots="{{bannerImages.length > 1}}"
-        indicator-color="rgba(255,255,255,0.55)"
-        indicator-active-color="#ffffff"
-      >
-        <swiper-item wx:for="{{bannerImages}}" wx:key="*this">
-          <image class="hero-image" src="{{item}}" mode="aspectFill" />
-        </swiper-item>
-      </swiper>
+      <view class="hero-mask"></view>
+      <view wx:if="{{bannerImages.length}}" class="hero-swiper-wrap">
+        <swiper
+          class="hero-swiper"
+          autoplay="{{bannerImages.length > 1}}"
+          circular="{{bannerImages.length > 1}}"
+          indicator-dots="{{false}}"
+          bindchange="onBannerChange"
+        >
+          <swiper-item wx:for="{{bannerImages}}" wx:key="*this">
+            <image class="hero-image" src="{{item}}" mode="aspectFill" />
+          </swiper-item>
+        </swiper>
+        <view wx:if="{{bannerImages.length > 1}}" class="hero-indicators">
+          <view
+            wx:for="{{bannerImages}}"
+            wx:key="*this"
+            class="hero-indicator {{currentBannerIndex == index ? 'active' : ''}}"
+          ></view>
+        </view>
+      </view>
       <view class="hero-fallback" wx:else>
         <view class="hero-title">{{bannerTitle}}</view>
         <view class="hero-subtitle">{{bannerSubtitle}}</view>
@@ -37,37 +45,53 @@
         bindtap="onQuickAction"
       >
         <view class="quick-icon-wrap">
-          <image class="quick-icon" src="{{item.iconUrl}}" mode="aspectFit" />
+          <image class="quick-icon" src="{{activeHomeTab == item.key ? item.activeIconUrl : item.iconUrl}}" mode="aspectFit" />
         </view>
         <view class="quick-label">{{item.label}}</view>
       </button>
     </view>
 
     <view wx:if="{{activeHomeTab == 'intro'}}" class="tab-content">
-      <view wx:if="{{aboutTitle || aboutSubtitle || aboutHeroImageUrl}}" class="about-card">
-        <image wx:if="{{aboutHeroImageUrl}}" class="about-image" src="{{aboutHeroImageUrl}}" mode="aspectFill" />
-        <view class="about-copy">
-          <view wx:if="{{aboutTitle}}" class="section-title">{{aboutTitle}}</view>
-          <view wx:if="{{aboutSubtitle}}" class="body-text about-subtitle">{{aboutSubtitle}}</view>
-        </view>
-      </view>
-      <view wx:if="{{aboutBlocks.length}}" class="about-blocks">
-        <block-renderer blocks="{{aboutBlocks}}" />
-      </view>
       <view class="intro-sections">
-        <view class="intro-section">
+        <view class="intro-section intro-platform-section">
           <view class="intro-section-title">{{aboutPlatformTitle}}</view>
-          <view class="body-text intro-section-text">{{aboutPlatformIntro}}</view>
+          <view class="intro-section-text">
+            <view
+              wx:for="{{aboutPlatformIntroParagraphs}}"
+              wx:key="*this"
+              class="body-text intro-paragraph"
+            >
+              {{item}}
+            </view>
+          </view>
         </view>
-        <view class="intro-section">
+        <view class="intro-section intro-institution-section">
           <view class="intro-section-title">{{aboutTeachingTitle}}</view>
-          <view class="body-text intro-section-text">{{aboutTeachingIntro}}</view>
+          <view class="intro-section-text">
+            <view
+              wx:for="{{aboutTeachingIntroParagraphs}}"
+              wx:key="*this"
+              class="body-text intro-paragraph"
+            >
+              {{item}}
+            </view>
+          </view>
           <view wx:if="{{institutions.length}}" class="institution-list">
             <view wx:for="{{institutions}}" wx:key="id" class="institution-card">
-              <image wx:if="{{item.logoUrl}}" class="institution-logo" src="{{item.logoUrl}}" mode="aspectFit" />
+              <view wx:if="{{item.logoUrl}}" class="institution-logo-row">
+                <image class="institution-logo" src="{{item.logoUrl}}" mode="aspectFit" />
+              </view>
               <view class="institution-body">
-                <view class="institution-name">{{item.name}}</view>
-                <view class="body-text institution-intro">{{item.intro}}</view>
+                <view class="institution-intro">
+                  <view
+                    wx:for="{{item.introParagraphs}}"
+                    wx:for-item="paragraph"
+                    wx:key="*this"
+                    class="body-text institution-paragraph"
+                  >
+                    {{paragraph}}
+                  </view>
+                </view>
                 <view wx:if="{{item.contact}}" class="institution-contact">{{item.contact}}</view>
               </view>
             </view>
@@ -142,9 +166,22 @@
     <view wx:if="{{activeHomeTab == 'campuses'}}" class="tab-content campus-list">
       <view wx:if="{{campuses.length}}">
         <view wx:for="{{campuses}}" wx:key="id" class="campus-card">
-          <view class="section-title">{{item.name}}</view>
-          <view wx:if="{{item.address}}" class="campus-line">
-            <view class="campus-label">地址</view>
+          <view class="campus-title-row">
+            <view class="campus-title-mark"></view>
+            <view class="section-title campus-title">{{item.name}}</view>
+          </view>
+          <view
+            wx:if="{{item.address}}"
+            class="campus-line {{item.hasLocation ? 'campus-line-clickable' : ''}}"
+            data-name="{{item.name}}"
+            data-address="{{item.address}}"
+            data-latitude="{{item.latitude}}"
+            data-longitude="{{item.longitude}}"
+            bindtap="onOpenCampusLocation"
+          >
+            <view class="campus-address-icon">
+              <view class="campus-address-pin"></view>
+            </view>
             <view class="campus-value">{{item.address}}</view>
           </view>
           <view wx:if="{{item.imageUrls.length}}" class="campus-images">
@@ -181,3 +218,4 @@
 
   </block>
 </view>
+<tabbar />

@@ -1,3 +1,4 @@
+<custom-navbar title="活动报名" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 

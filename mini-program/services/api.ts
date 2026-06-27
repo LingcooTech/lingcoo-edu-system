@@ -155,6 +155,7 @@ export interface Organization {
     highlightsTitle: string;
     highlights: PublicProfileHighlight[];
     bannerImages: string[];
+    miniBannerImages: string[];
     bannerImageUrl: string;
     bannerTitle: string;
     bannerSubtitle: string;
@@ -214,6 +215,8 @@ export interface HomePayload {
     id: string;
     name: string;
     address: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
     environmentImageUrls?: string[];
   }>;
   teachers: PublicTeacher[];

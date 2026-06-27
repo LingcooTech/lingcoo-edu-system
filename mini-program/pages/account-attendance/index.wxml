@@ -1,3 +1,4 @@
+<custom-navbar title="上课签到" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">

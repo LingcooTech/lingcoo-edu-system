@@ -1,5 +1,6 @@
+<custom-navbar title="试听" />
 <view class="page trials-page">
-  <view class="trial-head" style="{{heroStyle}}">
+  <view class="trial-head">
     <image wx:if="{{bannerImageUrl}}" class="trial-head-image" src="{{bannerImageUrl}}" mode="aspectFill" />
     <view class="trial-head-shade"></view>
     <view class="trial-head-copy">
@@ -37,3 +38,4 @@
     <button class="btn btn-primary empty-button" bindtap="goCourses">查看课程预约</button>
   </view>
 </view>
+<tabbar />

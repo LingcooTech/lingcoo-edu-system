@@ -1,11 +1,13 @@
 .schedule-page {
   min-height: 100vh;
+  padding-bottom: 130rpx;
   background: #f6f4f0;
 }
 
 .schedule-hero {
   margin: -24rpx -24rpx 0;
-  padding: 112px 24rpx 60rpx;
+  margin-top: -88px;
+  padding: calc(88px + 34rpx) 24rpx 60rpx;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0)),
     linear-gradient(180deg, #dcefd8 0%, #eff8ed 100%);
@@ -24,7 +26,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8rpx;
-  margin-top: 46rpx;
+  margin-top: 0;
 }
 
 .day-cell {
