@@ -92,6 +92,7 @@ export interface Campus {
   id: string;
   name: string;
   address?: string | null;
+  environmentImageUrls: string[];
 }
 
 export interface Teacher {

@@ -1,10 +1,10 @@
-<view class="page">
+<view class="page account-page">
   <skeleton wx:if="{{booting}}" variant="hub" />
   <block wx:elif="{{account}}">
-    <view class="card hub-card">
+    <view class="hub-card" style="{{heroStyle}}">
       <view class="hub-top">
         <view>
-          <view class="hub-eyebrow">家长中心</view>
+          <view class="hub-eyebrow">我的</view>
           <view class="hub-title">
             {{childSummaries[0] ? childSummaries[0].name + ' 的学习近况' : '学习近况'}}
           </view>
@@ -43,24 +43,25 @@
       初始密码：{{defaultPassword}}。手机号账号已同步创建。
     </view>
 
-    <view class="quick-grid">
-      <navigator
-        wx:for="{{entries}}"
-        wx:key="key"
-        class="quick-card"
-        url="{{item.url}}"
-        hover-class="quick-card-hover"
-      >
-        <view class="quick-symbol">{{item.symbol}}</view>
-        <view class="quick-text">
-          <view class="quick-label">{{item.label}}</view>
-          <view class="quick-desc">{{item.desc}}</view>
-        </view>
-        <view wx:if="{{item.badge}}" class="quick-badge">{{item.badge}}</view>
-      </navigator>
+    <view wx:for="{{entryGroups}}" wx:key="title" class="section entry-panel">
+      <view class="entry-title">{{item.title}}</view>
+      <view class="entry-grid">
+        <navigator
+          wx:for="{{item.entries}}"
+          wx:for-item="entry"
+          wx:key="key"
+          class="entry-item"
+          url="{{entry.url}}"
+          hover-class="entry-hover"
+        >
+          <view class="entry-symbol">{{entry.symbol}}</view>
+          <view class="entry-label">{{entry.label}}</view>
+          <view wx:if="{{entry.badge}}" class="entry-badge">{{entry.badge}}</view>
+        </navigator>
+      </view>
     </view>
 
-    <view class="section card panel">
+    <view class="section panel">
       <view class="section-head">
         <view class="section-title">孩子与课时</view>
         <navigator class="section-link" url="/pages/account-students/index">全部</navigator>
@@ -81,7 +82,7 @@
     </view>
 
     <view class="section overview-grid">
-      <view class="card panel overview-card">
+      <view class="panel overview-card">
         <view class="section-title">下一节课</view>
         <block wx:if="{{nextLesson}}">
           <view class="next-time">{{nextLesson.startsAtLabel}}</view>
@@ -94,7 +95,7 @@
         <view wx:else class="empty compact-empty">近期暂无正式课程安排</view>
       </view>
 
-      <view class="card panel overview-card">
+      <view class="panel overview-card">
         <view class="section-title">待办</view>
         <navigator
           wx:for="{{todoItems}}"
@@ -109,7 +110,7 @@
       </view>
     </view>
 
-    <view class="section card panel">
+    <view class="section panel">
       <view class="section-head">
         <view class="section-title">最新点评</view>
         <navigator class="section-link" url="/pages/account-feedbacks/index">全部</navigator>
@@ -130,12 +131,23 @@
   </block>
 
   <block wx:else>
-    <view class="card login-card">
-      <view class="title login-title">登录家长中心</view>
-      <view class="body-text login-desc">
-        微信登录后可查看孩子、课时余额、订单、签到、作业和通知。
+    <view class="guest-card" style="{{heroStyle}}">
+      <view class="guest-avatar">我</view>
+      <view class="guest-title">登录家长中心</view>
+      <view class="guest-desc">查看孩子课表、课时余额、订单、点评和通知。</view>
+      <button class="btn btn-primary login-button" bindtap="openLoginSheet">微信登录</button>
+    </view>
+  </block>
+
+  <view wx:if="{{loginSheetVisible}}" class="sheet-mask" bindtap="closeLoginSheet">
+    <view class="login-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">{{bindToken ? '绑定手机号' : '微信登录'}}</view>
+      <view class="sheet-desc">
+        {{bindToken ? '授权手机号后，可同步查看孩子档案、课表和课时账户。' : '登录后可进入家长中心，查看学习服务记录。'}}
       </view>
       <button
+        wx:if="{{!bindToken}}"
         class="btn btn-primary login-button"
         loading="{{loading}}"
         disabled="{{loading}}"
@@ -143,11 +155,7 @@
       >
         {{loading ? '登录中...' : '微信登录'}}
       </button>
-    </view>
-
-    <form wx:if="{{bindToken}}" class="section card bind-card" bindsubmit="onBindSubmit">
-      <view class="section-title">绑定手机号</view>
-      <view class="muted bind-hint">正式环境使用微信手机号授权；本地测试可手动填写。</view>
+      <form wx:else bindsubmit="onBindSubmit">
       <button
         class="btn btn-primary bind-button"
         open-type="getPhoneNumber"
@@ -157,7 +165,7 @@
       >
         微信授权手机号
       </button>
-      <view class="test-divider">本地测试</view>
+      <view class="test-divider">无法授权时手动绑定</view>
       <view class="form-gap">
         <input class="form-field" name="phone" type="number" placeholder="手机号" />
         <input class="form-field" name="displayName" placeholder="家长称呼（选填）" />
@@ -170,6 +178,8 @@
       >
         {{binding ? '绑定中...' : '手动绑定'}}
       </button>
-    </form>
-  </block>
+      </form>
+      <button class="sheet-close" bindtap="closeLoginSheet">稍后再说</button>
+    </view>
+  </view>
 </view>

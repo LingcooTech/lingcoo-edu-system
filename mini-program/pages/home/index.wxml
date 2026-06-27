@@ -1,10 +1,12 @@
-<view class="page">
+<view class="page home-page">
   <skeleton wx:if="{{loading}}" variant="home" />
 
   <block wx:else>
-    <view class="hero card">
-      <view class="title hero-title">{{bannerTitle}}</view>
-      <view class="body-text hero-subtitle">{{bannerSubtitle}}</view>
+    <view class="hero" style="{{heroStyle}}">
+      <view class="custom-nav" style="{{customNavStyle}}">
+        <image wx:if="{{logoUrl}}" class="nav-logo" style="{{navLogoStyle}}" src="{{logoUrl}}" mode="aspectFit" />
+        <view wx:else class="nav-logo-text">{{brandName || organizationName || logoInitial}}</view>
+      </view>
       <swiper
         wx:if="{{bannerImages.length}}"
         class="hero-swiper"
@@ -18,69 +20,68 @@
           <image class="hero-image" src="{{item}}" mode="aspectFill" />
         </swiper-item>
       </swiper>
-      <view class="hero-actions">
-        <button class="btn btn-primary hero-btn" bindtap="onPrimaryCta">{{ctaText}}</button>
-        <button class="btn btn-outline hero-btn" bindtap="goCourses">浏览课程</button>
+      <view class="hero-fallback" wx:else>
+        <view class="hero-title">{{bannerTitle}}</view>
+        <view class="hero-subtitle">{{bannerSubtitle}}</view>
       </view>
     </view>
 
-    <view wx:if="{{stats.length}}" class="section stats">
-      <view wx:for="{{stats}}" wx:key="*this" class="stat-card">{{item}}</view>
-    </view>
-
-    <view wx:if="{{highlights.length}}" class="section highlights">
-      <view
-        wx:for="{{highlights}}"
-        wx:key="text"
-        class="card highlight-card {{item.imageUrl ? 'highlight-card-image' : ''}}"
-        style="{{item.backgroundStyle}}"
+    <view class="quick-panel">
+      <button
+        wx:for="{{quickActions}}"
+        wx:key="key"
+        class="quick-action {{activeHomeTab == item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onQuickAction"
       >
-        <view class="highlight-icon">{{item.iconText}}</view>
-        <view class="highlight-title">{{item.title || item.text}}</view>
-        <view wx:if="{{item.showDescription}}" class="body-text highlight-text">
-          {{item.text}}
+        <view class="quick-icon-wrap">
+          <image class="quick-icon" src="{{item.iconUrl}}" mode="aspectFit" />
         </view>
-      </view>
+        <view class="quick-label">{{item.label}}</view>
+      </button>
     </view>
 
-    <view class="section learning-band">
-      <view class="learning-section">
-        <view class="row-between section-head">
-          <view>
-            <view class="section-title">推荐课程</view>
+    <view wx:if="{{activeHomeTab == 'intro'}}" class="tab-content">
+      <view wx:if="{{aboutTitle || aboutSubtitle || aboutHeroImageUrl}}" class="about-card">
+        <image wx:if="{{aboutHeroImageUrl}}" class="about-image" src="{{aboutHeroImageUrl}}" mode="aspectFill" />
+        <view class="about-copy">
+          <view wx:if="{{aboutTitle}}" class="section-title">{{aboutTitle}}</view>
+          <view wx:if="{{aboutSubtitle}}" class="body-text about-subtitle">{{aboutSubtitle}}</view>
+        </view>
+      </view>
+      <view wx:if="{{aboutBlocks.length}}" class="about-blocks">
+        <block-renderer blocks="{{aboutBlocks}}" />
+      </view>
+      <view class="intro-sections">
+        <view class="intro-section">
+          <view class="intro-section-title">{{aboutPlatformTitle}}</view>
+          <view class="body-text intro-section-text">{{aboutPlatformIntro}}</view>
+        </view>
+        <view class="intro-section">
+          <view class="intro-section-title">{{aboutTeachingTitle}}</view>
+          <view class="body-text intro-section-text">{{aboutTeachingIntro}}</view>
+        </view>
+      </view>
+      <view wx:if="{{stats.length}}" class="section stats">
+        <view wx:for="{{stats}}" wx:key="*this" class="stat-card">{{item}}</view>
+      </view>
+      <view wx:if="{{highlights.length}}" class="section highlights">
+        <view
+          wx:for="{{highlights}}"
+          wx:key="text"
+          class="card highlight-card {{item.imageUrl ? 'highlight-card-image' : ''}}"
+          style="{{item.backgroundStyle}}"
+        >
+          <view class="highlight-icon">{{item.iconText}}</view>
+          <view class="highlight-title">{{item.title || item.text}}</view>
+          <view wx:if="{{item.showDescription}}" class="body-text highlight-text">
+            {{item.text}}
           </view>
-          <button class="text-button" bindtap="goCourses">全部</button>
         </view>
-
-        <scroll-view wx:if="{{courses.length}}" class="course-list rail" scroll-x enable-flex>
-          <navigator wx:for="{{courses}}" wx:key="id" class="card course-card rail-card rail-card-sm" url="/pages/course-detail/index?slug={{item.slug}}">
-            <image wx:if="{{item.coverImageUrl}}" class="course-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
-            <view class="row-between">
-              <view class="course-name">{{item.name}}</view>
-              <view class="course-price">{{item.priceLabel}}</view>
-            </view>
-            <view class="muted course-meta">{{item.category}} · {{item.ageRange}}</view>
-            <view class="body-text course-summary">{{item.summary}}</view>
-          </navigator>
-        </scroll-view>
-        <view wx:else class="empty">课程即将上线</view>
-      </view>
-
-      <view class="learning-section">
-        <view class="section-title">本周公开课</view>
-        <scroll-view wx:if="{{trialSessions.length}}" class="trial-list rail" scroll-x enable-flex>
-          <navigator wx:for="{{trialSessions}}" wx:key="id" class="card trial-card rail-card rail-card-sm" url="/pages/trial-detail/index?id={{item.id}}">
-            <image wx:if="{{item.coverImageUrl}}" class="course-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
-            <view class="course-name">{{item.title}}</view>
-            <view class="muted trial-meta">{{item.startsAtLabel}} · 已报名 {{item.bookedCount}}/{{item.capacity}}</view>
-            <view wx:if="{{item.reservationFeeLabel}}" class="trial-fee">{{item.reservationFeeLabel}}</view>
-          </navigator>
-        </scroll-view>
-        <view wx:else class="empty">近期暂无公开课，可直接预约心仪课程的试听。</view>
       </view>
     </view>
 
-    <view wx:if="{{trustVisible}}" class="section">
+    <view wx:if="{{activeHomeTab == 'teachers'}}" class="tab-content teacher-section">
       <view class="row-between section-head">
         <view>
           <view class="section-title">教师团队</view>
@@ -88,7 +89,7 @@
         <button class="text-button" bindtap="goTeachers">全部</button>
       </view>
 
-      <scroll-view wx:if="{{trustTeachers.length}}" class="trust-teacher-scroll" scroll-x enable-flex>
+      <view wx:if="{{trustTeachers.length}}" class="trust-teacher-list">
         <navigator
           wx:for="{{trustTeachers}}"
           wx:key="id"
@@ -105,19 +106,48 @@
             <view wx:if="{{item.specialtiesText}}" class="trust-chip">{{item.specialtiesText}}</view>
           </view>
         </navigator>
-      </scroll-view>
+      </view>
+      <view wx:else class="empty">师资信息整理中</view>
     </view>
 
-    <view wx:if="{{studentStories.length}}" class="section stories">
-      <view class="section-title">{{contentMarketingTitle}}</view>
-      <scroll-view class="story-scroll rail" scroll-x enable-flex>
-        <view wx:for="{{studentStories}}" wx:key="title" class="card story-card rail-card rail-card-sm">
-        <image wx:if="{{item.coverImageUrl}}" class="story-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
-        <view wx:if="{{item.studentName}}" class="story-meta">{{item.studentName}}</view>
-        <view class="story-title">{{item.title}}</view>
-        <view class="body-text story-summary">{{item.excerpt}}</view>
+    <view wx:if="{{activeHomeTab == 'campuses'}}" class="tab-content campus-list">
+      <view wx:if="{{campuses.length}}">
+        <view wx:for="{{campuses}}" wx:key="id" class="campus-card">
+          <view class="section-title">{{item.name}}</view>
+          <view wx:if="{{item.address}}" class="campus-line">
+            <view class="campus-label">地址</view>
+            <view class="campus-value">{{item.address}}</view>
+          </view>
+          <view wx:if="{{item.imageUrls.length}}" class="campus-images">
+            <image
+              wx:for="{{item.imageUrls}}"
+              wx:for-item="image"
+              wx:key="*this"
+              class="campus-image"
+              src="{{image}}"
+              mode="aspectFill"
+              data-url="{{image}}"
+              data-urls="{{item.imageUrls}}"
+              bindtap="onPreviewCampusImage"
+            />
+          </view>
+          <view wx:else class="empty compact-empty">校区环境图片待补充</view>
         </view>
-      </scroll-view>
+      </view>
+      <view wx:else class="empty compact-empty">校区环境整理中</view>
+    </view>
+
+    <view wx:if="{{activeHomeTab == 'stories'}}" class="tab-content stories">
+      <view class="section-title">{{contentMarketingTitle}}</view>
+      <view wx:if="{{studentStories.length}}" class="story-list">
+        <navigator wx:for="{{studentStories}}" wx:key="slug" class="card story-card" url="/pages/story-detail/index?slug={{item.slug}}">
+          <image wx:if="{{item.coverImageUrl}}" class="story-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+          <view wx:if="{{item.studentName}}" class="story-meta">{{item.studentName}}</view>
+          <view class="story-title">{{item.title}}</view>
+          <view class="body-text story-summary">{{item.excerpt}}</view>
+        </navigator>
+      </view>
+      <view wx:else class="empty compact-empty">成长故事整理中</view>
     </view>
 
     <view wx:if="{{growthLoopTitle}}" class="section contact-card">

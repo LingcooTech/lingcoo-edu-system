@@ -60,62 +60,73 @@
       <view class="body-text package-desc">{{trialNotice}}</view>
     </view>
 
-    <form wx:if="{{showCheckoutForm && selectedPackage}}" class="section card checkout-form" bindsubmit="onCheckoutSubmit">
-      <view class="row-between checkout-heading">
-        <view>
-          <view class="section-title">购买课时包</view>
-          <view class="muted form-hint">{{selectedPackage.name}} · {{selectedPackage.lessonLabel}} · {{selectedPackage.priceLabel}}</view>
-        </view>
-        <button class="close-button" bindtap="closeCheckout">收起</button>
-      </view>
-
-      <block wx:if="{{checkoutOrder}}">
-        <view class="order-result">
-          <view class="row-between">
-            <view class="order-no">{{checkoutOrder.orderNo}}</view>
-            <view class="order-status {{checkoutOrder.status}}">{{checkoutOrder.statusLabel}}</view>
-          </view>
-          <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 课时</view>
-          <view wx:if="{{checkoutDefaultPassword}}" class="password-note">
-            初始密码：{{checkoutDefaultPassword}}。后续可用手机号登录家长中心。
-          </view>
-          <button wx:if="{{checkoutOrder.status == 'pending'}}" class="btn btn-primary checkout-submit" loading="{{payingOrder}}" disabled="{{payingOrder}}" bindtap="onContinuePay" data-order-no="{{checkoutOrder.orderNo}}">
-            {{payingOrder ? '支付中...' : '继续支付'}}
-          </button>
-        </view>
-      </block>
-
-      <block wx:else>
-        <view class="form-gap">
-          <input class="form-field" name="guardianName" placeholder="家长姓名（选填）" />
-          <input class="form-field" name="guardianPhone" type="number" placeholder="手机号" />
-          <input class="form-field" name="studentName" placeholder="孩子姓名" />
-          <input class="form-field" name="grade" placeholder="年级 / 年龄（选填）" />
-        </view>
-        <view class="muted checkout-hint">提交后会创建家长账号；开发环境可模拟支付并立即入账。</view>
-        <button class="btn btn-primary checkout-submit" form-type="submit" loading="{{submittingOrder || payingOrder}}" disabled="{{submittingOrder || payingOrder}}">
-          {{submittingOrder ? '下单中...' : '提交订单'}}
-        </button>
-      </block>
-    </form>
-
-    <form wx:if="{{showTrialForm}}" class="section card trial-form" bindsubmit="onTrialSubmit">
-      <view class="section-title">预约试听</view>
-      <view class="muted form-hint">提交后老师会电话确认上课时间。</view>
-      <view class="form-gap">
-        <input class="form-field" name="guardianName" placeholder="家长姓名" />
-        <input class="form-field" name="phone" type="number" placeholder="手机号" />
-        <input class="form-field" name="studentName" placeholder="孩子姓名" />
-        <input class="form-field" name="grade" placeholder="年级 / 年龄" />
-      </view>
-      <button class="btn btn-primary trial-submit" form-type="submit" loading="{{submittingTrial}}" disabled="{{submittingTrial}}">
-        {{submittingTrial ? '提交中...' : '提交预约'}}
-      </button>
-    </form>
-
     <view class="sticky-cta app-bottom-bar">
       <view class="sticky-note">免注册 · 老师电话确认时间</view>
       <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听</button>
+    </view>
+
+    <view wx:if="{{showCheckoutForm && selectedPackage}}" class="sheet-mask" bindtap="closeCheckout">
+      <form class="bottom-sheet" catchtap="noop" bindsubmit="onCheckoutSubmit">
+        <view class="sheet-handle"></view>
+        <view class="row-between checkout-heading">
+          <view>
+            <view class="section-title">购买课时包</view>
+            <view class="muted form-hint">{{selectedPackage.name}} · {{selectedPackage.lessonLabel}} · {{selectedPackage.priceLabel}}</view>
+          </view>
+          <button class="close-button" bindtap="closeCheckout">关闭</button>
+        </view>
+
+        <block wx:if="{{checkoutOrder}}">
+          <view class="order-result">
+            <view class="row-between">
+              <view class="order-no">{{checkoutOrder.orderNo}}</view>
+              <view class="order-status {{checkoutOrder.status}}">{{checkoutOrder.statusLabel}}</view>
+            </view>
+            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 课时</view>
+            <view wx:if="{{checkoutDefaultPassword}}" class="password-note">
+              初始密码：{{checkoutDefaultPassword}}。后续可用手机号登录家长中心。
+            </view>
+            <button wx:if="{{checkoutOrder.status == 'pending'}}" class="btn btn-primary checkout-submit" loading="{{payingOrder}}" disabled="{{payingOrder}}" bindtap="onContinuePay" data-order-no="{{checkoutOrder.orderNo}}">
+              {{payingOrder ? '支付中...' : '继续支付'}}
+            </button>
+          </view>
+        </block>
+
+        <block wx:else>
+          <view class="form-gap">
+            <input class="form-field" name="guardianName" placeholder="家长姓名（选填）" />
+            <input class="form-field" name="guardianPhone" type="number" placeholder="手机号" />
+            <input class="form-field" name="studentName" placeholder="孩子姓名" />
+            <input class="form-field" name="grade" placeholder="年级 / 年龄（选填）" />
+          </view>
+          <view class="muted checkout-hint">提交后会创建家长账号；微信支付配置完成后可直接支付。</view>
+          <button class="btn btn-primary checkout-submit" form-type="submit" loading="{{submittingOrder || payingOrder}}" disabled="{{submittingOrder || payingOrder}}">
+            {{submittingOrder ? '下单中...' : '提交订单'}}
+          </button>
+        </block>
+      </form>
+    </view>
+
+    <view wx:if="{{showTrialForm}}" class="sheet-mask" bindtap="closeTrial">
+      <form class="bottom-sheet" catchtap="noop" bindsubmit="onTrialSubmit">
+        <view class="sheet-handle"></view>
+        <view class="row-between checkout-heading">
+          <view>
+            <view class="section-title">预约试听</view>
+            <view class="muted form-hint">提交后老师会电话确认上课时间。</view>
+          </view>
+          <button class="close-button" bindtap="closeTrial">关闭</button>
+        </view>
+        <view class="form-gap">
+          <input class="form-field" name="guardianName" placeholder="家长姓名" />
+          <input class="form-field" name="phone" type="number" placeholder="手机号" />
+          <input class="form-field" name="studentName" placeholder="孩子姓名" />
+          <input class="form-field" name="grade" placeholder="年级 / 年龄" />
+        </view>
+        <button class="btn btn-primary trial-submit" form-type="submit" loading="{{submittingTrial}}" disabled="{{submittingTrial}}">
+          {{submittingTrial ? '提交中...' : '提交预约'}}
+        </button>
+      </form>
     </view>
   </block>
 </view>

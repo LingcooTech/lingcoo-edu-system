@@ -117,10 +117,6 @@
   margin-top: 18rpx;
 }
 
-.checkout-form {
-  padding: 28rpx;
-}
-
 .checkout-heading {
   align-items: flex-start;
   gap: 16rpx;
@@ -203,10 +199,6 @@
   padding: 18rpx;
 }
 
-.trial-form {
-  padding: 28rpx;
-}
-
 .form-hint {
   margin: 10rpx 0 22rpx;
   font-size: 24rpx;
@@ -240,4 +232,33 @@
 
 .empty-button {
   margin-top: 28rpx;
+}
+
+.sheet-mask {
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(33, 31, 28, 0.42);
+}
+
+.bottom-sheet {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 34rpx 34rpx 0 0;
+  background: #fff;
+  padding: 18rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
+}
+
+.sheet-handle {
+  width: 78rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: #ded8cf;
+  margin: 0 auto 30rpx;
 }

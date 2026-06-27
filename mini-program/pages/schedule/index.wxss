@@ -1,0 +1,151 @@
+.schedule-page {
+  min-height: 100vh;
+  background: #f6f4f0;
+}
+
+.schedule-hero {
+  margin: -24rpx -24rpx 0;
+  padding: 112px 24rpx 60rpx;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, #dcefd8 0%, #eff8ed 100%);
+}
+
+.schedule-title {
+  padding-right: 210rpx;
+  color: #211f1c;
+  font-size: 40rpx;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8rpx;
+  margin-top: 46rpx;
+}
+
+.day-cell {
+  display: flex;
+  width: 100%;
+  min-height: 116rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 34rpx;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.day-cell::after {
+  border: 0;
+}
+
+.weekday {
+  color: #314038;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.day-number {
+  margin-top: 18rpx;
+  color: #211f1c;
+  font-size: 35rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.day-cell.selected {
+  background: #2bc980;
+}
+
+.day-cell.selected .weekday,
+.day-cell.selected .day-number {
+  color: #fff;
+}
+
+.selected-date {
+  margin-top: 28rpx;
+  color: #314038;
+  font-size: 28rpx;
+  font-weight: 800;
+  text-align: center;
+}
+
+.schedule-body {
+  min-height: 900rpx;
+  margin: -28rpx -24rpx 0;
+  border-radius: 34rpx 34rpx 0 0;
+  background: #fff;
+  padding: 48rpx 30rpx calc(34rpx + env(safe-area-inset-bottom));
+}
+
+.schedule-empty {
+  display: flex;
+  min-height: 620rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.empty-mark {
+  display: flex;
+  width: 154rpx;
+  height: 154rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #f2f0ea;
+  color: #c8c2b8;
+  font-size: 42rpx;
+  font-weight: 900;
+}
+
+.empty-text {
+  margin-top: 28rpx;
+  color: #8b857c;
+  font-size: 27rpx;
+}
+
+.login-button {
+  width: 300rpx;
+  margin-top: 32rpx;
+}
+
+.event-list {
+  display: grid;
+  gap: 18rpx;
+  margin-top: 28rpx;
+}
+
+.event-card {
+  border-radius: 24rpx;
+  background: #f8f6f2;
+  padding: 24rpx;
+}
+
+.event-time {
+  color: #9a6a4b;
+  font-size: 26rpx;
+  font-weight: 900;
+}
+
+.event-title {
+  margin-top: 12rpx;
+  color: #211f1c;
+  font-size: 31rpx;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.event-meta {
+  margin-top: 8rpx;
+  color: #8b857c;
+  font-size: 24rpx;
+  line-height: 1.45;
+}

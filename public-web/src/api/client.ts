@@ -200,6 +200,7 @@ export interface HomePayload {
     id: string;
     name: string;
     address: string | null;
+    environmentImageUrls?: string[];
   }>;
   teachers: PublicTeacher[];
   featuredCourses: Course[];
@@ -420,6 +421,7 @@ export interface PublicCampus {
   id: string;
   name: string;
   address?: string | null;
+  environmentImageUrls?: string[];
 }
 
 export interface PublicClassroom {

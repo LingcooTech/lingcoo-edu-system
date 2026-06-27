@@ -108,10 +108,31 @@
   width: 100%;
 }
 
+.reserve-card {
+  margin-bottom: 120rpx;
+}
+
 .form-hint {
   margin: 10rpx 0 22rpx;
   font-size: 24rpx;
   line-height: 1.6;
+}
+
+.sticky-cta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.sticky-note {
+  color: #8b857c;
+  font-size: 22rpx;
+  line-height: 1.35;
+}
+
+.sticky-button {
+  width: 100%;
 }
 
 .empty-state {
@@ -121,4 +142,55 @@
 
 .empty-button {
   margin-top: 28rpx;
+}
+
+.sheet-mask {
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(33, 31, 28, 0.42);
+}
+
+.bottom-sheet {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 34rpx 34rpx 0 0;
+  background: #fff;
+  padding: 18rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
+}
+
+.sheet-handle {
+  width: 78rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: #ded8cf;
+  margin: 0 auto 30rpx;
+}
+
+.sheet-heading {
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.close-button {
+  width: auto;
+  height: 52rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: #f1e9e1;
+  color: #9a6a4b;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 52rpx;
+  padding: 0 20rpx;
+}
+
+.close-button::after {
+  border: 0;
 }

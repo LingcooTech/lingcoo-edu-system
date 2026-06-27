@@ -1,0 +1,146 @@
+.trials-page {
+  padding-top: 0;
+  background: #f5f3ef;
+}
+
+.trial-head {
+  position: relative;
+  min-height: 430rpx;
+  overflow: hidden;
+  border-radius: 0 0 34rpx 34rpx;
+  margin: -24rpx -24rpx 0;
+  padding-top: 112px;
+  background: #cfa57d;
+}
+
+.trial-head-image,
+.trial-head-shade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.trial-head-shade {
+  background: linear-gradient(180deg, rgba(33, 31, 28, 0.18), rgba(33, 31, 28, 0.62));
+}
+
+.trial-head-copy {
+  position: absolute;
+  right: 28rpx;
+  bottom: 34rpx;
+  left: 28rpx;
+  color: #fff;
+}
+
+.trial-eyebrow {
+  font-size: 25rpx;
+  font-weight: 800;
+  opacity: 0.86;
+}
+
+.trial-title {
+  margin-top: 10rpx;
+  font-size: 46rpx;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.trial-subtitle {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+  opacity: 0.86;
+}
+
+.trial-list {
+  display: grid;
+  gap: 18rpx;
+  margin-top: -20rpx;
+}
+
+.trial-card {
+  display: grid;
+  grid-template-columns: 190rpx 1fr;
+  gap: 22rpx;
+  border: 0;
+  border-radius: 26rpx;
+  background: #fff;
+  padding: 18rpx;
+  box-shadow: 0 10rpx 28rpx rgba(33, 31, 28, 0.05);
+}
+
+.trial-card-hover {
+  background: #f7f3ee;
+}
+
+.trial-cover {
+  display: flex;
+  width: 190rpx;
+  height: 190rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  background: #f1e9e1;
+}
+
+.trial-cover-fallback {
+  color: #9a6a4b;
+  font-size: 56rpx;
+  font-weight: 900;
+}
+
+.trial-body {
+  min-width: 0;
+  padding: 6rpx 0;
+}
+
+.trial-card-title {
+  color: #211f1c;
+  font-size: 31rpx;
+  font-weight: 900;
+  line-height: 1.32;
+}
+
+.trial-meta {
+  margin-top: 14rpx;
+  color: #8b857c;
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.trial-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.trial-fee {
+  color: #9a6a4b;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.trial-action {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 900;
+  padding: 10rpx 20rpx;
+}
+
+.trial-empty {
+  padding-top: 180rpx;
+}
+
+.empty-button {
+  margin-top: 28rpx;
+  width: 320rpx;
+}

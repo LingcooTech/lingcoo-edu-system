@@ -5,6 +5,7 @@ import {
   type Course,
 } from '../../services/api';
 import { coursePriceLabel } from '../../utils/format';
+import { createChromeState } from '../../utils/chrome';
 
 type CourseListItem = Course & { priceLabel: string };
 
@@ -15,9 +16,11 @@ Page({
     loading: true,
     courses: [] as CourseListItem[],
     businessModel: null as BusinessModelSettings | null,
+    heroStyle: createChromeState(18).heroStyle,
   },
 
   onLoad() {
+    this.setData({ heroStyle: createChromeState(18).heroStyle });
     this.load();
   },
 

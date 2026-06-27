@@ -1,7 +1,9 @@
-<view class="page">
-  <view class="page-head">
-    <view class="title page-title">课程列表</view>
-    <view class="body-text intro">选择感兴趣的课程，查看详情并预约试听。</view>
+<view class="page courses-page">
+  <view class="courses-hero" style="{{heroStyle}}">
+    <view class="courses-eyebrow">课程</view>
+    <view class="courses-title">选择适合孩子的课程</view>
+    <view class="courses-subtitle">了解课程方向、适合年龄和试听安排。</view>
+    <view wx:if="{{courses.length}}" class="courses-count">{{courses.length}} 个课程正在开放</view>
   </view>
 
   <skeleton wx:if="{{loading}}" variant="list" />

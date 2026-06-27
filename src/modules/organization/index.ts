@@ -204,6 +204,7 @@ const organizationSchema = z.object({
 const campusSchema = z.object({
   name: z.string().min(1).max(120),
   address: z.string().max(255).optional().nullable(),
+  environmentImageUrls: z.array(z.string().trim().url().max(500)).max(30).optional(),
 });
 
 const campusUpdateSchema = campusSchema.partial();
@@ -279,6 +280,7 @@ export const organizationModule: AppModule = {
       const campus = await organizationRepo.createCampus(app.db, {
         name: body.name.trim(),
         address: body.address?.trim() || null,
+        environmentImageUrls: body.environmentImageUrls ?? [],
       });
       return { campus };
     });
@@ -289,6 +291,7 @@ export const organizationModule: AppModule = {
       const campus = await organizationRepo.updateCampus(app.db, campusId, {
         name: body.name?.trim(),
         address: body.address === undefined ? undefined : body.address?.trim() || null,
+        environmentImageUrls: body.environmentImageUrls,
       });
       if (!campus) {
         throw Object.assign(new Error('Campus not found'), { statusCode: 404 });

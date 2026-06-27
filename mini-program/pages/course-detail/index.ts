@@ -211,7 +211,13 @@ Page({
   },
 
   onTrialTap() {
-    this.setData({ showTrialForm: true });
+    this.setData({
+      showTrialForm: true,
+      showCheckoutForm: false,
+      selectedPackage: null,
+      checkoutOrder: null,
+      checkoutDefaultPassword: '',
+    });
   },
 
   onBuyTap(event: { currentTarget: { dataset: { id?: string } } }) {
@@ -236,12 +242,22 @@ Page({
   },
 
   closeCheckout() {
+    if (this.data.submittingOrder || this.data.payingOrder) return;
     this.setData({
       showCheckoutForm: false,
       selectedPackage: null,
       checkoutOrder: null,
       checkoutDefaultPassword: '',
     });
+  },
+
+  closeTrial() {
+    if (this.data.submittingTrial) return;
+    this.setData({ showTrialForm: false });
+  },
+
+  noop() {
+    return;
   },
 
   async onCheckoutSubmit(event: {

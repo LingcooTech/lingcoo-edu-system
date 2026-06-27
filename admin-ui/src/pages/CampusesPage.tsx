@@ -8,24 +8,35 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field } from '@/components/shared/FormField';
+import { QiniuGalleryField } from '@/components/shared/QiniuImageField';
 import { useToast } from '@/components/shared/Toast';
 import { useApiResource } from '@/lib/useApiResource';
 
 interface CampusForm {
   name: string;
   address: string;
+  environmentImages: string;
 }
 
 const emptyForm: CampusForm = {
   name: '',
   address: '',
+  environmentImages: '',
 };
 
 function campusToForm(campus: Campus): CampusForm {
   return {
     name: campus.name,
     address: campus.address ?? '',
+    environmentImages: (campus.environmentImageUrls ?? []).join('\n'),
   };
+}
+
+function imageLines(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 interface EmbeddedCreateAction {
@@ -76,6 +87,7 @@ export function CampusesPage({
       const payload = {
         name: form.name.trim(),
         address: form.address.trim() || null,
+        environmentImageUrls: imageLines(form.environmentImages),
       };
       if (editing) {
         const { campus } = await apiPatch<{ campus: Campus }>(
@@ -115,6 +127,11 @@ export function CampusesPage({
         columns={[
           { key: 'name', header: '校区', cell: (row) => row.name },
           { key: 'address', header: '地址', cell: (row) => row.address ?? '-' },
+          {
+            key: 'environment',
+            header: '环境图',
+            cell: (row) => `${row.environmentImageUrls?.length ?? 0} 张`,
+          },
           {
             key: 'actions',
             header: '操作',
@@ -172,6 +189,13 @@ export function CampusesPage({
             onChange={(event) => setForm({ ...form, address: event.target.value })}
           />
         </Field>
+        <QiniuGalleryField
+          label="校区环境图片"
+          hint="用于小程序首页「校区环境」展示。每行一个图片地址，也可以上传后自动追加。"
+          value={form.environmentImages}
+          prefix="campuses/environment"
+          onChange={(value) => setForm({ ...form, environmentImages: value })}
+        />
       </Drawer>
       <ConfirmDialog
         open={Boolean(deleteTarget)}

@@ -1,0 +1,27 @@
+<view class="page story-detail-page">
+  <skeleton wx:if="{{loading}}" variant="detail" />
+
+  <view wx:elif="{{notFound}}" class="empty-state">
+    <view class="section-title">内容不存在或已下线</view>
+    <button class="btn btn-outline empty-button" bindtap="goBack">返回</button>
+  </view>
+
+  <block wx:else>
+    <button class="back-button" bindtap="goBack">‹ 成长故事</button>
+
+    <view class="story-header card">
+      <image wx:if="{{story.coverUrl}}" class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
+      <view class="story-copy">
+        <view wx:if="{{story.authorName}}" class="story-meta">{{story.authorName}}</view>
+        <view class="title">{{story.title}}</view>
+        <view wx:if="{{story.excerpt}}" class="body-text story-excerpt">{{story.excerpt}}</view>
+      </view>
+    </view>
+
+    <view class="card story-body">
+      <block-renderer wx:if="{{blocks.length}}" blocks="{{blocks}}" />
+      <rich-text wx:elif="{{html}}" nodes="{{html}}" />
+      <view wx:else class="empty compact-empty">暂无正文</view>
+    </view>
+  </block>
+</view>

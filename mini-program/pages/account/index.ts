@@ -25,6 +25,7 @@ import {
   type LessonAccountItem,
   type LessonFeedbackItem,
 } from '../../utils/parent-center';
+import { createChromeState } from '../../utils/chrome';
 
 type HubStats = {
   childCount: number;
@@ -62,9 +63,14 @@ type QuickEntry = {
   key: string;
   symbol: string;
   label: string;
-  desc: string;
+  group: string;
   url: string;
   badge: number;
+};
+
+type QuickGroup = {
+  title: string;
+  entries: QuickEntry[];
 };
 
 function nextThirtyDays() {
@@ -76,56 +82,70 @@ function nextThirtyDays() {
 const ENTRIES = [
   {
     key: 'schedule',
-    symbol: '课',
-    label: '课程',
-    desc: '课表与签到',
+    symbol: '表',
+    label: '课程表',
+    group: '课前准备',
     url: '/pages/account-attendance/index',
-  },
-  {
-    key: 'feedbacks',
-    symbol: '评',
-    label: '点评',
-    desc: '课后反馈',
-    url: '/pages/account-feedbacks/index',
   },
   {
     key: 'students',
     symbol: '孩',
-    label: '学员与课时',
-    desc: '孩子档案与课时余额',
+    label: '学员档案',
+    group: '课前准备',
     url: '/pages/account-students/index',
-  },
-  {
-    key: 'orders',
-    symbol: '单',
-    label: '订单',
-    desc: '购买与支付记录',
-    url: '/pages/account-orders/index',
   },
   {
     key: 'trials',
     symbol: '试',
     label: '试听席位',
-    desc: '预约、改期与到课',
+    group: '课前准备',
     url: '/pages/account-trials/index',
+  },
+  {
+    key: 'feedbacks',
+    symbol: '评',
+    label: '课后点评',
+    group: '课后服务',
+    url: '/pages/account-feedbacks/index',
   },
   {
     key: 'homework',
     symbol: '作',
     label: '作业打卡',
-    desc: '上传作业、查看批阅',
+    group: '课后服务',
     url: '/pages/account-homework/index',
   },
   {
     key: 'notifications',
     symbol: '信',
-    label: '消息通知',
-    desc: '提醒订阅与站内消息',
+    label: '通知消息',
+    group: '课后服务',
     url: '/pages/account-notifications/index',
+  },
+  {
+    key: 'orders',
+    symbol: '单',
+    label: '订单记录',
+    group: '个人中心',
+    url: '/pages/account-orders/index',
   },
 ] satisfies Array<Omit<QuickEntry, 'badge'>>;
 
-const ACCOUNT_TAB_INDEX = 2;
+const ACCOUNT_TAB_INDEX = 4;
+
+function withBadges(entries: Array<Omit<QuickEntry, 'badge'>>, counts: Record<string, number>) {
+  return entries.map((entry) => ({ ...entry, badge: counts[entry.key] ?? 0 }));
+}
+
+function groupEntries(entries: QuickEntry[]): QuickGroup[] {
+  const titles = ['课前准备', '课后服务', '个人中心'];
+  return titles
+    .map((title) => ({
+      title,
+      entries: entries.filter((entry) => entry.group === title),
+    }))
+    .filter((group) => group.entries.length > 0);
+}
 
 Page({
   data: {
@@ -134,18 +154,25 @@ Page({
     refreshing: false,
     booting: false,
     bindToken: '',
+    loginSheetVisible: false,
     account: null as AuthAccount | null,
     defaultPassword: '',
     avatarText: '我',
-    entries: ENTRIES.map((entry) => ({ ...entry, badge: 0 })) as QuickEntry[],
+    entryGroups: groupEntries(withBadges(ENTRIES, {})) as QuickGroup[],
     stats: emptyStats(),
     childSummaries: [] as ChildSummary[],
     nextLesson: null as CalendarEventItem | null,
     latestFeedback: null as LessonFeedbackItem | null,
     todoItems: [] as TodoItem[],
+    heroStyle: createChromeState(28).heroStyle,
+  },
+
+  onLoad() {
+    this.setData({ heroStyle: createChromeState(28).heroStyle });
   },
 
   onShow() {
+    this.setData(createChromeState(28));
     if (hasToken()) {
       this.setData({ booting: !this.data.account });
       this.loadSession();
@@ -289,19 +316,14 @@ Page({
             url: '/pages/account-orders/index',
           },
         ],
-        entries: ENTRIES.map((entry) => ({
-          ...entry,
-          badge:
-            entry.key === 'schedule'
-              ? pendingCheckIns
-              : entry.key === 'orders'
-                ? pendingOrders
-                : entry.key === 'trials'
-                  ? pendingReservations
-                  : entry.key === 'notifications'
-                    ? unreadNotifications
-                    : 0,
-        })),
+        entryGroups: groupEntries(
+          withBadges(ENTRIES, {
+            schedule: pendingCheckIns,
+            orders: pendingOrders,
+            trials: pendingReservations,
+            notifications: unreadNotifications,
+          }),
+        ),
       });
       this.updateTabBadge(unreadNotifications);
     } catch (error) {
@@ -316,6 +338,7 @@ Page({
     this.setData({
       account: null,
       bindToken: '',
+      loginSheetVisible: false,
       defaultPassword: '',
       avatarText: '我',
       stats: emptyStats(),
@@ -323,7 +346,7 @@ Page({
       nextLesson: null,
       latestFeedback: null,
       todoItems: [],
-      entries: ENTRIES.map((entry) => ({ ...entry, badge: 0 })),
+      entryGroups: groupEntries(withBadges(ENTRIES, {})),
     });
     this.updateTabBadge(0);
   },
@@ -345,6 +368,7 @@ Page({
   },
 
   onWechatLogin() {
+    this.setData({ loginSheetVisible: true });
     this.setData({ loading: true });
     wx.login({
       success: async (result) => {
@@ -357,13 +381,13 @@ Page({
               return;
             }
             this.applyAccount(payload.account);
-            this.setData({ defaultPassword: '' });
+            this.setData({ defaultPassword: '', loginSheetVisible: false });
             await this.loadSummary();
             wx.showToast({ title: '登录成功', icon: 'success' });
           } else {
             clearToken();
             this.resetAccountState();
-            this.setData({ bindToken: payload.bindToken });
+            this.setData({ bindToken: payload.bindToken, loginSheetVisible: true });
             wx.showToast({ title: '请绑定手机号', icon: 'none' });
           }
         } catch (error) {
@@ -379,7 +403,20 @@ Page({
         this.setData({ loading: false });
         wx.showToast({ title: error.errMsg || '登录失败', icon: 'none' });
       },
-    });
+      });
+  },
+
+  openLoginSheet() {
+    this.setData({ loginSheetVisible: true });
+  },
+
+  closeLoginSheet() {
+    if (this.data.loading || this.data.binding) return;
+    this.setData({ loginSheetVisible: false });
+  },
+
+  noop() {
+    return;
   },
 
   async bindPhone(input: { phone?: string; phoneCode?: string; displayName?: string }) {
@@ -394,7 +431,10 @@ Page({
       const payload = await bindWechatMiniPhone({ bindToken, ...input });
       setToken(payload.token);
       this.applyAccount(payload.account);
-      this.setData({ defaultPassword: payload.defaultPassword || '' });
+      this.setData({
+        defaultPassword: payload.defaultPassword || '',
+        loginSheetVisible: false,
+      });
       await this.loadSummary();
       wx.showToast({ title: '绑定成功', icon: 'success' });
     } catch (error) {

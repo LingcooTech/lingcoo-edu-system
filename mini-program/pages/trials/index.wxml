@@ -1,0 +1,39 @@
+<view class="page trials-page">
+  <view class="trial-head" style="{{heroStyle}}">
+    <image wx:if="{{bannerImageUrl}}" class="trial-head-image" src="{{bannerImageUrl}}" mode="aspectFill" />
+    <view class="trial-head-shade"></view>
+    <view class="trial-head-copy">
+      <view class="trial-eyebrow">预约试听</view>
+      <view class="trial-title">选择合适的体验场次</view>
+      <view class="trial-subtitle">提交后老师会确认到校时间和课程安排。</view>
+    </view>
+  </view>
+
+  <skeleton wx:if="{{loading}}" variant="list" />
+
+  <view wx:elif="{{trials.length}}" class="trial-list">
+    <navigator
+      wx:for="{{trials}}"
+      wx:key="id"
+      class="trial-card"
+      url="/pages/trial-detail/index?id={{item.id}}"
+      hover-class="trial-card-hover"
+    >
+      <image wx:if="{{item.coverImageUrl}}" class="trial-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+      <view wx:else class="trial-cover trial-cover-fallback">试</view>
+      <view class="trial-body">
+        <view class="trial-card-title">{{item.title}}</view>
+        <view class="trial-meta">{{item.startsAtLabel}} · 名额 {{item.capacityLabel}}</view>
+        <view class="trial-foot">
+          <view class="trial-fee">{{item.reservationFeeLabel}}</view>
+          <view class="trial-action">预约</view>
+        </view>
+      </view>
+    </navigator>
+  </view>
+
+  <view wx:else class="empty trial-empty">
+    近期暂无固定试听场次
+    <button class="btn btn-primary empty-button" bindtap="goCourses">查看课程预约</button>
+  </view>
+</view>

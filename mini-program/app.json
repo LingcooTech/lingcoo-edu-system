@@ -2,10 +2,13 @@
   "pages": [
     "pages/home/index",
     "pages/courses/index",
+    "pages/trials/index",
+    "pages/schedule/index",
     "pages/course-detail/index",
     "pages/trial-detail/index",
     "pages/teachers/index",
     "pages/teacher-detail/index",
+    "pages/story-detail/index",
     "pages/campaign/index",
     "pages/account/index",
     "pages/account-students/index",
@@ -21,6 +24,7 @@
     "navigationBarTitleText": "成长教室",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
+    "navigationStyle": "custom",
     "backgroundColor": "#f6f4f0",
     "backgroundTextStyle": "dark"
   },
@@ -41,6 +45,18 @@
         "text": "课程",
         "iconPath": "assets/tab/courses.png",
         "selectedIconPath": "assets/tab/courses-active.png"
+      },
+      {
+        "pagePath": "pages/trials/index",
+        "text": "试听",
+        "iconPath": "assets/tab/trial-tab.png",
+        "selectedIconPath": "assets/tab/trial-tab-active.png"
+      },
+      {
+        "pagePath": "pages/schedule/index",
+        "text": "课表",
+        "iconPath": "assets/tab/schedule-tab.png",
+        "selectedIconPath": "assets/tab/schedule-tab-active.png"
       },
       {
         "pagePath": "pages/account/index",

@@ -10,6 +10,27 @@ declare const wx: {
   getStorageSync<T = unknown>(key: string): T;
   setStorageSync(key: string, value: unknown): void;
   removeStorageSync(key: string): void;
+  getSystemInfoSync(): {
+    statusBarHeight?: number;
+    windowWidth?: number;
+    windowHeight?: number;
+    safeArea?: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+      width: number;
+      height: number;
+    };
+  };
+  getMenuButtonBoundingClientRect(): {
+    width: number;
+    height: number;
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
   navigateTo(options: { url: string; fail?: (error: { errMsg: string }) => void }): void;
   navigateBack(options?: {
     delta?: number;
@@ -17,6 +38,12 @@ declare const wx: {
   }): void;
   redirectTo(options: { url: string; fail?: (error: { errMsg: string }) => void }): void;
   switchTab(options: { url: string; fail?: (error: { errMsg: string }) => void }): void;
+  pageScrollTo(options: {
+    scrollTop?: number;
+    selector?: string;
+    duration?: number;
+    fail?: (error: { errMsg: string }) => void;
+  }): void;
   setTabBarBadge?: (options: {
     index: number;
     text: string;

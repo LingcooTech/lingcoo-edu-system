@@ -246,6 +246,13 @@
       "when": 1782518400000,
       "tag": "0034_lesson_feedbacks",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1782604800000,
+      "tag": "0035_campus_environment_images",
+      "breakpoints": true
     }
   ]
 }

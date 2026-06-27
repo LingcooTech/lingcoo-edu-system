@@ -99,6 +99,7 @@ Page({
     phone: '',
     studentName: '',
     grade: '',
+    showReservationForm: false,
   },
 
   onLoad(options: { id?: string; trialSessionId?: string }) {
@@ -153,6 +154,9 @@ Page({
         phone: prefill.phone || '',
         studentName: prefill.studentName || '',
         grade: prefill.grade || '',
+        showReservationForm: Boolean(
+          prefill.guardianName || prefill.phone || prefill.studentName || prefill.grade,
+        ),
       });
     } catch {
       this.setData({ loading: false, notFound: true });
@@ -165,6 +169,23 @@ Page({
 
   goAccount() {
     wx.switchTab({ url: '/pages/account/index' });
+  },
+
+  onReserveTap() {
+    if (this.data.full) {
+      wx.showToast({ title: '名额已满', icon: 'none' });
+      return;
+    }
+    this.setData({ showReservationForm: true });
+  },
+
+  closeReservationForm() {
+    if (this.data.submitting || this.data.paying) return;
+    this.setData({ showReservationForm: false });
+  },
+
+  noop() {
+    return;
   },
 
   async onSubmit(event: {
@@ -242,7 +263,10 @@ Page({
         title: '预约成功',
         content: '老师会尽快联系确认试听安排。',
         showCancel: false,
-        success: () => this.goHome(),
+        success: () => {
+          this.setData({ showReservationForm: false });
+          this.goHome();
+        },
       });
     } catch (error) {
       wx.showToast({

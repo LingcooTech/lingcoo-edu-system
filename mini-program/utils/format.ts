@@ -54,6 +54,11 @@ export function navigateToWebPath(path: string): void {
     return;
   }
 
+  if (path === '/trials') {
+    wx.switchTab({ url: '/pages/trials/index' });
+    return;
+  }
+
   if (path === '/account') {
     wx.switchTab({ url: '/pages/account/index' });
     return;

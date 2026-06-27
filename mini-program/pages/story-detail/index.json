@@ -1,7 +1,6 @@
 {
-  "navigationBarTitleText": "成长教室",
+  "navigationBarTitleText": "成长故事",
   "navigationStyle": "custom",
-  "enablePullDownRefresh": true,
   "usingComponents": {
     "block-renderer": "../../components/block-renderer/index"
   }

@@ -45,6 +45,7 @@ export interface PublicCampus {
   id: string;
   name: string;
   address?: string | null;
+  environmentImageUrls?: string[];
 }
 
 export interface PublicClassroom {
@@ -88,6 +89,13 @@ export interface ContentItem {
   meta: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ContentListResponse {
+  items: ContentItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface BusinessModelSettings {
@@ -206,6 +214,7 @@ export interface HomePayload {
     id: string;
     name: string;
     address: string | null;
+    environmentImageUrls?: string[];
   }>;
   teachers: PublicTeacher[];
   featuredCourses: Course[];
@@ -647,6 +656,13 @@ interface ApiErrorPayload {
   message?: string;
 }
 
+function buildQueryString(params: Record<string, string | number | undefined>) {
+  const pairs = Object.keys(params)
+    .filter((key) => params[key] !== undefined && params[key] !== '')
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key]))}`);
+  return pairs.length ? `?${pairs.join('&')}` : '';
+}
+
 export function getToken(): string {
   return String(wx.getStorageSync(TOKEN_KEY) || '');
 }
@@ -694,6 +710,14 @@ export function request<T>(
 
 export function loadHome(): Promise<HomePayload> {
   return request<HomePayload>('/public/home');
+}
+
+export function fetchStories(params: { limit?: number; offset?: number; search?: string } = {}) {
+  return request<ContentListResponse>(`/public/stories${buildQueryString(params)}`);
+}
+
+export function fetchStory(slug: string) {
+  return request<ContentItem>(`/public/stories/${encodeURIComponent(slug)}`);
 }
 
 export async function fetchCourses(): Promise<Course[]> {

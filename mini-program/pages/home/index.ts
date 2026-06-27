@@ -1,4 +1,5 @@
 import {
+  fetchStories,
   loadHome,
   type ContentItem,
   type Course,
@@ -8,6 +9,8 @@ import {
   type TrialSession,
 } from '../../services/api';
 import { coursePriceLabel, formatDateTime, money, navigateToWebPath } from '../../utils/format';
+import { createChromeState } from '../../utils/chrome';
+import { type Block } from '../../utils/blocks';
 
 interface HomeTeacherCard {
   id: string;
@@ -26,10 +29,18 @@ type HomeHighlightCard = PublicProfileHighlight & {
 };
 
 interface HomeStudentStoryCard {
+  slug: string;
   title: string;
   studentName: string;
   coverImageUrl: string;
   excerpt: string;
+}
+
+interface HomeCampusCard {
+  id: string;
+  name: string;
+  address: string;
+  imageUrls: string[];
 }
 
 interface GrowthLoopStepCard {
@@ -37,10 +48,30 @@ interface GrowthLoopStepCard {
   indexLabel: string;
 }
 
+interface HomeQuickAction {
+  key: string;
+  label: string;
+  iconUrl: string;
+}
+
 interface HomeState {
   loading: boolean;
   organizationName: string;
   brandName: string;
+  logoUrl: string;
+  logoInitial: string;
+  customNavStyle: string;
+  heroStyle: string;
+  navLogoStyle: string;
+  activeHomeTab: string;
+  aboutTitle: string;
+  aboutSubtitle: string;
+  aboutHeroImageUrl: string;
+  aboutPlatformTitle: string;
+  aboutPlatformIntro: string;
+  aboutTeachingTitle: string;
+  aboutTeachingIntro: string;
+  aboutBlocks: Block[];
   bannerTitle: string;
   bannerSubtitle: string;
   bannerImages: string[];
@@ -53,11 +84,13 @@ interface HomeState {
   address: string;
   phone: string;
   businessHours: string;
+  campuses: HomeCampusCard[];
   growthLoopTitle: string;
   growthLoopSummary: string;
   growthLoopPrimaryCtaText: string;
   growthLoopPrimaryCtaLink: string;
   growthLoopSteps: GrowthLoopStepCard[];
+  quickActions: HomeQuickAction[];
   courses: Array<Course & { priceLabel: string }>;
   trialSessions: Array<TrialSession & { startsAtLabel: string; reservationFeeLabel: string }>;
   trustVisible: boolean;
@@ -68,6 +101,20 @@ const initialState: HomeState = {
   loading: true,
   organizationName: '',
   brandName: '',
+  logoUrl: '',
+  logoInitial: '成',
+  customNavStyle: 'top: 44px; height: 32px; padding-right: 120px;',
+  heroStyle: 'padding-top: 96px;',
+  navLogoStyle: 'width: 220px; height: 32px;',
+  activeHomeTab: 'intro',
+  aboutTitle: '',
+  aboutSubtitle: '',
+  aboutHeroImageUrl: '',
+  aboutPlatformTitle: '',
+  aboutPlatformIntro: '',
+  aboutTeachingTitle: '',
+  aboutTeachingIntro: '',
+  aboutBlocks: [],
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
@@ -80,16 +127,25 @@ const initialState: HomeState = {
   address: '',
   phone: '',
   businessHours: '',
+  campuses: [],
   growthLoopTitle: '',
   growthLoopSummary: '',
   growthLoopPrimaryCtaText: '预约成长评估',
   growthLoopPrimaryCtaLink: '/register',
   growthLoopSteps: [],
+  quickActions: [],
   courses: [],
   trialSessions: [],
   trustVisible: false,
   trustTeachers: [],
 };
+
+const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
+  { key: 'intro', label: '品牌介绍', iconUrl: '/assets/nav/brand.png' },
+  { key: 'campuses', label: '校区环境', iconUrl: '/assets/nav/campus.png' },
+  { key: 'teachers', label: '师资团队', iconUrl: '/assets/nav/teacher.png' },
+  { key: 'stories', label: '成长故事', iconUrl: '/assets/nav/story.png' },
+];
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
@@ -129,6 +185,7 @@ function highlightIconText(icon: string) {
 
 function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
   return {
+    slug: item.slug,
     title: item.title,
     studentName: item.authorName ?? '',
     coverImageUrl: item.coverUrl ?? '',
@@ -136,8 +193,24 @@ function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
   };
 }
 
-function toState(home: HomePayload): HomeState {
+function platformTitleFor(brandName: string, configuredTitle?: string) {
+  const raw = configuredTitle?.trim();
+  const legacyDefaults = ['运营方介绍', '预约平台', '美智成长空间预约平台'];
+  if (raw && !legacyDefaults.includes(raw)) return raw;
+  const brand = brandName.trim();
+  if (!brand) return '预约平台';
+  return brand.endsWith('平台') ? brand : `${brand}预约平台`;
+}
+
+function platformIntroFallbackFor(brandName: string) {
+  const brand = brandName.trim();
+  const subject = brand ? (brand.endsWith('平台') ? brand : `${brand}预约平台`) : '预约平台';
+  return `${subject}负责线上课程展示、试听预约、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排。`;
+}
+
+function toState(home: HomePayload, storyItems: ContentItem[] = home.contentItems ?? []): HomeState {
   const profile = home.organization.publicProfile;
+  const about = home.organization.publicSite?.aboutPage;
   const bannerImages = Array.from(
     new Set(
       (profile.bannerImages?.length ? profile.bannerImages : [profile.bannerImageUrl]).filter(
@@ -149,9 +222,31 @@ function toState(home: HomePayload): HomeState {
   const trustTeachers = teachers.slice(0, 6).map(toTeacherCard);
 
   return {
+    ...createChromeState(16),
     loading: false,
     organizationName: home.organization.name,
     brandName: home.organization.brandName,
+    logoUrl:
+      home.organization.branding.fullLogoUrl ||
+      home.organization.branding.logoUrl ||
+      home.organization.branding.squareLogoUrl ||
+      '',
+    logoInitial: (home.organization.brandName || home.organization.name || '成').slice(0, 1),
+    activeHomeTab: 'intro',
+    aboutTitle:
+      about?.title || home.organization.publicProfile.bannerTitle || home.organization.brandName,
+    aboutSubtitle: about?.subtitle || home.organization.publicProfile.bannerSubtitle,
+    aboutHeroImageUrl: about?.heroImageUrl || '',
+    aboutPlatformTitle: platformTitleFor(home.organization.brandName, about?.operatorIntroTitle),
+    aboutPlatformIntro: about?.operatorIntro || platformIntroFallbackFor(home.organization.brandName),
+    aboutTeachingTitle:
+      about?.brandCooperationTitle && about.brandCooperationTitle !== '品牌合作'
+        ? about.brandCooperationTitle
+        : '教学机构',
+    aboutTeachingIntro:
+      about?.brandCooperation ||
+      '教学机构负责课程研发、师资安排、课堂交付与课后反馈。家长可结合课程详情、教师团队和成长故事，判断课程是否适合孩子当前阶段。',
+    aboutBlocks: about?.bodyBlocks || [],
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
@@ -160,10 +255,16 @@ function toState(home: HomePayload): HomeState {
     stats: profile.stats ?? [],
     highlights: (profile.highlights ?? []).map(toHighlightCard),
     contentMarketingTitle: profile.contentMarketingTitle || '成长故事',
-    studentStories: (home.contentItems ?? []).slice(0, 3).map(toStudentStoryCard),
+    studentStories: storyItems.map(toStudentStoryCard),
     address: home.organization.address ?? '',
     phone: home.organization.phone ?? '',
     businessHours: profile.businessHours,
+    campuses: (home.campuses ?? []).map((campus) => ({
+      id: campus.id,
+      name: campus.name,
+      address: campus.address ?? '',
+      imageUrls: campus.environmentImageUrls ?? [],
+    })),
     growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
     growthLoopSummary: profile.growthLoop?.summary || '',
     growthLoopPrimaryCtaText: profile.growthLoop?.primaryCtaText || '预约成长评估',
@@ -172,6 +273,7 @@ function toState(home: HomePayload): HomeState {
       title: step.title,
       indexLabel: String(index + 1).padStart(2, '0'),
     })),
+    quickActions: HOME_QUICK_ACTIONS,
     courses: home.featuredCourses.map((course) => ({
       ...course,
       priceLabel: coursePriceLabel(
@@ -198,6 +300,7 @@ Page({
   data: initialState,
 
   onLoad() {
+    this.setData(createChromeState(16));
     this.load();
   },
 
@@ -225,9 +328,9 @@ Page({
   async load() {
     this.setData({ loading: true });
     try {
-      const home = await loadHome();
+      const [home, stories] = await Promise.all([loadHome(), fetchStories({ limit: 20, offset: 0 })]);
       wx.setNavigationBarTitle({ title: home.organization.brandName || '成长教室' });
-      this.setData(toState(home));
+      this.setData(toState(home, stories.items));
     } catch (error) {
       this.setData({ loading: false });
       wx.showToast({
@@ -251,5 +354,18 @@ Page({
 
   onGrowthPrimaryCta() {
     navigateToWebPath(this.data.growthLoopPrimaryCtaLink || this.data.ctaLink);
+  },
+
+  onQuickAction(event: { currentTarget: { dataset: { key?: string } } }) {
+    const key = event.currentTarget.dataset.key;
+    if (!key) return;
+    this.setData({ activeHomeTab: key });
+  },
+
+  onPreviewCampusImage(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
+    const { url, urls } = event.currentTarget.dataset;
+    if (url && Array.isArray(urls) && urls.length) {
+      wx.previewImage({ urls, current: url });
+    }
   },
 });

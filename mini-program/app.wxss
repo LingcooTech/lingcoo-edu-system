@@ -14,7 +14,7 @@ textarea {
 }
 
 .page {
-  padding: 24rpx;
+  padding: calc(96px + 24rpx) 24rpx 24rpx;
   padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
 }
 
