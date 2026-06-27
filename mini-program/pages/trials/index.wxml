@@ -1,12 +1,51 @@
 <custom-navbar title="试听" />
 <view class="page trials-page">
   <view class="trial-head">
-    <image wx:if="{{bannerImageUrl}}" class="trial-head-image" src="{{bannerImageUrl}}" mode="aspectFill" />
     <view class="trial-head-shade"></view>
     <view class="trial-head-copy">
       <view class="trial-eyebrow">预约试听</view>
       <view class="trial-title">选择合适的体验场次</view>
       <view class="trial-subtitle">提交后老师会确认到校时间和课程安排。</view>
+    </view>
+  </view>
+
+  <view class="trial-filters">
+    <view class="time-filter-row">
+      <button
+        wx:for="{{timeFilters}}"
+        wx:key="key"
+        class="time-filter {{activeTimeFilter == item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onTimeFilterTap"
+      >
+        {{item.label}}
+      </button>
+    </view>
+    <view class="filter-grid">
+      <picker
+        mode="selector"
+        range="{{courseOptions}}"
+        range-key="label"
+        value="{{selectedCourseIndex}}"
+        bindchange="onCourseChange"
+      >
+        <view class="filter-picker">{{courseOptions[selectedCourseIndex].label}}</view>
+      </picker>
+      <picker
+        mode="selector"
+        range="{{campusOptions}}"
+        range-key="label"
+        value="{{selectedCampusIndex}}"
+        bindchange="onCampusChange"
+      >
+        <view class="filter-picker">{{campusOptions[selectedCampusIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="filter-footer">
+      <view class="filter-count">筛选结果 {{trials.length}} 场</view>
+      <button class="full-toggle {{showFull ? 'active' : ''}}" bindtap="onToggleFull">
+        {{showFull ? '显示已满' : '隐藏已满'}}
+      </button>
     </view>
   </view>
 

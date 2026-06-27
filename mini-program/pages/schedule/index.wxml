@@ -14,30 +14,39 @@
       </button>
     </view>
     <view class="selected-date">{{selectedDateLabel}}</view>
+    <view class="week-actions">
+      <button bindtap="onPreviousWeek">上一周</button>
+      <button bindtap="onCurrentWeek">本周</button>
+      <button bindtap="onNextWeek">下一周</button>
+    </view>
   </view>
 
   <view class="schedule-body">
-    <view class="section-title">今日课程</view>
+    <view class="section-title">课程安排</view>
 
     <skeleton wx:if="{{loading}}" variant="list" />
 
-    <view wx:elif="{{needLogin}}" class="schedule-empty">
-      <view class="empty-mark">...</view>
-      <view class="empty-text">登录后即可查看课程安排～</view>
-      <button class="btn btn-primary login-button" bindtap="goLogin">去登录</button>
-    </view>
-
     <view wx:elif="{{selectedEvents.length}}" class="event-list">
-      <view wx:for="{{selectedEvents}}" wx:key="id" class="event-card">
-        <view class="event-time">{{item.startsAtLabel}}</view>
+      <view
+        wx:for="{{selectedEvents}}"
+        wx:key="id"
+        class="event-card {{item.highlighted ? 'is-mine' : ''}} {{item.type == 'trial_session' ? 'is-trial' : ''}}"
+        data-url="{{item.url}}"
+        bindtap="onOpenEvent"
+      >
+        <view class="event-card-head">
+          <view class="event-time">{{item.startsAtLabel}}</view>
+          <view class="event-badge">{{item.badge}}</view>
+        </view>
         <view class="event-title">{{item.courseName}} · {{item.title}}</view>
-        <view class="event-meta">{{item.student.name}} · {{item.class.name}} · {{item.classroomName}}</view>
+        <view class="event-meta">{{item.meta}}</view>
+        <view wx:if="{{item.studentNames}}" class="event-students">孩子：{{item.studentNames}}</view>
       </view>
     </view>
 
     <view wx:else class="schedule-empty">
       <view class="empty-mark">...</view>
-      <view class="empty-text">当天暂无课程安排～</view>
+      <view class="empty-text">当天暂无公开课程安排～</view>
     </view>
   </view>
 </view>

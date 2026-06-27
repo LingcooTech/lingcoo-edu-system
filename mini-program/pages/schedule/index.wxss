@@ -78,6 +78,31 @@
   text-align: center;
 }
 
+.week-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.week-actions button {
+  min-width: 132rpx;
+  height: 58rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.58);
+  color: #5d675e;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 58rpx;
+  margin: 0;
+  padding: 0 22rpx;
+}
+
+.week-actions button::after {
+  border: 0;
+}
+
 .schedule-body {
   min-height: 900rpx;
   margin: -28rpx -24rpx 0;
@@ -126,15 +151,53 @@
 }
 
 .event-card {
+  border: 2rpx solid transparent;
   border-radius: 24rpx;
   background: #f8f6f2;
   padding: 24rpx;
+}
+
+.event-card.is-trial {
+  background: #f7fbf8;
+}
+
+.event-card.is-mine {
+  border-color: rgba(154, 106, 75, 0.42);
+  background: #fff7ed;
+}
+
+.event-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
 }
 
 .event-time {
   color: #9a6a4b;
   font-size: 26rpx;
   font-weight: 900;
+}
+
+.event-badge {
+  flex: 0 0 auto;
+  border-radius: 999rpx;
+  background: rgba(154, 106, 75, 0.1);
+  color: #9a6a4b;
+  font-size: 22rpx;
+  font-weight: 900;
+  line-height: 1;
+  padding: 10rpx 16rpx;
+}
+
+.event-card.is-trial .event-badge {
+  background: rgba(43, 201, 128, 0.12);
+  color: #188858;
+}
+
+.event-card.is-mine .event-badge {
+  background: #9a6a4b;
+  color: #fff;
 }
 
 .event-title {
@@ -149,5 +212,13 @@
   margin-top: 8rpx;
   color: #8b857c;
   font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.event-students {
+  margin-top: 12rpx;
+  color: #9a6a4b;
+  font-size: 24rpx;
+  font-weight: 800;
   line-height: 1.45;
 }

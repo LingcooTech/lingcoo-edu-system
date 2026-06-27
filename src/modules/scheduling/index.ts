@@ -5,6 +5,8 @@ import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as peopleRepo from '../../db/repositories/people.js';
+import * as trialRepo from '../../db/repositories/trial.js';
+import * as organizationRepo from '../../db/repositories/organization.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import type { AppModule } from '../types.js';
 
@@ -54,6 +56,10 @@ const calendarQuerySchema = z.object({
   teacherId: z.string().optional(),
   classroomId: z.string().optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled']).optional(),
+});
+const publicCalendarQuerySchema = z.object({
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
 });
 
 const enrollmentSchema = z.object({
@@ -251,6 +257,96 @@ export const schedulingModule: AppModule = {
               classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
             };
           }),
+      };
+    });
+
+    app.get('/public/calendar', async (request) => {
+      const query = publicCalendarQuerySchema.parse(request.query);
+      const now = new Date();
+      const from = query.from ? new Date(query.from) : now;
+      const defaultTo = new Date(from);
+      defaultTo.setDate(defaultTo.getDate() + 30);
+      const to = query.to ? new Date(query.to) : defaultTo;
+      const trialFrom = from > now ? from : now;
+
+      const [sessions, classes, courses, teachers, classrooms, campuses, trialSessions] =
+        await Promise.all([
+          schedulingRepo.listClassSessions(app.db),
+          schedulingRepo.listClasses(app.db),
+          catalogRepo.listPublishedCourses(app.db),
+          teachingRepo.listTeachers(app.db),
+          teachingRepo.listClassrooms(app.db),
+          organizationRepo.listCampuses(app.db),
+          trialRepo.listOpenFutureTrialSessions(app.db, { from: trialFrom, to }),
+        ]);
+      const classById = new Map(classes.map((item) => [item.id, item]));
+      const courseById = new Map(courses.map((item) => [item.id, item]));
+      const teacherById = new Map(teachers.map((item) => [item.id, item]));
+      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+      const campusById = new Map(campuses.map((item) => [item.id, item]));
+
+      const classEvents = sessions
+        .filter((session) => {
+          const classGroup = classById.get(session.classId);
+          if (!classGroup) return false;
+          if (!['recruiting', 'active'].includes(classGroup.status)) return false;
+          if (!courseById.has(classGroup.courseId)) return false;
+          if (session.status !== 'scheduled') return false;
+          return overlapsRange(session, from, to);
+        })
+        .map((session) => {
+          const classGroup = classById.get(session.classId);
+          const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
+          const teacher = teacherById.get(session.teacherId);
+          const classroom = classroomById.get(session.classroomId);
+          return {
+            id: session.id,
+            sessionId: session.id,
+            type: 'class_session',
+            title: session.topic,
+            startsAt: session.startsAt,
+            endsAt: session.endsAt,
+            status: session.status,
+            class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+            course: course
+              ? { id: course.id, name: course.name, slug: course.slug, category: course.category }
+              : null,
+            teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+            classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
+          };
+        });
+
+      const trialEvents = trialSessions
+        .map((trialSession) => {
+          const course = courseById.get(trialSession.courseId);
+          if (!course) return null;
+          const campus = campusById.get(trialSession.campusId);
+          return {
+            id: trialSession.id,
+            trialSessionId: trialSession.id,
+            type: 'trial_session',
+            title: trialSession.title,
+            startsAt: trialSession.startsAt,
+            endsAt: trialSession.endsAt,
+            status: trialSession.status,
+            capacity: trialSession.capacity,
+            bookedCount: trialSession.bookedCount,
+            reservationFeeAmount: trialSession.reservationFeeAmount,
+            course: {
+              id: course.id,
+              name: course.name,
+              slug: course.slug,
+              category: course.category,
+            },
+            campus: campus ? { id: campus.id, name: campus.name, address: campus.address } : null,
+          };
+        })
+        .filter((event): event is NonNullable<typeof event> => event !== null);
+
+      return {
+        events: [...classEvents, ...trialEvents].sort(
+          (a, b) => a.startsAt.getTime() - b.startsAt.getTime(),
+        ),
       };
     });
 

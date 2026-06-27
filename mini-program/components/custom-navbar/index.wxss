@@ -5,8 +5,8 @@
   right: 0;
   left: 0;
   box-sizing: border-box;
-  background: #ffffff;
-  border-bottom: 1rpx solid rgba(33, 31, 28, 0.05);
+  background: transparent;
+  border-bottom: 0;
   display: flex;
   align-items: flex-end;
 }
@@ -36,10 +36,23 @@
 }
 
 .navbar-title.with-back {
-  padding-right: 0;
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 96rpx;
+  box-sizing: border-box;
+  padding: 0;
+  text-align: center;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .navbar-back {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   width: 72rpx;
   height: 100%;

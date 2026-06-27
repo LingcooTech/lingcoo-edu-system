@@ -58,6 +58,7 @@ export interface PublicClassroom {
 
 export interface TrialSession {
   id: string;
+  campusId: string;
   courseId: string;
   title: string;
   startsAt: string;
@@ -496,6 +497,32 @@ export interface ParentCalendarEvent {
   attendanceStatus: string | null;
 }
 
+export interface PublicCalendarCourse {
+  id: string;
+  name: string;
+  slug: string;
+  category?: string | null;
+}
+
+export interface PublicCalendarEvent {
+  id: string;
+  type: 'class_session' | 'trial_session';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  sessionId?: string;
+  trialSessionId?: string;
+  class?: { id: string; name: string } | null;
+  course: PublicCalendarCourse | null;
+  teacher?: { id: string; name: string } | null;
+  classroom?: { id: string; name: string } | null;
+  campus?: { id: string; name: string; address?: string | null } | null;
+  capacity?: number;
+  bookedCount?: number;
+  reservationFeeAmount?: number;
+}
+
 export interface ParentHomeworkCheckIn {
   id: string;
   accountId?: string | null;
@@ -735,6 +762,11 @@ export function fetchCampaignLanding(code: string): Promise<CampaignLandingPaylo
   return request<CampaignLandingPayload>(`/public/campaigns/${encodeURIComponent(code)}`);
 }
 
+export async function fetchTrialSessions(): Promise<TrialSession[]> {
+  return (await request<{ trialSessions: TrialSession[] }>('/public/trial-sessions'))
+    .trialSessions;
+}
+
 export function fetchTrialSession(id: string): Promise<TrialDetail> {
   return request<TrialDetail>(`/public/trial-sessions/${encodeURIComponent(id)}`);
 }
@@ -941,6 +973,16 @@ export async function fetchParentCalendar(
       `/public/me/calendar${query ? `?${query}` : ''}`,
     )
   ).events;
+}
+
+export async function fetchPublicCalendar(
+  params: {
+    from?: string;
+    to?: string;
+  } = {},
+): Promise<PublicCalendarEvent[]> {
+  return (await request<{ events: PublicCalendarEvent[] }>(`/public/calendar${buildQueryString(params)}`))
+    .events;
 }
 
 export function submitParentCheckIn(
