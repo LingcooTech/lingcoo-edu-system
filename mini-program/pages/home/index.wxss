@@ -5,7 +5,7 @@
 .hero {
   position: relative;
   overflow: hidden;
-  margin: -24rpx -24rpx 0;
+  margin: 0 -24rpx;
   padding: 96px 24rpx 34rpx;
   background: linear-gradient(180deg, #cfa57d 0%, #ead7c3 72%, #f6f4f0 100%);
 }
@@ -13,15 +13,22 @@
 .custom-nav {
   position: absolute;
   z-index: 5;
+  top: 0;
   right: 0;
   left: 0;
+  padding-left: 28rpx;
+  box-sizing: border-box;
+}
+
+.custom-nav-inner {
   display: flex;
   align-items: center;
-  padding-left: 28rpx;
+  min-width: 0;
 }
 
 .nav-logo {
   display: block;
+  flex: 0 1 auto;
   max-width: 100%;
 }
 
@@ -31,7 +38,7 @@
   color: #211f1c;
   font-size: 36rpx;
   font-weight: 900;
-  line-height: 1.2;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -77,11 +84,11 @@
 .quick-panel {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8rpx;
+  gap: 12rpx;
   margin-top: 22rpx;
   border-radius: 28rpx;
   background: #fff;
-  padding: 24rpx 12rpx 22rpx;
+  padding: 20rpx 16rpx;
   box-shadow: 0 12rpx 32rpx rgba(33, 31, 28, 0.06);
 }
 

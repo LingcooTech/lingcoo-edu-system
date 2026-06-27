@@ -4,8 +4,10 @@
   <block wx:else>
     <view class="hero" style="{{heroStyle}}">
       <view class="custom-nav" style="{{customNavStyle}}">
-        <image wx:if="{{logoUrl}}" class="nav-logo" style="{{navLogoStyle}}" src="{{logoUrl}}" mode="aspectFit" />
-        <view wx:else class="nav-logo-text">{{brandName || organizationName || logoInitial}}</view>
+        <view class="custom-nav-inner" style="{{customNavInnerStyle}}">
+          <image wx:if="{{logoUrl}}" class="nav-logo" style="{{navLogoStyle}}" src="{{logoUrl}}" mode="aspectFit" />
+          <view wx:else class="nav-logo-text">{{brandName || organizationName || logoInitial}}</view>
+        </view>
       </view>
       <swiper
         wx:if="{{bannerImages.length}}"

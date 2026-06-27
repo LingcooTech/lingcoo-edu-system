@@ -13,6 +13,7 @@ import {
 import { coursePriceLabel, formatDateTime, money, navigateToWebPath } from '../../utils/format';
 import { createChromeState } from '../../utils/chrome';
 import { type Block } from '../../utils/blocks';
+import { HOME_QUICK_ACTIONS_ICONS } from '../../utils/icons';
 
 interface HomeTeacherCard {
   id: string;
@@ -71,6 +72,7 @@ interface HomeState {
   logoUrl: string;
   logoInitial: string;
   customNavStyle: string;
+  customNavInnerStyle: string;
   heroStyle: string;
   navLogoStyle: string;
   activeHomeTab: string;
@@ -114,9 +116,10 @@ const initialState: HomeState = {
   brandName: '',
   logoUrl: '',
   logoInitial: '成',
-  customNavStyle: 'top: 44px; height: 32px; padding-right: 120px;',
+  customNavStyle: 'height: 88px; padding-top: 48px; padding-right: 100px;',
+  customNavInnerStyle: 'height: 32px;',
   heroStyle: 'padding-top: 96px;',
-  navLogoStyle: 'width: 220px; height: 32px;',
+  navLogoStyle: 'width: 128px; height: 25px;',
   activeHomeTab: 'intro',
   aboutTitle: '',
   aboutSubtitle: '',
@@ -153,11 +156,11 @@ const initialState: HomeState = {
 };
 
 const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
-  { key: 'intro', label: '品牌介绍', iconUrl: '/assets/nav/brand.png' },
-  { key: 'advantages', label: '核心优势', iconUrl: '/assets/nav/course.png' },
-  { key: 'campuses', label: '校区环境', iconUrl: '/assets/nav/campus.png' },
-  { key: 'teachers', label: '师资团队', iconUrl: '/assets/nav/teacher.png' },
-  { key: 'stories', label: '成长故事', iconUrl: '/assets/nav/story.png' },
+  { key: 'intro', label: '品牌介绍', iconUrl: HOME_QUICK_ACTIONS_ICONS.intro },
+  { key: 'advantages', label: '核心优势', iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages },
+  { key: 'campuses', label: '校区环境', iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses },
+  { key: 'teachers', label: '师资团队', iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers },
+  { key: 'stories', label: '成长故事', iconUrl: HOME_QUICK_ACTIONS_ICONS.stories },
 ];
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {

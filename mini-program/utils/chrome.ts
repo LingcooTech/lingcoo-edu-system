@@ -1,5 +1,6 @@
 export type ChromeState = {
   customNavStyle: string;
+  customNavInnerStyle: string;
   heroStyle: string;
   navLogoStyle: string;
 };
@@ -14,18 +15,23 @@ export function createChromeState(offset = 16): ChromeState {
     const menuHeight = menu.height || 32;
     const menuBottom = menu.bottom || menuTop + menuHeight;
     const menuLeft = menu.left || windowWidth - 96;
+    const navBarHeight = menuHeight + 2 * Math.max(0, menuTop - statusBarHeight);
+    const totalNavHeight = statusBarHeight + navBarHeight;
     const rightReserved = Math.max(118, windowWidth - menuLeft + 12);
-    const logoWidth = Math.max(120, Math.min(220, menuLeft - 28));
+    const logoWidth = Math.max(96, Math.min(168, menuLeft - 40));
+    const logoHeight = Math.max(20, Math.round(menuHeight * 0.78));
     return {
-      customNavStyle: `top: ${menuTop}px; height: ${menuHeight}px; padding-right: ${rightReserved}px;`,
-      heroStyle: `padding-top: ${menuBottom + offset}px;`,
-      navLogoStyle: `width: ${logoWidth}px; height: ${menuHeight}px;`,
+      customNavStyle: `height: ${totalNavHeight}px; padding-top: ${menuTop}px; padding-right: ${rightReserved}px;`,
+      customNavInnerStyle: `height: ${menuHeight}px;`,
+      heroStyle: `padding-top: ${totalNavHeight + offset}px;`,
+      navLogoStyle: `width: ${logoWidth}px; height: ${logoHeight}px;`,
     };
   } catch {
     return {
-      customNavStyle: 'top: 44px; height: 32px; padding-right: 120px;',
+      customNavStyle: 'height: 88px; padding-top: 48px; padding-right: 120px;',
+      customNavInnerStyle: 'height: 32px;',
       heroStyle: `padding-top: ${96 + offset}px;`,
-      navLogoStyle: 'width: 220px; height: 32px;',
+      navLogoStyle: 'width: 128px; height: 25px;',
     };
   }
 }
