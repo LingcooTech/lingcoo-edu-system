@@ -210,6 +210,7 @@ export const contentItems = pgTable(
     sourceId: varchar('source_id', { length: 255 }),
     sourceUrl: varchar('source_url', { length: 2048 }),
     status: contentStatusEnum('status').notNull().default('draft'),
+    isPinned: boolean('is_pinned').notNull().default(false),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     importedAt: timestamp('imported_at', { withTimezone: true }),
     meta: jsonb('meta')
@@ -512,6 +513,7 @@ export const teachers = pgTable(
     specialties: jsonb('specialties')
       .notNull()
       .default(sql`'[]'::jsonb`),
+    isPinned: boolean('is_pinned').notNull().default(false),
     status: teachingResourceStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

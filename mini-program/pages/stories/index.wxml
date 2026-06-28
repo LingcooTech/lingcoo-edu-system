@@ -1,0 +1,21 @@
+<custom-navbar title="成长故事" />
+<view class="page stories-page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{stories.length}}" class="story-list">
+    <navigator
+      wx:for="{{stories}}"
+      wx:key="slug"
+      class="story-card"
+      url="/pages/story-detail/index?slug={{item.slug}}"
+    >
+      <image wx:if="{{item.coverImageUrl}}" class="story-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+      <view wx:else class="story-cover story-cover-fallback">文</view>
+      <view class="story-body">
+        <view class="story-title">{{item.title}}</view>
+        <view class="story-summary">{{item.excerpt}}</view>
+        <view wx:if="{{item.authorName}}" class="story-meta">{{item.authorName}}</view>
+      </view>
+    </navigator>
+  </view>
+  <view wx:else class="empty">成长故事整理中。</view>
+</view>

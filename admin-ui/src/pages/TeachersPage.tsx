@@ -42,6 +42,7 @@ interface TeacherForm {
   studentWorkUrlsText: string;
   parentTestimonialsText: string;
   specialties: string;
+  isPinned: boolean;
   status: 'active' | 'archived';
 }
 
@@ -76,6 +77,7 @@ const emptyTeacherForm: TeacherForm = {
   studentWorkUrlsText: '',
   parentTestimonialsText: '',
   specialties: '',
+  isPinned: false,
   status: 'active',
 };
 
@@ -126,6 +128,7 @@ export function TeachersPage({
             studentWorkUrlsText: listToLines(teacher.studentWorkUrls),
             parentTestimonialsText: listToLines(teacher.parentTestimonials),
             specialties: teacher.specialties.join('、'),
+            isPinned: Boolean(teacher.isPinned),
             status: teacher.status as TeacherForm['status'],
           }
         : emptyTeacherForm,
@@ -169,6 +172,7 @@ export function TeachersPage({
           .split(/[、,，]/)
           .map((item) => item.trim())
           .filter(Boolean),
+        isPinned: form.isPinned,
         status: form.status,
       };
       if (editing) {
@@ -233,7 +237,12 @@ export function TeachersPage({
           {
             key: 'status',
             header: '状态',
-            cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+            cell: (row) => (
+              <div className="flex flex-wrap gap-1">
+                {row.isPinned ? <StatusPill tone="warn" label="置顶" /> : null}
+                <StatusPill tone={statusToTone(row.status)} label={row.status} />
+              </div>
+            ),
           },
           {
             key: 'actions',
@@ -343,6 +352,14 @@ export function TeachersPage({
             onChange={(event) => setForm({ ...form, specialties: event.target.value })}
           />
         </Field>
+        <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={form.isPinned}
+            onChange={(event) => setForm({ ...form, isPinned: event.target.checked })}
+          />
+          <span>首页师资团队置顶展示</span>
+        </label>
         <div className="grid grid-cols-3 gap-3">
           <Field label="教学年限">
             <input

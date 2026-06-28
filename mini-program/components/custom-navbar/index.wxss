@@ -7,8 +7,6 @@
   box-sizing: border-box;
   background: transparent;
   border-bottom: 0;
-  display: flex;
-  align-items: flex-end;
 }
 
 .custom-navbar-inner {
@@ -18,32 +16,36 @@
   align-items: center;
   width: 100%;
   box-sizing: border-box;
-  padding-left: 24rpx;
+  padding-left: 40rpx;
 }
 
 .navbar-title {
+  display: flex;
+  height: 100%;
+  align-items: center;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   color: #211f1c;
   font-size: 34rpx;
-  font-weight: 900;
-  line-height: 1.2;
+  font-weight: 400;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  letter-spacing: -0.3px;
+  letter-spacing: 0;
 }
 
-.navbar-title.with-back {
-  position: absolute;
-  top: 50%;
+.navbar-title.centered {
+  position: fixed;
   right: 0;
-  left: 96rpx;
+  left: 0;
+  width: 100%;
   box-sizing: border-box;
-  padding: 0;
+  padding: 0 180rpx;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  transform: translateY(-50%);
   pointer-events: none;
 }
 
@@ -52,22 +54,30 @@
   z-index: 1;
   top: 0;
   bottom: 0;
-  left: 0;
+  left: 40rpx;
   display: flex;
-  width: 72rpx;
+  width: 56rpx;
   height: 100%;
-  flex: 0 0 72rpx;
+  flex: 0 0 56rpx;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   border: 0;
   background: transparent;
   color: #211f1c;
-  font-size: 40rpx;
-  font-weight: 400;
   line-height: 1;
   margin: 0;
-  padding: 0 12rpx 0 0;
+  padding: 0;
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.navbar-back-icon {
+  width: 22rpx;
+  height: 22rpx;
+  margin-left: 8rpx;
+  border-bottom: 4rpx solid currentColor;
+  border-left: 4rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(45deg);
 }
 
 .navbar-back::after {

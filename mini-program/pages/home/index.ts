@@ -23,6 +23,7 @@ interface HomeTeacherCard {
   avatarUrl: string;
   tagline: string;
   specialtiesText: string;
+  metaText: string;
 }
 
 type HomeHighlightCard = PublicProfileHighlight & {
@@ -183,6 +184,9 @@ function createHomeChromeState() {
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
+  const metaText = [teacher.teachingYears ? `${teacher.teachingYears}教学` : '', specialtiesText]
+    .filter(Boolean)
+    .join(' · ');
   return {
     id: teacher.id,
     name: teacher.name,
@@ -191,6 +195,7 @@ function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
     avatarUrl: teacher.avatarUrl || '',
     tagline: teacher.tagline?.trim() || specialtiesText || '查看老师档案与授课方向',
     specialtiesText,
+    metaText,
   };
 }
 
@@ -278,7 +283,7 @@ function toState(
   const miniBannerImages = Array.from(new Set((profile.miniBannerImages ?? []).filter(Boolean)));
   const bannerImages = miniBannerImages.length ? miniBannerImages : webBannerImages;
   const teachers = home.teachers ?? [];
-  const trustTeachers = teachers.slice(0, 6).map(toTeacherCard);
+  const trustTeachers = teachers.slice(0, 5).map(toTeacherCard);
   const aboutPlatformIntro =
     about?.operatorIntro || platformIntroFallbackFor(home.organization.brandName);
   const aboutTeachingIntro =
@@ -399,7 +404,7 @@ Page({
     try {
       const [home, stories, institutions] = await Promise.all([
         loadHome(),
-        fetchStories({ limit: 20, offset: 0 }),
+        fetchStories({ limit: 5, offset: 0 }),
         fetchPublicInstitutions(),
       ]);
       wx.setNavigationBarTitle({ title: home.organization.brandName || '成长教室' });
@@ -423,6 +428,10 @@ Page({
 
   goTeachers() {
     wx.navigateTo({ url: '/pages/teachers/index' });
+  },
+
+  goStories() {
+    wx.navigateTo({ url: '/pages/stories/index' });
   },
 
   onGrowthPrimaryCta() {

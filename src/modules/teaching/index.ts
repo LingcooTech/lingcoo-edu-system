@@ -33,6 +33,7 @@ const teacherSchema = z.object({
   parentTestimonials: z.array(z.string().min(1).max(240)).max(12).default([]),
   bio: z.string().default(''),
   specialties: z.array(z.string()).default([]),
+  isPinned: z.boolean().default(false),
   status: z.enum(['active', 'archived']).default('active'),
 });
 

@@ -251,7 +251,7 @@ export const trialModule: AppModule = {
         }),
         organizationRepo.listCampuses(app.db),
         teachingRepo.listTeachers(app.db),
-        contentRepo.listPublishedContent(app.db, { limit: 3, offset: 0 }),
+        contentRepo.listPublishedContent(app.db, { limit: 5, offset: 0 }),
       ]);
       const businessModel = readBusinessModel(organization.settings);
       const featuredCourses = await attachPackageSummary(app, courses, {
@@ -273,7 +273,7 @@ export const trialModule: AppModule = {
         trialSessions,
         contentItems: contentItems.items,
         campuses,
-        teachers: teachers.filter((teacher) => teacher.status !== 'archived'),
+        teachers: teachers.filter((teacher) => teacher.status !== 'archived').slice(0, 5),
       };
     });
 

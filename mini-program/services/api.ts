@@ -85,6 +85,7 @@ export interface ContentItem {
   sourceId: string | null;
   sourceUrl: string | null;
   status: ContentStatus;
+  isPinned: boolean;
   publishedAt: string | null;
   importedAt: string | null;
   meta: Record<string, unknown>;
@@ -353,6 +354,7 @@ export interface PublicTeacher {
   parentTestimonials: string[];
   bio?: string | null;
   specialties: string[];
+  isPinned?: boolean;
   status: string;
 }
 

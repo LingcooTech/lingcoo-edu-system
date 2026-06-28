@@ -145,6 +145,7 @@ export interface ContentUpsertInput {
   sourceType: ContentSourceType;
   sourceId?: string;
   sourceUrl?: string;
+  isPinned?: boolean;
   publishedAt?: string;
   meta?: Record<string, unknown>;
 }

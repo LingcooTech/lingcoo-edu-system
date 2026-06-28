@@ -41,6 +41,7 @@ interface ContentForm {
   coverUrl: string;
   authorName: string;
   status: ContentStatus;
+  isPinned: boolean;
   sourceType: ContentSourceType;
   sourceId: string;
   sourceUrl: string;
@@ -55,6 +56,7 @@ const EMPTY_FORM: ContentForm = {
   coverUrl: '',
   authorName: '',
   status: 'draft',
+  isPinned: false,
   sourceType: 'manual',
   sourceId: '',
   sourceUrl: '',
@@ -84,6 +86,7 @@ function toForm(item: ContentItem): ContentForm {
     coverUrl: item.coverUrl ?? '',
     authorName: item.authorName ?? '',
     status: item.status,
+    isPinned: Boolean(item.isPinned),
     sourceType: item.sourceType,
     sourceId: item.sourceId ?? '',
     sourceUrl: item.sourceUrl ?? '',
@@ -99,6 +102,7 @@ function toPayload(form: ContentForm): ContentUpsertInput {
     coverUrl: form.coverUrl.trim(),
     authorName: form.authorName.trim(),
     status: form.status,
+    isPinned: form.isPinned,
     sourceType: form.sourceType,
     sourceId: form.sourceId.trim(),
     sourceUrl: form.sourceUrl.trim(),
@@ -380,6 +384,7 @@ export function ContentMarketingPage() {
         cell: (row) => (
           <div className="space-y-1">
             <div className="text-foreground text-sm font-semibold">{row.title}</div>
+            {row.isPinned ? <StatusPill tone="warn" label="置顶" /> : null}
             <div className="text-muted-foreground font-mono text-[11px]">{row.slug}</div>
             {row.excerpt ? (
               <div className="text-muted-foreground line-clamp-2 text-xs leading-5">
@@ -732,6 +737,14 @@ export function ContentMarketingPage() {
               </select>
             </Field>
           </FieldRow>
+          <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.isPinned}
+              onChange={(event) => patchForm({ isPinned: event.target.checked })}
+            />
+            <span>首页成长故事置顶展示</span>
+          </label>
           <Field label="作者 / 学员称呼">
             <input
               className="form-input"

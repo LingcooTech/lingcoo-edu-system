@@ -13,6 +13,7 @@ Component({
   data: {
     navStyle: 'height: 88px; padding-top: 48px; padding-right: 120px;',
     navInnerStyle: 'height: 32px;',
+    navTitleStyle: 'top: 48px; height: 32px;',
   },
 
   lifetimes: {
@@ -51,11 +52,13 @@ function createNavState() {
     return {
       navStyle: `height: ${totalNavHeight}px; padding-top: ${menuTop}px; padding-right: ${rightReserved}px;`,
       navInnerStyle: `height: ${menuHeight}px;`,
+      navTitleStyle: `top: ${menuTop}px; height: ${menuHeight}px;`,
     };
   } catch {
     return {
       navStyle: 'height: 88px; padding-top: 48px; padding-right: 120px;',
       navInnerStyle: 'height: 32px;',
+      navTitleStyle: 'top: 48px; height: 32px;',
     };
   }
 }

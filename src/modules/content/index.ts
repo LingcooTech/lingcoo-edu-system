@@ -52,6 +52,7 @@ const upsertContentSchema = z.object({
   sourceType: z.enum(['manual', 'wordpress', 'notion', 'wechat']).default('manual'),
   sourceId: optionalTrimmedString(255),
   sourceUrl: z.string().trim().url().optional().or(z.literal('')),
+  isPinned: z.boolean().default(false),
   publishedAt: z.string().datetime().optional(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
@@ -620,6 +621,7 @@ class ContentService {
       sourceType: ContentSourceType;
       sourceId?: string;
       sourceUrl?: string;
+      isPinned?: boolean;
       publishedAt?: string;
       meta?: Record<string, unknown>;
     },
@@ -644,6 +646,7 @@ class ContentService {
       sourceType: input.sourceType,
       sourceId: normalizeString(input.sourceId) || null,
       sourceUrl: normalizeOptionalUrl(input.sourceUrl) ?? null,
+      isPinned: input.isPinned ?? existing?.isPinned ?? false,
       status: input.status,
       publishedAt: computedPublishedAt,
       meta: input.meta ?? existing?.meta ?? {},

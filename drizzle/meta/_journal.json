@@ -260,6 +260,13 @@
       "when": 1782691200000,
       "tag": "0036_campus_geo",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1782777600000,
+      "tag": "0037_pinned_public_content",
+      "breakpoints": true
     }
   ]
 }

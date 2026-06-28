@@ -4,7 +4,10 @@ import type { Database } from '../client.js';
 import * as schema from '../schema.js';
 
 export async function listTeachers(db: Database) {
-  return db.select().from(schema.teachers).orderBy(desc(schema.teachers.createdAt));
+  return db
+    .select()
+    .from(schema.teachers)
+    .orderBy(desc(schema.teachers.isPinned), desc(schema.teachers.createdAt));
 }
 
 export async function findTeacher(db: Database, teacherId: string | null) {

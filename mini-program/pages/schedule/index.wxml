@@ -1,28 +1,66 @@
 <custom-navbar title="课表" />
 <view class="page schedule-page">
   <view class="schedule-hero">
-    <view class="week-grid">
-      <button
-        wx:for="{{weekDays}}"
-        wx:key="key"
-        class="day-cell {{item.selected ? 'selected' : ''}}"
-        data-iso-date="{{item.isoDate}}"
-        bindtap="onSelectDate"
-      >
-        <view class="weekday">{{item.weekday}}</view>
-        <view class="day-number">{{item.day}}</view>
+    <view class="calendar-panel {{calendarExpanded ? 'expanded' : 'collapsed'}}">
+      <view wx:if="{{calendarExpanded}}" class="month-toolbar">
+        <button bindtap="onPreviousMonth">上一月</button>
+        <view class="month-title">{{monthLabel}}</view>
+        <button bindtap="onNextMonth">下一月</button>
+      </view>
+
+      <view wx:if="{{calendarExpanded}}" class="weekday-row">
+        <view wx:for="{{weekdays}}" wx:key="*this" class="weekday">{{item}}</view>
+      </view>
+
+      <view wx:if="{{calendarExpanded}}" class="month-grid">
+        <view
+          wx:for="{{calendarDays}}"
+          wx:key="key"
+          class="day-cell {{item.currentMonth ? '' : 'muted'}} {{item.selected ? 'selected' : ''}} {{item.today ? 'today' : ''}} {{item.hasMine ? 'has-mine' : ''}}"
+          data-iso-date="{{item.isoDate}}"
+          bindtap="onSelectDate"
+        >
+          <view class="day-number">{{item.day}}</view>
+          <view wx:if="{{item.eventCount}}" class="day-count">{{item.eventCount}}节</view>
+          <view class="day-dots">
+            <view wx:if="{{item.hasTrial}}" class="day-dot trial"></view>
+            <view wx:if="{{item.hasMine}}" class="day-dot mine"></view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:else class="week-grid">
+        <view
+          wx:for="{{weekDays}}"
+          wx:key="key"
+          class="day-cell {{item.currentMonth ? '' : 'muted'}} {{item.selected ? 'selected' : ''}} {{item.today ? 'today' : ''}} {{item.hasMine ? 'has-mine' : ''}}"
+          data-iso-date="{{item.isoDate}}"
+          bindtap="onSelectDate"
+        >
+          <view class="weekday">{{weekdays[index]}}</view>
+          <view class="day-number">{{item.day}}</view>
+          <view class="day-dots">
+            <view wx:if="{{item.eventCount && !item.hasTrial && !item.hasMine}}" class="day-dot"></view>
+            <view wx:if="{{item.hasTrial}}" class="day-dot trial"></view>
+            <view wx:if="{{item.hasMine}}" class="day-dot mine"></view>
+          </view>
+        </view>
+      </view>
+
+      <button class="date-toggle" bindtap="onToggleCalendar">
+        <text class="date-toggle-label">{{selectedDateLabel}}</text>
+        <view class="toggle-chevron {{calendarExpanded ? 'up' : ''}}"></view>
       </button>
-    </view>
-    <view class="selected-date">{{selectedDateLabel}}</view>
-    <view class="week-actions">
-      <button bindtap="onPreviousWeek">上一周</button>
-      <button bindtap="onCurrentWeek">本周</button>
-      <button bindtap="onNextWeek">下一周</button>
+
+      <button wx:if="{{calendarExpanded}}" class="month-current" bindtap="onCurrentMonth">回到本月</button>
     </view>
   </view>
 
   <view class="schedule-body">
-    <view class="section-title">课程安排</view>
+    <view class="section-head">
+      <view class="section-title">课程安排</view>
+      <view class="selected-date">{{selectedDateLabel}}</view>
+    </view>
 
     <skeleton wx:if="{{loading}}" variant="list" />
 

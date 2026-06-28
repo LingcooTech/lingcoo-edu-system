@@ -101,6 +101,7 @@ export async function listContent(db: Database, query: ContentListQuery) {
       .from(schema.contentItems)
       .where(where)
       .orderBy(
+        desc(schema.contentItems.isPinned),
         desc(schema.contentItems.publishedAt),
         desc(schema.contentItems.importedAt),
         desc(schema.contentItems.createdAt),
@@ -143,7 +144,11 @@ export async function listPublishedContent(
       .select()
       .from(schema.contentItems)
       .where(where)
-      .orderBy(desc(schema.contentItems.publishedAt), desc(schema.contentItems.updatedAt))
+      .orderBy(
+        desc(schema.contentItems.isPinned),
+        desc(schema.contentItems.publishedAt),
+        desc(schema.contentItems.updatedAt),
+      )
       .limit(query.limit)
       .offset(query.offset),
     db
