@@ -5,9 +5,9 @@
 
 .trial-head {
   position: relative;
-  min-height: 430rpx;
+  min-height: 360rpx;
   overflow: hidden;
-  border-radius: 0 0 34rpx 34rpx;
+  border-radius: 0;
   margin: -24rpx -24rpx 0;
   margin-top: -88px;
   padding-top: calc(88px + 38rpx);
@@ -32,22 +32,15 @@
 .trial-head-copy {
   position: absolute;
   right: 28rpx;
-  bottom: 34rpx;
+  bottom: 54rpx;
   left: 28rpx;
   color: #fff;
 }
 
-.trial-eyebrow {
-  font-size: 25rpx;
-  font-weight: 800;
-  opacity: 0.86;
-}
-
 .trial-title {
-  margin-top: 10rpx;
-  font-size: 46rpx;
-  font-weight: 900;
-  line-height: 1.18;
+  font-size: 38rpx;
+  font-weight: 700;
+  line-height: 1.26;
 }
 
 .trial-subtitle {
@@ -94,8 +87,7 @@
   padding: 0 4rpx;
 }
 
-.time-filter::after,
-.full-toggle::after {
+.time-filter::after {
   border: 0;
 }
 
@@ -118,10 +110,11 @@
   background: #f8f6f2;
   color: #211f1c;
   font-size: 25rpx;
-  font-weight: 800;
+  font-weight: 400;
   line-height: 72rpx;
   min-height: 72rpx;
   padding: 0 18rpx;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -130,36 +123,48 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
-  margin-top: 14rpx;
+  gap: 12rpx;
+  margin-top: 16rpx;
+  border-top: 1rpx solid rgba(33, 31, 28, 0.06);
+  padding-top: 14rpx;
+  width: 100%;
 }
 
 .filter-count {
+  display: flex;
+  flex: 1;
+  min-height: 52rpx;
+  align-items: center;
+  justify-content: flex-start;
   color: #8b857c;
   font-size: 24rpx;
   font-weight: 700;
+  line-height: 1;
 }
 
 .full-toggle {
   display: inline-flex;
   width: auto;
-  min-height: 56rpx;
+  min-width: 116rpx;
+  max-width: 136rpx;
+  flex: 0 0 auto;
+  height: 48rpx;
+  min-height: 48rpx;
   align-items: center;
   justify-content: center;
-  border: 0;
   border-radius: 999rpx;
-  background: #f7f3ee;
-  color: #8b857c;
-  font-size: 23rpx;
-  font-weight: 800;
-  line-height: 1;
-  margin: 0;
-  padding: 0 18rpx;
+  background: #fffaf0;
+  color: #9a6a4b;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 48rpx;
+  margin: 0 0 0 auto;
+  padding: 0 16rpx;
 }
 
 .full-toggle.active {
-  background: #f1e9e1;
-  color: #9a6a4b;
+  background: #f7f3ee;
+  color: #8b857c;
 }
 
 .trial-list {

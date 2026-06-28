@@ -13,7 +13,6 @@
       <view class="story-body">
         <view class="story-title">{{item.title}}</view>
         <view class="story-summary">{{item.excerpt}}</view>
-        <view wx:if="{{item.authorName}}" class="story-meta">{{item.authorName}}</view>
       </view>
     </navigator>
   </view>

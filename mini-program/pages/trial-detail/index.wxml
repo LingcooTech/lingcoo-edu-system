@@ -1,5 +1,5 @@
 <custom-navbar title="公开课预约" show-back="{{true}}" />
-<view class="page">
+<view class="page trial-detail-page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
@@ -56,46 +56,41 @@
       </button>
     </view>
 
-    <view class="section card form-card reserve-card">
-      <view class="section-title">{{requiresReservationFee ? '保留试听席位' : '预约试听'}}</view>
-      <view class="muted form-hint">
-        {{requiresReservationFee ? '登录后可支付席位保留费，老师按场次安排接待。' : '留下信息后，老师会电话确认试听安排。'}}
-      </view>
-      <button class="btn btn-primary submit-button" bindtap="onReserveTap" disabled="{{full}}">
-        {{full ? '名额已满' : (requiresReservationFee ? '保留名额' : '立即预约')}}
-      </button>
-    </view>
-
     <view class="sticky-cta app-bottom-bar">
-      <view class="sticky-note">{{startsAtLabel || '试听场次'}}</view>
+      <button class="btn btn-outline sticky-button secondary" bindtap="onPhoneTap">电话联系</button>
       <button class="btn btn-primary sticky-button" bindtap="onReserveTap" disabled="{{full}}">
         {{full ? '名额已满' : (requiresReservationFee ? '保留名额' : '预约试听')}}
       </button>
     </view>
 
     <view wx:if="{{showReservationForm}}" class="sheet-mask" bindtap="closeReservationForm">
-      <form class="bottom-sheet" catchtap="noop" bindsubmit="onSubmit">
-        <view class="sheet-handle"></view>
+      <form class="bottom-sheet {{reservationSheetDragging ? 'dragging' : ''}}" style="transform: translateY({{reservationSheetOffset}}px);" catchtap="noop" bindsubmit="onSubmit">
+        <view
+          class="sheet-handle"
+          bindtouchstart="onReservationSheetTouchStart"
+          bindtouchmove="onReservationSheetTouchMove"
+          bindtouchend="onReservationSheetTouchEnd"
+          bindtouchcancel="onReservationSheetTouchEnd"
+        ></view>
         <view class="row-between sheet-heading">
           <view>
             <view class="section-title">{{requiresReservationFee ? '保留试听席位' : '预约试听'}}</view>
             <view class="muted form-hint">
-              {{requiresReservationFee ? '请先登录家长中心，再支付席位保留费。' : '提交后老师会电话确认试听安排。'}}
+              {{requiresReservationFee ? '授权微信手机号后支付席位保留费，支付完成即确认保留。' : '提交后老师会电话确认试听安排。'}}
             </view>
           </view>
-          <button class="close-button" bindtap="closeReservationForm">关闭</button>
         </view>
         <view class="form-gap">
-          <input class="form-field" name="guardianName" placeholder="家长姓名" value="{{guardianName}}" />
-          <input class="form-field" name="phone" type="number" placeholder="手机号" value="{{phone}}" />
-          <input class="form-field" name="studentName" placeholder="孩子姓名" value="{{studentName}}" />
-          <input class="form-field" name="grade" placeholder="年级 / 年龄" value="{{grade}}" />
+          <input class="form-field" name="guardianName" data-field="guardianName" bindinput="onFormFieldInput" placeholder="家长姓名" value="{{guardianName}}" />
+          <input wx:if="{{!requiresReservationFee}}" class="form-field" name="phone" data-field="phone" bindinput="onFormFieldInput" type="number" placeholder="手机号" value="{{phone}}" />
+          <input class="form-field" name="studentName" data-field="studentName" bindinput="onFormFieldInput" placeholder="孩子姓名" value="{{studentName}}" />
+          <input class="form-field" name="grade" data-field="grade" bindinput="onFormFieldInput" placeholder="年级 / 年龄" value="{{grade}}" />
         </view>
-        <button class="btn btn-primary submit-button" form-type="submit" loading="{{submitting || paying}}" disabled="{{submitting || paying || full}}">
-          {{full ? '名额已满' : (submitting || paying ? '处理中...' : (requiresReservationFee ? '支付保留名额' : '提交预约'))}}
+        <button wx:if="{{requiresReservationFee}}" class="btn btn-primary submit-button" open-type="getPhoneNumber" bindgetphonenumber="onReservationPhoneAuth" loading="{{submitting || paying}}" disabled="{{submitting || paying || full}}">
+          {{full ? '名额已满' : (submitting || paying ? '处理中...' : '微信授权并支付')}}
         </button>
-        <button wx:if="{{requiresReservationFee}}" class="btn btn-outline account-button" bindtap="goAccount">
-          家长中心登录
+        <button wx:else class="btn btn-primary submit-button" form-type="submit" loading="{{submitting || paying}}" disabled="{{submitting || paying || full}}">
+          {{full ? '名额已满' : (submitting || paying ? '处理中...' : (requiresReservationFee ? '支付保留名额' : '提交预约'))}}
         </button>
       </form>
     </view>

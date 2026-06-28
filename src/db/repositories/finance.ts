@@ -120,7 +120,7 @@ export async function createPackageOrder(
   input: {
     accountId: string;
     packageId: string;
-    studentId: string;
+    studentId?: string | null;
     courseId: string;
     courseSeriesId?: string | null;
     amount: number;
@@ -141,7 +141,7 @@ export async function createPackageOrder(
     .values({
       accountId: input.accountId,
       packageId: input.packageId,
-      studentId: input.studentId,
+      studentId: input.studentId ?? null,
       courseId: input.courseId,
       courseSeriesId: input.courseSeriesId ?? null,
       orderNo,
@@ -161,6 +161,64 @@ export async function createPackageOrder(
     })
     .returning();
   return order;
+}
+
+export async function attachStudentToPaidPackageOrderInTx(
+  tx: Tx,
+  input: { orderNo: string; accountId: string; studentId: string },
+): Promise<Order> {
+  const [order] = await tx
+    .select()
+    .from(schema.orders)
+    .where(eq(schema.orders.orderNo, input.orderNo))
+    .limit(1)
+    .for('update');
+
+  if (!order) {
+    throw httpError(404, '订单不存在');
+  }
+  if (order.accountId !== input.accountId) {
+    throw httpError(403, '只能完善本人账号下的订单');
+  }
+  if (order.orderType !== 'package_purchase') {
+    throw httpError(422, '该订单不是课时包订单');
+  }
+  if (order.status !== 'paid') {
+    throw httpError(422, '订单支付完成后才能完善孩子信息');
+  }
+  if (order.studentId) {
+    if (order.studentId === input.studentId) {
+      return order;
+    }
+    throw httpError(422, '该订单已关联孩子信息');
+  }
+  if (!order.courseId || order.lessonCount <= 0) {
+    throw httpError(422, '订单课时信息不完整');
+  }
+
+  const [updated] = await tx
+    .update(schema.orders)
+    .set({ studentId: input.studentId, updatedAt: new Date() })
+    .where(eq(schema.orders.id, order.id))
+    .returning();
+
+  await applyLessonDelta(tx, {
+    studentId: input.studentId,
+    courseId: order.courseId,
+    type: 'purchase',
+    amount: order.lessonCount,
+    relatedEntityType: 'order',
+    relatedEntityId: order.id,
+  });
+
+  return updated;
+}
+
+export async function attachStudentToPaidPackageOrder(
+  db: Database,
+  input: { orderNo: string; accountId: string; studentId: string },
+): Promise<Order> {
+  return db.transaction(async (tx) => attachStudentToPaidPackageOrderInTx(tx, input));
 }
 
 export async function createSeatReservationOrder(
@@ -300,15 +358,7 @@ export async function markOrderPaidAndCredit(
         .for('update');
 
       if (reservation && reservation.reservationStatus !== 'reserved') {
-        await tx
-          .update(schema.seatReservations)
-          .set({
-            reservationStatus: 'reserved',
-            paymentStatus: 'paid',
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.seatReservations.id, reservation.id));
-
+        let seatReserved = false;
         if (reservation.trialSessionId) {
           const [trialSession] = await tx
             .select()
@@ -316,7 +366,7 @@ export async function markOrderPaidAndCredit(
             .where(eq(schema.trialSessions.id, reservation.trialSessionId))
             .limit(1)
             .for('update');
-          if (trialSession) {
+          if (trialSession && trialSession.bookedCount < trialSession.capacity) {
             await tx
               .update(schema.trialSessions)
               .set({
@@ -324,13 +374,28 @@ export async function markOrderPaidAndCredit(
                 updatedAt: new Date(),
               })
               .where(eq(schema.trialSessions.id, trialSession.id));
+            seatReserved = true;
           }
         }
 
-        if (reservation.leadId) {
+        await tx
+          .update(schema.seatReservations)
+          .set({
+            reservationStatus: seatReserved ? 'reserved' : 'cancelled',
+            paymentStatus: 'paid',
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.seatReservations.id, reservation.id));
+
+        if (seatReserved && reservation.leadId) {
           await tx
             .update(schema.leads)
             .set({ status: 'trial_booked', updatedAt: new Date() })
+            .where(eq(schema.leads.id, reservation.leadId));
+        } else if (reservation.leadId) {
+          await tx
+            .update(schema.leads)
+            .set({ status: 'follow_up', updatedAt: new Date() })
             .where(eq(schema.leads.id, reservation.leadId));
         }
       }

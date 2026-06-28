@@ -1,4 +1,4 @@
-<view class="custom-navbar" style="{{navStyle}}">
+<view class="custom-navbar {{transparent ? 'transparent' : ''}}" style="{{navStyle}}">
   <view class="custom-navbar-inner" style="{{navInnerStyle}}">
     <button wx:if="{{showBack}}" class="navbar-back" bindtap="onBack">
       <view class="navbar-back-icon"></view>

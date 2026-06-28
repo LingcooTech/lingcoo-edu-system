@@ -35,7 +35,6 @@ type HomeHighlightCard = PublicProfileHighlight & {
 interface HomeStudentStoryCard {
   slug: string;
   title: string;
-  studentName: string;
   coverImageUrl: string;
   excerpt: string;
 }
@@ -109,8 +108,6 @@ interface HomeState {
   campuses: HomeCampusCard[];
   growthLoopTitle: string;
   growthLoopSummary: string;
-  growthLoopPrimaryCtaText: string;
-  growthLoopPrimaryCtaLink: string;
   growthLoopSteps: GrowthLoopStepCard[];
   quickActions: HomeQuickAction[];
   courses: Array<Course & { priceLabel: string }>;
@@ -157,8 +154,6 @@ const initialState: HomeState = {
   campuses: [],
   growthLoopTitle: '',
   growthLoopSummary: '',
-  growthLoopPrimaryCtaText: '预约成长评估',
-  growthLoopPrimaryCtaLink: '/register',
   growthLoopSteps: [],
   quickActions: [],
   courses: [],
@@ -169,9 +164,9 @@ const initialState: HomeState = {
 
 const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
   { key: 'intro', label: '品牌介绍', iconUrl: HOME_QUICK_ACTIONS_ICONS.intro, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.introActive },
-  { key: 'advantages', label: '核心优势', iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.advantagesActive },
-  { key: 'campuses', label: '校区环境', iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.campusesActive },
-  { key: 'teachers', label: '师资团队', iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.teachersActive },
+  { key: 'advantages', label: '成长理念', iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.advantagesActive },
+  { key: 'campuses', label: '空间环境', iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.campusesActive },
+  { key: 'teachers', label: '伙伴资源', iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.teachersActive },
   { key: 'stories', label: '成长故事', iconUrl: HOME_QUICK_ACTIONS_ICONS.stories, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.storiesActive },
 ];
 
@@ -226,7 +221,6 @@ function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
   return {
     slug: item.slug,
     title: item.title,
-    studentName: item.authorName ?? '',
     coverImageUrl: item.coverUrl ?? '',
     excerpt: item.excerpt || item.content,
   };
@@ -341,8 +335,6 @@ function toState(
     })),
     growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
     growthLoopSummary: profile.growthLoop?.summary || '',
-    growthLoopPrimaryCtaText: profile.growthLoop?.primaryCtaText || '预约成长评估',
-    growthLoopPrimaryCtaLink: profile.growthLoop?.primaryCtaLink || '/register',
     growthLoopSteps: (profile.growthLoop?.steps ?? []).map((step, index) => ({
       title: step.title,
       indexLabel: String(index + 1).padStart(2, '0'),
@@ -432,10 +424,6 @@ Page({
 
   goStories() {
     wx.navigateTo({ url: '/pages/stories/index' });
-  },
-
-  onGrowthPrimaryCta() {
-    navigateToWebPath(this.data.growthLoopPrimaryCtaLink || this.data.ctaLink);
   },
 
   onQuickAction(event: { currentTarget: { dataset: { key?: string } } }) {

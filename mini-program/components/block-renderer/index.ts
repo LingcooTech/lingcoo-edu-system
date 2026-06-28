@@ -6,6 +6,10 @@ Component({
       type: Array,
       value: [],
     },
+    variant: {
+      type: String,
+      value: '',
+    },
   },
   methods: {
     onCtaTap(event: { currentTarget: { dataset: { link?: string } } }) {

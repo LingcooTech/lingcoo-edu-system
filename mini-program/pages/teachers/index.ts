@@ -8,9 +8,30 @@ import {
 type TeacherCard = PublicTeacher & {
   institutionName?: string;
   institutionLogoUrl?: string | null;
+  initial: string;
+  metaText: string;
+  displayTagline: string;
 };
 
 import { shareCard, timelineCard } from '../../utils/share';
+
+function toTeacherCard(
+  teacher: PublicTeacher,
+  institution?: PublicInstitution,
+): TeacherCard {
+  const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
+  const metaText = [teacher.teachingYears ? `${teacher.teachingYears}教学` : '', specialtiesText]
+    .filter(Boolean)
+    .join(' · ');
+  return {
+    ...teacher,
+    institutionName: institution?.name,
+    institutionLogoUrl: institution?.logoUrl,
+    initial: teacher.name.slice(0, 1) || '师',
+    metaText,
+    displayTagline: teacher.tagline?.trim() || specialtiesText || '查看老师档案与授课方向',
+  };
+}
 
 Page({
   data: {
@@ -56,11 +77,7 @@ Page({
         const institution = teacher.institutionId
           ? institutionById.get(teacher.institutionId)
           : undefined;
-        return {
-          ...teacher,
-          institutionName: institution?.name,
-          institutionLogoUrl: institution?.logoUrl,
-        };
+        return toTeacherCard(teacher, institution);
       });
       this.setData({ loading: false, teachers: teacherCards, tabs });
       this.applyTab(tabs[0]?.id || '');

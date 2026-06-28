@@ -1,5 +1,6 @@
 import {
   createPaymentIntent,
+  completePackageOrderStudent,
   createPublicOrder,
   createWechatMiniPaymentIntent,
   fetchCourse,
@@ -7,6 +8,7 @@ import {
   mockPayOrder,
   submitTrialRegistration,
   syncOrderPayment,
+  setToken,
   type Course,
   type CoursePackage,
   type BusinessModelSettings,
@@ -26,6 +28,12 @@ type PackageItem = CoursePackage & {
   originalPriceLabel: string;
 };
 type CheckoutOrder = ParentOrder & { amountLabel: string; statusLabel: string };
+type PhoneWx = typeof wx & {
+  makePhoneCall(options: { phoneNumber: string; fail?: () => void }): void;
+};
+type SheetTouchEvent = {
+  changedTouches: Array<{ clientY: number }>;
+};
 
 function packagePriceAmount(pkg: CoursePackage): number {
   return pkg.discountPriceAmount ?? pkg.priceAmount;
@@ -46,6 +54,11 @@ function mergeNotice(trialDescription?: string, reservationNotice?: string): str
     .map((item) => (item || '').trim())
     .filter(Boolean);
   return Array.from(new Set(parts)).join('\n\n');
+}
+
+function extractPhone(value?: string | null): string {
+  const match = (value || '').match(/1[3-9]\d[\s-]?\d{4}[\s-]?\d{4}|0\d{2,3}[-\s]?\d{7,8}/);
+  return match ? match[0].replace(/[\s-]/g, '') : '';
 }
 
 function orderStatusLabel(status: string): string {
@@ -91,6 +104,21 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
   });
 }
 
+function loginWechatMini(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success: (result) => {
+        if (result.code) {
+          resolve(result.code);
+          return;
+        }
+        reject(new Error('微信登录失败，请稍后重试'));
+      },
+      fail: (error) => reject(new Error(error.errMsg || '微信登录失败，请稍后重试')),
+    });
+  });
+}
+
 import { shareCard, timelineCard } from '../../utils/share';
 
 Page({
@@ -108,16 +136,25 @@ Page({
     locationLabel: '',
     trialNotice: '',
     receiverLabel: '',
+    contactPhone: '',
     packages: [] as PackageItem[],
     contentBlocks: [] as Block[],
     showTrialForm: false,
     submittingTrial: false,
+    trialSheetDragging: false,
+    trialSheetDragStartY: 0,
+    trialSheetOffset: 0,
     showCheckoutForm: false,
+    checkoutSheetDragging: false,
+    checkoutSheetDragStartY: 0,
+    checkoutSheetOffset: 0,
     submittingOrder: false,
     payingOrder: false,
     selectedPackage: null as PackageItem | null,
     checkoutOrder: null as CheckoutOrder | null,
     checkoutDefaultPassword: '',
+    childProfileRequired: false,
+    completingChildProfile: false,
   },
 
   onLoad(options: { slug?: string }) {
@@ -190,6 +227,9 @@ Page({
         locationLabel: campusLabel(campuses),
         trialNotice: mergeNotice(payload.course.trialDescription, payload.course.reservationNotice),
         receiverLabel,
+        contactPhone: extractPhone(
+          payload.providerInstitution?.contact || payload.paymentReceiverInstitution?.contact,
+        ),
         packages: payload.coursePackages.map((item) => ({
           ...item,
           priceLabel: money(packagePriceAmount(item)),
@@ -213,10 +253,27 @@ Page({
   onTrialTap() {
     this.setData({
       showTrialForm: true,
+      trialSheetDragging: false,
+      trialSheetDragStartY: 0,
+      trialSheetOffset: 0,
       showCheckoutForm: false,
       selectedPackage: null,
       checkoutOrder: null,
       checkoutDefaultPassword: '',
+      childProfileRequired: false,
+      completingChildProfile: false,
+    });
+  },
+
+  onPhoneTap() {
+    const phoneNumber = this.data.contactPhone;
+    if (!phoneNumber) {
+      wx.showToast({ title: '暂无联系电话', icon: 'none' });
+      return;
+    }
+    (wx as PhoneWx).makePhoneCall({
+      phoneNumber,
+      fail: () => wx.showToast({ title: '拨号失败', icon: 'none' }),
     });
   },
 
@@ -236,69 +293,141 @@ Page({
       selectedPackage,
       showCheckoutForm: true,
       showTrialForm: false,
+      checkoutSheetDragging: false,
+      checkoutSheetDragStartY: 0,
+      checkoutSheetOffset: 0,
       checkoutOrder: null,
       checkoutDefaultPassword: '',
+      childProfileRequired: false,
+      completingChildProfile: false,
     });
   },
 
   closeCheckout() {
     if (this.data.submittingOrder || this.data.payingOrder) return;
+    if (this.data.childProfileRequired) {
+      wx.showToast({ title: '请先完善孩子信息以开通课时', icon: 'none' });
+      return;
+    }
     this.setData({
       showCheckoutForm: false,
+      checkoutSheetDragging: false,
+      checkoutSheetDragStartY: 0,
+      checkoutSheetOffset: 0,
       selectedPackage: null,
       checkoutOrder: null,
       checkoutDefaultPassword: '',
+      childProfileRequired: false,
+      completingChildProfile: false,
     });
   },
 
   closeTrial() {
     if (this.data.submittingTrial) return;
-    this.setData({ showTrialForm: false });
+    this.setData({
+      showTrialForm: false,
+      trialSheetDragging: false,
+      trialSheetDragStartY: 0,
+      trialSheetOffset: 0,
+    });
   },
 
   noop() {
     return;
   },
 
-  async onCheckoutSubmit(event: {
-    detail: {
-      value: {
-        guardianName?: string;
-        guardianPhone?: string;
-        studentName?: string;
-        grade?: string;
-      };
-    };
-  }) {
+  onCheckoutSheetTouchStart(event: SheetTouchEvent) {
+    if (this.data.submittingOrder || this.data.payingOrder || this.data.childProfileRequired) {
+      return;
+    }
+    const touch = event.changedTouches[0];
+    this.setData({
+      checkoutSheetDragging: true,
+      checkoutSheetDragStartY: touch ? touch.clientY : 0,
+      checkoutSheetOffset: 0,
+    });
+  },
+
+  onCheckoutSheetTouchMove(event: SheetTouchEvent) {
+    if (!this.data.checkoutSheetDragging || this.data.submittingOrder || this.data.payingOrder) {
+      return;
+    }
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const offset = Math.max(0, touch.clientY - this.data.checkoutSheetDragStartY);
+    this.setData({ checkoutSheetOffset: Math.min(offset, 260) });
+  },
+
+  onCheckoutSheetTouchEnd() {
+    if (!this.data.checkoutSheetDragging) return;
+    if (this.data.checkoutSheetOffset >= 72) {
+      this.closeCheckout();
+      return;
+    }
+    this.setData({
+      checkoutSheetDragging: false,
+      checkoutSheetDragStartY: 0,
+      checkoutSheetOffset: 0,
+    });
+  },
+
+  onTrialSheetTouchStart(event: SheetTouchEvent) {
+    if (this.data.submittingTrial) return;
+    const touch = event.changedTouches[0];
+    this.setData({
+      trialSheetDragging: true,
+      trialSheetDragStartY: touch ? touch.clientY : 0,
+      trialSheetOffset: 0,
+    });
+  },
+
+  onTrialSheetTouchMove(event: SheetTouchEvent) {
+    if (!this.data.trialSheetDragging || this.data.submittingTrial) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const offset = Math.max(0, touch.clientY - this.data.trialSheetDragStartY);
+    this.setData({ trialSheetOffset: Math.min(offset, 260) });
+  },
+
+  onTrialSheetTouchEnd() {
+    if (!this.data.trialSheetDragging) return;
+    if (this.data.trialSheetOffset >= 72) {
+      this.closeTrial();
+      return;
+    }
+    this.setData({
+      trialSheetDragging: false,
+      trialSheetDragStartY: 0,
+      trialSheetOffset: 0,
+    });
+  },
+
+  async onCheckoutPhoneAuth(event: { detail: { code?: string; errMsg?: string } }) {
     const selectedPackage = this.data.selectedPackage;
     if (!selectedPackage) return;
-
-    const value = event.detail.value;
-    const guardianName = (value.guardianName || '').trim();
-    const guardianPhone = (value.guardianPhone || '').trim();
-    const studentName = (value.studentName || '').trim();
-    const grade = (value.grade || '').trim();
-
-    if (!guardianPhone || !studentName) {
-      wx.showToast({ title: '请填写手机号和孩子姓名', icon: 'none' });
+    const phoneCode = event.detail.code;
+    if (!phoneCode) {
+      wx.showToast({ title: '需要授权手机号后继续支付', icon: 'none' });
       return;
     }
 
     this.setData({ submittingOrder: true });
     try {
-      if (hasToken()) {
-        await requestSubscribe(['payment_success']);
-      }
+      const wechatMiniCode = await loginWechatMini();
       const payload = await createPublicOrder({
         packageId: selectedPackage.id,
         courseId: this.data.course?.id,
-        guardianName: guardianName || undefined,
-        guardianPhone,
-        studentName,
-        grade,
+        phoneCode,
         source: 'mini_program',
         medium: 'wechat_mini_program',
+        wechatMiniCode,
       });
+      if (payload.checkout.authToken) {
+        setToken(payload.checkout.authToken);
+      }
+      if (hasToken()) {
+        await requestSubscribe(['payment_success']);
+      }
       const order: CheckoutOrder = {
         ...payload.order,
         amountLabel: money(payload.order.amount),
@@ -307,6 +436,7 @@ Page({
       this.setData({
         checkoutOrder: order,
         checkoutDefaultPassword: payload.checkout.defaultPassword || '',
+        childProfileRequired: false,
       });
       await this.payCreatedOrder(order.orderNo);
     } catch (error) {
@@ -316,6 +446,42 @@ Page({
       });
     } finally {
       this.setData({ submittingOrder: false });
+    }
+  },
+
+  async onCompleteCheckoutStudent(event: {
+    detail: { value: { studentName?: string; grade?: string } };
+  }) {
+    const order = this.data.checkoutOrder;
+    if (!order) return;
+    const studentName = (event.detail.value.studentName || '').trim();
+    const grade = (event.detail.value.grade || '').trim();
+    if (!studentName) {
+      wx.showToast({ title: '请填写孩子姓名', icon: 'none' });
+      return;
+    }
+    this.setData({ completingChildProfile: true });
+    try {
+      const payload = await completePackageOrderStudent(order.orderNo, { studentName, grade });
+      const nextOrder: CheckoutOrder = {
+        ...payload.order,
+        amountLabel: money(payload.order.amount),
+        statusLabel: orderStatusLabel(payload.order.status),
+      };
+      this.setData({ checkoutOrder: nextOrder, childProfileRequired: false });
+      wx.showModal({
+        title: '已开通课时',
+        content: '孩子信息已完善，课时已到账，可在家长中心查看。',
+        showCancel: false,
+        success: () => wx.switchTab({ url: '/pages/account/index' }),
+      });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '保存失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ completingChildProfile: false });
     }
   },
 
@@ -400,7 +566,13 @@ Page({
       amountLabel: money(paidOrder.amount),
       statusLabel: orderStatusLabel(paidOrder.status),
     };
-    this.setData({ checkoutOrder: order });
+    if (!paidOrder.studentId && paidOrder.orderType === 'package_purchase') {
+      this.setData({ checkoutOrder: order, childProfileRequired: true });
+      wx.showToast({ title: '支付成功，请完善孩子信息', icon: 'success' });
+      return;
+    }
+
+    this.setData({ checkoutOrder: order, childProfileRequired: false });
     wx.showModal({
       title: '支付成功',
       content: this.data.checkoutDefaultPassword

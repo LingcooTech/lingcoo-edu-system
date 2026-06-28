@@ -2,19 +2,48 @@ import {
   createPaymentIntent,
   createSeatReservation,
   createWechatMiniPaymentIntent,
+  fetchParentSeatReservations,
   fetchTrialSession,
   hasToken,
   mockPayOrder,
+  setToken,
   submitTrialRegistration,
   syncOrderPayment,
   type ParentOrder,
   type PaymentIntent,
+  type SeatReservation,
   type TrialDetail,
 } from '../../services/api';
 import { requestSubscribe } from '../../services/subscribe';
 import { formatDateTime, money } from '../../utils/format';
 
 type ReservationOrder = ParentOrder & { amountLabel: string; statusLabel: string };
+type PhoneWx = typeof wx & {
+  makePhoneCall(options: { phoneNumber: string; fail?: () => void }): void;
+};
+type SheetTouchEvent = {
+  changedTouches: Array<{ clientY: number }>;
+};
+
+function loginWechatMini(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success: (result) => {
+        if (result.code) {
+          resolve(result.code);
+        } else {
+          reject(new Error('微信登录失败'));
+        }
+      },
+      fail: () => reject(new Error('微信登录失败')),
+    });
+  });
+}
+
+function extractPhone(value?: string | null): string {
+  const match = (value || '').match(/1[3-9]\d[\s-]?\d{4}[\s-]?\d{4}|0\d{2,3}[-\s]?\d{7,8}/);
+  return match ? match[0].replace(/[\s-]/g, '') : '';
+}
 
 function orderStatusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -95,11 +124,16 @@ Page({
     submitting: false,
     paying: false,
     order: null as ReservationOrder | null,
+    seatReservation: null as SeatReservation | null,
     guardianName: '',
     phone: '',
     studentName: '',
     grade: '',
     showReservationForm: false,
+    reservationSheetDragging: false,
+    reservationSheetDragStartY: 0,
+    reservationSheetOffset: 0,
+    contactPhone: '',
   },
 
   onLoad(options: { id?: string; trialSessionId?: string }) {
@@ -148,6 +182,9 @@ Page({
         reservationFeeLabel: detail.trialSession.reservationFeeAmount
           ? `${money(detail.trialSession.reservationFeeAmount)} 试听席位保留费`
           : '',
+        contactPhone: extractPhone(
+          detail.providerInstitution?.contact || detail.organization.phone,
+        ),
         requiresReservationFee,
         full: detail.trialSession.bookedCount >= detail.trialSession.capacity,
         guardianName: prefill.guardianName || '',
@@ -157,6 +194,9 @@ Page({
         showReservationForm: Boolean(
           prefill.guardianName || prefill.phone || prefill.studentName || prefill.grade,
         ),
+        reservationSheetDragging: false,
+        reservationSheetDragStartY: 0,
+        reservationSheetOffset: 0,
       });
     } catch {
       this.setData({ loading: false, notFound: true });
@@ -176,16 +216,78 @@ Page({
       wx.showToast({ title: '名额已满', icon: 'none' });
       return;
     }
-    this.setData({ showReservationForm: true });
+    this.setData({
+      showReservationForm: true,
+      reservationSheetDragging: false,
+      reservationSheetDragStartY: 0,
+      reservationSheetOffset: 0,
+    });
+  },
+
+  onPhoneTap() {
+    const phoneNumber = this.data.contactPhone;
+    if (!phoneNumber) {
+      wx.showToast({ title: '暂无联系电话', icon: 'none' });
+      return;
+    }
+    (wx as PhoneWx).makePhoneCall({
+      phoneNumber,
+      fail: () => wx.showToast({ title: '拨号失败', icon: 'none' }),
+    });
   },
 
   closeReservationForm() {
     if (this.data.submitting || this.data.paying) return;
-    this.setData({ showReservationForm: false });
+    this.setData({
+      showReservationForm: false,
+      reservationSheetDragging: false,
+      reservationSheetDragStartY: 0,
+      reservationSheetOffset: 0,
+    });
   },
 
   noop() {
     return;
+  },
+
+  onFormFieldInput(event: {
+    currentTarget: { dataset: { field?: string } };
+    detail: { value?: string };
+  }) {
+    const field = event.currentTarget.dataset.field;
+    if (!['guardianName', 'phone', 'studentName', 'grade'].includes(field || '')) return;
+    this.setData({ [field as string]: event.detail.value || '' });
+  },
+
+  onReservationSheetTouchStart(event: SheetTouchEvent) {
+    if (this.data.submitting || this.data.paying) return;
+    const touch = event.changedTouches[0];
+    this.setData({
+      reservationSheetDragging: true,
+      reservationSheetDragStartY: touch ? touch.clientY : 0,
+      reservationSheetOffset: 0,
+    });
+  },
+
+  onReservationSheetTouchMove(event: SheetTouchEvent) {
+    if (!this.data.reservationSheetDragging || this.data.submitting || this.data.paying) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const offset = Math.max(0, touch.clientY - this.data.reservationSheetDragStartY);
+    this.setData({ reservationSheetOffset: Math.min(offset, 260) });
+  },
+
+  onReservationSheetTouchEnd() {
+    if (!this.data.reservationSheetDragging) return;
+    if (this.data.reservationSheetOffset >= 72) {
+      this.closeReservationForm();
+      return;
+    }
+    this.setData({
+      reservationSheetDragging: false,
+      reservationSheetDragStartY: 0,
+      reservationSheetOffset: 0,
+    });
   },
 
   async onSubmit(event: {
@@ -211,42 +313,13 @@ Page({
       return;
     }
 
-    if (this.data.requiresReservationFee && !hasToken()) {
-      wx.showModal({
-        title: '请先登录',
-        content: '支付试听席位保留费需要先在家长中心完成微信登录和手机号绑定。',
-        confirmText: '去登录',
-        success: (result) => {
-          if (result.confirm) this.goAccount();
-        },
-      });
+    if (this.data.requiresReservationFee) {
+      wx.showToast({ title: '请授权微信手机号后支付', icon: 'none' });
       return;
     }
 
     this.setData({ submitting: true });
     try {
-      if (this.data.requiresReservationFee) {
-        await requestSubscribe(['payment_success']);
-        const payload = await createSeatReservation({
-          trialSessionId: detail.trialSession.id,
-          guardianName,
-          phone,
-          studentName,
-          grade,
-          source: 'mini_program',
-          course: detail.course.slug,
-          medium: 'wechat_mini_program',
-        });
-        const order: ReservationOrder = {
-          ...payload.order,
-          amountLabel: money(payload.order.amount),
-          statusLabel: orderStatusLabel(payload.order.status),
-        };
-        this.setData({ order });
-        await this.payCreatedOrder(order.orderNo);
-        return;
-      }
-
       await requestSubscribe(['trial_registration']);
       await submitTrialRegistration({
         trialSessionId: detail.trialSession.id,
@@ -268,6 +341,60 @@ Page({
           this.goHome();
         },
       });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '提交失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ submitting: false });
+    }
+  },
+
+  async onReservationPhoneAuth(event: { detail: { code?: string; errMsg?: string } }) {
+    const detail = this.data.detail;
+    if (!detail || this.data.full || this.data.submitting || this.data.paying) return;
+    const phoneCode = event.detail.code;
+    if (!phoneCode) {
+      wx.showToast({ title: '需要授权手机号后继续支付', icon: 'none' });
+      return;
+    }
+
+    const guardianName = (this.data.guardianName || '').trim();
+    const studentName = (this.data.studentName || '').trim();
+    const grade = (this.data.grade || '').trim();
+    if (!guardianName || !studentName || !grade) {
+      wx.showToast({ title: '请补全预约信息', icon: 'none' });
+      return;
+    }
+
+    this.setData({ submitting: true });
+    try {
+      const wechatMiniCode = await loginWechatMini();
+      const payload = await createSeatReservation({
+        trialSessionId: detail.trialSession.id,
+        guardianName,
+        phoneCode,
+        studentName,
+        grade,
+        source: 'mini_program',
+        course: detail.course.slug,
+        medium: 'wechat_mini_program',
+        wechatMiniCode,
+      });
+      if (payload.checkout?.authToken) {
+        setToken(payload.checkout.authToken);
+      }
+      if (hasToken()) {
+        await requestSubscribe(['payment_success']);
+      }
+      const order: ReservationOrder = {
+        ...payload.order,
+        amountLabel: money(payload.order.amount),
+        statusLabel: orderStatusLabel(payload.order.status),
+      };
+      this.setData({ order, seatReservation: payload.seatReservation });
+      await this.payCreatedOrder(order.orderNo);
     } catch (error) {
       wx.showToast({
         title: error instanceof Error ? error.message : '提交失败',
@@ -341,6 +468,16 @@ Page({
     });
   },
 
+  async refreshSeatReservation(orderNo: string) {
+    if (!hasToken()) return this.data.seatReservation;
+    const reservations = await fetchParentSeatReservations();
+    const reservation = reservations.find((item) => item.orderNo === orderNo) || null;
+    if (reservation) {
+      this.setData({ seatReservation: reservation });
+    }
+    return reservation || this.data.seatReservation;
+  },
+
   async finishPaidOrder(orderNo: string, paidOrder?: ParentOrder) {
     const nextOrder = paidOrder
       ? {
@@ -353,6 +490,22 @@ Page({
         : null;
     if (nextOrder) {
       this.setData({ order: nextOrder });
+    }
+    const seatReservation = await this.refreshSeatReservation(orderNo);
+    if (seatReservation && seatReservation.reservationStatus !== 'reserved') {
+      wx.showModal({
+        title: '支付已完成',
+        content:
+          seatReservation.reservationStatus === 'cancelled'
+            ? '当前试听名额暂未保留成功，老师会尽快联系您改期或处理退款。'
+            : '支付结果已确认，席位状态同步中，请稍后在家长中心查看。',
+        showCancel: false,
+        success: () => {
+          this.setData({ showReservationForm: false });
+          this.goAccount();
+        },
+      });
+      return;
     }
     wx.showModal({
       title: '席位已保留',

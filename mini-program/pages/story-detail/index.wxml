@@ -8,18 +8,19 @@
   </view>
 
   <block wx:else>
-    <view class="story-header card">
-      <image wx:if="{{story.coverUrl}}" class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
-      <view class="story-copy">
-        <view wx:if="{{story.authorName}}" class="story-meta">{{story.authorName}}</view>
-        <view class="title">{{story.title}}</view>
-        <view wx:if="{{story.excerpt}}" class="body-text story-excerpt">{{story.excerpt}}</view>
-      </view>
+    <view wx:if="{{story.coverUrl}}" class="story-hero">
+      <image class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
     </view>
 
-    <view class="card story-body">
-      <block-renderer wx:if="{{blocks.length}}" blocks="{{blocks}}" />
-      <rich-text wx:elif="{{html}}" nodes="{{html}}" />
+    <view class="story-title {{story.coverUrl ? '' : 'story-title-first'}}">{{story.title}}</view>
+
+    <view wx:if="{{story.excerpt}}" class="story-excerpt-card">
+      <view class="story-excerpt">{{story.excerpt}}</view>
+    </view>
+
+    <view class="story-body">
+      <block-renderer wx:if="{{blocks.length}}" blocks="{{blocks}}" variant="reading" />
+      <rich-text wx:elif="{{html}}" class="story-rich" nodes="{{html}}" />
       <view wx:else class="empty compact-empty">暂无正文</view>
     </view>
   </block>

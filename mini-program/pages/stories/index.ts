@@ -6,7 +6,6 @@ type StoryCard = {
   title: string;
   excerpt: string;
   coverImageUrl: string;
-  authorName: string;
 };
 
 function toStoryCard(item: ContentItem): StoryCard {
@@ -15,7 +14,6 @@ function toStoryCard(item: ContentItem): StoryCard {
     title: item.title,
     excerpt: item.excerpt || item.content,
     coverImageUrl: item.coverUrl || '',
-    authorName: item.authorName || '',
   };
 }
 

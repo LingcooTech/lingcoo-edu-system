@@ -61,6 +61,13 @@ function generateContractNo() {
   return `CC${Date.now()}${randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
+function onlineOrderPaymentMethod(order: typeof schema.orders.$inferSelect) {
+  if (order.paymentProvider) {
+    return order.paymentProvider;
+  }
+  return order.medium === 'wechat_mini_program' ? 'wechat_pay' : 'online_payment';
+}
+
 async function findStudent(db: DbOrTx, studentId: string) {
   const [student] = await db
     .select()
@@ -543,6 +550,117 @@ export async function listCourseContracts(db: Database) {
 
 export async function createCourseContract(db: Database, input: CourseContractInput) {
   return db.transaction(async (tx) => createCourseContractInTx(tx, input));
+}
+
+export async function createCourseContractFromPaidPackageOrderInTx(
+  tx: Tx,
+  input: { order: typeof schema.orders.$inferSelect; studentId: string },
+) {
+  const { order } = input;
+  if (order.orderType !== 'package_purchase') {
+    throw httpError(422, '该订单不是课时包订单');
+  }
+  if (order.status !== 'paid') {
+    throw httpError(422, '订单支付完成后才能生成正式课程档案');
+  }
+  if (order.studentId !== input.studentId) {
+    throw httpError(422, '订单关联孩子信息不匹配');
+  }
+  if (!order.courseId || !order.packageId || order.lessonCount <= 0) {
+    throw httpError(422, '订单课程信息不完整');
+  }
+
+  const [existingContract] = await tx
+    .select()
+    .from(schema.courseContracts)
+    .where(eq(schema.courseContracts.orderId, order.id))
+    .limit(1)
+    .for('update');
+  if (existingContract) {
+    const [paymentRecord] = await tx
+      .select()
+      .from(schema.courseContractPaymentRecords)
+      .where(eq(schema.courseContractPaymentRecords.orderId, order.id))
+      .limit(1);
+    return {
+      courseContract: existingContract,
+      paymentRecord: paymentRecord ?? null,
+      created: false,
+    };
+  }
+
+  const [student, course, coursePackage] = await Promise.all([
+    findStudent(tx, input.studentId),
+    findCourse(tx, order.courseId),
+    findPackage(tx, order.packageId),
+  ]);
+  if (!student) {
+    throw httpError(404, 'Student not found');
+  }
+  if (!course) {
+    throw httpError(404, 'Course not found');
+  }
+  if (!coursePackage) {
+    throw httpError(404, 'Course package not found');
+  }
+  if (coursePackage.courseId && coursePackage.courseId !== order.courseId) {
+    throw httpError(422, '课时包与课程不匹配');
+  }
+  if (coursePackage.courseSeriesId && course.courseSeriesId !== coursePackage.courseSeriesId) {
+    throw httpError(422, '课时包与课程系列不匹配');
+  }
+
+  const paymentMethod = onlineOrderPaymentMethod(order);
+  const note = '线上支付自动生成，待老师确认正式课程档案、分班与签约信息。';
+  const [contract] = await tx
+    .insert(schema.courseContracts)
+    .values({
+      studentId: input.studentId,
+      courseId: order.courseId,
+      classId: null,
+      packageId: order.packageId,
+      orderId: order.id,
+      contractNo: generateContractNo(),
+      title: coursePackage.name || `${course.name}正式课程`,
+      lessonCount: order.lessonCount,
+      paidAmount: order.paidAmount || order.amount,
+      paymentMethod,
+      paymentReceiverType: order.paymentReceiverType,
+      paymentReceiverInstitutionId: order.paymentReceiverInstitutionId ?? null,
+      paymentReceiverName: order.paymentReceiverName ?? null,
+      startsAt: null,
+      endsAt: null,
+      status: 'active',
+      note,
+      createdByAccountId: null,
+    })
+    .returning();
+
+  const [paymentRecord] = await tx
+    .insert(schema.courseContractPaymentRecords)
+    .values({
+      courseContractId: contract.id,
+      orderId: order.id,
+      paidAmount: order.paidAmount || order.amount,
+      paymentMethod,
+      note,
+      createdByAccountId: null,
+    })
+    .returning();
+
+  return {
+    courseContract: {
+      ...contract,
+      student,
+      course,
+      package: coursePackage,
+      order,
+      paymentRecords: [paymentRecord],
+      gifts: [],
+    },
+    paymentRecord,
+    created: true,
+  };
 }
 
 export async function addCourseContractGift(

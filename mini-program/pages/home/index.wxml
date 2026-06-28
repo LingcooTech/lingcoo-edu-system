@@ -101,9 +101,6 @@
     </view>
 
     <view wx:if="{{activeHomeTab == 'advantages'}}" class="tab-content">
-      <view wx:if="{{stats.length}}" class="section stats">
-        <view wx:for="{{stats}}" wx:key="*this" class="stat-card">{{item}}</view>
-      </view>
       <view wx:if="{{highlights.length}}" class="section highlights">
         <view
           wx:for="{{highlights}}"
@@ -111,7 +108,6 @@
           class="card highlight-card {{item.imageUrl ? 'highlight-card-image' : ''}}"
           style="{{item.backgroundStyle}}"
         >
-          <view class="highlight-icon">{{item.iconText}}</view>
           <view class="highlight-title">{{item.title || item.text}}</view>
           <view wx:if="{{item.showDescription}}" class="body-text highlight-text">
             {{item.text}}
@@ -128,10 +124,9 @@
             <view>{{item.title}}</view>
           </view>
         </view>
-        <button class="btn contact-btn" bindtap="onGrowthPrimaryCta">{{growthLoopPrimaryCtaText}}</button>
       </view>
 
-      <view wx:if="{{!stats.length && !highlights.length && !growthLoopTitle}}" class="empty compact-empty">核心优势整理中</view>
+      <view wx:if="{{!highlights.length && !growthLoopTitle}}" class="empty compact-empty">成长理念整理中</view>
     </view>
 
     <view wx:if="{{activeHomeTab == 'teachers'}}" class="tab-content teacher-section">
@@ -155,7 +150,6 @@
         </navigator>
         <button class="more-row" bindtap="goTeachers">
           <text>查看全部教师</text>
-          <text class="more-arrow">›</text>
         </button>
       </view>
       <view wx:else class="empty">师资信息整理中</view>
@@ -195,10 +189,10 @@
               bindtap="onPreviewCampusImage"
             />
           </view>
-          <view wx:else class="empty compact-empty">校区环境图片待补充</view>
+          <view wx:else class="empty compact-empty">空间环境图片待补充</view>
         </view>
       </view>
-      <view wx:else class="empty compact-empty">校区环境整理中</view>
+      <view wx:else class="empty compact-empty">空间环境整理中</view>
     </view>
 
     <view wx:if="{{activeHomeTab == 'stories'}}" class="tab-content stories">
@@ -209,12 +203,10 @@
           <view class="story-body">
             <view class="story-title">{{item.title}}</view>
             <view class="story-summary">{{item.excerpt}}</view>
-            <view wx:if="{{item.studentName}}" class="story-meta">{{item.studentName}}</view>
           </view>
         </navigator>
         <button class="more-row" bindtap="goStories">
           <text>查看全部成长故事</text>
-          <text class="more-arrow">›</text>
         </button>
       </view>
       <view wx:else class="empty compact-empty">成长故事整理中</view>

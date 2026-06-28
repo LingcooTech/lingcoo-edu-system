@@ -3,6 +3,10 @@
   gap: 28rpx;
 }
 
+.blocks.reading {
+  gap: 56rpx;
+}
+
 .block {
   width: 100%;
 }
@@ -26,6 +30,20 @@
   font-size: 28rpx;
   line-height: 1.75;
   white-space: pre-wrap;
+}
+
+.reading .paragraph {
+  color: #3f3b35;
+  font-size: 30rpx;
+  line-height: 1.9;
+}
+
+.reading .heading {
+  margin-top: 10rpx;
+}
+
+.reading .image {
+  border-radius: 28rpx;
 }
 
 .list {

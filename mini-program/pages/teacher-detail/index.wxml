@@ -1,5 +1,5 @@
 <custom-navbar title="老师详情" show-back="{{true}}" />
-<view class="page">
+<view class="page teacher-detail-page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
@@ -16,25 +16,21 @@
           <view class="teacher-main">
             <view class="teacher-name">{{teacher.name}}</view>
             <view wx:if="{{teacher.title}}" class="muted teacher-title">{{teacher.title}}</view>
-            <view
-              wx:if="{{institution}}"
-              class="{{institution.logoUrl ? 'institution-logo-only' : 'institution'}}"
-            >
-              <image
-                wx:if="{{institution.logoUrl}}"
-                class="institution-logo"
-                src="{{institution.logoUrl}}"
-                mode="aspectFit"
-              />
-              <text wx:else>{{institution.name}}</text>
-            </view>
           </view>
         </view>
 
-        <view wx:if="{{teacher.wechatQrUrl}}" class="qr-top">
-          <view class="qr-title">加老师微信</view>
-          <image class="qr-top-image" src="{{teacher.wechatQrUrl}}" mode="aspectFit" bindtap="previewQr" />
-        </view>
+      </view>
+      <view
+        wx:if="{{institution}}"
+        class="institution-corner {{institution.logoUrl ? 'institution-logo-only' : 'institution'}}"
+      >
+        <image
+          wx:if="{{institution.logoUrl}}"
+          class="institution-logo"
+          src="{{institution.logoUrl}}"
+          mode="aspectFit"
+        />
+        <text wx:else>{{institution.name}}</text>
       </view>
 
       <view wx:if="{{teacher.tagline}}" class="tagline">{{teacher.tagline}}</view>
@@ -50,15 +46,30 @@
         <text wx:for="{{teacher.specialties}}" wx:for-item="spec" wx:key="*this" class="chip">{{spec}}</text>
       </view>
 
-      <view class="action-row">
-        <button class="btn btn-primary action-btn" bindtap="goCourses">预约试听</button>
-        <button wx:if="{{teacher.wechatQrUrl}}" class="btn btn-outline action-btn" bindtap="previewQr">微信咨询</button>
-      </view>
     </view>
 
     <view wx:if="{{teacher.teachingPhilosophy}}" class="card profile-card">
       <view class="section-title">教学理念</view>
       <view class="profile-text profile-quote">{{teacher.teachingPhilosophy}}</view>
+    </view>
+
+    <view class="card profile-card">
+      <view class="section-title">教学经历与资质</view>
+      <view wx:if="{{profileSections.length}}" class="profile-list">
+        <view wx:for="{{profileSections}}" wx:key="key" class="profile-section">
+          <view class="profile-label">{{item.label}}</view>
+          <view wx:if="{{item.tone === 'list' && item.lines.length > 1}}" class="profile-lines">
+            <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="profile-line">
+              <text class="profile-dot"></text>
+              <text class="profile-line-text">{{line}}</text>
+            </view>
+          </view>
+          <view wx:else class="profile-text {{item.tone === 'quote' ? 'profile-quote' : ''}}">
+            {{item.text}}
+          </view>
+        </view>
+      </view>
+      <view wx:else class="muted profile-empty">老师介绍待补充。</view>
     </view>
 
     <view wx:if="{{courses.length}}" class="card profile-card">
@@ -98,23 +109,29 @@
       </view>
     </view>
 
-    <view class="card profile-card">
-      <view class="section-title">教学经历与资质</view>
-      <view wx:if="{{profileSections.length}}" class="profile-list">
-        <view wx:for="{{profileSections}}" wx:key="key" class="profile-section">
-          <view class="profile-label">{{item.label}}</view>
-          <view wx:if="{{item.tone === 'list' && item.lines.length > 1}}" class="profile-lines">
-            <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="profile-line">
-              <text class="profile-dot"></text>
-              <text class="profile-line-text">{{line}}</text>
-            </view>
-          </view>
-          <view wx:else class="profile-text {{item.tone === 'quote' ? 'profile-quote' : ''}}">
-            {{item.text}}
+    <view class="teacher-bottom-bar {{teacher.wechatQrUrl ? '' : 'single'}}">
+      <button wx:if="{{teacher.wechatQrUrl}}" class="btn btn-outline bottom-btn" bindtap="previewQr">微信咨询</button>
+      <button class="btn btn-primary bottom-btn" bindtap="goCourses">预约试听</button>
+    </view>
+
+    <view wx:if="{{coursePickerVisible}}" class="course-picker-mask" bindtap="closeCoursePicker">
+      <view class="course-picker" catchtap="noop">
+        <view class="sheet-handle"></view>
+        <view class="course-picker-title">选择试听课程</view>
+        <view class="course-picker-list">
+          <view
+            wx:for="{{courses}}"
+            wx:key="id"
+            class="course-picker-item"
+            data-slug="{{item.slug}}"
+            bindtap="onCourseChoiceTap"
+          >
+            <view class="course-picker-name">{{item.name}}</view>
+            <view class="course-picker-meta">{{item.category}} · {{item.ageRange}}</view>
           </view>
         </view>
+        <button class="course-picker-cancel" bindtap="closeCoursePicker">取消</button>
       </view>
-      <view wx:else class="muted profile-empty">老师介绍待补充。</view>
     </view>
   </block>
 </view>

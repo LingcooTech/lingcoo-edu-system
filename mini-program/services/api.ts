@@ -261,13 +261,14 @@ export interface CampaignLandingPayload {
 export interface TrialDetail {
   trialSession: TrialSession;
   course: Course;
+  providerInstitution?: PublicInstitution | null;
   campus: { id: string; name: string; address: string | null } | null;
   organization: Organization;
 }
 
 export interface TrialRegistrationInput {
   guardianName: string;
-  phone: string;
+  phone?: string;
   studentName: string;
   grade: string;
   campusId?: string;
@@ -278,6 +279,12 @@ export interface TrialRegistrationInput {
   campaign?: string;
   course?: string;
   medium?: string;
+}
+
+export interface SeatReservationInput extends Omit<TrialRegistrationInput, 'courseId'> {
+  trialSessionId: string;
+  phoneCode?: string;
+  wechatMiniCode?: string;
 }
 
 export interface SeatReservation {
@@ -312,12 +319,14 @@ export interface CreateOrderInput {
   packageId: string;
   courseId?: string;
   guardianName?: string;
-  guardianPhone: string;
-  studentName: string;
+  guardianPhone?: string;
+  phoneCode?: string;
+  studentName?: string;
   grade?: string;
   source?: string;
   campaign?: string;
   medium?: string;
+  wechatMiniCode?: string;
 }
 
 export type SubscribeTemplateKey =
@@ -436,6 +445,7 @@ export interface CheckoutPayload {
     defaultPassword: string | null;
     accountCreated: boolean;
     mustChangePassword: boolean;
+    authToken?: string | null;
   };
 }
 
@@ -765,8 +775,7 @@ export function fetchCampaignLanding(code: string): Promise<CampaignLandingPaylo
 }
 
 export async function fetchTrialSessions(): Promise<TrialSession[]> {
-  return (await request<{ trialSessions: TrialSession[] }>('/public/trial-sessions'))
-    .trialSessions;
+  return (await request<{ trialSessions: TrialSession[] }>('/public/trial-sessions')).trialSessions;
 }
 
 export function fetchTrialSession(id: string): Promise<TrialDetail> {
@@ -808,9 +817,17 @@ export function submitTrialRegistration(
   });
 }
 
-export function createSeatReservation(
-  input: Omit<TrialRegistrationInput, 'courseId'> & { trialSessionId: string },
-): Promise<{ seatReservation: SeatReservation; order: ParentOrder; message: string }> {
+export function createSeatReservation(input: SeatReservationInput): Promise<{
+  seatReservation: SeatReservation;
+  order: ParentOrder;
+  checkout?: {
+    loginIdentifier: string;
+    defaultPassword: string | null;
+    accountCreated: boolean;
+    authToken?: string | null;
+  };
+  message: string;
+}> {
   return request('/public/seat-reservations', {
     method: 'POST',
     data: input,
@@ -850,6 +867,16 @@ export async function fetchWechatMiniSubscribeTemplates(): Promise<WechatMiniSub
 
 export function createPublicOrder(input: CreateOrderInput): Promise<CheckoutPayload> {
   return request('/public/orders', {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export function completePackageOrderStudent(
+  orderNo: string,
+  input: { studentName: string; grade?: string },
+): Promise<{ order: ParentOrder; student: ParentChild; message: string }> {
+  return request(`/public/orders/${encodeURIComponent(orderNo)}/student`, {
     method: 'POST',
     data: input,
   });
@@ -983,8 +1010,9 @@ export async function fetchPublicCalendar(
     to?: string;
   } = {},
 ): Promise<PublicCalendarEvent[]> {
-  return (await request<{ events: PublicCalendarEvent[] }>(`/public/calendar${buildQueryString(params)}`))
-    .events;
+  return (
+    await request<{ events: PublicCalendarEvent[] }>(`/public/calendar${buildQueryString(params)}`)
+  ).events;
 }
 
 export function submitParentCheckIn(

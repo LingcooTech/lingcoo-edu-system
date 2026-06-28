@@ -1,7 +1,5 @@
 <custom-navbar title="教师团队" />
-<view class="page">
-  <view class="body-text intro">提前了解授课老师的擅长方向，点击老师查看详情。</view>
-
+<view class="page teachers-page">
   <scroll-view wx:if="{{tabs.length}}" class="tabs" scroll-x enable-flex>
     <view
       wx:for="{{tabs}}"
@@ -17,41 +15,35 @@
 
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{visibleTeachers.length}}" class="teacher-list">
-    <view
+    <navigator
       wx:for="{{visibleTeachers}}"
       wx:key="id"
-      class="card teacher-card"
-      data-id="{{item.id}}"
-      bindtap="goDetail"
+      class="teacher-card"
+      url="/pages/teacher-detail/index?id={{item.id}}"
     >
-      <view class="teacher-head">
-        <image wx:if="{{item.avatarUrl}}" class="avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
-        <view wx:else class="avatar fallback">师</view>
-        <view class="teacher-main">
+      <image wx:if="{{item.avatarUrl}}" class="teacher-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="teacher-avatar teacher-avatar-fallback">{{item.initial}}</view>
+      <view class="teacher-body">
+        <view class="teacher-row">
           <view class="teacher-name">{{item.name}}</view>
-          <view wx:if="{{item.title}}" class="muted teacher-title">{{item.title}}</view>
-          <view
-            wx:if="{{item.institutionName || item.institutionLogoUrl}}"
-            class="{{item.institutionLogoUrl ? 'institution-logo-wrap' : 'institution-mark'}}"
-          >
-            <image
-              wx:if="{{item.institutionLogoUrl}}"
-              class="institution-logo"
-              src="{{item.institutionLogoUrl}}"
-              mode="aspectFit"
-            />
-            <text wx:else>{{item.institutionName}}</text>
-          </view>
+          <view wx:if="{{item.title}}" class="teacher-title">{{item.title}}</view>
+        </view>
+        <view wx:if="{{item.metaText}}" class="teacher-meta">{{item.metaText}}</view>
+        <view class="teacher-tagline">{{item.displayTagline}}</view>
+        <view
+          wx:if="{{item.institutionName || item.institutionLogoUrl}}"
+          class="{{item.institutionLogoUrl ? 'institution-logo-wrap' : 'institution-mark'}}"
+        >
+          <image
+            wx:if="{{item.institutionLogoUrl}}"
+            class="institution-logo"
+            src="{{item.institutionLogoUrl}}"
+            mode="aspectFit"
+          />
+          <text wx:else>{{item.institutionName}}</text>
         </view>
       </view>
-
-      <view wx:if="{{item.tagline}}" class="tagline">{{item.tagline}}</view>
-
-      <view wx:if="{{item.specialties.length}}" class="specialties">
-        <text wx:for="{{item.specialties}}" wx:for-item="spec" wx:key="*this" class="chip">{{spec}}</text>
-      </view>
-      <view wx:else class="muted specialty-empty">待补充擅长方向</view>
-    </view>
+    </navigator>
   </view>
   <view wx:else class="empty">教师信息待上线。</view>
 </view>

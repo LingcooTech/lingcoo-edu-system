@@ -1,4 +1,4 @@
-<view class="blocks" wx:if="{{blocks.length}}">
+<view class="blocks {{variant}}" wx:if="{{blocks.length}}">
   <block wx:for="{{blocks}}" wx:key="id" wx:for-item="item">
     <view wx:if="{{item.type == 'heading' && item.text}}" class="block heading level-{{item.level}}">
       {{item.text}}

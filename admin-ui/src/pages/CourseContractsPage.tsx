@@ -26,6 +26,9 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   wechat_offline: '微信线下',
   alipay_offline: '支付宝线下',
   offline_other: '其他线下',
+  wechat_pay: '微信支付',
+  mock: '模拟支付',
+  online_payment: '线上支付',
 };
 
 const PAYMENT_RECEIVER_TYPE_LABEL: Record<string, string> = {
@@ -113,6 +116,15 @@ function contractStatusTone(status: string) {
   if (status === 'completed') return 'info';
   if (status === 'cancelled') return 'danger';
   return statusToTone(status);
+}
+
+function needsOnlineConfirmation(contract: CourseContract) {
+  return (
+    contract.status === 'active' &&
+    !contract.classId &&
+    Boolean(contract.orderId) &&
+    contract.note?.includes('线上支付自动生成')
+  );
 }
 
 function effectivePackagePrice(coursePackage: CoursePackage) {
@@ -641,8 +653,12 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             header: '状态',
             cell: (row) => (
               <StatusPill
-                tone={contractStatusTone(row.status)}
-                label={CONTRACT_STATUS_LABEL[row.status] ?? row.status}
+                tone={needsOnlineConfirmation(row) ? 'warn' : contractStatusTone(row.status)}
+                label={
+                  needsOnlineConfirmation(row)
+                    ? '待确认'
+                    : (CONTRACT_STATUS_LABEL[row.status] ?? row.status)
+                }
               />
             ),
           },

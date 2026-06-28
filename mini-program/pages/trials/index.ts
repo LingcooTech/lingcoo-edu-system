@@ -124,6 +124,7 @@ function filterTrials(
 Page({
   data: {
     loading: true,
+    navSolid: false,
     allTrials: [] as TrialListItem[],
     trials: [] as TrialListItem[],
     timeFilters: TIME_FILTERS,
@@ -150,6 +151,13 @@ Page({
   async onPullDownRefresh() {
     await this.load();
     wx.stopPullDownRefresh();
+  },
+
+  onPageScroll(event: { scrollTop: number }) {
+    const navSolid = event.scrollTop > 24;
+    if (navSolid !== this.data.navSolid) {
+      this.setData({ navSolid });
+    }
   },
 
   async load() {

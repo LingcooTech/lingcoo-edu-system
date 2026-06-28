@@ -67,6 +67,7 @@ Page({
     courses: [] as Course[],
     statItems: [] as StatItem[],
     profileSections: [] as ProfileSection[],
+    coursePickerVisible: false,
   },
 
   onLoad(options: { id?: string }) {
@@ -131,12 +132,31 @@ Page({
 
   goCourses() {
     const courses = this.data.courses as Course[];
-    if (courses[0]?.slug) {
+    if (courses.length === 1 && courses[0]?.slug) {
       wx.navigateTo({
         url: `/pages/course-detail/index?slug=${encodeURIComponent(courses[0].slug)}`,
       });
       return;
     }
+    if (courses.length > 1) {
+      this.setData({ coursePickerVisible: true });
+      return;
+    }
     wx.switchTab({ url: '/pages/courses/index' });
+  },
+
+  closeCoursePicker() {
+    this.setData({ coursePickerVisible: false });
+  },
+
+  noop() {},
+
+  onCourseChoiceTap(event: { currentTarget: { dataset: { slug?: string } } }) {
+    const slug = event.currentTarget.dataset.slug;
+    if (!slug) return;
+    this.setData({ coursePickerVisible: false });
+    wx.navigateTo({
+      url: `/pages/course-detail/index?slug=${encodeURIComponent(slug)}`,
+    });
   },
 });

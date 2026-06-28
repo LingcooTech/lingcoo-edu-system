@@ -219,6 +219,7 @@ function buildWeekDays(
 Page({
   data: {
     loading: false,
+    navSolid: false,
     calendarExpanded: false,
     selectedIsoDate: dateKey(new Date()),
     selectedDateLabel: dateLabel(new Date()),
@@ -255,6 +256,13 @@ Page({
   async onPullDownRefresh() {
     await this.load();
     wx.stopPullDownRefresh();
+  },
+
+  onPageScroll(event: { scrollTop: number }) {
+    const navSolid = event.scrollTop > 24;
+    if (navSolid !== this.data.navSolid) {
+      this.setData({ navSolid });
+    }
   },
 
   async load() {

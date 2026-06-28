@@ -2,6 +2,7 @@ import { and, desc, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
 
 import * as crmRepo from '../../db/repositories/crm.js';
+import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
@@ -12,6 +13,7 @@ import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { hashPassword } from '../../lib/password.js';
 import { resolvePackageCourse } from '../package-course.js';
+import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
 import type { AppModule } from '../types.js';
 import { getPaymentProvider } from './providers/index.js';
 import { PaymentService } from './service.js';
@@ -21,16 +23,27 @@ import {
   type WechatPaymentSettingsInput,
 } from './settings-service.js';
 
-const createOrderSchema = z.object({
-  packageId: z.string().uuid(),
-  courseId: z.string().uuid().optional(),
-  guardianName: z.string().min(1).max(120).optional(),
-  guardianPhone: z.string().min(6).max(40),
+const createOrderSchema = z
+  .object({
+    packageId: z.string().uuid(),
+    courseId: z.string().uuid().optional(),
+    guardianName: z.string().min(1).max(120).optional(),
+    guardianPhone: z.string().min(6).max(40).optional(),
+    phoneCode: z.string().min(1).optional(),
+    studentName: z.string().min(1).max(120).optional(),
+    grade: z.string().max(80).optional().default(''),
+    source: z.string().max(80).optional(),
+    campaign: z.string().max(80).optional(),
+    medium: z.string().max(40).optional(),
+    wechatMiniCode: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.guardianPhone || value.phoneCode), {
+    message: 'guardianPhone 或 phoneCode 至少提供一个',
+  });
+
+const completePackageOrderStudentSchema = z.object({
   studentName: z.string().min(1).max(120),
   grade: z.string().max(80).optional().default(''),
-  source: z.string().max(80).optional(),
-  campaign: z.string().max(80).optional(),
-  medium: z.string().max(40).optional(),
 });
 
 const paymentIntentSchema = z.object({
@@ -84,8 +97,17 @@ export const paymentModule: AppModule = {
   async register(app) {
     // --- Parent checkout (course-package purchase) ---
 
-    app.post('/public/orders', async (request) => {
+    app.post('/public/orders', async (request, reply) => {
       const body = createOrderSchema.parse(request.body);
+      const wechatIdentity = body.wechatMiniCode
+        ? await exchangeWechatMiniCode(app.appEnv, body.wechatMiniCode)
+        : null;
+      const rawPhone = body.phoneCode
+        ? await getWechatMiniPhoneNumber(app.appEnv, body.phoneCode)
+        : body.guardianPhone;
+      if (!body.phoneCode && app.appEnv.NODE_ENV === 'production' && body.wechatMiniCode) {
+        throw httpError(422, '小程序购买必须使用微信手机号授权');
+      }
       const pkg = await packagesRepo.requirePackage(app.db, body.packageId);
       if (pkg.status !== 'active') {
         throw httpError(422, '该课时包已下架');
@@ -112,7 +134,10 @@ export const paymentModule: AppModule = {
       });
       const amount = packagesRepo.effectivePackagePrice(pkg);
       const lessonCount = packagesRepo.effectivePackageLessonCount(pkg);
-      const phone = normalizePhone(body.guardianPhone);
+      if (!rawPhone) {
+        throw httpError(422, '手机号不能为空');
+      }
+      const phone = normalizePhone(rawPhone);
       const defaultPassword = defaultPasswordForPhone(phone);
       const attribution = await crmRepo.resolveAttribution(app.db, {
         source: body.source,
@@ -137,41 +162,53 @@ export const paymentModule: AppModule = {
               .returning()
           )[0];
 
-        const [existingStudent] = await tx
-          .select()
-          .from(schema.students)
-          .where(
-            and(
-              eq(schema.students.guardianId, guardian.id),
-              eq(schema.students.name, body.studentName.trim()),
-              ne(schema.students.status, 'archived'),
-            ),
-          )
-          .limit(1);
-        const student =
-          existingStudent ??
-          (
-            await tx
-              .insert(schema.students)
-              .values({
-                guardianId: guardian.id,
-                name: body.studentName.trim(),
-                grade: body.grade?.trim() || '未填写',
-                status: 'active',
-              })
-              .returning()
-          )[0];
+        const studentName = body.studentName?.trim();
+        const student = studentName
+          ? ((
+              await tx
+                .select()
+                .from(schema.students)
+                .where(
+                  and(
+                    eq(schema.students.guardianId, guardian.id),
+                    eq(schema.students.name, studentName),
+                    ne(schema.students.status, 'archived'),
+                  ),
+                )
+                .limit(1)
+            )[0] ??
+            (
+              await tx
+                .insert(schema.students)
+                .values({
+                  guardianId: guardian.id,
+                  name: studentName,
+                  grade: body.grade?.trim() || '未填写',
+                  status: 'active',
+                })
+                .returning()
+            )[0])
+          : null;
 
-        await tx
-          .insert(schema.studentGuardians)
-          .values({ studentId: student.id, guardianId: guardian.id, relation: 'guardian' })
-          .onConflictDoNothing();
+        if (student) {
+          await tx
+            .insert(schema.studentGuardians)
+            .values({ studentId: student.id, guardianId: guardian.id, relation: 'guardian' })
+            .onConflictDoNothing();
+        }
 
         const [existingAccount] = await tx
           .select()
           .from(schema.accounts)
           .where(eq(schema.accounts.phone, phone))
           .limit(1);
+        if (existingAccount && existingAccount.role !== 'parent') {
+          throw httpError(409, '该手机号已绑定非家长账号');
+        }
+        if (existingAccount && existingAccount.status !== 'active') {
+          throw httpError(403, '账号已停用');
+        }
+
         const account =
           existingAccount ??
           (
@@ -195,13 +232,42 @@ export const paymentModule: AppModule = {
             .where(eq(schema.accounts.id, account.id));
         }
 
+        if (wechatIdentity) {
+          const [existingIdentity] = await tx
+            .select()
+            .from(schema.accountWechatIdentities)
+            .where(
+              and(
+                eq(schema.accountWechatIdentities.appId, wechatIdentity.appId),
+                eq(schema.accountWechatIdentities.openid, wechatIdentity.openid),
+              ),
+            )
+            .limit(1);
+          if (existingIdentity && existingIdentity.accountId !== account.id) {
+            throw httpError(409, '当前微信已绑定其他手机号，请使用已绑定手机号购买');
+          }
+          if (existingIdentity) {
+            await tx
+              .update(schema.accountWechatIdentities)
+              .set({ unionid: wechatIdentity.unionid ?? null, updatedAt: new Date() })
+              .where(eq(schema.accountWechatIdentities.id, existingIdentity.id));
+          } else {
+            await tx.insert(schema.accountWechatIdentities).values({
+              accountId: account.id,
+              appId: wechatIdentity.appId,
+              openid: wechatIdentity.openid,
+              unionid: wechatIdentity.unionid ?? null,
+            });
+          }
+        }
+
         const [lead] = await tx
           .select()
           .from(schema.leads)
           .where(eq(schema.leads.phone, phone))
           .orderBy(desc(schema.leads.createdAt))
           .limit(1);
-        if (lead) {
+        if (lead && student) {
           await tx
             .update(schema.leads)
             .set({
@@ -215,7 +281,7 @@ export const paymentModule: AppModule = {
         const order = await financeRepo.createPackageOrder(tx, {
           accountId: account.id,
           packageId: pkg.id,
-          studentId: student.id,
+          studentId: student?.id ?? null,
           courseId: course.id,
           courseSeriesId: pkg.courseSeriesId ?? course.courseSeriesId,
           amount,
@@ -239,6 +305,13 @@ export const paymentModule: AppModule = {
         };
       });
 
+      const authToken = wechatIdentity
+        ? await reply.jwtSign(
+            { sub: result.account.id, role: result.account.role },
+            { expiresIn: '14d' },
+          )
+        : null;
+
       return {
         order: result.order,
         checkout: {
@@ -246,9 +319,105 @@ export const paymentModule: AppModule = {
           defaultPassword: result.accountCreated ? defaultPassword : null,
           accountCreated: result.accountCreated,
           mustChangePassword: result.account.mustChangePassword,
+          authToken,
         },
       };
     });
+
+    app.post(
+      '/public/orders/:orderNo/student',
+      { preHandler: app.requireParent },
+      async (request) => {
+        const { orderNo } = request.params as { orderNo: string };
+        const body = completePackageOrderStudentSchema.parse(request.body);
+        const account = await app.db.query.accounts.findFirst({
+          where: eq(schema.accounts.id, request.account!.id),
+        });
+        if (!account) {
+          throw httpError(401, '请先登录');
+        }
+        const phone = account.phone ? normalizePhone(account.phone) : null;
+        if (!phone) {
+          throw httpError(422, '当前账号缺少手机号');
+        }
+
+        const result = await app.db.transaction(async (tx) => {
+          const [existingGuardian] = await tx
+            .select()
+            .from(schema.guardians)
+            .where(eq(schema.guardians.phone, phone))
+            .limit(1);
+          const guardian =
+            existingGuardian ??
+            (
+              await tx
+                .insert(schema.guardians)
+                .values({ name: account.displayName || `${phone} 家长`, phone })
+                .returning()
+            )[0];
+
+          if (!account.guardianId) {
+            await tx
+              .update(schema.accounts)
+              .set({ guardianId: guardian.id, updatedAt: new Date() })
+              .where(eq(schema.accounts.id, account.id));
+          }
+
+          const studentName = body.studentName.trim();
+          const [existingStudent] = await tx
+            .select()
+            .from(schema.students)
+            .where(
+              and(
+                eq(schema.students.guardianId, guardian.id),
+                eq(schema.students.name, studentName),
+                ne(schema.students.status, 'archived'),
+              ),
+            )
+            .limit(1);
+          const student =
+            existingStudent ??
+            (
+              await tx
+                .insert(schema.students)
+                .values({
+                  guardianId: guardian.id,
+                  name: studentName,
+                  grade: body.grade?.trim() || '未填写',
+                  status: 'active',
+                })
+                .returning()
+            )[0];
+
+          await tx
+            .insert(schema.studentGuardians)
+            .values({ studentId: student.id, guardianId: guardian.id, relation: 'guardian' })
+            .onConflictDoNothing();
+
+          const order = await financeRepo.attachStudentToPaidPackageOrderInTx(tx, {
+            orderNo,
+            accountId: request.account!.id,
+            studentId: student.id,
+          });
+          const contract = await courseContractsRepo.createCourseContractFromPaidPackageOrderInTx(
+            tx,
+            {
+              order,
+              studentId: student.id,
+            },
+          );
+
+          return { student, order, courseContract: contract.courseContract };
+        });
+
+        return {
+          order: result.order,
+          student: result.student,
+          courseContract: result.courseContract,
+          message: '孩子信息已完善，课时已到账，正式课程档案待老师确认。',
+        };
+      },
+    );
 
     app.post('/public/orders/:orderNo/payment-intent', async (request) => {
       const { orderNo } = request.params as { orderNo: string };

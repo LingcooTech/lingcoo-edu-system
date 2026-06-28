@@ -8,6 +8,10 @@ Component({
       type: Boolean,
       value: false,
     },
+    transparent: {
+      type: Boolean,
+      value: false,
+    },
   },
 
   data: {

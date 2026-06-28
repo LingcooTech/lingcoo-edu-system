@@ -1,4 +1,4 @@
-<custom-navbar title="我的" />
+<custom-navbar title="我的" transparent="{{!navSolid}}" />
 <view class="page account-page">
   <skeleton wx:if="{{booting}}" variant="hub" />
   <block wx:elif="{{account}}">

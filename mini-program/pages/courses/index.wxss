@@ -4,52 +4,71 @@
 }
 
 .courses-hero {
+  position: relative;
+  min-height: 360rpx;
+  overflow: hidden;
   margin: -24rpx -24rpx 0;
   margin-top: -88px;
-  border-radius: 0 0 36rpx 36rpx;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)),
-    linear-gradient(180deg, #ead6bf 0%, #f6eee5 100%);
-  padding: calc(88px + 38rpx) 30rpx 54rpx;
+  border-radius: 0;
+  background: #cfa57d;
 }
 
-.courses-eyebrow {
-  color: #8b5e42;
-  font-size: 25rpx;
-  font-weight: 900;
+.courses-head-shade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background:
+    radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(33, 31, 28, 0.44));
+}
+
+.courses-head-copy {
+  position: absolute;
+  right: 250rpx;
+  bottom: 48rpx;
+  left: 28rpx;
+  color: #fff;
 }
 
 .courses-title {
-  margin-top: 14rpx;
-  color: #211f1c;
-  font-size: 48rpx;
-  font-weight: 900;
-  line-height: 1.16;
+  color: #fff;
+  font-size: 38rpx;
+  font-weight: 700;
+  line-height: 1.26;
 }
 
 .courses-subtitle {
   max-width: 560rpx;
-  margin-top: 14rpx;
-  color: #6b6258;
-  font-size: 27rpx;
-  line-height: 1.55;
+  margin-top: 12rpx;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 26rpx;
+  line-height: 1.5;
 }
 
 .courses-count {
+  position: absolute;
+  right: 28rpx;
+  bottom: 68rpx;
   display: inline-flex;
-  margin-top: 28rpx;
+  align-items: center;
+  justify-content: center;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.72);
   color: #8b5e42;
   font-size: 24rpx;
   font-weight: 900;
   padding: 12rpx 20rpx;
+  white-space: nowrap;
 }
 
 .course-list {
   display: grid;
   gap: 20rpx;
-  margin-top: -20rpx;
+  margin-top: 18rpx;
+  position: relative;
+  z-index: 2;
 }
 
 .course-card {

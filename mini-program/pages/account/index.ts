@@ -148,6 +148,7 @@ function groupEntries(entries: QuickEntry[]): QuickGroup[] {
 
 Page({
   data: {
+    navSolid: false,
     loading: false,
     binding: false,
     refreshing: false,
@@ -179,6 +180,13 @@ Page({
       this.loadSummary().finally(() => wx.stopPullDownRefresh());
     } else {
       wx.stopPullDownRefresh();
+    }
+  },
+
+  onPageScroll(event: { scrollTop: number }) {
+    const navSolid = event.scrollTop > 24;
+    if (navSolid !== this.data.navSolid) {
+      this.setData({ navSolid });
     }
   },
 

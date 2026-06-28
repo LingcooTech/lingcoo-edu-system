@@ -13,6 +13,7 @@ import { shareCard, timelineCard } from '../../utils/share';
 Page({
   data: {
     loading: true,
+    navSolid: false,
     courses: [] as CourseListItem[],
     businessModel: null as BusinessModelSettings | null,
   },
@@ -32,6 +33,13 @@ Page({
   async onPullDownRefresh() {
     await this.load();
     wx.stopPullDownRefresh();
+  },
+
+  onPageScroll(event: { scrollTop: number }) {
+    const navSolid = event.scrollTop > 24;
+    if (navSolid !== this.data.navSolid) {
+      this.setData({ navSolid });
+    }
   },
 
   async load() {

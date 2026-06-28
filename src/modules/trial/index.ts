@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import type { FastifyRequest } from 'fastify';
+import { and, eq } from 'drizzle-orm';
 
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
@@ -18,7 +19,10 @@ import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
+import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
 import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
+import { httpError } from '../../lib/http-error.js';
+import { hashPassword } from '../../lib/password.js';
 import { validateLeadPreferences } from '../lead-preferences.js';
 import type { AppModule } from '../types.js';
 
@@ -61,17 +65,23 @@ const registrationSchema = z.object({
   medium: z.string().optional(),
 });
 
-const seatReservationSchema = z.object({
-  trialSessionId: z.string(),
-  guardianName: z.string().min(1),
-  phone: z.string().min(6),
-  studentName: z.string().min(1),
-  grade: z.string().min(1),
-  source: z.string().default('unknown'),
-  campaign: z.string().optional(),
-  course: z.string().optional(),
-  medium: z.string().optional(),
-});
+const seatReservationSchema = z
+  .object({
+    trialSessionId: z.string(),
+    guardianName: z.string().min(1),
+    phone: z.string().min(6).optional(),
+    phoneCode: z.string().min(1).optional(),
+    wechatMiniCode: z.string().min(1).optional(),
+    studentName: z.string().min(1),
+    grade: z.string().min(1),
+    source: z.string().default('unknown'),
+    campaign: z.string().optional(),
+    course: z.string().optional(),
+    medium: z.string().optional(),
+  })
+  .refine((value) => Boolean(value.phone || value.phoneCode), {
+    message: 'phone 或 phoneCode 至少提供一个',
+  });
 
 const seatReservationRescheduleSchema = z.object({
   trialSessionId: z.string(),
@@ -110,6 +120,14 @@ function toPublicInstitution(institution: typeof schema.institutions.$inferSelec
 
 function unprocessable(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 422 });
+}
+
+function normalizePhone(phone: string) {
+  return phone.trim();
+}
+
+function defaultPasswordForPhone(phone: string) {
+  return phone.slice(-6);
 }
 
 function endOfCurrentWeek(now = new Date()) {
@@ -308,9 +326,14 @@ export const trialModule: AppModule = {
         organizationRepo.listCampuses(app.db),
         organizationRepo.requireOrganization(app.db),
       ]);
+      const providerInstitution = await teachingRepo.findInstitution(
+        app.db,
+        course.providerInstitutionId,
+      );
       return {
         trialSession,
         course,
+        providerInstitution: providerInstitution ? toPublicInstitution(providerInstitution) : null,
         campus: campuses.find((item) => item.id === trialSession.campusId) ?? null,
         organization: {
           id: organization.id,
@@ -475,8 +498,21 @@ export const trialModule: AppModule = {
       return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
     });
 
-    app.post('/public/seat-reservations', async (request) => {
+    app.post('/public/seat-reservations', async (request, reply) => {
       const body = seatReservationSchema.parse(request.body);
+      const wechatIdentity = body.wechatMiniCode
+        ? await exchangeWechatMiniCode(app.appEnv, body.wechatMiniCode)
+        : null;
+      const rawPhone = body.phoneCode
+        ? await getWechatMiniPhoneNumber(app.appEnv, body.phoneCode)
+        : body.phone;
+      if (!body.phoneCode && app.appEnv.NODE_ENV === 'production' && body.wechatMiniCode) {
+        throw httpError(422, '小程序占位必须使用微信手机号授权');
+      }
+      if (!rawPhone) {
+        throw unprocessable('手机号不能为空');
+      }
+      const phone = normalizePhone(rawPhone);
       const [organization, trialSession] = await Promise.all([
         organizationRepo.requireOrganization(app.db),
         trialRepo.requireTrialSession(app.db, body.trialSessionId),
@@ -511,9 +547,98 @@ export const trialModule: AppModule = {
         campaignCode: body.campaign,
       });
       const cancelBefore = new Date(trialSession.startsAt.getTime() - 12 * 60 * 60 * 1000);
-      const accountId = await readOptionalParentAccountId(request);
+      const tokenAccountId = await readOptionalParentAccountId(request);
 
       const result = await app.db.transaction(async (tx) => {
+        let accountId = tokenAccountId;
+        let accountCreated = false;
+        let defaultPassword: string | null = null;
+
+        if (wechatIdentity) {
+          const [existingGuardian] = await tx
+            .select()
+            .from(schema.guardians)
+            .where(eq(schema.guardians.phone, phone))
+            .limit(1);
+          const guardian =
+            existingGuardian ??
+            (
+              await tx
+                .insert(schema.guardians)
+                .values({
+                  name: body.guardianName.trim() || `${phone} 家长`,
+                  phone,
+                })
+                .returning()
+            )[0];
+
+          const [existingAccount] = await tx
+            .select()
+            .from(schema.accounts)
+            .where(eq(schema.accounts.phone, phone))
+            .limit(1);
+          if (existingAccount && existingAccount.role !== 'parent') {
+            throw httpError(409, '该手机号已绑定非家长账号');
+          }
+          if (existingAccount && existingAccount.status !== 'active') {
+            throw httpError(403, '账号已停用');
+          }
+
+          const newDefaultPassword = defaultPasswordForPhone(phone);
+          defaultPassword = existingAccount ? null : newDefaultPassword;
+          const account =
+            existingAccount ??
+            (
+              await tx
+                .insert(schema.accounts)
+                .values({
+                  role: 'parent',
+                  phone,
+                  passwordHash: hashPassword(newDefaultPassword),
+                  displayName: guardian.name,
+                  guardianId: guardian.id,
+                  mustChangePassword: true,
+                })
+                .returning()
+            )[0];
+          accountCreated = !existingAccount;
+          accountId = account.id;
+
+          if (!account.guardianId) {
+            await tx
+              .update(schema.accounts)
+              .set({ guardianId: guardian.id, updatedAt: new Date() })
+              .where(eq(schema.accounts.id, account.id));
+          }
+
+          const [existingIdentity] = await tx
+            .select()
+            .from(schema.accountWechatIdentities)
+            .where(
+              and(
+                eq(schema.accountWechatIdentities.appId, wechatIdentity.appId),
+                eq(schema.accountWechatIdentities.openid, wechatIdentity.openid),
+              ),
+            )
+            .limit(1);
+          if (existingIdentity && existingIdentity.accountId !== account.id) {
+            throw httpError(409, '当前微信已绑定其他手机号，请使用已绑定手机号预约');
+          }
+          if (existingIdentity) {
+            await tx
+              .update(schema.accountWechatIdentities)
+              .set({ unionid: wechatIdentity.unionid ?? null, updatedAt: new Date() })
+              .where(eq(schema.accountWechatIdentities.id, existingIdentity.id));
+          } else {
+            await tx.insert(schema.accountWechatIdentities).values({
+              accountId: account.id,
+              appId: wechatIdentity.appId,
+              openid: wechatIdentity.openid,
+              unionid: wechatIdentity.unionid ?? null,
+            });
+          }
+        }
+
         const [lead] = await tx
           .insert(schema.leads)
           .values({
@@ -521,7 +646,7 @@ export const trialModule: AppModule = {
             courseId: trialSession.courseId,
             trialSessionId: trialSession.id,
             guardianName: body.guardianName,
-            phone: body.phone,
+            phone,
             studentName: body.studentName,
             grade: body.grade,
             source: body.source,
@@ -551,7 +676,7 @@ export const trialModule: AppModule = {
           courseId: trialSession.courseId,
           trialSessionId: trialSession.id,
           guardianName: body.guardianName,
-          phone: body.phone,
+          phone,
           studentName: body.studentName,
           grade: body.grade,
           reservationFeeAmount: trialSession.reservationFeeAmount,
@@ -564,11 +689,24 @@ export const trialModule: AppModule = {
           campaignId,
           medium: body.medium ?? null,
         });
-        return { lead, order, seatReservation };
+        return { lead, order, seatReservation, accountId, accountCreated, defaultPassword };
       });
 
+      const authToken =
+        wechatIdentity && result.accountId
+          ? await reply.jwtSign({ sub: result.accountId, role: 'parent' }, { expiresIn: '14d' })
+          : null;
+
       return {
-        ...result,
+        lead: result.lead,
+        order: result.order,
+        seatReservation: result.seatReservation,
+        checkout: {
+          loginIdentifier: phone,
+          defaultPassword: result.defaultPassword,
+          accountCreated: result.accountCreated,
+          authToken,
+        },
         message: '已创建试听席位保留订单，请完成支付以保留名额。',
       };
     });

@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import QRCode from 'qrcode';
+import { eq } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as financeRepo from '../../db/repositories/finance.js';
 import type { Order } from '../../db/repositories/finance.js';
+import * as schema from '../../db/schema.js';
 import { httpError } from '../../lib/http-error.js';
 import {
   getWechatMiniSubscribeTemplateId,
@@ -348,6 +350,10 @@ export class PaymentService {
       return;
     }
     const isSeatReservation = order.orderType === 'seat_reservation';
+    const seatReservation = isSeatReservation
+      ? await this.findSeatReservation(order.orderNo)
+      : null;
+    const seatReserved = seatReservation?.reservationStatus === 'reserved';
 
     await new NotificationsService(this.app.db).create({
       recipientType: 'parent',
@@ -356,14 +362,27 @@ export class PaymentService {
       level: 'success',
       title: '支付成功',
       body: isSeatReservation
-        ? `订单 ${order.orderNo} 已支付，试听席位已保留。`
-        : `订单 ${order.orderNo} 已支付，${order.lessonCount} 课时已到账。`,
+        ? seatReserved
+          ? `订单 ${order.orderNo} 已支付，试听席位已保留。`
+          : `订单 ${order.orderNo} 已支付，试听席位待老师确认。`
+        : order.studentId
+          ? `订单 ${order.orderNo} 已支付，${order.lessonCount} 课时已到账。`
+          : `订单 ${order.orderNo} 已支付，请完善孩子信息后开通课时。`,
       ctaLabel: '查看订单',
       ctaUrl: '/account',
       sourceEventName: 'payment.paid',
       dedupeKey: `payment.paid:${order.orderNo}:${provider}:${providerOrderId}`,
     });
     await this.sendWechatMiniPaymentSubscribe(order);
+  }
+
+  private async findSeatReservation(orderNo: string) {
+    const [reservation] = await this.app.db
+      .select()
+      .from(schema.seatReservations)
+      .where(eq(schema.seatReservations.orderNo, orderNo))
+      .limit(1);
+    return reservation ?? null;
   }
 
   private async sendWechatMiniPaymentSubscribe(order: Order) {
@@ -381,6 +400,9 @@ export class PaymentService {
     if (!identity) {
       return;
     }
+    const seatReservation =
+      order.orderType === 'seat_reservation' ? await this.findSeatReservation(order.orderNo) : null;
+    const seatReserved = seatReservation?.reservationStatus === 'reserved';
 
     try {
       const result = await sendWechatMiniSubscribeMessage(this.app.appEnv, {
@@ -393,8 +415,12 @@ export class PaymentService {
           thing3: {
             value:
               order.orderType === 'seat_reservation'
-                ? '试听席位已保留'
-                : `${order.lessonCount} 课时已到账`,
+                ? seatReserved
+                  ? '试听席位已保留'
+                  : '试听席位待确认'
+                : order.studentId
+                  ? `${order.lessonCount} 课时已到账`
+                  : '待完善孩子信息',
           },
           time4: { value: formatMessageTime(order.paidAt ?? new Date()) },
         },

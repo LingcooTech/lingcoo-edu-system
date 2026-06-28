@@ -62,17 +62,10 @@
 .story-summary {
   display: -webkit-box;
   overflow: hidden;
-  margin-top: 8rpx;
+  margin-top: 12rpx;
   color: #57534e;
   font-size: 24rpx;
-  line-height: 1.45;
+  line-height: 1.55;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-}
-
-.story-meta {
-  margin-top: 8rpx;
-  color: #9a6a4b;
-  font-size: 23rpx;
-  font-weight: 800;
+  -webkit-line-clamp: 2;
 }
