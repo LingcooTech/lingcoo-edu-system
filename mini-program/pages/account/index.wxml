@@ -1,6 +1,62 @@
 <custom-navbar title="我的" transparent="{{!navSolid}}" />
 <view class="page account-page">
   <skeleton wx:if="{{booting}}" variant="hub" />
+  <block wx:elif="{{account && account.role == 'teacher'}}">
+    <view class="hub-card teacher-hub">
+      <view class="hub-top">
+        <view>
+          <view class="hub-eyebrow">老师账号</view>
+          <view class="hub-title">老师工作台</view>
+        </view>
+        <view class="profile-pill">
+          <view class="profile-avatar">{{avatarText}}</view>
+          <view class="profile-info">
+            <view class="profile-name">{{account.displayName || '老师'}}</view>
+            <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
+            <view wx:else class="profile-phone muted">微信登录</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="teacher-summary">
+        <view class="teacher-summary-title">授课、班级、学员和课后服务都在这里处理。</view>
+        <navigator
+          class="btn btn-primary teacher-main-action"
+          url="/pages/teacher-workbench/index"
+          hover-class="button-hover"
+        >
+          进入老师工作台
+        </navigator>
+      </view>
+    </view>
+
+    <view class="section entry-panel">
+      <view class="entry-title">常用工具</view>
+      <view class="entry-grid teacher-entry-grid">
+        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
+          <view class="entry-symbol">课</view>
+          <view class="entry-label">今日课表</view>
+        </navigator>
+        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
+          <view class="entry-symbol">班</view>
+          <view class="entry-label">我的班级</view>
+        </navigator>
+        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
+          <view class="entry-symbol">点</view>
+          <view class="entry-label">点名</view>
+        </navigator>
+        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
+          <view class="entry-symbol">评</view>
+          <view class="entry-label">课后点评</view>
+        </navigator>
+      </view>
+    </view>
+
+    <view class="logout-wrap">
+      <button class="mini-button logout-button" bindtap="onLogout">退出登录</button>
+    </view>
+  </block>
+
   <block wx:elif="{{account}}">
     <view class="hub-card">
       <view class="hub-top">
@@ -134,8 +190,8 @@
   <block wx:else>
     <view class="guest-card">
       <view class="guest-avatar">我</view>
-      <view class="guest-title">登录家长中心</view>
-      <view class="guest-desc">查看孩子课表、课时余额、订单、点评和通知。</view>
+      <view class="guest-title">微信登录</view>
+      <view class="guest-desc">登录后自动识别家长或老师身份，进入对应工作台。</view>
       <button class="btn btn-primary login-button" bindtap="openLoginSheet">微信登录</button>
     </view>
   </block>
@@ -145,7 +201,7 @@
       <view class="sheet-handle"></view>
       <view class="sheet-title">{{bindToken ? '绑定手机号' : '微信登录'}}</view>
       <view class="sheet-desc">
-        {{bindToken ? '授权手机号后，可同步查看孩子档案、课表和课时账户。' : '登录后可进入家长中心，查看学习服务记录。'}}
+        {{bindToken ? '授权手机号后，将自动匹配家长中心或老师工作台。' : '登录后可进入家长中心或老师工作台。'}}
       </view>
       <button
         wx:if="{{!bindToken}}"

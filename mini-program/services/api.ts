@@ -726,11 +726,13 @@ export function request<T>(
   options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; data?: unknown } = {},
 ): Promise<T> {
   const authToken = getToken();
+  const method = options.method ?? 'GET';
+  const data = method === 'GET' ? options.data : (options.data ?? {});
   return new Promise((resolve, reject) => {
     wx.request<T | ApiErrorPayload>({
       url: `${API_BASE_URL}${path}`,
-      method: options.method ?? 'GET',
-      data: options.data,
+      method,
+      data,
       header: {
         'Content-Type': 'application/json',
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),

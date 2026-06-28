@@ -200,6 +200,35 @@
 }
 
 .sheet-heading {
+  position: relative;
   align-items: flex-start;
   gap: 16rpx;
+  padding-right: 76rpx;
+}
+
+.close-button {
+  position: absolute;
+  top: -2rpx;
+  right: 0;
+  display: flex;
+  width: 56rpx;
+  min-width: 56rpx;
+  max-width: 56rpx;
+  height: 56rpx;
+  min-height: 56rpx;
+  max-height: 56rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f1e9e1;
+  color: #9a6a4b;
+  font-size: 42rpx;
+  font-weight: 500;
+  line-height: 52rpx;
+  overflow: hidden;
+  text-align: center;
+}
+
+.close-button:active {
+  background: #eadbce;
 }

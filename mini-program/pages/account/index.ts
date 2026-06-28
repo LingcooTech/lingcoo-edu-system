@@ -200,8 +200,8 @@ Page({
         return;
       }
       if (payload.account.role === 'teacher') {
-        this.setData({ refreshing: false, booting: false });
-        wx.navigateTo({ url: '/pages/teacher-workbench/index' });
+        this.applyAccount(payload.account);
+        this.updateTabBadge(0);
         return;
       }
       if (payload.account.role !== 'parent') {
@@ -378,7 +378,10 @@ Page({
           if (payload.bound) {
             setToken(payload.token);
             if (payload.account.role === 'teacher') {
-              wx.navigateTo({ url: '/pages/teacher-workbench/index' });
+              this.applyAccount(payload.account);
+              this.setData({ defaultPassword: '', loginSheetVisible: false });
+              this.updateTabBadge(0);
+              wx.showToast({ title: '登录成功', icon: 'success' });
               return;
             }
             this.applyAccount(payload.account);
@@ -433,9 +436,14 @@ Page({
       setToken(payload.token);
       this.applyAccount(payload.account);
       this.setData({
-        defaultPassword: payload.defaultPassword || '',
+        defaultPassword: payload.account.role === 'parent' ? payload.defaultPassword || '' : '',
         loginSheetVisible: false,
       });
+      if (payload.account.role === 'teacher') {
+        this.updateTabBadge(0);
+        wx.showToast({ title: '绑定成功', icon: 'success' });
+        return;
+      }
       await this.loadSummary();
       wx.showToast({ title: '绑定成功', icon: 'success' });
     } catch (error) {

@@ -79,6 +79,7 @@
               {{requiresReservationFee ? '授权微信手机号后支付席位保留费，支付完成即确认保留。' : '提交后老师会电话确认试听安排。'}}
             </view>
           </view>
+          <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeReservationForm">×</view>
         </view>
         <view class="form-gap">
           <input class="form-field" name="guardianName" data-field="guardianName" bindinput="onFormFieldInput" placeholder="家长姓名" value="{{guardianName}}" />

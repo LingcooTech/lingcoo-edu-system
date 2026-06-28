@@ -63,8 +63,11 @@
 
 .time-filter-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8rpx;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
   border-radius: 999rpx;
   background: #f7f3ee;
   padding: 6rpx;
@@ -72,6 +75,9 @@
 
 .time-filter {
   display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   height: 64rpx;
   align-items: center;
