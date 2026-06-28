@@ -116,10 +116,7 @@ export async function findAccountByWechatIdentity(db: Database, appId: string, o
   const [row] = await db
     .select({ account: schema.accounts })
     .from(schema.accountWechatIdentities)
-    .innerJoin(
-      schema.accounts,
-      eq(schema.accountWechatIdentities.accountId, schema.accounts.id),
-    )
+    .innerJoin(schema.accounts, eq(schema.accountWechatIdentities.accountId, schema.accounts.id))
     .where(
       and(
         eq(schema.accountWechatIdentities.appId, appId),
@@ -144,6 +141,10 @@ export async function findWechatIdentityByAccount(db: Database, accountId: strin
   return identity ?? null;
 }
 
+export async function listWechatIdentities(db: Database) {
+  return db.select().from(schema.accountWechatIdentities);
+}
+
 export async function createWechatIdentity(
   db: Database,
   values: typeof schema.accountWechatIdentities.$inferInsert,
@@ -161,6 +162,30 @@ export async function updateWechatIdentity(
     .update(schema.accountWechatIdentities)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(schema.accountWechatIdentities.id, id))
+    .returning();
+  return identity ?? null;
+}
+
+export async function deleteWechatIdentity(db: Database, identityId: string) {
+  const [identity] = await db
+    .delete(schema.accountWechatIdentities)
+    .where(eq(schema.accountWechatIdentities.id, identityId))
+    .returning();
+  return identity ?? null;
+}
+
+export async function deleteWechatIdentityForAccount(
+  db: Database,
+  input: { identityId: string; accountId: string },
+) {
+  const [identity] = await db
+    .delete(schema.accountWechatIdentities)
+    .where(
+      and(
+        eq(schema.accountWechatIdentities.id, input.identityId),
+        eq(schema.accountWechatIdentities.accountId, input.accountId),
+      ),
+    )
     .returning();
   return identity ?? null;
 }

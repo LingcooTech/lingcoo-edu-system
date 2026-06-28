@@ -162,6 +162,14 @@ export interface Account {
   teacherId?: string | null;
   guardian?: Guardian;
   teacher?: Teacher;
+  wechatIdentities?: Array<{
+    id: string;
+    appId: string;
+    openid: string;
+    unionid?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   createdAt: string;
 }
 

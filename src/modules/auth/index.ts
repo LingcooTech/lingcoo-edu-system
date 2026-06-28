@@ -65,9 +65,7 @@ const adminAccountCreateSchema = z.object({
   password: z.string().min(6).optional(),
 });
 
-const adminAccountUpdateSchema = adminAccountCreateSchema
-  .omit({ password: true })
-  .partial();
+const adminAccountUpdateSchema = adminAccountCreateSchema.omit({ password: true }).partial();
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -203,7 +201,10 @@ export const authModule: AppModule = {
 
     app.post('/auth/login', async (request, reply) => {
       const body = loginSchema.parse(request.body);
-      const account = await accountsRepo.findByIdentifier(app.db, normalizeIdentifier(body.identifier));
+      const account = await accountsRepo.findByIdentifier(
+        app.db,
+        normalizeIdentifier(body.identifier),
+      );
       if (
         !account ||
         account.status !== 'active' ||
@@ -382,19 +383,28 @@ export const authModule: AppModule = {
     }
 
     app.get('/v1/accounts', { preHandler: app.requireAdmin }, async () => {
-      const [accounts, guardians, teachers] = await Promise.all([
+      const [accounts, guardians, teachers, wechatIdentities] = await Promise.all([
         accountsRepo.listAccounts(app.db),
         peopleRepo.listGuardians(app.db),
         teachingRepo.listTeachers(app.db),
+        accountsRepo.listWechatIdentities(app.db),
       ]);
       const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
       const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+      const wechatIdentitiesByAccountId = new Map<string, typeof wechatIdentities>();
+      for (const identity of wechatIdentities) {
+        wechatIdentitiesByAccountId.set(identity.accountId, [
+          ...(wechatIdentitiesByAccountId.get(identity.accountId) ?? []),
+          identity,
+        ]);
+      }
 
       return {
         accounts: accounts.map((account) => ({
           ...adminAccount(account),
           guardian: account.guardianId ? guardianById.get(account.guardianId) : undefined,
           teacher: account.teacherId ? teacherById.get(account.teacherId) : undefined,
+          wechatIdentities: wechatIdentitiesByAccountId.get(account.id) ?? [],
         })),
       };
     });
@@ -445,9 +455,17 @@ export const authModule: AppModule = {
       }
 
       const guardianId =
-        nextRole === 'parent' ? (body.guardianId === undefined ? current.guardianId : body.guardianId) : null;
+        nextRole === 'parent'
+          ? body.guardianId === undefined
+            ? current.guardianId
+            : body.guardianId
+          : null;
       const teacherId =
-        nextRole === 'teacher' ? (body.teacherId === undefined ? current.teacherId : body.teacherId) : null;
+        nextRole === 'teacher'
+          ? body.teacherId === undefined
+            ? current.teacherId
+            : body.teacherId
+          : null;
 
       await ensureUniqueIdentifiers({ email, phone, ignoreAccountId: accountId });
       await validateProfileLinks({ role: nextRole, guardianId, teacherId });
@@ -465,19 +483,23 @@ export const authModule: AppModule = {
       return { account: adminAccount(updated!) };
     });
 
-    app.post('/v1/accounts/:accountId/reset-password', { preHandler: app.requireAdmin }, async (request) => {
-      const { accountId } = request.params as { accountId: string };
-      const account = await accountsRepo.findById(app.db, accountId);
-      if (!account) {
-        throw httpError(404, '账号不存在');
-      }
-      const defaultPassword = generateDefaultPassword(account.phone);
-      const updated = await accountsRepo.updateAccount(app.db, accountId, {
-        passwordHash: hashPassword(defaultPassword),
-        mustChangePassword: true,
-      });
-      return { account: adminAccount(updated!), defaultPassword };
-    });
+    app.post(
+      '/v1/accounts/:accountId/reset-password',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { accountId } = request.params as { accountId: string };
+        const account = await accountsRepo.findById(app.db, accountId);
+        if (!account) {
+          throw httpError(404, '账号不存在');
+        }
+        const defaultPassword = generateDefaultPassword(account.phone);
+        const updated = await accountsRepo.updateAccount(app.db, accountId, {
+          passwordHash: hashPassword(defaultPassword),
+          mustChangePassword: true,
+        });
+        return { account: adminAccount(updated!), defaultPassword };
+      },
+    );
 
     app.delete('/v1/accounts/:accountId', { preHandler: app.requireAdmin }, async (request) => {
       const { accountId } = request.params as { accountId: string };
@@ -490,6 +512,29 @@ export const authModule: AppModule = {
       }
       return { account: adminAccount(account) };
     });
+
+    app.delete(
+      '/v1/accounts/:accountId/wechat-identities/:identityId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { accountId, identityId } = request.params as {
+          accountId: string;
+          identityId: string;
+        };
+        const account = await accountsRepo.findById(app.db, accountId);
+        if (!account) {
+          throw httpError(404, '账号不存在');
+        }
+        const identity = await accountsRepo.deleteWechatIdentityForAccount(app.db, {
+          accountId,
+          identityId,
+        });
+        if (!identity) {
+          throw httpError(404, '微信绑定不存在');
+        }
+        return { identity };
+      },
+    );
 
     // --- Parent self-registration ---
 
@@ -537,24 +582,20 @@ export const authModule: AppModule = {
 
     // --- Email verification ---
 
-    app.post(
-      '/auth/resend-verification',
-      { preHandler: app.authenticate },
-      async (request) => {
-        const account = await accountsRepo.findById(app.db, request.account!.id);
-        if (!account) {
-          throw httpError(404, 'Account not found');
-        }
-        if (account.emailVerifiedAt) {
-          return { sent: false, alreadyVerified: true };
-        }
-        if (!account.email) {
-          throw httpError(400, '该账号未绑定邮箱');
-        }
-        const result = await sendCode(account, 'email_verify');
-        return { sent: result.sent };
-      },
-    );
+    app.post('/auth/resend-verification', { preHandler: app.authenticate }, async (request) => {
+      const account = await accountsRepo.findById(app.db, request.account!.id);
+      if (!account) {
+        throw httpError(404, 'Account not found');
+      }
+      if (account.emailVerifiedAt) {
+        return { sent: false, alreadyVerified: true };
+      }
+      if (!account.email) {
+        throw httpError(400, '该账号未绑定邮箱');
+      }
+      const result = await sendCode(account, 'email_verify');
+      return { sent: result.sent };
+    });
 
     app.post('/auth/verify-email', { preHandler: app.authenticate }, async (request) => {
       const body = verifyEmailSchema.parse(request.body);

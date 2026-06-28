@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Trash2, Unlink } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Account, AccountRole, Guardian, Teacher } from '@/api/types';
@@ -70,10 +70,7 @@ function buildPayload(form: AccountForm, includePassword: boolean) {
 
 export function AccountsPage() {
   const toast = useToast();
-  const { data: accounts, setData: setAccounts } = useApiResource<Account>(
-    ACCOUNTS(),
-    'accounts',
-  );
+  const { data: accounts, setData: setAccounts } = useApiResource<Account>(ACCOUNTS(), 'accounts');
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
   const { data: guardians } = useApiResource<Guardian>('/v1/guardians', 'guardians');
 
@@ -83,6 +80,7 @@ export function AccountsPage() {
   const [saving, setSaving] = useState(false);
   const [defaultPassword, setDefaultPassword] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [unbindingWechatId, setUnbindingWechatId] = useState<string>('');
 
   const teacherOptions = useMemo(
     () => teachers.filter((teacher) => teacher.status !== 'archived'),
@@ -161,6 +159,32 @@ export function AccountsPage() {
     }
   }
 
+  async function unbindWechat(account: Account) {
+    const identity = account.wechatIdentities?.[0];
+    if (!identity) return;
+    setUnbindingWechatId(identity.id);
+    try {
+      await apiDelete(`/v1/accounts/${account.id}/wechat-identities/${identity.id}`);
+      setAccounts(
+        accounts.map((item) =>
+          item.id === account.id
+            ? {
+                ...item,
+                wechatIdentities: (item.wechatIdentities ?? []).filter(
+                  (wechatIdentity) => wechatIdentity.id !== identity.id,
+                ),
+              }
+            : item,
+        ),
+      );
+      toast.success('微信绑定已解绑');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '解绑失败');
+    } finally {
+      setUnbindingWechatId('');
+    }
+  }
+
   async function deleteAccount() {
     if (!deleteTarget) return;
     try {
@@ -201,7 +225,7 @@ export function AccountsPage() {
             header: '关联档案',
             cell: (row) =>
               row.role === 'teacher'
-                ? row.teacher?.name ?? '-'
+                ? (row.teacher?.name ?? '-')
                 : row.role === 'parent'
                   ? row.guardian
                     ? `${row.guardian.name} · ${row.guardian.phone}`
@@ -217,6 +241,21 @@ export function AccountsPage() {
             key: 'password',
             header: '首登改密',
             cell: (row) => (row.mustChangePassword ? '是' : '否'),
+          },
+          {
+            key: 'wechat',
+            header: '微信绑定',
+            cell: (row) => {
+              const identity = row.wechatIdentities?.[0];
+              return identity ? (
+                <div className="cell-stack">
+                  <span className="cell-title">已绑定</span>
+                  <span className="cell-subtitle">openid: {identity.openid.slice(-8)}</span>
+                </div>
+              ) : (
+                '未绑定'
+              );
+            },
           },
           {
             key: 'actions',
@@ -239,6 +278,17 @@ export function AccountsPage() {
                   <KeyRound className="h-3.5 w-3.5" />
                   重置
                 </button>
+                {row.wechatIdentities?.length ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    disabled={unbindingWechatId === row.wechatIdentities[0].id}
+                    onClick={() => unbindWechat(row)}
+                  >
+                    <Unlink className="h-3.5 w-3.5" />
+                    解绑微信
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="btn btn-ghost px-2 py-1 text-red-600"
@@ -280,9 +330,7 @@ export function AccountsPage() {
             <select
               className="form-input"
               value={form.role}
-              onChange={(event) =>
-                setForm({ ...form, role: event.target.value as AccountRole })
-              }
+              onChange={(event) => setForm({ ...form, role: event.target.value as AccountRole })}
             >
               <option value="admin">管理员</option>
               <option value="teacher">老师</option>
