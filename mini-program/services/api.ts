@@ -656,6 +656,13 @@ export interface TeacherRosterStudent {
   grade: string;
 }
 
+export interface TeacherSessionAttendance {
+  session: TeacherClassSession;
+  class: { id: string; name: string } | null;
+  roster: TeacherRosterStudent[];
+  attendanceRecords: SessionAttendanceRecord[];
+}
+
 export interface TeacherCalendarEvent {
   id: string;
   type: 'class_session';
@@ -1116,4 +1123,43 @@ export async function fetchTeacherLessonFeedbacks(): Promise<TeacherLessonFeedba
   return (
     await request<{ lessonFeedbacks: TeacherLessonFeedback[] }>('/public/teacher/lesson-feedbacks')
   ).lessonFeedbacks;
+}
+
+export function fetchTeacherSessionAttendance(
+  sessionId: string,
+): Promise<TeacherSessionAttendance> {
+  return request(`/public/teacher/sessions/${encodeURIComponent(sessionId)}/attendance`);
+}
+
+export function recordTeacherAttendance(
+  sessionId: string,
+  records: Array<{ studentId: string; status: AttendanceStatus; note?: string }>,
+): Promise<{ attendanceRecords: SessionAttendanceRecord[] }> {
+  return request(`/public/teacher/sessions/${encodeURIComponent(sessionId)}/attendance`, {
+    method: 'POST',
+    data: { records },
+  });
+}
+
+export function saveTeacherSessionFeedbacks(
+  sessionId: string,
+  items: Array<{ studentId: string; content: string; imageUrls?: string[] }>,
+): Promise<{ lessonFeedbacks: TeacherLessonFeedback[] }> {
+  return request(`/public/teacher/sessions/${encodeURIComponent(sessionId)}/feedbacks`, {
+    method: 'POST',
+    data: { items },
+  });
+}
+
+export function reviewTeacherHomeworkCheckIn(
+  homeworkCheckInId: string,
+  input: { reviewStatus: 'reviewed' | 'needs_revision'; teacherFeedback: string },
+): Promise<{ homeworkCheckIn: TeacherHomeworkCheckIn }> {
+  return request(
+    `/public/teacher/homework-check-ins/${encodeURIComponent(homeworkCheckInId)}/review`,
+    {
+      method: 'POST',
+      data: input,
+    },
+  );
 }

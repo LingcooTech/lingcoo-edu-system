@@ -3,15 +3,23 @@ import {
   fetchTeacherDashboard,
   fetchTeacherHomeworkCheckIns,
   fetchTeacherLessonFeedbacks,
+  fetchTeacherSessionAttendance,
+  recordTeacherAttendance,
+  reviewTeacherHomeworkCheckIn,
+  saveTeacherSessionFeedbacks,
+  type AttendanceStatus,
+  type SessionAttendanceRecord,
   type TeacherCalendarEvent,
   type TeacherClass,
   type TeacherHomeworkCheckIn,
   type TeacherLessonFeedback,
+  type TeacherRosterStudent,
 } from '../../services/api';
 
 type ActiveView = 'schedule' | 'classes' | 'students' | 'feedbacks' | 'homework';
 type MetricScope = 'today' | 'week';
 type MiniTapEvent = { currentTarget: { dataset: Record<string, string | undefined> } };
+type MiniInputEvent = { currentTarget: { dataset: Record<string, string | undefined> }; detail: { value: string } };
 
 interface StudentRow {
   id: string;
@@ -21,6 +29,31 @@ interface StudentRow {
   classes: string[];
   balances: Array<{ courseName: string; balance: string }>;
 }
+
+interface RollCallRow extends TeacherRosterStudent {
+  recorded: boolean;
+  recordedStatus: AttendanceStatus | '';
+  draftStatus: AttendanceStatus;
+  statusLabel: string;
+}
+
+interface FeedbackRow extends TeacherRosterStudent {
+  content: string;
+  imageUrls: string[];
+}
+
+type SheetSession = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  dateLabel: string;
+  timeLabel: string;
+  title: string;
+  status: string;
+  className: string;
+  courseName: string;
+  classroomName: string;
+};
 
 const VIEW_TABS: Array<{ key: ActiveView; label: string }> = [
   { key: 'schedule', label: '课表' },
@@ -47,6 +80,24 @@ const HOMEWORK_STATUS_LABEL: Record<string, string> = {
   submitted: '待批阅',
   reviewed: '已批阅',
   needs_revision: '需订正',
+};
+
+const ATTENDANCE_STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
+  { value: 'present', label: '到课' },
+  { value: 'late', label: '迟到' },
+  { value: 'leave', label: '请假' },
+  { value: 'absent', label: '缺勤' },
+  { value: 'makeup', label: '补课' },
+  { value: 'trial', label: '试听' },
+];
+
+const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
+  present: '到课',
+  late: '迟到',
+  leave: '请假',
+  absent: '缺勤',
+  makeup: '补课',
+  trial: '试听',
 };
 
 function addDays(date: Date, days: number) {
@@ -103,6 +154,35 @@ function formatDateTime(value: string) {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(
     date.getMinutes(),
   )}`;
+}
+
+function formatSheetSession(event: TeacherCalendarEvent): SheetSession {
+  return {
+    id: event.id,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    dateLabel: dateLabel(event.startsAt),
+    timeLabel: timeRange(event.startsAt, event.endsAt),
+    title: event.title || '上课内容',
+    status: event.status,
+    className: event.class?.name || '班级',
+    courseName: event.course?.name || '课程',
+    classroomName: event.classroom?.name || '教室待确认',
+  };
+}
+
+function countStatuses(rows: RollCallRow[]) {
+  return rows.reduce(
+    (acc, row) => {
+      const status = row.recordedStatus || row.draftStatus;
+      acc[status] = (acc[status] ?? 0) + 1;
+      return acc;
+    },
+    { present: 0, late: 0, leave: 0, absent: 0, makeup: 0, trial: 0 } as Record<
+      AttendanceStatus,
+      number
+    >,
+  );
 }
 
 function calendarRange(days = 30) {
@@ -192,6 +272,34 @@ Page({
     >,
     calendarEvents: [] as TeacherCalendarEvent[],
     lessonFeedbacks: [] as TeacherLessonFeedback[],
+    attendanceStatusOptions: ATTENDANCE_STATUS_OPTIONS,
+    rollCallVisible: false,
+    rollCallLoading: false,
+    rollCallSaving: false,
+    rollCallError: '',
+    rollCallSession: null as SheetSession | null,
+    rollCallRows: [] as RollCallRow[],
+    rollCallSummary: { present: 0, late: 0, leave: 0, absent: 0, makeup: 0, trial: 0 },
+    feedbackVisible: false,
+    feedbackLoading: false,
+    feedbackSaving: false,
+    feedbackError: '',
+    feedbackSession: null as SheetSession | null,
+    feedbackRows: [] as FeedbackRow[],
+    reviewVisible: false,
+    reviewSaving: false,
+    reviewError: '',
+    reviewTarget: null as
+      | (TeacherHomeworkCheckIn & {
+          statusLabel: string;
+          dateLabel: string;
+          studentName: string;
+          courseName: string;
+          className: string;
+        })
+      | null,
+    reviewStatus: 'reviewed' as 'reviewed' | 'needs_revision',
+    teacherFeedback: '',
   },
 
   onLoad() {
@@ -363,11 +471,228 @@ Page({
     this.recompute();
   },
 
-  openRollCall() {
-    wx.showToast({ title: '请在 Web 老师端完成点名', icon: 'none' });
+  findCalendarEvent(id: string) {
+    return (this.data.calendarEvents as TeacherCalendarEvent[]).find((event) => event.id === id);
   },
 
-  openFeedback() {
-    wx.showToast({ title: '请在 Web 老师端填写点评', icon: 'none' });
+  async openRollCall(event: MiniTapEvent) {
+    const sessionId = String(event.currentTarget.dataset.id || '');
+    const calendarEvent = this.findCalendarEvent(sessionId);
+    if (!calendarEvent) return;
+    this.setData({
+      rollCallVisible: true,
+      rollCallLoading: true,
+      rollCallSaving: false,
+      rollCallError: '',
+      rollCallSession: formatSheetSession(calendarEvent),
+      rollCallRows: [],
+    });
+    try {
+      const payload = await fetchTeacherSessionAttendance(sessionId);
+      const recordByStudentId = new Map<string, SessionAttendanceRecord>(
+        payload.attendanceRecords.map((record) => [record.studentId, record]),
+      );
+      const rows = payload.roster.map((student) => {
+        const record = recordByStudentId.get(student.id);
+        const recordedStatus: AttendanceStatus | '' = record?.status ?? '';
+        const draftStatus = (recordedStatus || 'present') as AttendanceStatus;
+        return {
+          ...student,
+          recorded: Boolean(record),
+          recordedStatus,
+          draftStatus,
+          statusLabel: record ? ATTENDANCE_STATUS_LABEL[record.status] : '待点名',
+        };
+      });
+      this.setData({
+        rollCallRows: rows,
+        rollCallSummary: countStatuses(rows),
+      });
+    } catch (error) {
+      this.setData({ rollCallError: error instanceof Error ? error.message : '花名册加载失败' });
+    } finally {
+      this.setData({ rollCallLoading: false });
+    }
+  },
+
+  selectRollCallStatus(event: MiniTapEvent) {
+    const studentId = String(event.currentTarget.dataset.id || '');
+    const status = event.currentTarget.dataset.status as AttendanceStatus;
+    if (!studentId || !status) return;
+    const rows = (this.data.rollCallRows as RollCallRow[]).map((row) =>
+      row.id === studentId && !row.recorded ? { ...row, draftStatus: status } : row,
+    );
+    this.setData({
+      rollCallRows: rows,
+      rollCallSummary: countStatuses(rows),
+    });
+  },
+
+  async submitRollCall() {
+    const session = this.data.rollCallSession as SheetSession | null;
+    if (!session) return;
+    const rows = this.data.rollCallRows as RollCallRow[];
+    const records = rows
+      .filter((row) => !row.recorded)
+      .map((row) => ({ studentId: row.id, status: row.draftStatus }));
+    if (records.length === 0) {
+      wx.showToast({ title: '已完成点名', icon: 'none' });
+      return;
+    }
+    this.setData({ rollCallSaving: true, rollCallError: '' });
+    try {
+      await recordTeacherAttendance(session.id, records);
+      wx.showToast({ title: '点名已保存', icon: 'success' });
+      this.setData({ rollCallVisible: false });
+      await this.reload();
+    } catch (error) {
+      this.setData({ rollCallError: error instanceof Error ? error.message : '点名保存失败' });
+    } finally {
+      this.setData({ rollCallSaving: false });
+    }
+  },
+
+  async openFeedback(event: MiniTapEvent) {
+    const sessionId = String(event.currentTarget.dataset.id || '');
+    const calendarEvent = this.findCalendarEvent(sessionId);
+    if (!calendarEvent) return;
+    this.setData({
+      feedbackVisible: true,
+      feedbackLoading: true,
+      feedbackSaving: false,
+      feedbackError: '',
+      feedbackSession: formatSheetSession(calendarEvent),
+      feedbackRows: [],
+    });
+    try {
+      const payload = await fetchTeacherSessionAttendance(sessionId);
+      const feedbackByStudentId = new Map(
+        (this.data.lessonFeedbacks as TeacherLessonFeedback[])
+          .filter((item) => item.classSessionId === sessionId)
+          .map((item) => [item.studentId, item]),
+      );
+      this.setData({
+        feedbackRows: payload.roster.map((student) => ({
+          ...student,
+          content: feedbackByStudentId.get(student.id)?.content ?? '',
+          imageUrls: feedbackByStudentId.get(student.id)?.imageUrls ?? [],
+        })),
+      });
+    } catch (error) {
+      this.setData({ feedbackError: error instanceof Error ? error.message : '点评名单加载失败' });
+    } finally {
+      this.setData({ feedbackLoading: false });
+    }
+  },
+
+  updateFeedbackContent(event: MiniInputEvent) {
+    const studentId = String(event.currentTarget.dataset.id || '');
+    const value = event.detail.value;
+    const rows = (this.data.feedbackRows as FeedbackRow[]).map((row) =>
+      row.id === studentId ? { ...row, content: value } : row,
+    );
+    this.setData({ feedbackRows: rows });
+  },
+
+  async submitFeedback() {
+    const session = this.data.feedbackSession as SheetSession | null;
+    if (!session) return;
+    const items = (this.data.feedbackRows as FeedbackRow[])
+      .map((row) => ({ studentId: row.id, content: row.content.trim(), imageUrls: row.imageUrls }))
+      .filter((item) => item.content);
+    if (items.length === 0) {
+      this.setData({ feedbackError: '请至少填写一位学员的点评内容' });
+      return;
+    }
+    this.setData({ feedbackSaving: true, feedbackError: '' });
+    try {
+      await saveTeacherSessionFeedbacks(session.id, items);
+      wx.showToast({ title: '点评已保存', icon: 'success' });
+      this.setData({ feedbackVisible: false });
+      await this.reload();
+    } catch (error) {
+      this.setData({ feedbackError: error instanceof Error ? error.message : '点评保存失败' });
+    } finally {
+      this.setData({ feedbackSaving: false });
+    }
+  },
+
+  openReview(event: MiniTapEvent) {
+    const id = String(event.currentTarget.dataset.id || '');
+    const target = (
+      this.data.homeworkCheckIns as Array<NonNullable<typeof this.data.reviewTarget>>
+    ).find((item) => item.id === id);
+    if (!target) return;
+    this.setData({
+      reviewVisible: true,
+      reviewSaving: false,
+      reviewError: '',
+      reviewTarget: target,
+      reviewStatus: target.reviewStatus === 'needs_revision' ? 'needs_revision' : 'reviewed',
+      teacherFeedback: target.teacherFeedback ?? '',
+    });
+  },
+
+  selectReviewStatus(event: MiniTapEvent) {
+    const status = event.currentTarget.dataset.status;
+    if (status === 'reviewed' || status === 'needs_revision') {
+      this.setData({ reviewStatus: status });
+    }
+  },
+
+  updateTeacherFeedback(event: { detail: { value: string } }) {
+    this.setData({ teacherFeedback: event.detail.value });
+  },
+
+  previewImage(event: MiniTapEvent) {
+    const current = String(event.currentTarget.dataset.url || '');
+    if (!current) return;
+    const homeworkImages = (this.data.homeworkCheckIns as TeacherHomeworkCheckIn[]).flatMap(
+      (item) => item.imageUrls ?? [],
+    );
+    const feedbackImages = (this.data.feedbackRows as FeedbackRow[]).flatMap(
+      (item) => item.imageUrls ?? [],
+    );
+    const reviewImages = this.data.reviewTarget?.imageUrls ?? [];
+    const urls = Array.from(new Set([...homeworkImages, ...feedbackImages, ...reviewImages]));
+    wx.previewImage({ current, urls: urls.length ? urls : [current] });
+  },
+
+  async submitReview() {
+    const target = this.data.reviewTarget;
+    if (!target) return;
+    this.setData({ reviewSaving: true, reviewError: '' });
+    try {
+      await reviewTeacherHomeworkCheckIn(target.id, {
+        reviewStatus: this.data.reviewStatus,
+        teacherFeedback: String(this.data.teacherFeedback || '').trim(),
+      });
+      wx.showToast({ title: '批阅已保存', icon: 'success' });
+      this.setData({ reviewVisible: false });
+      await this.reload();
+    } catch (error) {
+      this.setData({ reviewError: error instanceof Error ? error.message : '批阅保存失败' });
+    } finally {
+      this.setData({ reviewSaving: false });
+    }
+  },
+
+  closeRollCall() {
+    if (this.data.rollCallSaving) return;
+    this.setData({ rollCallVisible: false });
+  },
+
+  closeFeedback() {
+    if (this.data.feedbackSaving) return;
+    this.setData({ feedbackVisible: false });
+  },
+
+  closeReview() {
+    if (this.data.reviewSaving) return;
+    this.setData({ reviewVisible: false });
+  },
+
+  noop() {
+    return;
   },
 });

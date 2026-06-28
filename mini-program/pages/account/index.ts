@@ -72,6 +72,8 @@ type QuickGroup = {
   entries: QuickEntry[];
 };
 
+type PhoneAuthEvent = { detail: { code?: string; errMsg?: string } };
+
 function nextThirtyDays() {
   const from = new Date();
   const to = new Date(from.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -368,8 +370,8 @@ Page({
     });
   },
 
-  onWechatLogin() {
-    this.setData({ loginSheetVisible: true });
+  async completeLogin(phoneCode?: string) {
+    if (this.data.loading || this.data.binding) return;
     this.setData({ loading: true });
     wx.login({
       success: async (result) => {
@@ -379,21 +381,26 @@ Page({
             setToken(payload.token);
             if (payload.account.role === 'teacher') {
               this.applyAccount(payload.account);
-              this.setData({ defaultPassword: '', loginSheetVisible: false });
+              this.setData({ defaultPassword: '', bindToken: '', loginSheetVisible: false });
               this.updateTabBadge(0);
               wx.showToast({ title: '登录成功', icon: 'success' });
               return;
             }
             this.applyAccount(payload.account);
-            this.setData({ defaultPassword: '', loginSheetVisible: false });
+            this.setData({ defaultPassword: '', bindToken: '', loginSheetVisible: false });
             await this.loadSummary();
             wx.showToast({ title: '登录成功', icon: 'success' });
-          } else {
-            clearToken();
-            this.resetAccountState();
-            this.setData({ bindToken: payload.bindToken, loginSheetVisible: true });
-            wx.showToast({ title: '请绑定手机号', icon: 'none' });
+            return;
           }
+
+          clearToken();
+          if (phoneCode) {
+            await this.bindPhoneWithToken(payload.bindToken, { phoneCode });
+            return;
+          }
+          this.resetAccountState();
+          this.setData({ bindToken: payload.bindToken, loginSheetVisible: true });
+          wx.showToast({ title: '请授权手机号完成登录', icon: 'none' });
         } catch (error) {
           wx.showToast({
             title: error instanceof Error ? error.message : '登录失败',
@@ -410,6 +417,14 @@ Page({
       });
   },
 
+  onWechatLogin(event?: PhoneAuthEvent) {
+    const phoneCode = event?.detail?.code;
+    if (event?.detail?.errMsg && !phoneCode) {
+      wx.showToast({ title: '将尝试使用已绑定微信登录', icon: 'none' });
+    }
+    this.completeLogin(phoneCode);
+  },
+
   openLoginSheet() {
     this.setData({ loginSheetVisible: true });
   },
@@ -423,8 +438,10 @@ Page({
     return;
   },
 
-  async bindPhone(input: { phone?: string; phoneCode?: string; displayName?: string }) {
-    const bindToken = this.data.bindToken;
+  async bindPhoneWithToken(
+    bindToken: string,
+    input: { phoneCode?: string; displayName?: string },
+  ) {
     if (!bindToken) {
       wx.showToast({ title: '请先微信登录', icon: 'none' });
       return;
@@ -456,23 +473,17 @@ Page({
     }
   },
 
-  onPhoneAuth(event: { detail: { code?: string; errMsg?: string } }) {
+  async bindPhone(input: { phoneCode?: string; displayName?: string }) {
+    await this.bindPhoneWithToken(this.data.bindToken, input);
+  },
+
+  onPhoneAuth(event: PhoneAuthEvent) {
     const code = event.detail.code;
     if (!code) {
       wx.showToast({ title: event.detail.errMsg || '未授权手机号', icon: 'none' });
       return;
     }
     this.bindPhone({ phoneCode: code });
-  },
-
-  async onBindSubmit(event: { detail: { value: { phone?: string; displayName?: string } } }) {
-    const phone = (event.detail.value.phone || '').trim();
-    const displayName = (event.detail.value.displayName || '').trim();
-    if (!phone) {
-      wx.showToast({ title: '请输入手机号', icon: 'none' });
-      return;
-    }
-    await this.bindPhone({ phone, displayName: displayName || undefined });
   },
 
   async onLogout() {

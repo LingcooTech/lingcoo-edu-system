@@ -192,50 +192,32 @@
       <view class="guest-avatar">我</view>
       <view class="guest-title">微信登录</view>
       <view class="guest-desc">登录后自动识别家长或老师身份，进入对应工作台。</view>
-      <button class="btn btn-primary login-button" bindtap="openLoginSheet">微信登录</button>
+      <button
+        class="btn btn-primary login-button"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onWechatLogin"
+        loading="{{loading}}"
+        disabled="{{loading || binding}}"
+      >
+        {{loading || binding ? '登录中...' : '微信登录'}}
+      </button>
     </view>
   </block>
 
   <view wx:if="{{loginSheetVisible}}" class="sheet-mask" bindtap="closeLoginSheet">
     <view class="login-sheet" catchtap="noop">
       <view class="sheet-handle"></view>
-      <view class="sheet-title">{{bindToken ? '绑定手机号' : '微信登录'}}</view>
-      <view class="sheet-desc">
-        {{bindToken ? '授权手机号后，将自动匹配家长中心或老师工作台。' : '登录后可进入家长中心或老师工作台。'}}
-      </view>
-      <button
-        wx:if="{{!bindToken}}"
-        class="btn btn-primary login-button"
-        loading="{{loading}}"
-        disabled="{{loading}}"
-        bindtap="onWechatLogin"
-      >
-        {{loading ? '登录中...' : '微信登录'}}
-      </button>
-      <form wx:else bindsubmit="onBindSubmit">
+      <view class="sheet-title">授权手机号</view>
+      <view class="sheet-desc">当前微信还未绑定账号，授权手机号后将自动进入家长中心或老师工作台。</view>
       <button
         class="btn btn-primary bind-button"
         open-type="getPhoneNumber"
         bindgetphonenumber="onPhoneAuth"
         loading="{{binding}}"
-        disabled="{{binding}}"
+        disabled="{{binding || loading}}"
       >
-        微信授权手机号
+        {{binding ? '授权中...' : '授权手机号并登录'}}
       </button>
-      <view class="test-divider">无法授权时手动绑定</view>
-      <view class="form-gap">
-        <input class="form-field" name="phone" type="number" placeholder="手机号" />
-        <input class="form-field" name="displayName" placeholder="家长称呼（选填）" />
-      </view>
-      <button
-        class="btn btn-outline bind-button"
-        form-type="submit"
-        loading="{{binding}}"
-        disabled="{{binding}}"
-      >
-        {{binding ? '绑定中...' : '手动绑定'}}
-      </button>
-      </form>
       <button class="sheet-close" bindtap="closeLoginSheet">稍后再说</button>
     </view>
   </view>
