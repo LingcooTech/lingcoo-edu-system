@@ -201,11 +201,11 @@
           </view>
           <view class="session-foot">
             <view class="card-meta">{{item.classroomName}}</view>
-          <button class="mini-button" data-id="{{item.id}}" catchtap="openFeedback">做互动</button>
+            <button class="mini-button" data-id="{{item.id}}" catchtap="openFeedback">做互动</button>
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无可点评课次。</view>
+      <view wx:else class="card empty-card">暂无历史互动课次。</view>
     </block>
 
     <block wx:else>

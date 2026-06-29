@@ -432,6 +432,7 @@
 }
 
 .guest-avatar-icon {
+  position: relative;
   display: flex;
   width: 76rpx;
   height: 76rpx;
@@ -440,8 +441,26 @@
   border-radius: 999rpx;
   background: #d3a67c;
   color: #fff;
-  font-size: 34rpx;
-  font-weight: 900;
+}
+
+.guest-avatar-icon::before {
+  position: absolute;
+  top: 14rpx;
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  content: '';
+}
+
+.guest-avatar-icon::after {
+  position: absolute;
+  bottom: 12rpx;
+  width: 48rpx;
+  height: 26rpx;
+  border-radius: 28rpx 28rpx 12rpx 12rpx;
+  background: #fff;
+  content: '';
 }
 
 .guest-state {
@@ -460,7 +479,7 @@
   margin-top: 24rpx;
   color: #211f1c;
   font-size: 40rpx;
-  font-weight: 900;
+  font-weight: 500;
   line-height: 1.25;
 }
 
@@ -478,6 +497,40 @@
   margin-top: 30rpx;
   background: #a9704c;
   box-shadow: 0 12rpx 28rpx rgba(154, 106, 75, 0.22);
+}
+
+.wechat-login-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.wechat-login-icon {
+  position: relative;
+  width: 38rpx;
+  height: 32rpx;
+  border-radius: 20rpx;
+  background: #fff;
+}
+
+.wechat-login-icon::before,
+.wechat-login-icon::after {
+  position: absolute;
+  top: 13rpx;
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: #a9704c;
+  content: '';
+}
+
+.wechat-login-icon::before {
+  left: 10rpx;
+}
+
+.wechat-login-icon::after {
+  right: 10rpx;
 }
 
 .guest-panel {
@@ -504,6 +557,7 @@
 }
 
 .guest-title-icon {
+  position: relative;
   display: flex;
   width: 42rpx;
   height: 42rpx;
@@ -512,13 +566,52 @@
   border-radius: 14rpx;
   background: #f7e8dc;
   color: #c46f2e;
-  font-size: 22rpx;
-  font-weight: 900;
 }
 
 .guest-title-icon.teacher {
   background: #f1e9e1;
   color: #9a6a4b;
+}
+
+.guest-title-icon::before,
+.guest-title-icon::after,
+.guest-tool-icon::before,
+.guest-tool-icon::after {
+  position: absolute;
+  box-sizing: border-box;
+  content: '';
+}
+
+.guest-title-icon-parent::before {
+  width: 20rpx;
+  height: 18rpx;
+  border: 4rpx solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 4rpx 4rpx;
+  transform: translateY(5rpx);
+}
+
+.guest-title-icon-parent::after {
+  width: 22rpx;
+  height: 22rpx;
+  border-left: 4rpx solid currentColor;
+  border-top: 4rpx solid currentColor;
+  transform: translateY(-4rpx) rotate(45deg);
+}
+
+.guest-title-icon-teacher::before {
+  width: 24rpx;
+  height: 16rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 4rpx;
+}
+
+.guest-title-icon-teacher::after {
+  width: 16rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  transform: translateY(13rpx);
 }
 
 .guest-grid {
@@ -540,6 +633,7 @@
 }
 
 .guest-tool-icon {
+  position: relative;
   display: flex;
   width: 64rpx;
   height: 64rpx;
@@ -548,8 +642,6 @@
   justify-content: center;
   border-radius: 999rpx;
   color: #fff;
-  font-size: 25rpx;
-  font-weight: 900;
 }
 
 .guest-tool-icon.warm {
@@ -570,6 +662,128 @@
 
 .guest-tool-icon.yellow {
   background: #e9bd49;
+}
+
+.icon-calendar::before,
+.icon-calendar-check::before {
+  width: 30rpx;
+  height: 32rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 6rpx;
+}
+
+.icon-calendar::after,
+.icon-calendar-check::after {
+  width: 22rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  transform: translateY(-9rpx);
+}
+
+.icon-calendar-check::after {
+  width: 16rpx;
+  height: 9rpx;
+  border-left: 4rpx solid currentColor;
+  border-bottom: 4rpx solid currentColor;
+  background: transparent;
+  transform: translateY(5rpx) rotate(-45deg);
+}
+
+.icon-clock::before {
+  width: 34rpx;
+  height: 34rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 999rpx;
+}
+
+.icon-clock::after {
+  width: 13rpx;
+  height: 13rpx;
+  border-left: 4rpx solid currentColor;
+  border-bottom: 4rpx solid currentColor;
+  transform: translate(4rpx, -2rpx);
+}
+
+.icon-headset::before {
+  width: 36rpx;
+  height: 30rpx;
+  border: 4rpx solid currentColor;
+  border-bottom: 0;
+  border-radius: 22rpx 22rpx 0 0;
+}
+
+.icon-headset::after {
+  width: 40rpx;
+  height: 18rpx;
+  border-left: 7rpx solid currentColor;
+  border-right: 7rpx solid currentColor;
+  transform: translateY(10rpx);
+}
+
+.icon-message::before {
+  width: 36rpx;
+  height: 28rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 10rpx;
+}
+
+.icon-message::after {
+  width: 10rpx;
+  height: 10rpx;
+  border-right: 4rpx solid currentColor;
+  border-bottom: 4rpx solid currentColor;
+  transform: translate(10rpx, 14rpx) rotate(45deg);
+}
+
+.icon-users::before {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  box-shadow: -14rpx 8rpx 0 -3rpx currentColor, 14rpx 8rpx 0 -3rpx currentColor;
+  transform: translateY(-11rpx);
+}
+
+.icon-users::after {
+  width: 38rpx;
+  height: 20rpx;
+  border-radius: 20rpx 20rpx 8rpx 8rpx;
+  background: currentColor;
+  transform: translateY(13rpx);
+}
+
+.icon-check::before {
+  width: 36rpx;
+  height: 30rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 8rpx;
+}
+
+.icon-check::after {
+  width: 18rpx;
+  height: 10rpx;
+  border-left: 5rpx solid currentColor;
+  border-bottom: 5rpx solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.icon-star::before {
+  width: 0;
+  height: 0;
+  border-right: 15rpx solid transparent;
+  border-bottom: 28rpx solid currentColor;
+  border-left: 15rpx solid transparent;
+  transform: translateY(-4rpx);
+}
+
+.icon-star::after {
+  width: 0;
+  height: 0;
+  border-right: 15rpx solid transparent;
+  border-bottom: 28rpx solid currentColor;
+  border-left: 15rpx solid transparent;
+  transform: translateY(4rpx) rotate(72deg);
 }
 
 .guest-tool-title {

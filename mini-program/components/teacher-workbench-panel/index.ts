@@ -211,7 +211,7 @@ function countStatuses(rows: RollCallRow[]) {
 }
 
 function calendarRange() {
-  const from = addDays(startOfMonth(new Date()), -42);
+  const from = addDays(startOfMonth(new Date()), -365);
   const to = addMonths(startOfMonth(new Date()), 3);
   to.setHours(23, 59, 59, 999);
   return { from: from.toISOString(), to: to.toISOString() };
@@ -538,9 +538,9 @@ Component({
         };
       }),
       feedbackEvents: calendarEvents
-        .filter((event) => event.status !== 'cancelled')
+        .filter((event) => event.status !== 'cancelled' && new Date(event.startsAt) <= new Date())
         .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-        .slice(0, 10)
+        .slice(0, 30)
         .map((event) => ({
           ...normalizeEvent(event),
           feedbackCount: feedbackCountBySession.get(event.id) ?? 0,
