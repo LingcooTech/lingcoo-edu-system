@@ -318,6 +318,7 @@ export interface ParentSeatReservation extends SeatReservation {
 export interface CreateOrderInput {
   packageId: string;
   courseId?: string;
+  studentId?: string;
   guardianName?: string;
   guardianPhone?: string;
   phoneCode?: string;

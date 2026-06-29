@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import * as crmRepo from '../../db/repositories/crm.js';
@@ -28,6 +28,7 @@ const createOrderSchema = z
   .object({
     packageId: z.string().uuid(),
     courseId: z.string().uuid().optional(),
+    studentId: z.string().uuid().optional(),
     guardianName: z.string().min(1).max(120).optional(),
     guardianPhone: z.string().min(6).max(40).optional(),
     phoneCode: z.string().min(1).optional(),
@@ -163,33 +164,76 @@ export const paymentModule: AppModule = {
               .returning()
           )[0];
 
-        const studentName = body.studentName?.trim();
-        const student = studentName
-          ? ((
-              await tx
-                .select()
-                .from(schema.students)
-                .where(
-                  and(
-                    eq(schema.students.guardianId, guardian.id),
-                    eq(schema.students.name, studentName),
-                    ne(schema.students.status, 'archived'),
-                  ),
-                )
-                .limit(1)
-            )[0] ??
-            (
-              await tx
-                .insert(schema.students)
-                .values({
-                  guardianId: guardian.id,
-                  name: studentName,
-                  grade: body.grade?.trim() || '未填写',
-                  status: 'active',
-                })
-                .returning()
-            )[0])
-          : null;
+        let student: typeof schema.students.$inferSelect | null = null;
+        if (body.studentId) {
+          const [existingStudentRow] = await tx
+            .select({ student: schema.students })
+            .from(schema.students)
+            .leftJoin(
+              schema.studentGuardians,
+              and(
+                eq(schema.studentGuardians.studentId, schema.students.id),
+                eq(schema.studentGuardians.guardianId, guardian.id),
+              ),
+            )
+            .where(
+              and(
+                eq(schema.students.id, body.studentId),
+                ne(schema.students.status, 'archived'),
+                or(
+                  eq(schema.students.guardianId, guardian.id),
+                  eq(schema.studentGuardians.guardianId, guardian.id),
+                ),
+              ),
+            )
+            .limit(1);
+          const existingStudent = existingStudentRow?.student;
+          if (!existingStudent) {
+            throw httpError(403, '无权为该学员续费');
+          }
+          const [existingLessonAccount] = await tx
+            .select()
+            .from(schema.lessonAccounts)
+            .where(
+              and(
+                eq(schema.lessonAccounts.studentId, existingStudent.id),
+                eq(schema.lessonAccounts.courseId, course.id),
+              ),
+            )
+            .limit(1);
+          if (!existingLessonAccount) {
+            throw httpError(422, '该学员暂无此课程档案，不能直接续费');
+          }
+          student = existingStudent;
+        } else {
+          const studentName = body.studentName?.trim();
+          student = studentName
+            ? ((
+                await tx
+                  .select()
+                  .from(schema.students)
+                  .where(
+                    and(
+                      eq(schema.students.guardianId, guardian.id),
+                      eq(schema.students.name, studentName),
+                      ne(schema.students.status, 'archived'),
+                    ),
+                  )
+                  .limit(1)
+              )[0] ??
+              (
+                await tx
+                  .insert(schema.students)
+                  .values({
+                    guardianId: guardian.id,
+                    name: studentName,
+                    grade: body.grade?.trim() || '未填写',
+                    status: 'active',
+                  })
+                  .returning()
+              )[0])
+            : null;
+        }
 
         if (student) {
           await tx
