@@ -142,7 +142,7 @@
   <block wx:else>
     <view class="guest-hero">
       <view class="guest-avatar">
-        <view class="guest-avatar-icon"></view>
+        <image class="guest-avatar-icon" src="{{guestIcons.avatar}}" mode="aspectFit" />
       </view>
       <view class="guest-state">未登录</view>
       <view class="guest-title">一起见证成长</view>
@@ -156,7 +156,7 @@
       >
         <view wx:if="{{loading || binding}}">登录中...</view>
         <view wx:else class="wechat-login-content">
-          <view class="wechat-login-icon"></view>
+          <image class="wechat-login-icon" src="{{guestIcons.wechat}}" mode="aspectFit" />
           <view>微信一键登录</view>
         </view>
       </button>
@@ -164,33 +164,43 @@
 
     <view class="guest-panel">
       <view class="guest-panel-title">
-        <view class="guest-title-icon guest-title-icon-parent"></view>
+        <view class="guest-title-icon">
+          <image class="guest-title-image" src="{{guestIcons.parent}}" mode="aspectFit" />
+        </view>
         <view>家长中心</view>
       </view>
       <view class="guest-grid">
         <view class="guest-tool">
-          <view class="guest-tool-icon warm icon-calendar"></view>
+          <view class="guest-tool-icon warm">
+            <image class="guest-tool-image" src="{{guestIcons.calendar}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">孩子课表</view>
             <view class="guest-tool-desc">查看上课安排</view>
           </view>
         </view>
         <view class="guest-tool">
-          <view class="guest-tool-icon green icon-clock"></view>
+          <view class="guest-tool-icon green">
+            <image class="guest-tool-image" src="{{guestIcons.clock}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">课时记录</view>
             <view class="guest-tool-desc">了解余额与明细</view>
           </view>
         </view>
         <view class="guest-tool">
-          <view class="guest-tool-icon blue icon-headset"></view>
+          <view class="guest-tool-icon blue">
+            <image class="guest-tool-image" src="{{guestIcons.headset}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">预约试听</view>
             <view class="guest-tool-desc">管理试听与报名</view>
           </view>
         </view>
         <view class="guest-tool">
-          <view class="guest-tool-icon purple icon-message"></view>
+          <view class="guest-tool-icon purple">
+            <image class="guest-tool-image" src="{{guestIcons.message}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">成长反馈</view>
             <view class="guest-tool-desc">接收老师通知</view>
@@ -201,33 +211,43 @@
 
     <view class="guest-panel teacher-guest-panel">
       <view class="guest-panel-title">
-        <view class="guest-title-icon teacher guest-title-icon-teacher"></view>
+        <view class="guest-title-icon teacher">
+          <image class="guest-title-image" src="{{guestIcons.teacher}}" mode="aspectFit" />
+        </view>
         <view>老师工作台</view>
       </view>
       <view class="guest-grid">
         <view class="guest-tool">
-          <view class="guest-tool-icon yellow icon-calendar-check"></view>
+          <view class="guest-tool-icon yellow">
+            <image class="guest-tool-image" src="{{guestIcons.calendarCheck}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">今日课表</view>
             <view class="guest-tool-desc">查看当天课程</view>
           </view>
         </view>
         <view class="guest-tool">
-          <view class="guest-tool-icon green icon-users"></view>
+          <view class="guest-tool-icon green">
+            <image class="guest-tool-image" src="{{guestIcons.users}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">学员管理</view>
             <view class="guest-tool-desc">查看学员信息</view>
           </view>
         </view>
         <view class="guest-tool">
-          <view class="guest-tool-icon blue icon-check"></view>
+          <view class="guest-tool-icon blue">
+            <image class="guest-tool-image" src="{{guestIcons.check}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">点名</view>
             <view class="guest-tool-desc">处理课堂签到</view>
           </view>
         </view>
         <view class="guest-tool">
-          <view class="guest-tool-icon purple icon-star"></view>
+          <view class="guest-tool-icon purple">
+            <image class="guest-tool-image" src="{{guestIcons.star}}" mode="aspectFit" />
+          </view>
           <view>
             <view class="guest-tool-title">课后反馈</view>
             <view class="guest-tool-desc">记录课堂表现</view>

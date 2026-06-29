@@ -25,6 +25,7 @@ import {
   type LessonAccountItem,
   type LessonFeedbackItem,
 } from '../../utils/parent-center';
+import { GUEST_ACCOUNT_ICONS } from '../../utils/icons';
 
 type HubStats = {
   childCount: number;
@@ -160,6 +161,7 @@ Page({
     account: null as AuthAccount | null,
     defaultPassword: '',
     avatarText: '我',
+    guestIcons: GUEST_ACCOUNT_ICONS,
     entryGroups: groupEntries(withBadges(ENTRIES, {})) as QuickGroup[],
     stats: emptyStats(),
     childSummaries: [] as ChildSummary[],
