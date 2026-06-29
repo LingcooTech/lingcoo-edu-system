@@ -206,6 +206,87 @@ export const parentCenterModule: AppModule = {
       if (items.length === 0) {
         return [];
       }
+      const [courses, sessions, classes, teachers, assignments] = await Promise.all([
+        catalogRepo.listCourses(app.db),
+        schedulingRepo.listClassSessions(app.db),
+        schedulingRepo.listClasses(app.db),
+        teachingRepo.listTeachers(app.db),
+        app.db
+          .select()
+          .from(schema.homeworkAssignments)
+          .where(
+            inArray(
+              schema.homeworkAssignments.classSessionId,
+              Array.from(new Set(items.map((item) => item.classSessionId))),
+            ),
+          ),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const sessionById = new Map(sessions.map((session) => [session.id, session]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+      const assignmentByKey = new Map(
+        assignments.map((assignment) => [
+          `${assignment.classSessionId}:${assignment.studentId ?? 'class'}`,
+          assignment,
+        ]),
+      );
+
+      return items.map((item) => {
+        const session = sessionById.get(item.classSessionId) ?? null;
+        const classGroup = session ? (classById.get(session.classId) ?? null) : null;
+        const teacher = item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null;
+        const personalAssignment =
+          assignmentByKey.get(`${item.classSessionId}:${item.studentId}`) ?? null;
+        const classAssignment = assignmentByKey.get(`${item.classSessionId}:class`) ?? null;
+        const homeworkAssignment = personalAssignment ?? classAssignment;
+        return {
+          ...item,
+          student: studentById.get(item.studentId)
+            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+            : null,
+          course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+          homeworkAssignment: homeworkAssignment
+            ? {
+                id: homeworkAssignment.id,
+                content: homeworkAssignment.content,
+                studentId: homeworkAssignment.studentId,
+                isPersonal: Boolean(homeworkAssignment.studentId),
+              }
+            : null,
+        };
+      });
+    }
+
+    async function listHomeworkAssignmentsForStudents(
+      students: (typeof schema.students.$inferSelect)[],
+    ) {
+      const studentIds = students.map((student) => student.id);
+      if (studentIds.length === 0) {
+        return [];
+      }
+      const enrollments = await app.db
+        .select()
+        .from(schema.classEnrollments)
+        .where(
+          and(
+            inArray(schema.classEnrollments.studentId, studentIds),
+            eq(schema.classEnrollments.active, true),
+          ),
+        );
+      const classIds = Array.from(new Set(enrollments.map((enrollment) => enrollment.classId)));
+      if (classIds.length === 0) {
+        return [];
+      }
+      const items = await app.db
+        .select()
+        .from(schema.homeworkAssignments)
+        .where(inArray(schema.homeworkAssignments.classId, classIds))
+        .orderBy(desc(schema.homeworkAssignments.createdAt));
       const [courses, sessions, classes, teachers] = await Promise.all([
         catalogRepo.listCourses(app.db),
         schedulingRepo.listClassSessions(app.db),
@@ -217,22 +298,36 @@ export const parentCenterModule: AppModule = {
       const sessionById = new Map(sessions.map((session) => [session.id, session]));
       const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
       const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
-
-      return items.map((item) => {
-        const session = sessionById.get(item.classSessionId) ?? null;
-        const classGroup = session ? (classById.get(session.classId) ?? null) : null;
-        const teacher = item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null;
-        return {
+      const studentIdsByClassId = new Map<string, Set<string>>();
+      for (const enrollment of enrollments) {
+        const set = studentIdsByClassId.get(enrollment.classId) ?? new Set<string>();
+        set.add(enrollment.studentId);
+        studentIdsByClassId.set(enrollment.classId, set);
+      }
+      return items
+        .filter((item) => {
+          if (item.studentId) return studentIds.includes(item.studentId);
+          return (studentIdsByClassId.get(item.classId)?.size ?? 0) > 0;
+        })
+        .map((item) => ({
           ...item,
-          student: studentById.get(item.studentId)
-            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+          student: item.studentId
+            ? studentById.get(item.studentId)
+              ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+              : null
             : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
-          session,
-          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
-          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
-        };
-      });
+          session: sessionById.get(item.classSessionId) ?? null,
+          class: classById.get(item.classId)
+            ? { id: item.classId, name: classById.get(item.classId)!.name }
+            : null,
+          teacher: item.teacherId
+            ? teacherById.get(item.teacherId)
+              ? { id: item.teacherId, name: teacherById.get(item.teacherId)!.name }
+              : null
+            : null,
+          isPersonal: Boolean(item.studentId),
+        }));
     }
 
     app.get('/public/me/children', { preHandler: app.requireParent }, async (request) => {
@@ -698,6 +793,11 @@ export const parentCenterModule: AppModule = {
         .where(inArray(schema.lessonFeedbacks.studentId, studentIds))
         .orderBy(desc(schema.lessonFeedbacks.createdAt));
       return { lessonFeedbacks: await enrichLessonFeedbacks(students, items) };
+    });
+
+    app.get('/public/me/homework-assignments', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      return { homeworkAssignments: await listHomeworkAssignmentsForStudents(students) };
     });
 
     app.post(

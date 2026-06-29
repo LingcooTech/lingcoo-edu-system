@@ -56,6 +56,23 @@
     </view>
 
     <view class="section card panel">
+      <view class="section-title">老师布置</view>
+      <view wx:if="{{homeworkAssignments.length}}" class="item-list">
+        <view wx:for="{{homeworkAssignments}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="row-meta">{{item.teacherName}} · {{item.createdAtLabel}}</view>
+            </view>
+            <view class="notice-status">{{item.assignmentScopeLabel}}</view>
+          </view>
+          <view class="attendance-topic">{{item.content}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无老师布置的作业</view>
+    </view>
+
+    <view class="section card panel">
       <view class="section-title">打卡记录</view>
       <view wx:if="{{homeworkCheckIns.length}}" class="item-list">
         <view wx:for="{{homeworkCheckIns}}" wx:key="id" class="stack-row">
@@ -81,6 +98,7 @@
             />
           </view>
           <view wx:if="{{item.teacherFeedback}}" class="teacher-feedback">{{item.teacherFeedback}}</view>
+          <view class="homework-rating">{{item.ratingLabel}}</view>
         </view>
       </view>
       <view wx:else class="empty compact-empty">暂无作业打卡</view>

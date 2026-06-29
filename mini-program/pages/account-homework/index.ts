@@ -2,13 +2,16 @@ import {
   createParentHomeworkCheckIn,
   createParentUploadToken,
   fetchParentChildren,
+  fetchParentHomeworkAssignments,
   fetchParentHomeworkCheckIns,
   fetchParentLessonAccounts,
   hasToken,
 } from '../../services/api';
 import {
   buildHomeworkTargets,
+  toHomeworkAssignmentItem,
   toHomeworkItem,
+  type HomeworkAssignmentItem,
   toLessonAccountItem,
   type HomeworkItem,
   type HomeworkTarget,
@@ -28,6 +31,7 @@ Page({
     content: '',
     images: [] as string[],
     homeworkCheckIns: [] as HomeworkItem[],
+    homeworkAssignments: [] as HomeworkAssignmentItem[],
     maxImages: MAX_IMAGES,
   },
 
@@ -50,10 +54,11 @@ Page({
     }
     this.setData({ loading: true });
     try {
-      const [lessonAccounts, children, homeworkCheckIns] = await Promise.all([
+      const [lessonAccounts, children, homeworkCheckIns, homeworkAssignments] = await Promise.all([
         fetchParentLessonAccounts(),
         fetchParentChildren(),
         fetchParentHomeworkCheckIns(),
+        fetchParentHomeworkAssignments(),
       ]);
       const targets = buildHomeworkTargets(lessonAccounts.map(toLessonAccountItem), children);
       this.setData({
@@ -61,6 +66,7 @@ Page({
         targetLabels: targets.map((target) => target.label),
         targetIndex: this.data.targetIndex >= targets.length ? 0 : this.data.targetIndex,
         homeworkCheckIns: homeworkCheckIns.map(toHomeworkItem),
+        homeworkAssignments: homeworkAssignments.map(toHomeworkAssignmentItem),
         needLogin: false,
         loading: false,
       });

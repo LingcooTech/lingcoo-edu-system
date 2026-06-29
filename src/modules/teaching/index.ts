@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
@@ -103,22 +103,33 @@ function summarizeAttendance(records: Array<{ status: string }>) {
 const teacherHomeworkReviewSchema = z.object({
   reviewStatus: z.enum(['reviewed', 'needs_revision']).default('reviewed'),
   teacherFeedback: z.string().trim().max(2000).default(''),
+  rating: z.number().int().min(0).max(5).default(0),
 });
 
 const teacherLessonFeedbackSchema = z.object({
+  classAssignmentContent: z.string().trim().max(2000).default(''),
+  studentAssignments: z
+    .array(
+      z.object({
+        studentId: z.string().uuid(),
+        content: z.string().trim().max(2000).default(''),
+      }),
+    )
+    .default([]),
   items: z
     .array(
       z
         .object({
           studentId: z.string().uuid(),
           content: z.string().trim().max(2000).default(''),
+          rating: z.number().int().min(0).max(5).default(0),
           imageUrls: z.array(z.string().trim().url().max(500)).max(9).default([]),
         })
-        .refine((value) => value.content || value.imageUrls.length > 0, {
-          message: '请填写点评内容或图片',
+        .refine((value) => value.rating > 0 || value.content || value.imageUrls.length > 0, {
+          message: '请选择星星或填写点评内容',
         }),
     )
-    .min(1),
+    .default([]),
 });
 
 function notFound(message: string): Error {
@@ -443,6 +454,33 @@ export const teachingModule: AppModule = {
       });
     }
 
+    function enrichTeacherHomeworkAssignments(
+      scope: TeacherHomeworkScope,
+      items: (typeof schema.homeworkAssignments.$inferSelect)[],
+    ) {
+      return items.map((item) => {
+        const session = scope.sessionById.get(item.classSessionId) ?? null;
+        const classGroup = scope.classById.get(item.classId) ?? null;
+        const teacher = item.teacherId ? (scope.teacherById.get(item.teacherId) ?? null) : null;
+        return {
+          ...item,
+          student: item.studentId
+            ? scope.studentById.get(item.studentId)
+              ? {
+                  id: item.studentId,
+                  name: scope.studentById.get(item.studentId)!.name,
+                  grade: scope.studentById.get(item.studentId)!.grade,
+                }
+              : null
+            : null,
+          course: item.courseId ? (scope.courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+        };
+      });
+    }
+
     app.get(
       '/public/teacher/sessions/:sessionId/attendance',
       { preHandler: app.requireRole('teacher') },
@@ -542,9 +580,11 @@ export const teachingModule: AppModule = {
         const body = teacherLessonFeedbackSchema.parse(request.body);
         const enrollments = await schedulingRepo.listEnrollments(app.db, session.classId);
         const rosterStudentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
-        const invalidItem = body.items.find((item) => !rosterStudentIds.has(item.studentId));
+        const invalidItem = [...body.items, ...body.studentAssignments].find(
+          (item) => !rosterStudentIds.has(item.studentId),
+        );
         if (invalidItem) {
-          throw Object.assign(new Error('只能点评本班正式学员'), { statusCode: 400 });
+          throw Object.assign(new Error('只能操作本班正式学员'), { statusCode: 400 });
         }
 
         const updatedItems = [];
@@ -558,6 +598,7 @@ export const teachingModule: AppModule = {
               courseId: classGroup.courseId,
               classId: classGroup.id,
               content: item.content,
+              rating: item.rating,
               imageUrls: item.imageUrls,
               updatedAt: new Date(),
             })
@@ -568,6 +609,7 @@ export const teachingModule: AppModule = {
                 courseId: classGroup.courseId,
                 classId: classGroup.id,
                 content: item.content,
+                rating: item.rating,
                 imageUrls: item.imageUrls,
                 updatedAt: new Date(),
               },
@@ -576,10 +618,105 @@ export const teachingModule: AppModule = {
           updatedItems.push(updated);
         }
 
+        if (body.classAssignmentContent) {
+          await app.db
+            .insert(schema.homeworkAssignments)
+            .values({
+              classSessionId: sessionId,
+              classId: classGroup.id,
+              courseId: classGroup.courseId,
+              teacherId: account.teacherId,
+              studentId: null,
+              content: body.classAssignmentContent,
+              updatedAt: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: [schema.homeworkAssignments.classSessionId],
+              targetWhere: isNull(schema.homeworkAssignments.studentId),
+              set: {
+                courseId: classGroup.courseId,
+                classId: classGroup.id,
+                teacherId: account.teacherId,
+                content: body.classAssignmentContent,
+                updatedAt: new Date(),
+              },
+            });
+        } else {
+          await app.db
+            .delete(schema.homeworkAssignments)
+            .where(
+              and(
+                eq(schema.homeworkAssignments.classSessionId, sessionId),
+                isNull(schema.homeworkAssignments.studentId),
+              ),
+            );
+        }
+
+        for (const assignment of body.studentAssignments) {
+          if (assignment.content) {
+            await app.db
+              .insert(schema.homeworkAssignments)
+              .values({
+                classSessionId: sessionId,
+                classId: classGroup.id,
+                courseId: classGroup.courseId,
+                teacherId: account.teacherId,
+                studentId: assignment.studentId,
+                content: assignment.content,
+                updatedAt: new Date(),
+              })
+              .onConflictDoUpdate({
+                target: [
+                  schema.homeworkAssignments.classSessionId,
+                  schema.homeworkAssignments.studentId,
+                ],
+                set: {
+                  courseId: classGroup.courseId,
+                  classId: classGroup.id,
+                  teacherId: account.teacherId,
+                  content: assignment.content,
+                  updatedAt: new Date(),
+                },
+              });
+          } else {
+            await app.db
+              .delete(schema.homeworkAssignments)
+              .where(
+                and(
+                  eq(schema.homeworkAssignments.classSessionId, sessionId),
+                  eq(schema.homeworkAssignments.studentId, assignment.studentId),
+                ),
+              );
+          }
+        }
+
         const scope = await loadTeacherHomeworkScope(request.account!.id);
+        const assignments = await app.db
+          .select()
+          .from(schema.homeworkAssignments)
+          .where(eq(schema.homeworkAssignments.classSessionId, sessionId))
+          .orderBy(desc(schema.homeworkAssignments.updatedAt));
         return {
           lessonFeedbacks: enrichTeacherLessonFeedbacks(scope, updatedItems),
+          homeworkAssignments: enrichTeacherHomeworkAssignments(scope, assignments),
         };
+      },
+    );
+
+    app.get(
+      '/public/teacher/homework-assignments',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        if (scope.classIds.size === 0) {
+          return { homeworkAssignments: [] };
+        }
+        const items = await app.db
+          .select()
+          .from(schema.homeworkAssignments)
+          .where(inArray(schema.homeworkAssignments.classId, Array.from(scope.classIds)))
+          .orderBy(desc(schema.homeworkAssignments.createdAt));
+        return { homeworkAssignments: enrichTeacherHomeworkAssignments(scope, items) };
       },
     );
 
@@ -632,6 +769,7 @@ export const teachingModule: AppModule = {
           .set({
             reviewStatus: body.reviewStatus,
             teacherFeedback: body.teacherFeedback,
+            rating: body.rating,
             reviewedByTeacherId: scope.teacherId,
             reviewedAt: new Date(),
             updatedAt: new Date(),

@@ -1,0 +1,104 @@
+<custom-navbar title="学员详情" show-back="{{true}}" />
+<view class="page student-detail-page">
+  <skeleton wx:if="{{loading}}" variant="hub" />
+  <block wx:else>
+    <view wx:if="{{profile}}" class="profile-card">
+      <view>
+        <view class="profile-eyebrow">学员档案</view>
+        <view class="profile-name">{{profile.name}}</view>
+        <view class="profile-meta">{{profile.grade}}{{profile.school ? ' · ' + profile.school : ''}}</view>
+      </view>
+      <view class="profile-stats">
+        <view>
+          <view class="stat-value">{{profile.classCount}}</view>
+          <view class="stat-label">班级</view>
+        </view>
+        <view>
+          <view class="stat-value">{{profile.totalBalance}}</view>
+          <view class="stat-label">课时</view>
+        </view>
+        <view>
+          <view class="stat-value">{{profile.totalStars}}</view>
+          <view class="stat-label">星星</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="detail-tabs">
+      <view
+        wx:for="{{detailTabs}}"
+        wx:key="key"
+        class="{{item.className}}"
+        data-key="{{item.key}}"
+        bindtap="switchTab"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <block wx:if="{{activeTab == 'overview'}}">
+      <view class="section-title">所在班级</view>
+      <view wx:if="{{classes.length}}" class="list">
+        <view wx:for="{{classes}}" wx:key="id" class="card row-card">
+          <view>
+            <view class="row-title">{{item.name}}</view>
+            <view class="row-meta">{{item.courseName}} · {{item.classroomName}}</view>
+          </view>
+          <view class="balance">{{item.balance}} 课时</view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">暂无班级信息。</view>
+    </block>
+
+    <block wx:elif="{{activeTab == 'attendance'}}">
+      <view class="section-title">签到记录</view>
+      <view wx:if="{{attendance.length}}" class="list">
+        <view wx:for="{{attendance}}" wx:key="id" class="card row-card">
+          <view>
+            <view class="row-title">{{item.title}}</view>
+            <view class="row-meta">{{item.dateLabel}} · {{item.className}}</view>
+          </view>
+          <view class="status-pill">{{item.statusLabel}}</view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">暂无签到记录。</view>
+    </block>
+
+    <block wx:elif="{{activeTab == 'interactions'}}">
+      <view class="section-title">课堂互动</view>
+      <view wx:if="{{feedbacks.length}}" class="list">
+        <view wx:for="{{feedbacks}}" wx:key="id" class="card text-card">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.courseName}} · {{item.className}}</view>
+              <view class="row-meta">{{item.dateLabel}}</view>
+            </view>
+            <view class="status-pill">{{item.ratingLabel}}</view>
+          </view>
+          <view wx:if="{{item.content}}" class="text-content">{{item.content}}</view>
+          <view wx:if="{{item.assignmentContent}}" class="teacher-feedback">{{item.assignmentContent}}</view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">暂无课堂互动。</view>
+    </block>
+
+    <block wx:else>
+      <view class="section-title">作业记录</view>
+      <view wx:if="{{homework.length}}" class="list">
+        <view wx:for="{{homework}}" wx:key="id" class="card text-card">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.title}}</view>
+              <view class="row-meta">{{item.dateLabel}}</view>
+            </view>
+            <view class="status-pill">{{item.ratingLabel}}</view>
+          </view>
+          <view class="row-meta">{{item.statusLabel}}</view>
+          <view wx:if="{{item.content}}" class="text-content">{{item.content}}</view>
+          <view wx:if="{{item.teacherFeedback}}" class="teacher-feedback">{{item.teacherFeedback}}</view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">暂无作业记录。</view>
+    </block>
+  </block>
+</view>

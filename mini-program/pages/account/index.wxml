@@ -2,55 +2,7 @@
 <view class="page account-page">
   <skeleton wx:if="{{booting}}" variant="hub" />
   <block wx:elif="{{account && account.role == 'teacher'}}">
-    <view class="hub-card teacher-hub">
-      <view class="hub-top">
-        <view>
-          <view class="hub-eyebrow">老师账号</view>
-          <view class="hub-title">老师工作台</view>
-        </view>
-        <view class="profile-pill">
-          <view class="profile-avatar">{{avatarText}}</view>
-          <view class="profile-info">
-            <view class="profile-name">{{account.displayName || '老师'}}</view>
-            <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
-            <view wx:else class="profile-phone muted">微信登录</view>
-          </view>
-        </view>
-      </view>
-
-      <view class="teacher-summary">
-        <view class="teacher-summary-title">授课、班级、学员和课后服务都在这里处理。</view>
-        <navigator
-          class="btn btn-primary teacher-main-action"
-          url="/pages/teacher-workbench/index"
-          hover-class="button-hover"
-        >
-          进入老师工作台
-        </navigator>
-      </view>
-    </view>
-
-    <view class="section entry-panel">
-      <view class="entry-title">常用工具</view>
-      <view class="entry-grid teacher-entry-grid">
-        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
-          <view class="entry-symbol">课</view>
-          <view class="entry-label">今日课表</view>
-        </navigator>
-        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
-          <view class="entry-symbol">班</view>
-          <view class="entry-label">我的班级</view>
-        </navigator>
-        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
-          <view class="entry-symbol">点</view>
-          <view class="entry-label">点名</view>
-        </navigator>
-        <navigator class="entry-item" url="/pages/teacher-workbench/index" hover-class="entry-hover">
-          <view class="entry-symbol">评</view>
-          <view class="entry-label">课后点评</view>
-        </navigator>
-      </view>
-    </view>
+    <teacher-workbench-panel id="teacherWorkbench" />
 
     <view class="logout-wrap">
       <button class="mini-button logout-button" bindtap="onLogout">退出登录</button>
@@ -188,19 +140,96 @@
   </block>
 
   <block wx:else>
-    <view class="guest-card">
-      <view class="guest-avatar">我</view>
-      <view class="guest-title">微信登录</view>
-      <view class="guest-desc">登录后自动识别家长或老师身份，进入对应工作台。</view>
+    <view class="guest-hero">
+      <view class="guest-avatar">
+        <view class="guest-avatar-icon">人</view>
+      </view>
+      <view class="guest-state">未登录</view>
+      <view class="guest-title">登录后使用更多服务</view>
+      <view class="guest-desc">家长和老师均可使用微信登录</view>
       <button
-        class="btn btn-primary login-button"
+        class="btn btn-primary guest-login-button"
         open-type="getPhoneNumber"
         bindgetphonenumber="onWechatLogin"
         loading="{{loading}}"
         disabled="{{loading || binding}}"
       >
-        {{loading || binding ? '登录中...' : '微信登录'}}
+        {{loading || binding ? '登录中...' : '微信一键登录'}}
       </button>
+    </view>
+
+    <view class="guest-panel">
+      <view class="guest-panel-title">
+        <view class="guest-title-icon">家</view>
+        <view>家长常用</view>
+      </view>
+      <view class="guest-grid">
+        <view class="guest-tool">
+          <view class="guest-tool-icon warm">表</view>
+          <view>
+            <view class="guest-tool-title">孩子课表</view>
+            <view class="guest-tool-desc">查看上课安排</view>
+          </view>
+        </view>
+        <view class="guest-tool">
+          <view class="guest-tool-icon green">时</view>
+          <view>
+            <view class="guest-tool-title">课时记录</view>
+            <view class="guest-tool-desc">了解余额与明细</view>
+          </view>
+        </view>
+        <view class="guest-tool">
+          <view class="guest-tool-icon blue">试</view>
+          <view>
+            <view class="guest-tool-title">预约试听</view>
+            <view class="guest-tool-desc">管理试听与报名</view>
+          </view>
+        </view>
+        <view class="guest-tool">
+          <view class="guest-tool-icon purple">信</view>
+          <view>
+            <view class="guest-tool-title">成长反馈</view>
+            <view class="guest-tool-desc">接收老师通知</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="guest-panel teacher-guest-panel">
+      <view class="guest-panel-title">
+        <view class="guest-title-icon teacher">师</view>
+        <view>老师常用</view>
+      </view>
+      <view class="guest-grid">
+        <view class="guest-tool">
+          <view class="guest-tool-icon yellow">课</view>
+          <view>
+            <view class="guest-tool-title">今日课表</view>
+            <view class="guest-tool-desc">查看当天课程</view>
+          </view>
+        </view>
+        <view class="guest-tool">
+          <view class="guest-tool-icon green">员</view>
+          <view>
+            <view class="guest-tool-title">学员管理</view>
+            <view class="guest-tool-desc">查看学员信息</view>
+          </view>
+        </view>
+        <view class="guest-tool">
+          <view class="guest-tool-icon blue">点</view>
+          <view>
+            <view class="guest-tool-title">点名</view>
+            <view class="guest-tool-desc">处理课堂签到</view>
+          </view>
+        </view>
+        <view class="guest-tool">
+          <view class="guest-tool-icon purple">评</view>
+          <view>
+            <view class="guest-tool-title">课后反馈</view>
+            <view class="guest-tool-desc">记录课堂表现</view>
+          </view>
+        </view>
+      </view>
     </view>
   </block>
 

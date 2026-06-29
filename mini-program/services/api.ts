@@ -546,6 +546,7 @@ export interface ParentHomeworkCheckIn {
   imageUrls: string[];
   reviewStatus: string;
   teacherFeedback: string;
+  rating: number;
   reviewedByTeacherId?: string | null;
   reviewedAt?: string | null;
   createdAt: string;
@@ -570,10 +571,41 @@ export interface ParentLessonFeedback {
   courseId?: string | null;
   classId?: string | null;
   content: string;
+  rating: number;
   imageUrls: string[];
   createdAt: string;
   updatedAt: string;
   student?: { id: string; name: string } | null;
+  course?: Course | null;
+  session?: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    topic: string;
+    status: string;
+  } | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+  homeworkAssignment?: {
+    id: string;
+    content: string;
+    studentId?: string | null;
+    isPersonal: boolean;
+  } | null;
+}
+
+export interface HomeworkAssignment {
+  id: string;
+  classSessionId: string;
+  classId: string;
+  courseId?: string | null;
+  teacherId?: string | null;
+  studentId?: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  isPersonal?: boolean;
+  student?: { id: string; name: string; grade?: string } | null;
   course?: Course | null;
   session?: {
     id: string;
@@ -691,6 +723,7 @@ export interface TeacherLessonFeedback {
   courseId?: string | null;
   classId?: string | null;
   content: string;
+  rating: number;
   imageUrls: string[];
   createdAt: string;
   updatedAt: string;
@@ -1040,6 +1073,12 @@ export async function fetchParentHomeworkCheckIns(): Promise<ParentHomeworkCheck
   ).homeworkCheckIns;
 }
 
+export async function fetchParentHomeworkAssignments(): Promise<HomeworkAssignment[]> {
+  return (
+    await request<{ homeworkAssignments: HomeworkAssignment[] }>('/public/me/homework-assignments')
+  ).homeworkAssignments;
+}
+
 export async function fetchParentLessonFeedbacks(): Promise<ParentLessonFeedback[]> {
   return (await request<{ lessonFeedbacks: ParentLessonFeedback[] }>('/public/me/lesson-feedbacks'))
     .lessonFeedbacks;
@@ -1125,6 +1164,14 @@ export async function fetchTeacherLessonFeedbacks(): Promise<TeacherLessonFeedba
   ).lessonFeedbacks;
 }
 
+export async function fetchTeacherHomeworkAssignments(): Promise<HomeworkAssignment[]> {
+  return (
+    await request<{ homeworkAssignments: HomeworkAssignment[] }>(
+      '/public/teacher/homework-assignments',
+    )
+  ).homeworkAssignments;
+}
+
 export function fetchTeacherSessionAttendance(
   sessionId: string,
 ): Promise<TeacherSessionAttendance> {
@@ -1143,17 +1190,21 @@ export function recordTeacherAttendance(
 
 export function saveTeacherSessionFeedbacks(
   sessionId: string,
-  items: Array<{ studentId: string; content: string; imageUrls?: string[] }>,
-): Promise<{ lessonFeedbacks: TeacherLessonFeedback[] }> {
+  input: {
+    items: Array<{ studentId: string; content: string; rating: number; imageUrls?: string[] }>;
+    classAssignmentContent?: string;
+    studentAssignments?: Array<{ studentId: string; content: string }>;
+  },
+): Promise<{ lessonFeedbacks: TeacherLessonFeedback[]; homeworkAssignments: HomeworkAssignment[] }> {
   return request(`/public/teacher/sessions/${encodeURIComponent(sessionId)}/feedbacks`, {
     method: 'POST',
-    data: { items },
+    data: input,
   });
 }
 
 export function reviewTeacherHomeworkCheckIn(
   homeworkCheckInId: string,
-  input: { reviewStatus: 'reviewed' | 'needs_revision'; teacherFeedback: string },
+  input: { reviewStatus: 'reviewed' | 'needs_revision'; teacherFeedback: string; rating: number },
 ): Promise<{ homeworkCheckIn: TeacherHomeworkCheckIn }> {
   return request(
     `/public/teacher/homework-check-ins/${encodeURIComponent(homeworkCheckInId)}/review`,

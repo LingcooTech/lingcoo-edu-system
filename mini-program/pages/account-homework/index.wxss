@@ -85,3 +85,14 @@
   border-radius: 14rpx;
   background: #eef1ee;
 }
+
+.homework-rating {
+  display: inline-flex;
+  margin-top: 14rpx;
+  border-radius: 999rpx;
+  background: #fff7e6;
+  color: #9a6a4b;
+  font-size: 23rpx;
+  font-weight: 900;
+  padding: 8rpx 16rpx;
+}

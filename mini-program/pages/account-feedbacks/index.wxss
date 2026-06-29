@@ -30,6 +30,37 @@
   white-space: pre-wrap;
 }
 
+.feedback-rating {
+  display: inline-flex;
+  margin-top: 18rpx;
+  border-radius: 999rpx;
+  background: #fff7e6;
+  color: #9a6a4b;
+  font-size: 23rpx;
+  font-weight: 900;
+  padding: 8rpx 16rpx;
+}
+
+.assignment-note {
+  margin-top: 18rpx;
+  border-radius: 18rpx;
+  background: #f6f4f0;
+  padding: 18rpx;
+}
+
+.assignment-note-title {
+  color: #9a6a4b;
+  font-size: 23rpx;
+  font-weight: 900;
+}
+
+.assignment-note-content {
+  margin-top: 8rpx;
+  color: #57534e;
+  font-size: 25rpx;
+  line-height: 1.6;
+}
+
 .feedback-images {
   display: flex;
   flex-wrap: wrap;

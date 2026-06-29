@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "老师工作台",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "teacher-workbench-panel": "/components/teacher-workbench-panel/index"
+  }
 }

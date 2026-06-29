@@ -179,6 +179,13 @@ Page({
 
   onPullDownRefresh() {
     if (hasToken()) {
+      if (this.data.account?.role === 'teacher') {
+        const panel = this.selectComponent('#teacherWorkbench') as
+          | { refresh?: () => Promise<void> }
+          | null;
+        Promise.resolve(panel?.refresh?.()).finally(() => wx.stopPullDownRefresh());
+        return;
+      }
       this.loadSummary().finally(() => wx.stopPullDownRefresh());
     } else {
       wx.stopPullDownRefresh();

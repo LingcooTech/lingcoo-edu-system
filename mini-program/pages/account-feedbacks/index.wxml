@@ -20,7 +20,14 @@
           </view>
           <view wx:if="{{item.class}}" class="feedback-class">{{item.class.name}}</view>
         </view>
+        <view class="feedback-rating">{{item.ratingLabel}}</view>
         <view class="feedback-content">{{item.content}}</view>
+        <view wx:if="{{item.homeworkAssignment}}" class="assignment-note">
+          <view class="assignment-note-title">
+            {{item.homeworkAssignment.isPersonal ? '个人作业' : '课后作业'}}
+          </view>
+          <view class="assignment-note-content">{{item.homeworkAssignment.content}}</view>
+        </view>
         <view wx:if="{{item.imageUrls.length}}" class="feedback-images">
           <image
             wx:for="{{item.imageUrls}}"

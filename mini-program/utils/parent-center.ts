@@ -7,6 +7,7 @@ import {
   type ParentCheckInSession,
   type ParentChild,
   type ParentHomeworkCheckIn,
+  type HomeworkAssignment,
   type ParentLessonAccount,
   type ParentLessonFeedback,
   type ParentNotification,
@@ -55,6 +56,7 @@ export type HomeworkItem = ParentHomeworkCheckIn & {
   studentName: string;
   courseName: string;
   reviewStatusLabel: string;
+  ratingLabel: string;
 };
 
 export type LessonFeedbackItem = ParentLessonFeedback & {
@@ -62,6 +64,16 @@ export type LessonFeedbackItem = ParentLessonFeedback & {
   studentName: string;
   courseName: string;
   teacherName: string;
+  ratingLabel: string;
+  totalStars: number;
+};
+
+export type HomeworkAssignmentItem = HomeworkAssignment & {
+  createdAtLabel: string;
+  studentName: string;
+  courseName: string;
+  teacherName: string;
+  assignmentScopeLabel: string;
 };
 
 export type SeatReservationItem = ParentSeatReservation & {
@@ -151,6 +163,10 @@ export function homeworkReviewStatusLabel(status: string): string {
   return labels[status] || status;
 }
 
+export function ratingLabel(rating?: number | null): string {
+  return rating && rating > 0 ? `${rating} 星` : '暂未评分';
+}
+
 export function toLessonAccountItem(item: ParentLessonAccount): LessonAccountItem {
   return {
     ...item,
@@ -228,16 +244,31 @@ export function toHomeworkItem(item: ParentHomeworkCheckIn): HomeworkItem {
     studentName: item.student?.name || '未知学员',
     courseName: item.course?.name || item.title,
     reviewStatusLabel: homeworkReviewStatusLabel(item.reviewStatus),
+    ratingLabel: ratingLabel(item.rating),
   };
 }
 
 export function toLessonFeedbackItem(item: ParentLessonFeedback): LessonFeedbackItem {
+  const lessonStars = Number(item.rating || 0);
   return {
     ...item,
     createdAtLabel: formatDateTime(item.createdAt),
     studentName: item.student?.name || '未知学员',
     courseName: item.course?.name || '课程',
     teacherName: item.teacher?.name || '老师',
+    ratingLabel: ratingLabel(item.rating),
+    totalStars: lessonStars,
+  };
+}
+
+export function toHomeworkAssignmentItem(item: HomeworkAssignment): HomeworkAssignmentItem {
+  return {
+    ...item,
+    createdAtLabel: formatDateTime(item.createdAt),
+    studentName: item.student?.name || '全班',
+    courseName: item.course?.name || '课程',
+    teacherName: item.teacher?.name || '老师',
+    assignmentScopeLabel: item.isPersonal ? '个人作业' : '全班作业',
   };
 }
 

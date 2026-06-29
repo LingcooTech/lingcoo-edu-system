@@ -19,7 +19,8 @@
     "pages/account-homework/index",
     "pages/account-feedbacks/index",
     "pages/account-notifications/index",
-    "pages/teacher-workbench/index"
+    "pages/teacher-workbench/index",
+    "pages/teacher-student-detail/index"
   ],
   "window": {
     "navigationBarTitleText": "成长教室",

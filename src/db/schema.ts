@@ -663,6 +663,7 @@ export const homeworkCheckIns = pgTable(
       .default(sql`'[]'::jsonb`),
     reviewStatus: varchar('review_status', { length: 40 }).notNull().default('submitted'),
     teacherFeedback: text('teacher_feedback').notNull().default(''),
+    rating: integer('rating').notNull().default(0),
     reviewedByTeacherId: uuid('reviewed_by_teacher_id').references(() => teachers.id, {
       onDelete: 'set null',
     }),
@@ -691,6 +692,7 @@ export const lessonFeedbacks = pgTable(
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
     classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
     content: text('content').notNull().default(''),
+    rating: integer('rating').notNull().default(0),
     imageUrls: jsonb('image_urls')
       .$type<string[]>()
       .notNull()
@@ -706,6 +708,37 @@ export const lessonFeedbacks = pgTable(
     studentIdx: index('lesson_feedbacks_student_idx').on(table.studentId, table.createdAt),
     teacherIdx: index('lesson_feedbacks_teacher_idx').on(table.teacherId, table.createdAt),
     sessionIdx: index('lesson_feedbacks_session_idx').on(table.classSessionId),
+  }),
+);
+
+export const homeworkAssignments = pgTable(
+  'homework_assignments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    classSessionId: uuid('class_session_id')
+      .notNull()
+      .references(() => classSessions.id, { onDelete: 'cascade' }),
+    classId: uuid('class_id')
+      .notNull()
+      .references(() => classes.id, { onDelete: 'cascade' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'cascade' }),
+    content: text('content').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionStudentUnique: uniqueIndex('homework_assignments_session_student_idx').on(
+      table.classSessionId,
+      table.studentId,
+    ),
+    sessionClassUnique: uniqueIndex('homework_assignments_session_class_idx')
+      .on(table.classSessionId)
+      .where(sql`${table.studentId} is null`),
+    studentIdx: index('homework_assignments_student_idx').on(table.studentId, table.createdAt),
+    classIdx: index('homework_assignments_class_idx').on(table.classId, table.createdAt),
+    sessionIdx: index('homework_assignments_session_idx').on(table.classSessionId),
   }),
 );
 
