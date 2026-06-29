@@ -4,7 +4,9 @@ import {
   fetchTeacherHomeworkAssignments,
   fetchTeacherHomeworkCheckIns,
   fetchTeacherLessonFeedbacks,
+  fetchTeacherNotifications,
   fetchTeacherSessionAttendance,
+  markTeacherNotificationRead,
   recordTeacherAttendance,
   reviewTeacherHomeworkCheckIn,
   saveTeacherSessionFeedbacks,
@@ -12,14 +14,17 @@ import {
   type SessionAttendanceRecord,
   type TeacherCalendarEvent,
   type TeacherClass,
+  type TeacherNotification,
   type HomeworkAssignment,
   type TeacherHomeworkCheckIn,
   type TeacherLessonFeedback,
   type TeacherRosterStudent,
 } from '../../services/api';
+import { TEACHER_WORKBENCH_ICONS } from '../../utils/icons';
 
 type ActiveView = 'schedule' | 'classes' | 'students' | 'feedbacks' | 'homework';
 type MetricScope = 'today' | 'week' | 'month';
+type FeedbackScope = 'today' | 'pending' | 'history';
 type MiniTapEvent = { currentTarget: { dataset: Record<string, string | undefined> } };
 type MiniInputEvent = { currentTarget: { dataset: Record<string, string | undefined> }; detail: { value: string } };
 
@@ -60,18 +65,37 @@ type SheetSession = {
   classroomName: string;
 };
 
-const VIEW_TABS: Array<{ key: ActiveView; label: string; icon: string }> = [
-  { key: 'schedule', label: '课表', icon: '课' },
-  { key: 'classes', label: '班级', icon: '班' },
-  { key: 'students', label: '学员', icon: '员' },
-  { key: 'feedbacks', label: '互动', icon: '评' },
-  { key: 'homework', label: '批阅', icon: '批' },
+type TeacherNoticeItem = {
+  id: string;
+  category: string;
+  title: string;
+  body: string;
+  status: string;
+  dateLabel: string;
+  actionLabel: string;
+  studentId: string;
+  courseId: string;
+  className: string;
+};
+
+const VIEW_TABS: Array<{ key: ActiveView; label: string; iconSrc: string }> = [
+  { key: 'schedule', label: '课表', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
+  { key: 'classes', label: '班级', iconSrc: TEACHER_WORKBENCH_ICONS.classes },
+  { key: 'students', label: '学员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
+  { key: 'feedbacks', label: '互动', iconSrc: TEACHER_WORKBENCH_ICONS.feedbacks },
+  { key: 'homework', label: '批阅', iconSrc: TEACHER_WORKBENCH_ICONS.homework },
 ];
 
 const SCOPE_TABS: Array<{ key: MetricScope; label: string }> = [
   { key: 'today', label: '今天' },
   { key: 'week', label: '本周' },
   { key: 'month', label: '本月' },
+];
+
+const FEEDBACK_SCOPE_TABS: Array<{ key: FeedbackScope; label: string }> = [
+  { key: 'today', label: '今日' },
+  { key: 'pending', label: '待互动' },
+  { key: 'history', label: '历史' },
 ];
 
 const CLASS_STATUS_LABEL: Record<string, string> = {
@@ -181,6 +205,30 @@ function formatDateTime(value: string) {
   )}`;
 }
 
+function normalizeTeacherNotification(item: TeacherNotification): TeacherNoticeItem {
+  const meta = (item.meta ?? {}) as Record<string, unknown>;
+  const studentId = typeof meta.studentId === 'string' ? meta.studentId : '';
+  const courseId = typeof meta.courseId === 'string' ? meta.courseId : '';
+  const actionLabel =
+    item.category === 'teacher.student.enrolled'
+      ? '查看分班'
+      : item.category === 'teacher.trial.reserved'
+        ? '查看试听'
+        : '查看';
+  return {
+    id: item.id,
+    category: item.category,
+    title: item.title,
+    body: item.body,
+    status: item.status,
+    dateLabel: formatDateTime(item.createdAt),
+    actionLabel,
+    studentId,
+    courseId,
+    className: item.status === 'unread' ? 'notice-card notice-card-unread' : 'notice-card',
+  };
+}
+
 function formatSheetSession(event: TeacherCalendarEvent): SheetSession {
   return {
     id: event.id,
@@ -234,6 +282,10 @@ function scopeClassName(metricScope: MetricScope, key: MetricScope) {
   return metricScope === key ? 'scope scope-active' : 'scope';
 }
 
+function feedbackScopeClassName(activeScope: FeedbackScope, key: FeedbackScope) {
+  return activeScope === key ? 'feedback-scope feedback-scope-active' : 'feedback-scope';
+}
+
 function summaryTitle(metricScope: MetricScope) {
   if (metricScope === 'today') return '今日授课';
   if (metricScope === 'week') return '本周授课';
@@ -279,6 +331,7 @@ Component({
     loading: true,
     activeView: 'schedule' as ActiveView,
     metricScope: 'today' as MetricScope,
+    activeFeedbackScope: 'today' as FeedbackScope,
     summaryTitle: summaryTitle('today'),
     viewTabs: VIEW_TABS.map((item) => ({
       ...item,
@@ -288,7 +341,14 @@ Component({
       ...item,
       className: scopeClassName('today', item.key),
     })),
+    feedbackScopeTabs: FEEDBACK_SCOPE_TABS.map((item) => ({
+      ...item,
+      count: 0,
+      className: feedbackScopeClassName('today', item.key),
+    })),
     stats: { courseCount: 0, pendingRollCall: 0, leaveMessages: 0, pendingHomework: 0 },
+    teacherNotifications: [] as TeacherNoticeItem[],
+    pendingAttentionCount: 0,
     todayCourseCount: 0,
     todayPendingCount: 0,
     todaySummaryText: '今天暂无排课',
@@ -307,7 +367,13 @@ Component({
     selectedDateKey: dateKey(startOfDay(new Date())),
     classes: [] as Array<ReturnType<typeof normalizeClass>>,
     students: [] as StudentRow[],
-    feedbackEvents: [] as Array<ReturnType<typeof normalizeEvent> & { feedbackCount: number }>,
+    feedbackEvents: [] as Array<
+      ReturnType<typeof normalizeEvent> & {
+        feedbackCount: number;
+        interactionStatusLabel: string;
+      }
+    >,
+    feedbackEmptyText: '今天暂无可互动课次。',
     homeworkCheckIns: [] as Array<
       TeacherHomeworkCheckIn & {
         statusLabel: string;
@@ -374,12 +440,14 @@ Component({
         homeworkCheckIns,
         lessonFeedbacks,
         homeworkAssignments,
+        teacherNotifications,
       ] = await Promise.all([
         fetchTeacherDashboard(),
         fetchTeacherCalendar(calendarRange()),
         fetchTeacherHomeworkCheckIns(),
         fetchTeacherLessonFeedbacks(),
         fetchTeacherHomeworkAssignments(),
+        fetchTeacherNotifications({ status: 'unread', limit: 20 }),
       ]);
       const today = startOfDay(new Date());
       const selectedDateKey = this.data.selectedDateKey || dateKey(today);
@@ -390,6 +458,8 @@ Component({
         students: this.buildStudentRows(dashboard.classes),
         lessonFeedbacks,
         homeworkAssignments,
+        teacherNotifications: teacherNotifications.map(normalizeTeacherNotification),
+        pendingAttentionCount: teacherNotifications.filter((item) => item.status === 'unread').length,
         homeworkCheckIns: homeworkCheckIns.map((item) => ({
           ...item,
           statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus,
@@ -472,6 +542,56 @@ Component({
         (feedbackCountBySession.get(feedback.classSessionId) ?? 0) + 1,
       );
     }
+    const now = new Date();
+    const pendingStart = addDays(today, -14);
+    const historyStart = addDays(today, -30);
+    const feedbackRows = calendarEvents
+      .filter((event) => event.status !== 'cancelled' && new Date(event.startsAt) <= now)
+      .map((event) => {
+        const feedbackCount = feedbackCountBySession.get(event.id) ?? 0;
+        const complete = event.rosterCount > 0 && feedbackCount >= event.rosterCount;
+        return {
+          ...normalizeEvent(event),
+          feedbackCount,
+          interactionStatusLabel: complete
+            ? '已完成'
+            : feedbackCount > 0
+              ? `已互动 ${feedbackCount}/${event.rosterCount}`
+              : '未互动',
+        };
+      });
+    const todayFeedbackEvents = feedbackRows
+      .filter((event) => sameDate(new Date(event.startsAt), today))
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    const pendingFeedbackEvents = feedbackRows
+      .filter((event) => {
+        const startsAt = new Date(event.startsAt);
+        return (
+          startsAt >= pendingStart &&
+          startsAt <= now &&
+          !sameDate(startsAt, today) &&
+          event.rosterCount > 0 &&
+          event.feedbackCount < event.rosterCount
+        );
+      })
+      .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+    const historyFeedbackEvents = feedbackRows
+      .filter((event) => {
+        const startsAt = new Date(event.startsAt);
+        return startsAt >= historyStart && startsAt <= now && !sameDate(startsAt, today);
+      })
+      .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+    const feedbackBuckets: Record<FeedbackScope, typeof feedbackRows> = {
+      today: todayFeedbackEvents,
+      pending: pendingFeedbackEvents,
+      history: historyFeedbackEvents,
+    };
+    const feedbackEmptyTextMap: Record<FeedbackScope, string> = {
+      today: '今天暂无可互动课次。',
+      pending: '近14天暂无待补互动课次。',
+      history: '近30天暂无历史互动课次。',
+    };
+    const activeFeedbackScope = this.data.activeFeedbackScope as FeedbackScope;
     this.setData({
       viewTabs: VIEW_TABS.map((item) => ({
         ...item,
@@ -480,6 +600,11 @@ Component({
       scopeTabs: SCOPE_TABS.map((item) => ({
         ...item,
         className: scopeClassName(this.data.metricScope, item.key),
+      })),
+      feedbackScopeTabs: FEEDBACK_SCOPE_TABS.map((item) => ({
+        ...item,
+        count: feedbackBuckets[item.key].length,
+        className: feedbackScopeClassName(activeFeedbackScope, item.key),
       })),
       summaryTitle: summaryTitle(this.data.metricScope),
       stats: {
@@ -537,14 +662,8 @@ Component({
                 : `month-day${inCurrentMonth ? '' : ' month-day-muted'}`,
         };
       }),
-      feedbackEvents: calendarEvents
-        .filter((event) => event.status !== 'cancelled' && new Date(event.startsAt) <= new Date())
-        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-        .slice(0, 30)
-        .map((event) => ({
-          ...normalizeEvent(event),
-          feedbackCount: feedbackCountBySession.get(event.id) ?? 0,
-        })),
+      feedbackEvents: feedbackBuckets[activeFeedbackScope].slice(0, 30),
+      feedbackEmptyText: feedbackEmptyTextMap[activeFeedbackScope],
     });
   },
 
@@ -557,6 +676,55 @@ Component({
   switchScope(event: MiniTapEvent) {
     const key = event.currentTarget.dataset.key as MetricScope;
     this.setData({ metricScope: key });
+    this.recompute();
+  },
+
+  handleSummaryTap(event: MiniTapEvent) {
+    const action = String(event.currentTarget.dataset.action || '');
+    if (action === 'homework') {
+      this.setData({ activeView: 'homework' });
+      this.recompute();
+      return;
+    }
+    if (action === 'leave' || action === 'rollcall' || action === 'schedule') {
+      this.setData({
+        activeView: 'schedule',
+        selectedDateKey: dateKey(startOfDay(new Date())),
+      });
+      this.recompute();
+    }
+  },
+
+  async openTeacherNotification(event: MiniTapEvent) {
+    const notificationId = String(event.currentTarget.dataset.id || '');
+    const notice = (this.data.teacherNotifications as TeacherNoticeItem[]).find(
+      (item) => item.id === notificationId,
+    );
+    if (!notice) return;
+    if (notice.category === 'teacher.student.enrolled' && notice.studentId) {
+      if (notice.status === 'unread') {
+        await markTeacherNotificationRead(notificationId).catch(() => null);
+      }
+      wx.navigateTo({
+        url: `/pages/teacher-student-detail/index?studentId=${encodeURIComponent(
+          notice.studentId,
+        )}&courseId=${encodeURIComponent(notice.courseId)}&notificationId=${encodeURIComponent(
+          notificationId,
+        )}&tab=overview`,
+      });
+      return;
+    }
+    if (notice.status === 'unread') {
+      await markTeacherNotificationRead(notificationId).catch(() => null);
+      await this.reload();
+    }
+    wx.showToast({ title: '已标记关注', icon: 'none' });
+  },
+
+  switchFeedbackScope(event: MiniTapEvent) {
+    const key = event.currentTarget.dataset.key as FeedbackScope;
+    if (!key) return;
+    this.setData({ activeFeedbackScope: key });
     this.recompute();
   },
 

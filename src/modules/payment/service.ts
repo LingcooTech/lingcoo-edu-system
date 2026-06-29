@@ -12,6 +12,7 @@ import {
   sendWechatMiniSubscribeMessage,
 } from '../../lib/wechat-mini.js';
 import { NotificationsService } from '../notifications/service.js';
+import { notifyTeachersTrialSeatReserved } from '../teacher-notification-events.js';
 import { getPaymentProvider } from './providers/index.js';
 import type {
   LivePaymentProviderCode,
@@ -373,6 +374,19 @@ export class PaymentService {
       sourceEventName: 'payment.paid',
       dedupeKey: `payment.paid:${order.orderNo}:${provider}:${providerOrderId}`,
     });
+    if (isSeatReservation && seatReservation?.courseId && seatReserved) {
+      const trialSession = seatReservation.trialSessionId
+        ? await this.findTrialSession(seatReservation.trialSessionId)
+        : null;
+      await notifyTeachersTrialSeatReserved(this.app.db, {
+        orderNo: order.orderNo,
+        seatReservationId: seatReservation.id,
+        trialSessionId: seatReservation.trialSessionId,
+        studentName: seatReservation.studentName,
+        courseId: seatReservation.courseId,
+        startsAt: trialSession?.startsAt ?? null,
+      });
+    }
     await this.sendWechatMiniPaymentSubscribe(order);
   }
 
@@ -383,6 +397,15 @@ export class PaymentService {
       .where(eq(schema.seatReservations.orderNo, orderNo))
       .limit(1);
     return reservation ?? null;
+  }
+
+  private async findTrialSession(trialSessionId: string) {
+    const [trialSession] = await this.app.db
+      .select()
+      .from(schema.trialSessions)
+      .where(eq(schema.trialSessions.id, trialSessionId))
+      .limit(1);
+    return trialSession ?? null;
   }
 
   private async sendWechatMiniPaymentSubscribe(order: Order) {

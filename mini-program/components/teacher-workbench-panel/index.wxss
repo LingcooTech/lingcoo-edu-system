@@ -92,6 +92,15 @@
   min-width: 0;
 }
 
+.summary-action {
+  border-radius: 18rpx;
+  padding: 10rpx 4rpx;
+}
+
+.summary-action:active {
+  background: rgba(154, 106, 75, 0.08);
+}
+
 .summary-value {
   color: #211f1c;
   font-size: 44rpx;
@@ -147,7 +156,6 @@
 }
 
 .tab-icon {
-  position: relative;
   display: flex;
   width: 58rpx;
   height: 58rpx;
@@ -155,98 +163,16 @@
   justify-content: center;
   border-radius: 20rpx;
   background: #f7e8dc;
-  color: #9a6a4b;
-  font-size: 25rpx;
-  font-weight: 900;
-  line-height: 1;
 }
 
 .tab-active .tab-icon {
-  background: #9a6a4b;
-  color: #fff;
+  background: #f7e8dc;
 }
 
-.tab-icon::before,
-.tab-icon::after {
-  position: absolute;
-  box-sizing: border-box;
-  content: '';
-}
-
-.tab-icon-schedule::before {
-  width: 30rpx;
-  height: 34rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 6rpx;
-}
-
-.tab-icon-schedule::after {
-  width: 24rpx;
-  height: 4rpx;
-  border-radius: 999rpx;
-  background: currentColor;
-  transform: translateY(-8rpx);
-}
-
-.tab-icon-classes::before {
-  width: 34rpx;
-  height: 26rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 6rpx;
-}
-
-.tab-icon-classes::after {
-  width: 24rpx;
-  height: 4rpx;
-  border-radius: 999rpx;
-  background: currentColor;
-  transform: translateY(8rpx);
-}
-
-.tab-icon-students::before {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 999rpx;
-  background: currentColor;
-  transform: translateY(-10rpx);
-}
-
-.tab-icon-students::after {
-  width: 34rpx;
-  height: 18rpx;
-  border-radius: 18rpx 18rpx 8rpx 8rpx;
-  background: currentColor;
-  transform: translateY(12rpx);
-}
-
-.tab-icon-feedbacks::before {
-  width: 34rpx;
-  height: 28rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 10rpx;
-}
-
-.tab-icon-feedbacks::after {
-  width: 10rpx;
-  height: 10rpx;
-  border-right: 4rpx solid currentColor;
-  border-bottom: 4rpx solid currentColor;
-  transform: translate(10rpx, 15rpx) rotate(45deg);
-}
-
-.tab-icon-homework::before {
-  width: 30rpx;
-  height: 34rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 8rpx;
-}
-
-.tab-icon-homework::after {
-  width: 18rpx;
-  height: 10rpx;
-  border-left: 4rpx solid currentColor;
-  border-bottom: 4rpx solid currentColor;
-  transform: rotate(-45deg);
+.tab-icon-image {
+  display: block;
+  width: 38rpx;
+  height: 38rpx;
 }
 
 .tab-label {
@@ -265,6 +191,79 @@
 .tab-active .tab-label {
   color: #9a6a4b;
   font-weight: 850;
+}
+
+.notice-panel {
+  margin-top: 24rpx;
+}
+
+.notice-panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.notice-title {
+  margin: 0;
+}
+
+.notice-subtitle {
+  margin-top: 6rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+}
+
+.notice-list {
+  display: grid;
+  gap: 14rpx;
+  margin-top: 16rpx;
+}
+
+.notice-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  padding: 22rpx 24rpx;
+  box-shadow: 0 6rpx 18rpx rgba(33, 31, 28, 0.05);
+}
+
+.notice-card-unread {
+  border: 1rpx solid rgba(154, 106, 75, 0.18);
+  background: #fffaf4;
+}
+
+.notice-card-title {
+  color: #211f1c;
+  font-size: 27rpx;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.notice-card-body {
+  margin-top: 6rpx;
+  color: #57534e;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.notice-card-date {
+  margin-top: 8rpx;
+  color: #9a948b;
+  font-size: 21rpx;
+}
+
+.notice-action {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #211f1c;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 850;
+  padding: 10rpx 18rpx;
 }
 
 .section-title {
@@ -358,6 +357,47 @@
   padding: 34rpx;
   color: #8b857c;
   font-size: 26rpx;
+}
+
+.feedback-filter {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+  margin: 28rpx 0 18rpx;
+}
+
+.feedback-scope {
+  display: flex;
+  min-width: 0;
+  min-height: 82rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid rgba(33, 31, 28, 0.06);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 4rpx 12rpx rgba(33, 31, 28, 0.04);
+  color: #57534e;
+}
+
+.feedback-scope-active {
+  border-color: rgba(154, 106, 75, 0.2);
+  background: #211f1c;
+  color: #fff;
+}
+
+.feedback-scope-label {
+  font-size: 24rpx;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.feedback-scope-count {
+  margin-top: 6rpx;
+  font-size: 21rpx;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0.72;
 }
 
 .calendar-card {

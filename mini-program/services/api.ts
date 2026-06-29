@@ -626,10 +626,13 @@ export interface ParentNotification {
   body: string;
   ctaLabel?: string | null;
   ctaUrl?: string | null;
+  meta?: Record<string, unknown>;
   status: 'unread' | 'read' | 'archived' | string;
   createdAt: string;
   updatedAt: string;
 }
+
+export type TeacherNotification = ParentNotification;
 
 export interface AttendanceSummary {
   present: number;
@@ -669,6 +672,38 @@ export interface TeacherClass {
     status?: string;
     lessonBalance?: number | null;
   }>;
+}
+
+export interface TeacherClassOption {
+  id: string;
+  name: string;
+  status: string;
+  capacity: number;
+  enrolledCount: number;
+  remainingSeats: number;
+  alreadyEnrolled: boolean;
+  canEnroll: boolean;
+  disabledReason: string;
+  course?: { id: string; name: string } | null;
+  classroom?: { id?: string; name: string } | null;
+}
+
+export interface TeacherClassOptionsPayload {
+  student: {
+    id: string;
+    name: string;
+    grade: string;
+    school?: string | null;
+    status?: string;
+  };
+  lessonAccounts: Array<{
+    id: string;
+    studentId: string;
+    courseId: string;
+    balance: number;
+    course?: Course | null;
+  }>;
+  classes: TeacherClassOption[];
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent' | 'makeup' | 'trial';
@@ -1134,6 +1169,49 @@ export async function fetchTeacherDashboard(): Promise<{
   classes: TeacherClass[];
 }> {
   return request('/public/teacher/dashboard');
+}
+
+export async function fetchTeacherNotifications(params: {
+  status?: 'unread' | 'read' | 'archived';
+  limit?: number;
+} = {}): Promise<TeacherNotification[]> {
+  return (
+    await request<{ notifications: TeacherNotification[] }>(
+      `/public/teacher/notifications${buildQueryString(params)}`,
+    )
+  ).notifications;
+}
+
+export async function markTeacherNotificationRead(
+  notificationId: string,
+): Promise<TeacherNotification> {
+  return (
+    await request<{ notification: TeacherNotification }>(
+      `/public/teacher/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: 'POST' },
+    )
+  ).notification;
+}
+
+export function fetchTeacherStudentClassOptions(
+  studentId: string,
+  params: { courseId?: string } = {},
+): Promise<TeacherClassOptionsPayload> {
+  return request(
+    `/public/teacher/students/${encodeURIComponent(studentId)}/class-options${buildQueryString(
+      params,
+    )}`,
+  );
+}
+
+export function enrollTeacherStudent(
+  studentId: string,
+  input: { classId: string; notificationId?: string },
+): Promise<{ enrollment: { id: string; classId: string; studentId: string; active: boolean } }> {
+  return request(`/public/teacher/students/${encodeURIComponent(studentId)}/enrollments`, {
+    method: 'POST',
+    data: input,
+  });
 }
 
 export async function fetchTeacherCalendar(params: { from?: string; to?: string } = {}) {

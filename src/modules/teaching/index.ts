@@ -10,6 +10,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
 import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
+import { NotificationsService } from '../notifications/service.js';
 import type { AppModule } from '../types.js';
 
 const teacherSchema = z.object({
@@ -82,6 +83,20 @@ const teacherAttendanceSchema = z.object({
 const teacherCalendarQuerySchema = z.object({
   from: z.string().datetime({ offset: true }).optional(),
   to: z.string().datetime({ offset: true }).optional(),
+});
+
+const teacherNotificationQuerySchema = z.object({
+  status: z.enum(['unread', 'read', 'archived']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const teacherClassOptionsQuerySchema = z.object({
+  courseId: z.string().uuid().optional(),
+});
+
+const teacherEnrollmentSchema = z.object({
+  classId: z.string().uuid(),
+  notificationId: z.string().uuid().optional(),
 });
 
 function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, to?: Date) {
@@ -235,6 +250,130 @@ export const teachingModule: AppModule = {
     );
 
     app.get(
+      '/public/teacher/notifications',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const query = teacherNotificationQuerySchema.parse(request.query);
+        const service = new NotificationsService(app.db);
+        const items = await service.listForRecipient({
+          recipientType: 'staff',
+          recipientId: request.account!.id,
+          status: query.status,
+          limit: query.limit ?? 50,
+        });
+        return {
+          notifications: items.filter((item) => item.category.startsWith('teacher.')),
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/notifications/:notificationId/read',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { notificationId } = request.params as { notificationId: string };
+        const service = new NotificationsService(app.db);
+        const item = await service.markAsRead(notificationId, request.account!.id);
+        if (!item || !item.category.startsWith('teacher.')) {
+          throw notFound('Notification not found');
+        }
+        return { notification: item };
+      },
+    );
+
+    app.get(
+      '/public/teacher/students/:studentId/class-options',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { studentId } = request.params as { studentId: string };
+        const query = teacherClassOptionsQuerySchema.parse(request.query);
+        const options = await loadTeacherClassOptions({
+          accountId: request.account!.id,
+          studentId,
+          courseId: query.courseId,
+        });
+        return {
+          student: options.student,
+          lessonAccounts: options.lessonAccounts,
+          classes: options.classes,
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/students/:studentId/enrollments',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { studentId } = request.params as { studentId: string };
+        const body = teacherEnrollmentSchema.parse(request.body);
+        const account = await requireTeacherAccount(request.account!.id);
+        const classGroup = await schedulingRepo.findClass(app.db, body.classId);
+        if (!classGroup) throw notFound('Class not found');
+        if (classGroup.teacherId !== account.teacherId) {
+          throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
+        }
+        if (!['recruiting', 'active'].includes(classGroup.status)) {
+          throw Object.assign(new Error('只能分入招生中或开课中班级'), { statusCode: 422 });
+        }
+
+        await peopleRepo.requireStudent(app.db, studentId);
+        const [lessonAccount] = await app.db
+          .select()
+          .from(schema.lessonAccounts)
+          .where(
+            and(
+              eq(schema.lessonAccounts.studentId, studentId),
+              eq(schema.lessonAccounts.courseId, classGroup.courseId),
+            ),
+          )
+          .limit(1);
+        if (!lessonAccount) {
+          throw Object.assign(new Error('该学员暂无此课程的正式课时档案'), { statusCode: 422 });
+        }
+
+        const allClasses = await schedulingRepo.listClasses(app.db);
+        const sameCourseClasses = allClasses.filter(
+          (item) => item.courseId === classGroup.courseId,
+        );
+        const sameCourseEnrollments = (
+          await Promise.all(
+            sameCourseClasses.map((item) => schedulingRepo.listEnrollments(app.db, item.id)),
+          )
+        ).flat();
+        const existingSameCourseEnrollment = sameCourseEnrollments.find(
+          (enrollment) => enrollment.studentId === studentId,
+        );
+        if (existingSameCourseEnrollment) {
+          throw Object.assign(
+            new Error(
+              existingSameCourseEnrollment.classId === classGroup.id
+                ? '该学员已在此班'
+                : '该学员已在同课程其他班级，需管理员调整',
+            ),
+            { statusCode: 409 },
+          );
+        }
+
+        const enrolledCount = await schedulingRepo.countActiveEnrollments(app.db, classGroup.id);
+        if (enrolledCount >= classGroup.capacity) {
+          throw Object.assign(new Error('班级已满'), { statusCode: 409 });
+        }
+
+        const enrollment = await schedulingRepo.createEnrollment(app.db, {
+          classId: classGroup.id,
+          studentId,
+          active: true,
+        });
+
+        if (body.notificationId) {
+          await new NotificationsService(app.db).markAsRead(body.notificationId, request.account!.id);
+        }
+
+        return { enrollment };
+      },
+    );
+
+    app.get(
       '/public/teacher/calendar',
       { preHandler: app.requireRole('teacher') },
       async (request) => {
@@ -317,6 +456,87 @@ export const teachingModule: AppModule = {
         throw Object.assign(new Error('无权操作该课次'), { statusCode: 403 });
       }
       return { account, session };
+    }
+
+    async function requireTeacherAccount(accountId: string) {
+      const account = await accountsRepo.findById(app.db, accountId);
+      if (!account?.teacherId) {
+        throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
+      }
+      return account;
+    }
+
+    async function loadTeacherClassOptions(input: {
+      accountId: string;
+      studentId: string;
+      courseId?: string;
+    }) {
+      const account = await requireTeacherAccount(input.accountId);
+      const [student, allClasses, courses, classrooms, lessonAccounts] = await Promise.all([
+        peopleRepo.requireStudent(app.db, input.studentId),
+        schedulingRepo.listClasses(app.db),
+        catalogRepo.listCourses(app.db),
+        teachingRepo.listClassrooms(app.db),
+        app.db
+          .select()
+          .from(schema.lessonAccounts)
+          .where(eq(schema.lessonAccounts.studentId, input.studentId)),
+      ]);
+
+      const lessonCourseIds = new Set(lessonAccounts.map((item) => item.courseId));
+      const targetCourseIds = input.courseId ? new Set([input.courseId]) : lessonCourseIds;
+      if (input.courseId && !lessonCourseIds.has(input.courseId)) {
+        throw Object.assign(new Error('该学员暂无此课程的正式课时档案'), { statusCode: 422 });
+      }
+
+      const myClasses = allClasses.filter(
+        (classGroup) =>
+          classGroup.teacherId === account.teacherId &&
+          targetCourseIds.has(classGroup.courseId) &&
+          ['recruiting', 'active'].includes(classGroup.status),
+      );
+      const enrollmentsByClassId = new Map<
+        string,
+        Awaited<ReturnType<typeof schedulingRepo.listEnrollments>>
+      >();
+      for (const classGroup of myClasses) {
+        enrollmentsByClassId.set(
+          classGroup.id,
+          await schedulingRepo.listEnrollments(app.db, classGroup.id),
+        );
+      }
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const classroomById = new Map(classrooms.map((classroom) => [classroom.id, classroom]));
+      return {
+        account,
+        student,
+        lessonAccounts: lessonAccounts.map((item) => ({
+          ...item,
+          course: courseById.get(item.courseId) ?? null,
+        })),
+        classes: myClasses.map((classGroup) => {
+          const enrollments = enrollmentsByClassId.get(classGroup.id) ?? [];
+          const enrolledCount = enrollments.length;
+          const alreadyEnrolled = enrollments.some(
+            (enrollment) => enrollment.studentId === input.studentId,
+          );
+          const capacityReached = enrolledCount >= classGroup.capacity;
+          return {
+            ...classGroup,
+            course: courseById.get(classGroup.courseId) ?? null,
+            classroom: classroomById.get(classGroup.classroomId) ?? null,
+            enrolledCount,
+            remainingSeats: Math.max(classGroup.capacity - enrolledCount, 0),
+            alreadyEnrolled,
+            canEnroll: !alreadyEnrolled && !capacityReached,
+            disabledReason: alreadyEnrolled
+              ? '已在班'
+              : capacityReached
+                ? '已满'
+                : '',
+          };
+        }),
+      };
     }
 
     async function loadTeacherHomeworkScope(accountId: string) {

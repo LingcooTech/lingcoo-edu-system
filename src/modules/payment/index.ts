@@ -15,6 +15,7 @@ import { hashPassword } from '../../lib/password.js';
 import { resolvePackageCourse } from '../package-course.js';
 import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
 import type { AppModule } from '../types.js';
+import { notifyTeachersFormalStudentEnrolled } from '../teacher-notification-events.js';
 import { getPaymentProvider } from './providers/index.js';
 import { PaymentService } from './service.js';
 import {
@@ -408,6 +409,14 @@ export const paymentModule: AppModule = {
           );
 
           return { student, order, courseContract: contract.courseContract };
+        });
+
+        await notifyTeachersFormalStudentEnrolled(app.db, {
+          orderNo: result.order.orderNo,
+          studentId: result.student.id,
+          studentName: result.student.name,
+          courseId: result.order.courseId!,
+          courseContractId: result.courseContract.id,
         });
 
         return {

@@ -48,6 +48,32 @@
         </view>
       </view>
       <view wx:else class="card empty-card">暂无班级信息。</view>
+
+      <view wx:if="{{classOptions.length}}" class="section-title">可分班级</view>
+      <view wx:if="{{classOptions.length}}" class="list">
+        <view wx:for="{{classOptions}}" wx:key="id" class="card class-option-card">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.name}}</view>
+              <view class="row-meta">{{item.courseName}} · {{item.classroomName}}</view>
+            </view>
+            <view class="status-pill">{{item.statusLabel}}</view>
+          </view>
+          <view class="class-option-stats">
+            <view>{{item.enrolledCount}}/{{item.capacity}} 人</view>
+            <view>余 {{item.remainingSeats}}</view>
+          </view>
+          <button
+            class="mini-button class-enroll-button"
+            disabled="{{!item.canEnroll || enrollingClassId}}"
+            loading="{{enrollingClassId == item.id}}"
+            data-id="{{item.id}}"
+            bindtap="enrollStudent"
+          >
+            {{item.canEnroll ? '分入此班' : item.disabledReason}}
+          </button>
+        </view>
+      </view>
     </block>
 
     <block wx:elif="{{activeTab == 'attendance'}}">

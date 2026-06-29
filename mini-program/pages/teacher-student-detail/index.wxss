@@ -116,6 +116,10 @@
   padding: 28rpx;
 }
 
+.class-option-card {
+  padding: 28rpx;
+}
+
 .row-card,
 .row-between {
   display: flex;
@@ -172,4 +176,25 @@
   padding: 34rpx;
   color: #8b857c;
   font-size: 26rpx;
+}
+
+.class-option-stats {
+  display: flex;
+  gap: 18rpx;
+  margin-top: 18rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.class-enroll-button {
+  width: 100%;
+  margin-top: 20rpx;
+  background: #211f1c;
+  color: #fff;
+}
+
+.class-enroll-button[disabled] {
+  background: #eee9e2;
+  color: #9a948b;
 }

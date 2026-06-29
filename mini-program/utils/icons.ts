@@ -97,3 +97,30 @@ export const GUEST_ACCOUNT_ICONS = {
   star:
     'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22m32%208%207%2015%2016%202-12%2012%203%2017-14-8-14%208%203-17L9%2025l16-2%207-15Z%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E',
 };
+
+export const TEACHER_WORKBENCH_ICONS = {
+  schedule: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect x="13" y="14" width="38" height="40" rx="7" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <path d="M13 27h38M23 10v10M41 10v10" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+    <path d="m23 42 7 7 13-16" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`),
+  classes: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="24" cy="24" r="9" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <circle cx="43" cy="27" r="7" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <path d="M10 53c2.8-11 9.5-16 17-16s14.2 5 17 16" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+    <path d="M36 42c5.8.8 10.4 4.4 12 11" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+  </svg>`),
+  students: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="23" r="11" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <path d="M14 54c3-12 10-18 18-18s15 6 18 18" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+  </svg>`),
+  feedbacks: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <path d="M12 16h40a7 7 0 0 1 7 7v20a7 7 0 0 1-7 7H34l-14 8v-8h-8a7 7 0 0 1-7-7V23a7 7 0 0 1 7-7Z" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linejoin="round"/>
+    <path d="m32 25 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6Z" fill="#9A6A4B"/>
+  </svg>`),
+  homework: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect x="15" y="12" width="34" height="44" rx="7" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <path d="M24 25h16M24 36h10" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+    <path d="m26 47 5 5 10-13" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`),
+};

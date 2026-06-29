@@ -1,6 +1,8 @@
 import {
   fetchTeacherCalendar,
   fetchTeacherDashboard,
+  enrollTeacherStudent,
+  fetchTeacherStudentClassOptions,
   fetchTeacherHomeworkAssignments,
   fetchTeacherHomeworkCheckIns,
   fetchTeacherLessonFeedbacks,
@@ -9,6 +11,7 @@ import {
   type HomeworkAssignment,
   type TeacherCalendarEvent,
   type TeacherClass,
+  type TeacherClassOption,
 } from '../../services/api';
 
 type StudentProfile = {
@@ -27,6 +30,12 @@ type ClassRow = {
   courseName: string;
   classroomName: string;
   balance: string;
+};
+
+type ClassOptionRow = TeacherClassOption & {
+  courseName: string;
+  classroomName: string;
+  statusLabel: string;
 };
 
 type AttendanceRow = {
@@ -121,6 +130,9 @@ Page({
   data: {
     loading: true,
     studentId: '',
+    courseId: '',
+    notificationId: '',
+    enrollingClassId: '',
     profile: null as StudentProfile | null,
     activeTab: 'overview' as ActiveTab,
     detailTabs: DETAIL_TABS.map((item) => ({
@@ -128,13 +140,24 @@ Page({
       className: item.key === 'overview' ? 'detail-tab detail-tab-active' : 'detail-tab',
     })),
     classes: [] as ClassRow[],
+    classOptions: [] as ClassOptionRow[],
     attendance: [] as AttendanceRow[],
     feedbacks: [] as FeedbackRow[],
     homework: [] as HomeworkRow[],
   },
 
-  onLoad(query: { studentId?: string }) {
-    this.setData({ studentId: query.studentId || '' });
+  onLoad(query: { studentId?: string; courseId?: string; notificationId?: string; tab?: ActiveTab }) {
+    const activeTab = query.tab || 'overview';
+    this.setData({
+      studentId: query.studentId || '',
+      courseId: query.courseId || '',
+      notificationId: query.notificationId || '',
+      activeTab,
+      detailTabs: DETAIL_TABS.map((item) => ({
+        ...item,
+        className: item.key === activeTab ? 'detail-tab detail-tab-active' : 'detail-tab',
+      })),
+    });
     this.reload();
   },
 
@@ -158,15 +181,19 @@ Page({
         homeworkCheckIns,
         lessonFeedbacks,
         homeworkAssignments,
+        classOptionsPayload,
       ] = await Promise.all([
         fetchTeacherDashboard(),
         fetchTeacherCalendar(calendarRange()),
         fetchTeacherHomeworkCheckIns(),
         fetchTeacherLessonFeedbacks(),
         fetchTeacherHomeworkAssignments(),
+        this.data.courseId
+          ? fetchTeacherStudentClassOptions(studentId, { courseId: this.data.courseId })
+          : Promise.resolve(null),
       ]);
       const student = findStudent(dashboard.classes, studentId);
-      if (!student) {
+      if (!student && !classOptionsPayload?.student) {
         throw new Error('暂无权限查看该学员');
       }
 
@@ -259,19 +286,40 @@ Page({
       const totalStars =
         feedbackRows.reduce((sum, item) => sum + item.rating, 0) +
         homeworkRows.reduce((sum, item) => sum + item.rating, 0);
+      const classOptions =
+        classOptionsPayload?.classes.map((item) => ({
+          ...item,
+          courseName: item.course?.name || '课程',
+          classroomName: item.classroom?.name || '教室待确认',
+          statusLabel:
+            item.disabledReason ||
+            (item.status === 'recruiting'
+              ? '招生中'
+              : item.status === 'active'
+                ? '开课中'
+                : item.status),
+        })) ?? [];
+      const profileStudent = student ?? classOptionsPayload!.student;
+      const optionBalance = classOptionsPayload?.lessonAccounts.reduce(
+        (sum, item) => sum + item.balance,
+        0,
+      ) ?? 0;
 
       this.setData({
         loading: false,
         profile: {
-          id: student.id,
-          name: student.name,
-          grade: student.grade,
-          school: student.school || '',
+          id: profileStudent.id,
+          name: profileStudent.name,
+          grade: profileStudent.grade,
+          school: profileStudent.school || '',
           classCount: classRows.length,
-          totalBalance: classRows.reduce((sum, item) => sum + (Number(item.balance) || 0), 0),
+          totalBalance:
+            classRows.reduce((sum, item) => sum + (Number(item.balance) || 0), 0) ||
+            optionBalance,
           totalStars,
         },
         classes: classRows,
+        classOptions,
         attendance,
         feedbacks: feedbackRows,
         homework: homeworkRows,
@@ -292,5 +340,23 @@ Page({
         className: item.key === key ? 'detail-tab detail-tab-active' : 'detail-tab',
       })),
     });
+  },
+
+  async enrollStudent(event: { currentTarget: { dataset: { id?: string } } }) {
+    const classId = String(event.currentTarget.dataset.id || '');
+    if (!classId || this.data.enrollingClassId) return;
+    this.setData({ enrollingClassId: classId });
+    try {
+      await enrollTeacherStudent(this.data.studentId, {
+        classId,
+        notificationId: this.data.notificationId || undefined,
+      });
+      wx.showToast({ title: '分班成功', icon: 'success' });
+      await this.reload();
+    } catch (error) {
+      wx.showToast({ title: error instanceof Error ? error.message : '分班失败', icon: 'none' });
+    } finally {
+      this.setData({ enrollingClassId: '' });
+    }
   },
 });

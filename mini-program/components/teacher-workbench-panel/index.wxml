@@ -21,19 +21,19 @@
         </view>
       </view>
       <view class="summary-grid">
-        <view class="summary-item">
+        <view class="summary-item summary-action" data-action="schedule" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.courseCount}}</view>
           <view class="summary-label">课程数</view>
         </view>
-        <view class="summary-item">
+        <view class="summary-item summary-action" data-action="rollcall" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.pendingRollCall}}</view>
           <view class="summary-label">待点名</view>
         </view>
-        <view class="summary-item">
+        <view class="summary-item summary-action" data-action="leave" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.leaveMessages}}</view>
           <view class="summary-label">请假消息</view>
         </view>
-        <view class="summary-item">
+        <view class="summary-item summary-action" data-action="homework" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.pendingHomework}}</view>
           <view class="summary-label">待批阅</view>
         </view>
@@ -48,8 +48,35 @@
         data-key="{{item.key}}"
         bindtap="switchView"
       >
-        <view class="tab-icon tab-icon-{{item.key}}"></view>
+        <view class="tab-icon">
+          <image class="tab-icon-image" src="{{item.iconSrc}}" mode="aspectFit" />
+        </view>
         <view class="tab-label">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{teacherNotifications.length}}" class="notice-panel">
+      <view class="notice-panel-head">
+        <view>
+          <view class="section-title notice-title">待处理</view>
+          <view class="notice-subtitle">{{pendingAttentionCount}} 条新通知</view>
+        </view>
+      </view>
+      <view class="notice-list">
+        <view
+          wx:for="{{teacherNotifications}}"
+          wx:key="id"
+          class="{{item.className}}"
+          data-id="{{item.id}}"
+          bindtap="openTeacherNotification"
+        >
+          <view>
+            <view class="notice-card-title">{{item.title}}</view>
+            <view class="notice-card-body">{{item.body}}</view>
+            <view class="notice-card-date">{{item.dateLabel}}</view>
+          </view>
+          <view class="notice-action">{{item.actionLabel}}</view>
+        </view>
       </view>
     </view>
 
@@ -189,15 +216,26 @@
     </block>
 
     <block wx:elif="{{activeView == 'feedbacks'}}">
-      <view class="section-title">课堂互动</view>
+      <view class="feedback-filter">
+        <view
+          wx:for="{{feedbackScopeTabs}}"
+          wx:key="key"
+          class="{{item.className}}"
+          data-key="{{item.key}}"
+          bindtap="switchFeedbackScope"
+        >
+          <view class="feedback-scope-label">{{item.label}}</view>
+          <view class="feedback-scope-count">{{item.count}}</view>
+        </view>
+      </view>
       <view wx:if="{{feedbackEvents.length}}" class="list">
         <view wx:for="{{feedbackEvents}}" wx:key="id" class="card compact-card">
           <view class="row-between">
             <view>
               <view class="card-title">{{item.className}} · {{item.title}}</view>
-              <view class="card-meta">{{item.dateLabel}} · {{item.courseName}}</view>
+              <view class="card-meta">{{item.dateLabel}} · {{item.timeLabel}} · {{item.courseName}}</view>
             </view>
-            <view class="pill">已互动 {{item.feedbackCount}}/{{item.rosterCount}}</view>
+            <view class="pill">{{item.interactionStatusLabel}}</view>
           </view>
           <view class="session-foot">
             <view class="card-meta">{{item.classroomName}}</view>
@@ -205,7 +243,7 @@
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无历史互动课次。</view>
+      <view wx:else class="card empty-card">{{feedbackEmptyText}}</view>
     </block>
 
     <block wx:else>
