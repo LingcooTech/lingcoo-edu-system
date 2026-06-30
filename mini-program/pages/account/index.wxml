@@ -38,11 +38,11 @@
         </navigator>
         <navigator class="hero-metric" url="/pages/account-lessons/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.totalBalance}}</view>
-          <view class="metric-label">课时</view>
+          <view class="metric-label">剩余课时</view>
         </navigator>
-        <navigator class="hero-metric" url="/pages/account-attendance/index" hover-class="metric-hover">
-          <view class="metric-value">{{stats.pendingCheckIns}}</view>
-          <view class="metric-label">待签到</view>
+        <navigator class="hero-metric" url="/pages/account-interactions/index" hover-class="metric-hover">
+          <view class="metric-value">{{stats.interactionStars}}</view>
+          <view class="metric-label">本月星星</view>
         </navigator>
         <navigator class="hero-metric" url="/pages/account-orders/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.pendingTasks}}</view>
@@ -142,8 +142,8 @@
 
     <view class="section panel">
       <view class="section-head">
-        <view class="section-title">最新点评</view>
-        <navigator class="section-link" url="/pages/account-feedbacks/index">全部</navigator>
+        <view class="section-title">最新互动</view>
+        <navigator class="section-link" url="/pages/account-interactions/index">全部</navigator>
       </view>
       <block wx:if="{{latestFeedback}}">
         <view class="feedback-title">

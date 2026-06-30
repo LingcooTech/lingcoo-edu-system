@@ -32,6 +32,7 @@ type HubStats = {
   childCount: number;
   totalBalance: number;
   pendingCheckIns: number;
+  interactionStars: number;
   pendingTasks: number;
   unreadNotifications: number;
 };
@@ -41,6 +42,7 @@ function emptyStats(): HubStats {
     childCount: 0,
     totalBalance: 0,
     pendingCheckIns: 0,
+    interactionStars: 0,
     pendingTasks: 0,
     unreadNotifications: 0,
   };
@@ -130,6 +132,16 @@ function nextThirtyDays() {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
+function currentMonthStartsAt() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+}
+
+function isCurrentMonth(value?: string | null) {
+  if (!value) return false;
+  return new Date(value).getTime() >= currentMonthStartsAt();
+}
+
 const ENTRIES = [
   {
     key: 'schedule',
@@ -155,9 +167,9 @@ const ENTRIES = [
   {
     key: 'feedbacks',
     symbol: '评',
-    label: '课后点评',
+    label: '课堂互动',
     group: '课后服务',
-    url: '/pages/account-feedbacks/index',
+    url: '/pages/account-interactions/index',
   },
   {
     key: 'homework',
@@ -340,6 +352,13 @@ Page({
       ).length;
       const pendingCheckIns = checkInSessions.filter((item) => item.canCheckIn).length;
       const unreadNotifications = notifications.filter((item) => item.status === 'unread').length;
+      const interactionStars =
+        lessonFeedbacks
+          .filter((item) => isCurrentMonth(item.createdAt))
+          .reduce((sum, item) => sum + Math.max(0, Number(item.rating || 0)), 0) +
+        homeworkCheckIns
+          .filter((item) => isCurrentMonth(item.reviewedAt || item.updatedAt))
+          .reduce((sum, item) => sum + Math.max(0, Number(item.rating || 0)), 0);
       const latestFeedback = lessonFeedbacks.length
         ? toLessonFeedbackItem(lessonFeedbacks[0])
         : null;
@@ -353,6 +372,7 @@ Page({
           childCount: children.length,
           totalBalance: lessonAccounts.reduce((sum, item) => sum + item.balance, 0),
           pendingCheckIns,
+          interactionStars,
           pendingTasks,
           unreadNotifications,
         },
@@ -382,6 +402,9 @@ Page({
         entryGroups: groupEntries(
           withBadges(ENTRIES, {
             schedule: pendingCheckIns,
+            feedbacks: lessonFeedbacks.length,
+            homework: homeworkCheckIns.filter((item) => item.reviewStatus === 'needs_revision')
+              .length,
             orders: pendingOrders,
             trials: pendingReservations,
             notifications: unreadNotifications,

@@ -18,6 +18,7 @@
     "pages/account-orders/index",
     "pages/account-trials/index",
     "pages/account-attendance/index",
+    "pages/account-interactions/index",
     "pages/account-homework/index",
     "pages/account-feedbacks/index",
     "pages/account-notifications/index",

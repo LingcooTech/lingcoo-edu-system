@@ -42,11 +42,23 @@ type LessonAccountCard = LessonAccountItem & {
   attendance: AttendanceItem[];
   upcomingCount: number;
   consumedCount: number;
+  activeRecordTab: 'upcoming' | 'attendance';
 };
 
 type RenewalPhoneAuthEvent = {
   currentTarget: { dataset: { key?: string } };
   detail: { code?: string; errMsg?: string };
+};
+
+type StudentFilter = {
+  id: string;
+  label: string;
+};
+
+type LessonAccountGroup = {
+  studentId: string;
+  studentName: string;
+  accounts: LessonAccountCard[];
 };
 
 function packagePriceAmount(pkg: CoursePackage): number {
@@ -123,13 +135,58 @@ function nextNinetyDays() {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
+function uniqueStudentFilters(accounts: LessonAccountCard[]): StudentFilter[] {
+  const filters: StudentFilter[] = [];
+  const seen = new Set<string>();
+  for (const account of accounts) {
+    if (seen.has(account.studentId)) continue;
+    seen.add(account.studentId);
+    filters.push({
+      id: account.studentId,
+      label: account.studentName,
+    });
+  }
+  return filters;
+}
+
+function buildAccountGroups(
+  accounts: LessonAccountCard[],
+  selectedStudentId: string,
+): LessonAccountGroup[] {
+  const filtered =
+    selectedStudentId && selectedStudentId !== 'all'
+      ? accounts.filter((account) => account.studentId === selectedStudentId)
+      : accounts;
+  const groups: LessonAccountGroup[] = [];
+  const groupIndex = new Map<string, number>();
+
+  for (const account of filtered) {
+    const index = groupIndex.get(account.studentId);
+    if (index === undefined) {
+      groupIndex.set(account.studentId, groups.length);
+      groups.push({
+        studentId: account.studentId,
+        studentName: account.studentName,
+        accounts: [account],
+      });
+      continue;
+    }
+    groups[index].accounts.push(account);
+  }
+  return groups;
+}
+
 Page({
   data: {
     loading: true,
     needLogin: false,
     payingKey: '',
     dismissedRenewalKeys: [] as string[],
+    selectedStudentId: 'all',
+    showStudentFilter: false,
+    studentFilters: [] as StudentFilter[],
     accounts: [] as LessonAccountCard[],
+    accountGroups: [] as LessonAccountGroup[],
   },
 
   onLoad() {
@@ -181,9 +238,25 @@ Page({
           attendance: accountAttendance,
           upcomingCount: upcoming.length,
           consumedCount: accountAttendance.filter((record) => record.lessonDelta < 0).length,
+          activeRecordTab: 'upcoming' as const,
         };
       });
-      this.setData({ accounts, needLogin: false, loading: false });
+      const studentFilters = uniqueStudentFilters(accounts);
+      const availableStudentIds = new Set(studentFilters.map((student) => student.id));
+      const currentSelected = this.data.selectedStudentId as string;
+      const selectedStudentId =
+        currentSelected === 'all' || availableStudentIds.has(currentSelected)
+          ? currentSelected
+          : 'all';
+      this.setData({
+        accounts,
+        accountGroups: buildAccountGroups(accounts, selectedStudentId),
+        studentFilters,
+        selectedStudentId,
+        showStudentFilter: studentFilters.length > 1,
+        needLogin: false,
+        loading: false,
+      });
     } catch (error) {
       this.setData({ loading: false });
       wx.showToast({
@@ -246,7 +319,37 @@ Page({
     const accounts = (this.data.accounts as LessonAccountCard[]).map((account) =>
       account.renewal?.key === key ? { ...account, renewal: null } : account,
     );
-    this.setData({ dismissedRenewalKeys, accounts });
+    this.setData({
+      dismissedRenewalKeys,
+      accounts,
+      accountGroups: buildAccountGroups(accounts, this.data.selectedStudentId as string),
+    });
+  },
+
+  onSelectStudent(event: { currentTarget: { dataset: { id?: string } } }) {
+    const selectedStudentId = event.currentTarget.dataset.id || 'all';
+    this.setData({
+      selectedStudentId,
+      accountGroups: buildAccountGroups(
+        this.data.accounts as LessonAccountCard[],
+        selectedStudentId,
+      ),
+    });
+  },
+
+  onRecordTabChange(event: {
+    currentTarget: { dataset: { id?: string; tab?: 'upcoming' | 'attendance' } };
+  }) {
+    const id = event.currentTarget.dataset.id;
+    const tab = event.currentTarget.dataset.tab;
+    if (!id || !tab) return;
+    const accounts = (this.data.accounts as LessonAccountCard[]).map((account) =>
+      account.id === id ? { ...account, activeRecordTab: tab } : account,
+    );
+    this.setData({
+      accounts,
+      accountGroups: buildAccountGroups(accounts, this.data.selectedStudentId as string),
+    });
   },
 
   async onRenewalPhoneAuth(event: RenewalPhoneAuthEvent) {

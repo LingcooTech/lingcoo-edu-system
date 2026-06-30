@@ -1,0 +1,157 @@
+<custom-navbar title="课堂互动" show-back="{{true}}" />
+<view class="page interaction-page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    请先在“我的”登录
+    <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
+  </view>
+  <block wx:else>
+    <view wx:if="{{showStudentFilter}}" class="student-filter">
+      <button
+        class="student-filter-chip {{selectedStudentId == 'all' ? 'active' : ''}}"
+        data-id="all"
+        bindtap="onSelectStudent"
+      >
+        全部
+      </button>
+      <button
+        wx:for="{{studentFilters}}"
+        wx:key="id"
+        class="student-filter-chip {{selectedStudentId == item.id ? 'active' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onSelectStudent"
+      >
+        {{item.label}}
+      </button>
+    </view>
+
+    <view class="card interaction-summary">
+      <view class="summary-main">
+        <view class="summary-label">本月星星</view>
+        <view class="summary-value">{{stats.monthStars}}</view>
+      </view>
+      <view class="summary-grid">
+        <view>
+          <view class="summary-small-value">{{stats.feedbackCount}}</view>
+          <view class="summary-small-label">课堂表现</view>
+        </view>
+        <view>
+          <view class="summary-small-value">{{stats.homeworkCount}}</view>
+          <view class="summary-small-label">作业记录</view>
+        </view>
+        <view>
+          <view class="summary-small-value">{{stats.assignmentCount}}</view>
+          <view class="summary-small-label">老师布置</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="interaction-tabs">
+      <button
+        class="interaction-tab {{activeTab == 'feedbacks' ? 'active' : ''}}"
+        data-tab="feedbacks"
+        bindtap="onTabChange"
+      >
+        课堂表现
+      </button>
+      <button
+        class="interaction-tab {{activeTab == 'homework' ? 'active' : ''}}"
+        data-tab="homework"
+        bindtap="onTabChange"
+      >
+        作业记录
+      </button>
+      <button
+        class="interaction-tab {{activeTab == 'assignments' ? 'active' : ''}}"
+        data-tab="assignments"
+        bindtap="onTabChange"
+      >
+        老师布置
+      </button>
+    </view>
+
+    <block wx:if="{{activeTab == 'feedbacks'}}">
+      <view wx:if="{{visibleFeedbacks.length}}" class="interaction-list">
+        <view wx:for="{{visibleFeedbacks}}" wx:key="id" class="card interaction-card">
+          <view class="card-head">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="row-meta">{{item.teacherName}} · {{item.createdAtLabel}}</view>
+            </view>
+            <view class="star-pill">{{item.ratingLabel}}</view>
+          </view>
+          <view wx:if="{{item.class}}" class="row-meta class-meta">{{item.class.name}}</view>
+          <view class="interaction-content">{{item.content}}</view>
+          <view wx:if="{{item.homeworkAssignment}}" class="assignment-note">
+            <view class="assignment-note-title">
+              {{item.homeworkAssignment.isPersonal ? '个人作业' : '全班作业'}}
+            </view>
+            <view class="assignment-note-content">{{item.homeworkAssignment.content}}</view>
+          </view>
+          <view wx:if="{{item.imageUrls.length}}" class="image-strip">
+            <image
+              wx:for="{{item.imageUrls}}"
+              wx:for-item="url"
+              wx:key="*this"
+              class="interaction-image"
+              src="{{url}}"
+              mode="aspectFill"
+              data-url="{{url}}"
+              data-urls="{{item.imageUrls}}"
+              bindtap="onPreviewFeedbackImage"
+            />
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无课堂互动</view>
+    </block>
+
+    <block wx:elif="{{activeTab == 'homework'}}">
+      <view wx:if="{{visibleHomework.length}}" class="interaction-list">
+        <view wx:for="{{visibleHomework}}" wx:key="id" class="card interaction-card">
+          <view class="card-head">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="row-meta">{{item.createdAtLabel}}</view>
+            </view>
+            <view class="status-pill {{item.reviewStatus}}">{{item.reviewStatusLabel}}</view>
+          </view>
+          <view wx:if="{{item.content}}" class="interaction-content">{{item.content}}</view>
+          <view wx:if="{{item.imageUrls.length}}" class="image-strip">
+            <image
+              wx:for="{{item.imageUrls}}"
+              wx:for-item="url"
+              wx:key="*this"
+              class="interaction-image"
+              src="{{url}}"
+              mode="aspectFill"
+              data-url="{{url}}"
+              data-urls="{{item.imageUrls}}"
+              bindtap="onPreviewHomeworkImage"
+            />
+          </view>
+          <view wx:if="{{item.teacherFeedback}}" class="teacher-feedback">{{item.teacherFeedback}}</view>
+          <view class="star-pill inline">{{item.ratingLabel}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无作业记录</view>
+    </block>
+
+    <block wx:else>
+      <view wx:if="{{visibleAssignments.length}}" class="interaction-list">
+        <view wx:for="{{visibleAssignments}}" wx:key="id" class="card interaction-card">
+          <view class="card-head">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="row-meta">{{item.teacherName}} · {{item.createdAtLabel}}</view>
+            </view>
+            <view class="status-pill">{{item.assignmentScopeLabel}}</view>
+          </view>
+          <view wx:if="{{item.class}}" class="row-meta class-meta">{{item.class.name}}</view>
+          <view class="interaction-content">{{item.content}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无老师布置</view>
+    </block>
+  </block>
+</view>
