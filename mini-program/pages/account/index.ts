@@ -1,10 +1,6 @@
 import {
   bindWechatMiniPhone,
   clearToken,
-  createPaymentIntent,
-  createPublicOrder,
-  createWechatMiniPaymentIntent,
-  fetchCourse,
   fetchMe,
   fetchParentCalendar,
   fetchParentChildren,
@@ -17,16 +13,11 @@ import {
   fetchParentSeatReservations,
   hasToken,
   logout,
-  mockPayOrder,
   setToken,
-  syncOrderPayment,
   wechatMiniLogin,
   type AuthAccount,
-  type CoursePackage,
-  type ParentOrder,
-  type PaymentIntent,
+  type ParentChild,
 } from '../../services/api';
-import { requestSubscribe } from '../../services/subscribe';
 import {
   toCalendarEventItem,
   toLessonAccountItem,
@@ -36,7 +27,6 @@ import {
   type LessonFeedbackItem,
 } from '../../utils/parent-center';
 import { GUEST_ACCOUNT_ICONS } from '../../utils/icons';
-import { money } from '../../utils/format';
 
 type HubStats = {
   childCount: number;
@@ -60,7 +50,16 @@ type ChildSummary = {
   id: string;
   name: string;
   meta: string;
-  balance: number;
+  courses: ChildCourseSummary[];
+  emptyCourseText: string;
+};
+
+type ChildCourseSummary = {
+  key: string;
+  courseName: string;
+  className: string;
+  campusName: string;
+  teacherName: string;
 };
 
 type TodoItem = {
@@ -68,21 +67,6 @@ type TodoItem = {
   label: string;
   value: number;
   url: string;
-};
-
-type RenewalReminder = {
-  key: string;
-  studentId: string;
-  studentName: string;
-  courseId: string;
-  courseSlug: string;
-  courseName: string;
-  balance: number;
-  packageId: string;
-  packageName: string;
-  packageLessonLabel: string;
-  packagePriceLabel: string;
-  packageCount: number;
 };
 
 type QuickEntry = {
@@ -100,77 +84,44 @@ type QuickGroup = {
 };
 
 type PhoneAuthEvent = { detail: { code?: string; errMsg?: string } };
-type RenewalPhoneAuthEvent = {
-  currentTarget: { dataset: { key?: string } };
-  detail: { code?: string; errMsg?: string };
-};
 
-function packagePriceAmount(pkg: CoursePackage): number {
-  return pkg.discountPriceAmount ?? pkg.priceAmount;
+function childMeta(child: ParentChild): string {
+  return [child.grade, child.school].filter(Boolean).join(' · ') || '学员';
 }
 
-function packageLessonLabel(pkg: CoursePackage): string {
-  return pkg.giftedLessonCount
-    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
-    : `${pkg.lessonCount} 课时`;
-}
-
-function pickRenewalPackage(packages: CoursePackage[]): CoursePackage | null {
-  if (!packages.length) return null;
-  return [...packages].sort((a, b) => {
-    const aLessons = a.lessonCount + a.giftedLessonCount;
-    const bLessons = b.lessonCount + b.giftedLessonCount;
-    if (aLessons !== bLessons) return aLessons - bLessons;
-    return packagePriceAmount(a) - packagePriceAmount(b);
-  })[0];
-}
-
-function payloadString(payload: Record<string, unknown>, key: string): string {
-  const value = payload[key];
-  return typeof value === 'string'
-    ? value
-    : value === undefined || value === null
-      ? ''
-      : String(value);
-}
-
-function requestWechatPayment(intent: PaymentIntent): Promise<void> {
-  const timeStamp = payloadString(intent.payload, 'timeStamp');
-  const nonceStr = payloadString(intent.payload, 'nonceStr');
-  const packageValue = payloadString(intent.payload, 'package');
-  const signType = payloadString(intent.payload, 'signType') || 'HMAC-SHA256';
-  const paySign = payloadString(intent.payload, 'paySign');
-
-  if (!timeStamp || !nonceStr || !packageValue || !paySign) {
-    return Promise.reject(new Error('微信支付参数不完整'));
+function summarizeChildCourses(
+  child: ParentChild,
+  lessonItems: LessonAccountItem[],
+): ChildCourseSummary[] {
+  const courseById = new Map<string, ChildCourseSummary>();
+  for (const item of lessonItems) {
+    courseById.set(item.courseId, {
+      key: item.courseId,
+      courseName: item.courseName,
+      className: '待分班',
+      campusName: '校区待确认',
+      teacherName: '老师待确认',
+    });
   }
 
-  return new Promise((resolve, reject) => {
-    wx.requestPayment({
-      timeStamp,
-      nonceStr,
-      package: packageValue,
-      signType,
-      paySign,
-      success: () => resolve(),
-      fail: (error) => reject(new Error(error.errMsg || '微信支付失败')),
-    });
-  });
-}
+  for (const enrollment of child.enrollments ?? []) {
+    const courseId = enrollment.course?.id;
+    const existing = courseId ? courseById.get(courseId) : null;
+    const summary: ChildCourseSummary = {
+      key: courseId || enrollment.id,
+      courseName: enrollment.course?.name || existing?.courseName || '课程待确认',
+      className: enrollment.className || '班级待确认',
+      campusName: enrollment.campus?.name || '校区待确认',
+      teacherName: enrollment.teacher?.name || '老师待确认',
+    };
+    if (courseId) {
+      courseById.set(courseId, summary);
+    } else {
+      courseById.set(enrollment.id, summary);
+    }
+  }
 
-function loginWechatMiniCode(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    wx.login({
-      success: (result) => {
-        if (result.code) {
-          resolve(result.code);
-          return;
-        }
-        reject(new Error('微信登录失败，请稍后重试'));
-      },
-      fail: (error) => reject(new Error(error.errMsg || '微信登录失败，请稍后重试')),
-    });
-  });
+  return Array.from(courseById.values());
 }
 
 function nextThirtyDays() {
@@ -266,8 +217,6 @@ Page({
     nextLesson: null as CalendarEventItem | null,
     latestFeedback: null as LessonFeedbackItem | null,
     todoItems: [] as TodoItem[],
-    renewalReminders: [] as RenewalReminder[],
-    renewingKey: '',
   },
 
   onShow() {
@@ -373,11 +322,13 @@ Page({
       }
       const childSummaries = children.slice(0, 3).map((child) => {
         const childLessonItems = lessonItemsByStudentId.get(child.id) ?? [];
+        const courses = summarizeChildCourses(child, childLessonItems);
         return {
           id: child.id,
           name: child.name,
-          meta: [child.grade, child.school].filter(Boolean).join(' · ') || '学员',
-          balance: childLessonItems.reduce((sum, item) => sum + item.balance, 0),
+          meta: childMeta(child),
+          courses,
+          emptyCourseText: '暂未开通正式课程',
         };
       });
       const pendingOrders = orders.filter((item) => item.status === 'pending').length;
@@ -396,9 +347,7 @@ Page({
         .map(toCalendarEventItem)
         .filter((event) => new Date(event.endsAt).getTime() >= Date.now())
         .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-      const renewalReminders = await this.buildRenewalReminders(lessonItems);
-      const pendingTasks =
-        pendingCheckIns + pendingOrders + pendingReservations + renewalReminders.length;
+      const pendingTasks = pendingCheckIns + pendingOrders + pendingReservations;
       this.setData({
         stats: {
           childCount: children.length,
@@ -410,7 +359,6 @@ Page({
         childSummaries,
         nextLesson: upcomingLessons[0] ?? null,
         latestFeedback,
-        renewalReminders,
         todoItems: [
           {
             key: 'checkins',
@@ -427,7 +375,7 @@ Page({
           {
             key: 'orders',
             label: '待付款 / 待处理',
-            value: pendingOrders + pendingReservations + renewalReminders.length,
+            value: pendingOrders + pendingReservations,
             url: '/pages/account-orders/index',
           },
         ],
@@ -449,56 +397,6 @@ Page({
     }
   },
 
-  async buildRenewalReminders(lessonItems: LessonAccountItem[]): Promise<RenewalReminder[]> {
-    const lowBalanceItems = lessonItems
-      .filter((item) => item.balance <= 3 && item.balance >= 0 && item.course?.slug)
-      .slice(0, 6);
-    if (!lowBalanceItems.length) return [];
-
-    const detailBySlug = new Map<string, Awaited<ReturnType<typeof fetchCourse>> | null>();
-    await Promise.all(
-      Array.from(new Set(lowBalanceItems.map((item) => item.course!.slug as string))).map(
-        async (slug) => {
-          try {
-            detailBySlug.set(slug, await fetchCourse(slug));
-          } catch {
-            detailBySlug.set(slug, null);
-          }
-        },
-      ),
-    );
-
-    return lowBalanceItems.flatMap((item) => {
-      const slug = item.course!.slug as string;
-      const detail = detailBySlug.get(slug);
-      if (
-        !detail ||
-        !detail.businessModel.onlinePackageSalesEnabled ||
-        detail.course.onlineSalesEnabled === false
-      ) {
-        return [];
-      }
-      const selectedPackage = pickRenewalPackage(detail.coursePackages);
-      if (!selectedPackage) return [];
-      return [
-        {
-          key: `${item.studentId}:${item.courseId}`,
-          studentId: item.studentId,
-          studentName: item.studentName,
-          courseId: item.courseId,
-          courseSlug: slug,
-          courseName: item.courseName,
-          balance: item.balance,
-          packageId: selectedPackage.id,
-          packageName: selectedPackage.name,
-          packageLessonLabel: packageLessonLabel(selectedPackage),
-          packagePriceLabel: money(packagePriceAmount(selectedPackage)),
-          packageCount: detail.coursePackages.length,
-        },
-      ];
-    });
-  },
-
   resetAccountState() {
     this.setData({
       account: null,
@@ -511,8 +409,6 @@ Page({
       nextLesson: null,
       latestFeedback: null,
       todoItems: [],
-      renewalReminders: [],
-      renewingKey: '',
       entryGroups: groupEntries(withBadges(ENTRIES, {})),
     });
     this.updateTabBadge(0);
@@ -636,129 +532,6 @@ Page({
 
   async bindPhone(input: { phoneCode?: string; displayName?: string }) {
     await this.bindPhoneWithToken(this.data.bindToken, input);
-  },
-
-  async onRenewalPhoneAuth(event: RenewalPhoneAuthEvent) {
-    const key = event.currentTarget.dataset.key;
-    const phoneCode = event.detail.code;
-    if (!key) return;
-    if (!phoneCode) {
-      wx.showToast({ title: event.detail.errMsg || '请授权手机号后续费', icon: 'none' });
-      return;
-    }
-    if (this.data.renewingKey) return;
-
-    const reminder = (this.data.renewalReminders as RenewalReminder[]).find(
-      (item) => item.key === key,
-    );
-    if (!reminder) {
-      wx.showToast({ title: '续费信息已变化，请刷新后再试', icon: 'none' });
-      return;
-    }
-
-    this.setData({ renewingKey: key });
-    try {
-      const wechatMiniCode = await loginWechatMiniCode();
-      const payload = await createPublicOrder({
-        packageId: reminder.packageId,
-        courseId: reminder.courseId,
-        studentId: reminder.studentId,
-        phoneCode,
-        source: 'mini_program',
-        medium: 'wechat_mini_program',
-        wechatMiniCode,
-      });
-      if (payload.checkout.authToken) {
-        setToken(payload.checkout.authToken);
-      }
-      if (hasToken()) {
-        await requestSubscribe(['payment_success']);
-      }
-      await this.payRenewalOrder(payload.order.orderNo);
-    } catch (error) {
-      wx.showToast({
-        title: error instanceof Error ? error.message : '续费失败',
-        icon: 'none',
-      });
-    } finally {
-      this.setData({ renewingKey: '' });
-    }
-  },
-
-  async payRenewalOrder(orderNo: string) {
-    if (hasToken()) {
-      try {
-        const intent = await createWechatMiniPaymentIntent(orderNo);
-        if (intent.nextAction === 'none' && intent.status === 'paid') {
-          await this.finishRenewalPayment(orderNo);
-          return;
-        }
-        if (intent.nextAction !== 'request_payment') {
-          throw new Error('微信支付参数未就绪');
-        }
-
-        await requestWechatPayment(intent);
-        const paidOrder = await syncOrderPayment(orderNo);
-        if (paidOrder.status !== 'paid') {
-          throw new Error('支付结果同步中，请稍后在家长中心查看订单状态');
-        }
-        await this.finishRenewalPayment(orderNo, paidOrder);
-        return;
-      } catch (error) {
-        await this.offerRenewalMockPayment(orderNo, error instanceof Error ? error.message : '');
-        return;
-      }
-    }
-
-    await this.offerRenewalMockPayment(orderNo, '未登录家长中心，暂不能发起小程序微信支付。');
-  },
-
-  async offerRenewalMockPayment(orderNo: string, reason?: string) {
-    try {
-      const intent = await createPaymentIntent(orderNo, 'mock');
-      if (!intent.configured || intent.nextAction !== 'mock_pay') {
-        wx.showModal({
-          title: '支付待配置',
-          content: reason || '订单已创建，微信支付配置完成后可继续支付。',
-          showCancel: false,
-        });
-        return;
-      }
-
-      wx.showModal({
-        title: '开发模拟支付',
-        content: reason
-          ? `${reason}\n\n当前可使用 mock-pay 完成续费流程验证。`
-          : '当前可使用 mock-pay 完成续费流程验证。',
-        confirmText: '模拟支付',
-        success: async (result) => {
-          if (!result.confirm) return;
-          const paidOrder = await mockPayOrder(orderNo);
-          await this.finishRenewalPayment(orderNo, paidOrder);
-        },
-      });
-    } catch (error) {
-      wx.showToast({
-        title: error instanceof Error ? error.message : '支付待配置',
-        icon: 'none',
-      });
-    }
-  },
-
-  async finishRenewalPayment(orderNo: string, paidOrder?: ParentOrder) {
-    if (!paidOrder) {
-      paidOrder = await syncOrderPayment(orderNo);
-    }
-    if (paidOrder.status !== 'paid') {
-      wx.showToast({ title: '支付结果同步中，请稍后查看', icon: 'none' });
-      return;
-    }
-    await this.loadSummary();
-    wx.showModal({
-      title: '续费成功',
-      content: '课时已到账，可在孩子课时记录中查看明细。',
-      showCancel: false,
-    });
   },
 
   onPhoneAuth(event: PhoneAuthEvent) {

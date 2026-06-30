@@ -332,7 +332,60 @@ export const parentCenterModule: AppModule = {
 
     app.get('/public/me/children', { preHandler: app.requireParent }, async (request) => {
       const { students } = await resolveChildren(request.account!.id);
-      return { children: students };
+      if (students.length === 0) {
+        return { children: [] };
+      }
+
+      const studentIds = students.map((student) => student.id);
+      const [enrollments, classes, courses, campuses, teachers] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.classEnrollments)
+          .where(
+            and(
+              inArray(schema.classEnrollments.studentId, studentIds),
+              eq(schema.classEnrollments.active, true),
+            ),
+          ),
+        schedulingRepo.listClasses(app.db),
+        catalogRepo.listCourses(app.db),
+        organizationRepo.listCampuses(app.db),
+        teachingRepo.listTeachers(app.db),
+      ]);
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const campusById = new Map(campuses.map((campus) => [campus.id, campus]));
+      const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+      const enrollmentsByStudentId = new Map<string, typeof enrollments>();
+      for (const enrollment of enrollments) {
+        enrollmentsByStudentId.set(enrollment.studentId, [
+          ...(enrollmentsByStudentId.get(enrollment.studentId) ?? []),
+          enrollment,
+        ]);
+      }
+
+      return {
+        children: students.map((student) => ({
+          ...student,
+          enrollments: (enrollmentsByStudentId.get(student.id) ?? []).flatMap((enrollment) => {
+            const classGroup = classById.get(enrollment.classId);
+            if (!classGroup) return [];
+            const course = courseById.get(classGroup.courseId) ?? null;
+            const campus = campusById.get(classGroup.campusId) ?? null;
+            const teacher = teacherById.get(classGroup.teacherId) ?? null;
+            return [
+              {
+                id: enrollment.id,
+                classId: classGroup.id,
+                className: classGroup.name,
+                course: course ? { id: course.id, name: course.name, slug: course.slug } : null,
+                campus: campus ? { id: campus.id, name: campus.name } : null,
+                teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+              },
+            ];
+          }),
+        })),
+      };
     });
 
     app.get('/public/me/lesson-accounts', { preHandler: app.requireParent }, async (request) => {

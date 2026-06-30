@@ -40,6 +40,7 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
       sessionId: schema.classSessions.id,
       startsAt: schema.classSessions.startsAt,
       topic: schema.classSessions.topic,
+      courseId: schema.courses.id,
       className: schema.classes.name,
       courseName: schema.courses.name,
     })

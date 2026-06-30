@@ -1,0 +1,91 @@
+<custom-navbar title="课时信息" show-back="{{true}}" />
+<view class="page lessons-page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    请先在“我的”登录
+    <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
+  </view>
+  <block wx:else>
+    <view wx:if="{{accounts.length}}" class="lesson-account-list">
+      <view wx:for="{{accounts}}" wx:key="id" class="card lesson-account-card">
+        <view class="lesson-head">
+          <view>
+            <view class="lesson-course">{{item.courseName}}</view>
+            <view class="lesson-meta">{{item.studentName}} · 更新 {{item.updatedAtLabel}}</view>
+          </view>
+          <view class="lesson-balance">{{item.balanceLabel}}</view>
+        </view>
+
+        <view wx:if="{{item.renewal}}" class="renewal-alert">
+          <button
+            class="renewal-close"
+            data-key="{{item.renewal.key}}"
+            bindtap="onDismissRenewal"
+          >
+            ×
+          </button>
+          <view class="renewal-title">课时不多了</view>
+          <view class="renewal-desc">
+            剩余 {{item.balance}} 课时，可提前续费，避免影响后续排课。
+          </view>
+          <view class="renewal-package">
+            {{item.renewal.packageName}} · {{item.renewal.packageLessonLabel}} ·
+            {{item.renewal.packagePriceLabel}}
+          </view>
+          <button
+            class="renewal-action"
+            open-type="getPhoneNumber"
+            data-key="{{item.renewal.key}}"
+            bindgetphonenumber="onRenewalPhoneAuth"
+            loading="{{payingKey == item.renewal.key}}"
+            disabled="{{payingKey}}"
+          >
+            续费
+          </button>
+        </view>
+
+        <view class="lesson-summary">
+          <view class="lesson-summary-item">
+            <view class="summary-value">{{item.balance}}</view>
+            <view class="summary-label">未上课时</view>
+          </view>
+          <view class="lesson-summary-item">
+            <view class="summary-value">{{item.upcomingCount}}</view>
+            <view class="summary-label">已排课次</view>
+          </view>
+          <view class="lesson-summary-item">
+            <view class="summary-value">{{item.consumedCount}}</view>
+            <view class="summary-label">已上课次</view>
+          </view>
+        </view>
+
+        <view class="record-title">待上课次</view>
+        <view wx:if="{{item.upcoming.length}}" class="record-list">
+          <view wx:for="{{item.upcoming}}" wx:for-item="event" wx:key="id" class="record-row">
+            <view class="record-main">
+              <view class="record-time">{{event.startsAtLabel}}</view>
+              <view class="record-topic">{{event.title || '常规课'}}</view>
+              <view class="record-meta">{{event.class.name}} · {{event.classroomName}}</view>
+            </view>
+            <view class="record-status pending">待上课</view>
+          </view>
+        </view>
+        <view wx:else class="empty compact-empty">暂无已排未上课次</view>
+
+        <view class="record-title">上课记录</view>
+        <view wx:if="{{item.attendance.length}}" class="record-list">
+          <view wx:for="{{item.attendance}}" wx:for-item="record" wx:key="id" class="record-row">
+            <view class="record-main">
+              <view class="record-time">{{record.startsAtLabel}}</view>
+              <view class="record-topic">{{record.topic || '常规课'}}</view>
+              <view class="record-meta">{{record.className}}</view>
+            </view>
+            <view class="record-status">{{record.statusLabel}}</view>
+          </view>
+        </view>
+        <view wx:else class="empty compact-empty">暂无上课记录</view>
+      </view>
+    </view>
+    <view wx:else class="empty compact-empty">暂无课时账户</view>
+  </block>
+</view>

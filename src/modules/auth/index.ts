@@ -513,7 +513,11 @@ export const authModule: AppModule = {
       if (!account) {
         throw httpError(404, '账号不存在');
       }
-      return { account: adminAccount(account) };
+      const guardianDeleted =
+        account.role === 'parent' && account.guardianId
+          ? await peopleRepo.deleteGuardianIfOrphan(app.db, account.guardianId)
+          : null;
+      return { account: adminAccount(account), guardianDeleted };
     });
 
     app.delete(

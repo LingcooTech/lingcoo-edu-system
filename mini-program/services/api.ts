@@ -402,6 +402,14 @@ export interface ParentChild {
   status: string;
   createdAt?: string;
   updatedAt?: string;
+  enrollments?: Array<{
+    id: string;
+    classId: string;
+    className: string;
+    course?: { id: string; name: string; slug?: string | null } | null;
+    campus?: { id: string; name: string } | null;
+    teacher?: { id: string; name: string } | null;
+  }>;
 }
 
 export interface ParentLessonAccount {
@@ -474,6 +482,7 @@ export interface ParentAttendance {
   sessionId: string;
   startsAt: string;
   topic: string;
+  courseId: string;
   className: string;
   courseName: string;
   student?: { id: string; name: string };
@@ -1172,10 +1181,12 @@ export async function fetchTeacherDashboard(): Promise<{
   return request('/public/teacher/dashboard');
 }
 
-export async function fetchTeacherNotifications(params: {
-  status?: 'unread' | 'read' | 'archived';
-  limit?: number;
-} = {}): Promise<TeacherNotification[]> {
+export async function fetchTeacherNotifications(
+  params: {
+    status?: 'unread' | 'read' | 'archived';
+    limit?: number;
+  } = {},
+): Promise<TeacherNotification[]> {
   return (
     await request<{ notifications: TeacherNotification[] }>(
       `/public/teacher/notifications${buildQueryString(params)}`,
@@ -1274,7 +1285,10 @@ export function saveTeacherSessionFeedbacks(
     classAssignmentContent?: string;
     studentAssignments?: Array<{ studentId: string; content: string }>;
   },
-): Promise<{ lessonFeedbacks: TeacherLessonFeedback[]; homeworkAssignments: HomeworkAssignment[] }> {
+): Promise<{
+  lessonFeedbacks: TeacherLessonFeedback[];
+  homeworkAssignments: HomeworkAssignment[];
+}> {
   return request(`/public/teacher/sessions/${encodeURIComponent(sessionId)}/feedbacks`, {
     method: 'POST',
     data: input,

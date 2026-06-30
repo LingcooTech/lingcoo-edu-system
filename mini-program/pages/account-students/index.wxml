@@ -1,4 +1,4 @@
-<custom-navbar title="学员与课时" show-back="{{true}}" />
+<custom-navbar title="孩子档案" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">
@@ -9,29 +9,31 @@
     <view class="card panel">
       <view class="section-title">我的孩子</view>
       <view wx:if="{{children.length}}" class="item-list">
-        <view wx:for="{{children}}" wx:key="id" class="info-row">
-          <view>
-            <view class="row-title">{{item.name}}</view>
-            <view class="row-meta">{{item.grade}} · {{item.status}}</view>
+        <view wx:for="{{children}}" wx:key="id" class="student-card">
+          <view class="student-head">
+            <view>
+              <view class="row-title">{{item.name}}</view>
+              <view class="row-meta">{{item.meta}}</view>
+            </view>
+            <view class="status-pill">{{item.statusLabel}}</view>
           </view>
-          <view wx:if="{{item.school}}" class="row-side">{{item.school}}</view>
+          <view wx:if="{{item.courses.length}}" class="student-course-list">
+            <view
+              wx:for="{{item.courses}}"
+              wx:for-item="course"
+              wx:key="key"
+              class="student-course"
+            >
+              <view class="student-course-title">{{course.courseName}}</view>
+              <view class="student-course-line">校区：{{course.campusName}}</view>
+              <view class="student-course-line">班级：{{course.className}}</view>
+              <view class="student-course-line">老师：{{course.teacherName}}</view>
+            </view>
+          </view>
+          <view wx:else class="empty-row">{{item.emptyCourseText}}</view>
         </view>
       </view>
       <view wx:else class="empty compact-empty">还没有绑定孩子档案</view>
-    </view>
-
-    <view class="section card panel">
-      <view class="section-title">课时余额</view>
-      <view wx:if="{{lessonAccounts.length}}" class="item-list">
-        <view wx:for="{{lessonAccounts}}" wx:key="id" class="info-row">
-          <view>
-            <view class="row-title">{{item.courseName}}</view>
-            <view class="row-meta">{{item.studentName}} · 更新 {{item.updatedAtLabel}}</view>
-          </view>
-          <view class="balance-pill">{{item.balance}} 课时</view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无课时账户</view>
     </view>
   </block>
 </view>

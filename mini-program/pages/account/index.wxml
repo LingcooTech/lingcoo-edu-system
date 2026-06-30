@@ -13,19 +13,22 @@
     <view class="hub-card">
       <view class="hub-top">
         <view>
-          <view class="hub-eyebrow">我的</view>
           <view class="hub-title">
-            {{childSummaries[0] ? childSummaries[0].name + ' 的学习近况' : '学习近况'}}
+            家长中心
           </view>
         </view>
-        <view class="profile-pill">
+        <navigator
+          class="profile-pill"
+          url="/pages/account-profile/index"
+          hover-class="profile-hover"
+        >
           <view class="profile-avatar">{{avatarText}}</view>
           <view class="profile-info">
             <view class="profile-name">{{account.displayName || '家长'}}</view>
             <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
             <view wx:else class="profile-phone muted">微信登录</view>
           </view>
-        </view>
+        </navigator>
       </view>
 
       <view class="hero-metrics">
@@ -33,9 +36,9 @@
           <view class="metric-value">{{stats.childCount}}</view>
           <view class="metric-label">孩子</view>
         </navigator>
-        <navigator class="hero-metric" url="/pages/account-students/index" hover-class="metric-hover">
+        <navigator class="hero-metric" url="/pages/account-lessons/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.totalBalance}}</view>
-          <view class="metric-label">剩余课时</view>
+          <view class="metric-label">课时</view>
         </navigator>
         <navigator class="hero-metric" url="/pages/account-attendance/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.pendingCheckIns}}</view>
@@ -50,34 +53,6 @@
 
     <view wx:if="{{defaultPassword}}" class="password-note">
       初始密码：{{defaultPassword}}。手机号账号已同步创建。
-    </view>
-
-    <view wx:if="{{renewalReminders.length}}" class="section panel renewal-panel">
-      <view class="section-head">
-        <view class="section-title">续费提醒</view>
-        <navigator class="section-link" url="/pages/account-students/index">课时明细</navigator>
-      </view>
-      <view class="renewal-list">
-        <view wx:for="{{renewalReminders}}" wx:key="key" class="renewal-row">
-          <view class="renewal-main">
-            <view class="renewal-title">{{item.studentName}} · {{item.courseName}}</view>
-            <view class="renewal-meta">剩余 {{item.balance}} 课时，建议提前续费</view>
-            <view class="renewal-package">
-              {{item.packageName}} · {{item.packageLessonLabel}} · {{item.packagePriceLabel}}
-            </view>
-          </view>
-          <button
-            class="renewal-button"
-            open-type="getPhoneNumber"
-            data-key="{{item.key}}"
-            bindgetphonenumber="onRenewalPhoneAuth"
-            loading="{{renewingKey == item.key}}"
-            disabled="{{renewingKey}}"
-          >
-            续费
-          </button>
-        </view>
-      </view>
     </view>
 
     <view wx:for="{{entryGroups}}" wx:key="title" class="section entry-panel">
@@ -100,20 +75,38 @@
 
     <view class="section panel">
       <view class="section-head">
-        <view class="section-title">孩子与课时</view>
+        <view class="section-title">我的孩子</view>
         <navigator class="section-link" url="/pages/account-students/index">全部</navigator>
       </view>
       <view wx:if="{{childSummaries.length}}" class="child-list">
-        <view wx:for="{{childSummaries}}" wx:key="id" class="child-row">
-          <view>
-            <view class="child-name">{{item.name}}</view>
-            <view class="child-meta">{{item.meta}}</view>
+        <navigator
+          wx:for="{{childSummaries}}"
+          wx:key="id"
+          class="child-card"
+          url="/pages/account-students/index"
+          hover-class="child-card-hover"
+        >
+          <view class="child-card-head">
+            <view>
+              <view class="child-name">{{item.name}}</view>
+              <view class="child-meta">{{item.meta}}</view>
+            </view>
           </view>
-          <view class="child-balance">
-            <view class="child-balance-value">{{item.balance}}</view>
-            <view class="child-balance-label">课时</view>
+          <view wx:if="{{item.courses.length}}" class="child-course-list">
+            <view
+              wx:for="{{item.courses}}"
+              wx:for-item="course"
+              wx:key="key"
+              class="child-course"
+            >
+              <view class="child-course-title">{{course.courseName}}</view>
+              <view class="child-course-line">校区：{{course.campusName}}</view>
+              <view class="child-course-line">班级：{{course.className}}</view>
+              <view class="child-course-line">老师：{{course.teacherName}}</view>
+            </view>
           </view>
-        </view>
+          <view wx:else class="child-empty">{{item.emptyCourseText}}</view>
+        </navigator>
       </view>
       <view wx:else class="empty compact-empty">暂未关联孩子，请联系机构绑定学员档案。</view>
     </view>

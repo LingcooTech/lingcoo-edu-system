@@ -38,6 +38,43 @@ export async function updateGuardian(
   return guardian ?? null;
 }
 
+export async function deleteGuardianIfOrphan(db: Database, guardianId: string) {
+  return db.transaction(async (tx) => {
+    const [linkedAccount] = await tx
+      .select({ id: schema.accounts.id })
+      .from(schema.accounts)
+      .where(eq(schema.accounts.guardianId, guardianId))
+      .limit(1);
+    if (linkedAccount) {
+      return null;
+    }
+
+    const [linkedStudent] = await tx
+      .select({ id: schema.students.id })
+      .from(schema.students)
+      .where(eq(schema.students.guardianId, guardianId))
+      .limit(1);
+    if (linkedStudent) {
+      return null;
+    }
+
+    const [linkedStudentGuardian] = await tx
+      .select({ guardianId: schema.studentGuardians.guardianId })
+      .from(schema.studentGuardians)
+      .where(eq(schema.studentGuardians.guardianId, guardianId))
+      .limit(1);
+    if (linkedStudentGuardian) {
+      return null;
+    }
+
+    const [guardian] = await tx
+      .delete(schema.guardians)
+      .where(eq(schema.guardians.id, guardianId))
+      .returning();
+    return guardian ?? null;
+  });
+}
+
 export async function findStudentForGuardian(
   db: Database,
   input: { guardianId: string; name: string },
