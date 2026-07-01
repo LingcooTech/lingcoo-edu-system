@@ -56,7 +56,7 @@ function buildStats(teacher: PublicTeacher): StatItem[] {
   ].filter((item) => item.value.trim().length > 0);
 }
 
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: {
@@ -71,6 +71,7 @@ Page({
   },
 
   onLoad(options: { id?: string }) {
+    enableShareMenu();
     this.load(options.id || '');
   },
 

@@ -8,7 +8,7 @@ import {
   type TrialSession,
 } from '../../services/api';
 import { formatDateTime, money } from '../../utils/format';
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 type TimeFilter = 'next_14' | 'this_week' | 'next_week' | 'all';
 
@@ -165,6 +165,7 @@ Page({
   },
 
   onLoad() {
+    enableShareMenu();
     this.load();
   },
 

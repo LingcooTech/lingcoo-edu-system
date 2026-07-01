@@ -1,6 +1,6 @@
 import { fetchStory, type ContentItem } from '../../services/api';
 import { parseBlocks, type Block } from '../../utils/blocks';
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 function isHtmlContent(value: string) {
   return /^\s*</.test(value);
@@ -16,6 +16,7 @@ Page({
   },
 
   onLoad(options: { slug?: string }) {
+    enableShareMenu();
     this.load(options.slug || '');
   },
 

@@ -13,7 +13,7 @@ type TeacherCard = PublicTeacher & {
   displayTagline: string;
 };
 
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 function toTeacherCard(
   teacher: PublicTeacher,
@@ -43,6 +43,7 @@ Page({
   },
 
   onLoad() {
+    enableShareMenu();
     this.load();
   },
 

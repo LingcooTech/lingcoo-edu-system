@@ -5,7 +5,7 @@ import {
   type ParentCalendarEvent,
   type PublicCalendarEvent,
 } from '../../services/api';
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 type CalendarDayItem = {
   key: string;
@@ -233,6 +233,7 @@ Page({
   },
 
   onLoad() {
+    enableShareMenu();
     const today = new Date();
     this.setData({
       activeMonth: dateKey(monthStart(today)),

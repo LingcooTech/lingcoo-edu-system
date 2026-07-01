@@ -107,7 +107,7 @@ function readPrefill(trialSessionId: string) {
   return payload || {};
 }
 
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: {
@@ -137,6 +137,7 @@ Page({
   },
 
   onLoad(options: { id?: string; trialSessionId?: string }) {
+    enableShareMenu();
     const trialSessionId = options.id || options.trialSessionId || '';
     this.load(trialSessionId);
   },

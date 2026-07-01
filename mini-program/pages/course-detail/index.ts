@@ -119,7 +119,7 @@ function loginWechatMini(): Promise<string> {
   });
 }
 
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: {
@@ -158,6 +158,7 @@ Page({
   },
 
   onLoad(options: { slug?: string }) {
+    enableShareMenu();
     this.load(options.slug || '');
   },
 

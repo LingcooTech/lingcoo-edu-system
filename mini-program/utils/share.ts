@@ -7,3 +7,18 @@ export function shareCard(title: string, path: string, imageUrl?: string | null)
 export function timelineCard(title: string, query: string, imageUrl?: string | null) {
   return imageUrl ? { title, query, imageUrl } : { title, query };
 }
+
+export function enableShareMenu() {
+  const wxWithShare = wx as typeof wx & {
+    showShareMenu?: (options: {
+      withShareTicket?: boolean;
+      menus?: Array<'shareAppMessage' | 'shareTimeline'>;
+      success?: () => void;
+      fail?: () => void;
+    }) => void;
+  };
+  wxWithShare.showShareMenu?.({
+    withShareTicket: true,
+    menus: ['shareAppMessage', 'shareTimeline'],
+  });
+}

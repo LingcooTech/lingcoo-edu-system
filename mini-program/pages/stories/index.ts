@@ -1,5 +1,5 @@
 import { fetchStories, type ContentItem } from '../../services/api';
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 type StoryCard = {
   slug: string;
@@ -24,6 +24,7 @@ Page({
   },
 
   onLoad() {
+    enableShareMenu();
     this.load();
   },
 

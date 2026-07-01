@@ -360,12 +360,13 @@ function toState(
   };
 }
 
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: initialState,
 
   onLoad() {
+    enableShareMenu();
     this.setData(createHomeChromeState());
     this.load();
   },

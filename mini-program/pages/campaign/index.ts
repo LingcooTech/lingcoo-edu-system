@@ -58,12 +58,13 @@ function prefillStorageKey(trialSessionId: string): string {
   return `trial_registration_prefill:${trialSessionId}`;
 }
 
-import { shareCard, timelineCard } from '../../utils/share';
+import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: initialState,
 
   onLoad(options: { code?: string; scene?: string }) {
+    enableShareMenu();
     const scene = decodeScene(options.scene);
     const code = options.code || scene.campaign || scene.code || '';
     this.load(code);
