@@ -1,4 +1,4 @@
-<custom-navbar title="上课签到" show-back="{{true}}" />
+<custom-navbar title="活动签到" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">
@@ -7,7 +7,7 @@
   </view>
   <block wx:else>
     <view class="card panel">
-      <view class="section-title">待签到课次</view>
+      <view class="section-title">待签到安排</view>
       <view wx:if="{{checkInSessions.length}}" class="item-list">
         <view wx:for="{{checkInSessions}}" wx:key="checkInKey" class="stack-row">
           <view class="row-between">
@@ -32,7 +32,7 @@
           <view class="row-meta">{{item.startsAtLabel}} · {{item.classroomName}}</view>
         </view>
       </view>
-      <view wx:else class="empty compact-empty">暂无可签到课次</view>
+      <view wx:else class="empty compact-empty">暂无可签到安排</view>
     </view>
 
     <view class="section card panel">

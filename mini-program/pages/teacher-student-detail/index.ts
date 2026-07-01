@@ -1,4 +1,6 @@
 import {
+  createTeacherStudentWork,
+  createTeacherUploadToken,
   fetchTeacherCalendar,
   fetchTeacherDashboard,
   enrollTeacherStudent,
@@ -6,13 +8,17 @@ import {
   fetchTeacherHomeworkAssignments,
   fetchTeacherHomeworkCheckIns,
   fetchTeacherLessonFeedbacks,
+  fetchTeacherStudentWorks,
   fetchTeacherSessionAttendance,
   type AttendanceStatus,
   type HomeworkAssignment,
+  type StudentWork,
   type TeacherCalendarEvent,
   type TeacherClass,
   type TeacherClassOption,
 } from '../../services/api';
+
+const MAX_WORK_IMAGES = 9;
 
 type StudentProfile = {
   id: string;
@@ -26,6 +32,7 @@ type StudentProfile = {
 
 type ClassRow = {
   id: string;
+  courseId: string;
   name: string;
   courseName: string;
   classroomName: string;
@@ -69,7 +76,17 @@ type HomeworkRow = {
   ratingLabel: string;
 };
 
-type ActiveTab = 'overview' | 'attendance' | 'interactions' | 'homework';
+type WorkRow = StudentWork & {
+  createdAtLabel: string;
+  titleLabel: string;
+  courseName: string;
+  className: string;
+  sourceLabel: string;
+  coverUrl: string;
+  frameClass: string;
+};
+
+type ActiveTab = 'overview' | 'attendance' | 'interactions' | 'homework' | 'works';
 
 const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus | string, string> = {
   present: '到课',
@@ -91,6 +108,13 @@ const DETAIL_TABS: Array<{ key: ActiveTab; label: string }> = [
   { key: 'attendance', label: '签到' },
   { key: 'interactions', label: '互动' },
   { key: 'homework', label: '作业' },
+  { key: 'works', label: '作品' },
+];
+
+const WORK_FRAME_OPTIONS = [
+  { key: 'classic', label: '经典框' },
+  { key: 'gallery', label: '展览框' },
+  { key: 'paper', label: '纸张框' },
 ];
 
 function pad(input: number) {
@@ -126,6 +150,19 @@ function findStudent(classes: TeacherClass[], studentId: string) {
   return null;
 }
 
+function toWorkRow(item: StudentWork): WorkRow {
+  return {
+    ...item,
+    createdAtLabel: formatDateTime(item.createdAt),
+    titleLabel: item.title || '作品展示',
+    courseName: item.course?.name || '活动',
+    className: item.class?.name || '',
+    sourceLabel: item.source === 'teacher' ? '机构上传' : '家长上传',
+    coverUrl: item.imageUrls[0] || '',
+    frameClass: `student-work-frame frame-${item.frameStyle || 'classic'}`,
+  };
+}
+
 Page({
   data: {
     loading: true,
@@ -144,6 +181,20 @@ Page({
     attendance: [] as AttendanceRow[],
     feedbacks: [] as FeedbackRow[],
     homework: [] as HomeworkRow[],
+    works: [] as WorkRow[],
+    workTitle: '',
+    workDescription: '',
+    workImages: [] as string[],
+    workClassIndex: 0,
+    workClassLabels: [] as string[],
+    workFrameStyle: 'classic' as 'classic' | 'gallery' | 'paper',
+    workFrameOptions: WORK_FRAME_OPTIONS.map((item) => ({
+      ...item,
+      className: item.key === 'classic' ? 'work-frame-option active' : 'work-frame-option',
+    })),
+    workUploading: false,
+    workSubmitting: false,
+    maxWorkImages: MAX_WORK_IMAGES,
   },
 
   onLoad(query: { studentId?: string; courseId?: string; notificationId?: string; tab?: ActiveTab }) {
@@ -182,6 +233,7 @@ Page({
         lessonFeedbacks,
         homeworkAssignments,
         classOptionsPayload,
+        studentWorks,
       ] = await Promise.all([
         fetchTeacherDashboard(),
         fetchTeacherCalendar(calendarRange()),
@@ -191,6 +243,7 @@ Page({
         this.data.courseId
           ? fetchTeacherStudentClassOptions(studentId, { courseId: this.data.courseId })
           : Promise.resolve(null),
+        fetchTeacherStudentWorks(),
       ]);
       const student = findStudent(dashboard.classes, studentId);
       if (!student && !classOptionsPayload?.student) {
@@ -203,6 +256,7 @@ Page({
           const classStudent = classGroup.students.find((item) => item.id === studentId);
           return {
             id: classGroup.id,
+            courseId: classGroup.course?.id || '',
             name: classGroup.name,
             courseName: classGroup.course?.name || '课程',
             classroomName: classGroup.classroom?.name || '教室待确认',
@@ -237,7 +291,7 @@ Page({
               return {
                 id: record.id,
                 dateLabel: event ? formatDateTime(event.startsAt) : '',
-                title: event?.title || '课次',
+                title: event?.title || '场次',
                 className: event?.class?.name || payload.class?.name || '班级',
                 statusLabel: ATTENDANCE_STATUS_LABEL[record.status] ?? record.status,
                 lessonDelta: record.lessonDelta,
@@ -323,6 +377,13 @@ Page({
         attendance,
         feedbacks: feedbackRows,
         homework: homeworkRows,
+        works: (studentWorks as StudentWork[])
+          .filter((item) => item.studentId === studentId)
+          .map(toWorkRow),
+        workClassLabels: classRows.length
+          ? classRows.map((item) => `${item.name} · ${item.courseName}`)
+          : ['不绑定活动组'],
+        workClassIndex: this.data.workClassIndex >= classRows.length ? 0 : this.data.workClassIndex,
       });
     } catch (error) {
       this.setData({ loading: false });
@@ -340,6 +401,144 @@ Page({
         className: item.key === key ? 'detail-tab detail-tab-active' : 'detail-tab',
       })),
     });
+  },
+
+  onWorkClassChange(event: { detail: { value?: string | number } }) {
+    const index = Number(event.detail.value ?? 0);
+    if (!Number.isNaN(index)) {
+      this.setData({ workClassIndex: index });
+    }
+  },
+
+  onWorkTitleInput(event: { detail: { value?: string } }) {
+    this.setData({ workTitle: event.detail.value || '' });
+  },
+
+  onWorkDescriptionInput(event: { detail: { value?: string } }) {
+    this.setData({ workDescription: event.detail.value || '' });
+  },
+
+  onWorkFrameChange(event: {
+    currentTarget: { dataset: { key?: 'classic' | 'gallery' | 'paper' } };
+  }) {
+    const key = event.currentTarget.dataset.key || 'classic';
+    this.setData({
+      workFrameStyle: key,
+      workFrameOptions: WORK_FRAME_OPTIONS.map((item) => ({
+        ...item,
+        className: item.key === key ? 'work-frame-option active' : 'work-frame-option',
+      })),
+    });
+  },
+
+  onChooseWorkImages() {
+    const remaining = MAX_WORK_IMAGES - (this.data.workImages as string[]).length;
+    if (remaining <= 0) {
+      wx.showToast({ title: `最多上传 ${MAX_WORK_IMAGES} 张`, icon: 'none' });
+      return;
+    }
+    wx.chooseMedia({
+      count: remaining,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (result) => {
+        void this.uploadWorkImages(result.tempFiles.map((file) => file.tempFilePath));
+      },
+    });
+  },
+
+  async uploadWorkImages(filePaths: string[]) {
+    if (!filePaths.length) return;
+    this.setData({ workUploading: true });
+    wx.showLoading({ title: '上传中...', mask: true });
+    const uploaded: string[] = [];
+    for (const filePath of filePaths) {
+      try {
+        uploaded.push(await this.uploadOneWorkImage(filePath));
+      } catch (error) {
+        wx.showToast({ title: error instanceof Error ? error.message : '图片上传失败', icon: 'none' });
+      }
+    }
+    wx.hideLoading();
+    this.setData({
+      workImages: [...(this.data.workImages as string[]), ...uploaded],
+      workUploading: false,
+    });
+  },
+
+  uploadOneWorkImage(filePath: string): Promise<string> {
+    const filename = filePath.split('/').pop() || 'work.jpg';
+    return createTeacherUploadToken(filename).then(
+      (token) =>
+        new Promise<string>((resolve, reject) => {
+          wx.uploadFile({
+            url: token.uploadHost,
+            filePath,
+            name: 'file',
+            formData: { token: token.uploadToken, key: token.key },
+            success: (result) => {
+              if (result.statusCode >= 200 && result.statusCode < 300) {
+                resolve(token.publicUrl);
+              } else {
+                reject(new Error('图片上传失败'));
+              }
+            },
+            fail: (error) => reject(new Error(error.errMsg || '图片上传失败')),
+          });
+        }),
+    );
+  },
+
+  onPreviewWorkDraft(event: { currentTarget: { dataset: { index?: number } } }) {
+    const index = Number(event.currentTarget.dataset.index);
+    const images = this.data.workImages as string[];
+    if (Number.isNaN(index) || !images[index]) return;
+    wx.previewImage({ urls: images, current: images[index] });
+  },
+
+  onPreviewWork(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
+    const { url, urls } = event.currentTarget.dataset;
+    if (url && Array.isArray(urls) && urls.length) {
+      wx.previewImage({ urls, current: url });
+    }
+  },
+
+  onRemoveWorkImage(event: { currentTarget: { dataset: { index?: number } } }) {
+    const index = Number(event.currentTarget.dataset.index);
+    if (Number.isNaN(index)) return;
+    const workImages = (this.data.workImages as string[]).slice();
+    workImages.splice(index, 1);
+    this.setData({ workImages });
+  },
+
+  async submitStudentWork() {
+    const workImages = this.data.workImages as string[];
+    if (!workImages.length) {
+      wx.showToast({ title: '请先上传作品图片', icon: 'none' });
+      return;
+    }
+    const classes = this.data.classes as ClassRow[];
+    const selectedClass = classes[this.data.workClassIndex] || classes[0] || null;
+    this.setData({ workSubmitting: true });
+    try {
+      const result = await createTeacherStudentWork({
+        studentId: this.data.studentId,
+        courseId: selectedClass?.courseId || null,
+        classId: selectedClass?.id || null,
+        title: String(this.data.workTitle || '').trim() || '作品展示',
+        description: String(this.data.workDescription || '').trim(),
+        imageUrls: workImages,
+        frameStyle: this.data.workFrameStyle,
+      });
+      this.setData({ workTitle: '', workDescription: '', workImages: [] });
+      await this.reload();
+      wx.showToast({ title: result.message || '已发布', icon: 'success' });
+    } catch (error) {
+      wx.showToast({ title: error instanceof Error ? error.message : '发布失败', icon: 'none' });
+    } finally {
+      this.setData({ workSubmitting: false });
+    }
   },
 
   async enrollStudent(event: { currentTarget: { dataset: { id?: string } } }) {

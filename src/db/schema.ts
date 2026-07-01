@@ -742,6 +742,41 @@ export const homeworkAssignments = pgTable(
   }),
 );
 
+export const studentWorks = pgTable(
+  'student_works',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+    classSessionId: uuid('class_session_id').references(() => classSessions.id, {
+      onDelete: 'set null',
+    }),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    title: varchar('title', { length: 160 }).notNull().default('作品展示'),
+    description: text('description').notNull().default(''),
+    imageUrls: jsonb('image_urls')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    frameStyle: varchar('frame_style', { length: 40 }).notNull().default('classic'),
+    source: varchar('source', { length: 40 }).notNull().default('parent'),
+    status: varchar('status', { length: 40 }).notNull().default('published'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    studentIdx: index('student_works_student_idx').on(table.studentId, table.createdAt),
+    courseIdx: index('student_works_course_idx').on(table.courseId, table.createdAt),
+    classIdx: index('student_works_class_idx').on(table.classId, table.createdAt),
+    sessionIdx: index('student_works_session_idx').on(table.classSessionId),
+    teacherIdx: index('student_works_teacher_idx').on(table.teacherId, table.createdAt),
+  }),
+);
+
 export const lessonAccounts = pgTable(
   'lesson_accounts',
   {

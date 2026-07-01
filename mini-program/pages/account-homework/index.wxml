@@ -1,4 +1,4 @@
-<custom-navbar title="作业打卡" show-back="{{true}}" />
+<custom-navbar title="任务" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">
@@ -6,8 +6,49 @@
     <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
   </view>
   <block wx:else>
-    <view class="card panel">
-      <view class="section-title">作业打卡</view>
+    <view class="homework-tabs">
+      <view
+        class="homework-tab {{activeTab == 'assignments' ? 'active' : ''}}"
+        data-tab="assignments"
+        bindtap="onSwitchTab"
+      >
+        查看任务
+      </view>
+      <view
+        class="homework-tab {{activeTab == 'checkin' ? 'active' : ''}}"
+        data-tab="checkin"
+        bindtap="onSwitchTab"
+      >
+        快捷打卡
+      </view>
+      <view
+        class="homework-tab {{activeTab == 'records' ? 'active' : ''}}"
+        data-tab="records"
+        bindtap="onSwitchTab"
+      >
+        打卡记录
+      </view>
+    </view>
+
+    <view wx:if="{{activeTab == 'assignments' || activeTab == 'checkin'}}" class="card panel">
+      <view class="section-title">机构布置</view>
+      <view wx:if="{{homeworkAssignments.length}}" class="item-list">
+        <view wx:for="{{homeworkAssignments}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view>
+              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
+              <view class="row-meta">{{item.teacherName}} · {{item.createdAtLabel}}</view>
+            </view>
+            <view class="notice-status">{{item.assignmentScopeLabel}}</view>
+          </view>
+          <view class="attendance-topic">{{item.content}}</view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无机构布置的任务</view>
+    </view>
+
+    <view wx:if="{{activeTab == 'checkin'}}" class="section card panel">
+      <view class="section-title">快捷打卡</view>
       <view class="homework-form">
         <picker
           wx:if="{{targetLabels.length}}"
@@ -18,12 +59,12 @@
         >
           <view class="picker-field">{{targetLabels[targetIndex]}}</view>
         </picker>
-        <view wx:else class="empty compact-empty">暂无可打卡学员</view>
+        <view wx:else class="empty compact-empty">暂无可打卡成员</view>
 
         <textarea
           class="form-field homework-textarea"
           value="{{content}}"
-          placeholder="完成内容、练习情况或需要老师关注的问题"
+          placeholder="完成内容、练习情况或需要机构关注的问题"
           bindinput="onContentInput"
         />
 
@@ -55,24 +96,7 @@
       </view>
     </view>
 
-    <view class="section card panel">
-      <view class="section-title">老师布置</view>
-      <view wx:if="{{homeworkAssignments.length}}" class="item-list">
-        <view wx:for="{{homeworkAssignments}}" wx:key="id" class="stack-row">
-          <view class="row-between">
-            <view>
-              <view class="row-title">{{item.studentName}} · {{item.courseName}}</view>
-              <view class="row-meta">{{item.teacherName}} · {{item.createdAtLabel}}</view>
-            </view>
-            <view class="notice-status">{{item.assignmentScopeLabel}}</view>
-          </view>
-          <view class="attendance-topic">{{item.content}}</view>
-        </view>
-      </view>
-      <view wx:else class="empty compact-empty">暂无老师布置的作业</view>
-    </view>
-
-    <view class="section card panel">
+    <view wx:if="{{activeTab == 'records'}}" class="card panel">
       <view class="section-title">打卡记录</view>
       <view wx:if="{{homeworkCheckIns.length}}" class="item-list">
         <view wx:for="{{homeworkCheckIns}}" wx:key="id" class="stack-row">
@@ -101,7 +125,7 @@
           <view class="homework-rating">{{item.ratingLabel}}</view>
         </view>
       </view>
-      <view wx:else class="empty compact-empty">暂无作业打卡</view>
+      <view wx:else class="empty compact-empty">暂无任务打卡</view>
     </view>
   </block>
 </view>

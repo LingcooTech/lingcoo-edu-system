@@ -114,12 +114,12 @@ function toScheduleEventItem(
   const isTrial = item.type === 'trial_session';
   const studentNames = item.sessionId ? studentNamesBySessionId.get(item.sessionId) || [] : [];
   const time = `${timeLabel(item.startsAt)}-${timeLabel(item.endsAt)}`;
-  const courseName = item.course?.name || '课程';
+  const courseName = item.course?.name || '活动';
   const location =
     item.classroom?.name ||
     item.campus?.name ||
     item.campus?.address ||
-    (isTrial ? '校区待确认' : '教室待确认');
+    '空间待确认';
   const className = item.class?.name || '';
   const capacityText =
     isTrial && typeof item.capacity === 'number'
@@ -133,7 +133,7 @@ function toScheduleEventItem(
     courseName,
     startsAt: item.startsAt,
     startsAtLabel: time,
-    badge: isTrial ? '试听' : studentNames.length > 0 ? '我的课程' : '班课',
+    badge: isTrial ? '体验' : studentNames.length > 0 ? '我的活动' : '排期',
     meta: isTrial ? `${location}${capacityText}` : [className, location].filter(Boolean).join(' · '),
     url: isTrial
       ? `/pages/trial-detail/index?id=${encodeURIComponent(item.trialSessionId || item.id)}`
@@ -246,11 +246,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('课表 · 成长教室', '/pages/schedule/index');
+    return shareCard('排期 · 成长空间', '/pages/schedule/index');
   },
 
   onShareTimeline() {
-    return timelineCard('课表 · 成长教室', '');
+    return timelineCard('排期 · 成长空间', '');
   },
 
   async onPullDownRefresh() {
@@ -295,7 +295,7 @@ Page({
     } catch (error) {
       this.setData({ loading: false, events: [], selectedEvents: [] });
       wx.showToast({
-        title: error instanceof Error ? error.message : '课表加载失败',
+        title: error instanceof Error ? error.message : '排期加载失败',
         icon: 'none',
       });
     }

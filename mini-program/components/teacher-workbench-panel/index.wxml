@@ -5,7 +5,7 @@
     <view class="card summary-card">
       <view class="summary-head">
         <view>
-          <view class="summary-eyebrow">老师工作台</view>
+          <view class="summary-eyebrow">机构工作台</view>
           <view class="summary-title">{{summaryTitle}}</view>
         </view>
         <view class="scope-tabs">
@@ -23,11 +23,11 @@
       <view class="summary-grid">
         <view class="summary-item summary-action" data-action="schedule" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.courseCount}}</view>
-          <view class="summary-label">课程数</view>
+          <view class="summary-label">活动数</view>
         </view>
         <view class="summary-item summary-action" data-action="rollcall" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.pendingRollCall}}</view>
-          <view class="summary-label">待点名</view>
+          <view class="summary-label">待签到</view>
         </view>
         <view class="summary-item summary-action" data-action="leave" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.leaveMessages}}</view>
@@ -118,7 +118,7 @@
               bindtap="selectDay"
             >
               <view class="month-day-num">{{item.day}}</view>
-              <view wx:if="{{item.eventCount}}" class="month-day-count">{{item.eventCount}}节</view>
+              <view wx:if="{{item.eventCount}}" class="month-day-count">{{item.eventCount}}场</view>
             </view>
           </view>
         </view>
@@ -134,18 +134,18 @@
             </view>
             <view class="session-foot">
               <view class="card-meta">
-                已点 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
+                已签 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
               </view>
-              <button class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">点名</button>
+              <button class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">签到</button>
             </view>
           </view>
         </view>
-        <view wx:else class="empty-card">当天暂无排课。</view>
+        <view wx:else class="empty-card">当天暂无排期。</view>
       </view>
     </block>
 
     <block wx:elif="{{activeView == 'classes'}}">
-      <view class="section-title">我的班级</view>
+      <view class="section-title">活动组</view>
       <view wx:if="{{classes.length}}" class="list">
         <view wx:for="{{classes}}" wx:key="id" class="card class-card">
           <view class="row-between">
@@ -158,7 +158,7 @@
           <view class="class-stats">
             <view>
               <view class="stat-num">{{item.students.length}}</view>
-              <view class="stat-label">学员</view>
+              <view class="stat-label">成员</view>
             </view>
             <view>
               <view class="stat-num">{{item.capacity}}</view>
@@ -182,16 +182,16 @@
                 <view class="student-name">{{student.name}}</view>
                 <view class="card-meta">{{student.grade}}{{student.school ? ' · ' + student.school : ''}}</view>
               </view>
-              <view class="balance">{{student.lessonBalanceLabel}} 课时</view>
+              <view class="balance">{{student.lessonBalanceLabel}} 次</view>
             </view>
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无班级。</view>
+      <view wx:else class="card empty-card">暂无活动组。</view>
     </block>
 
     <block wx:elif="{{activeView == 'students'}}">
-      <view class="section-title">学员</view>
+      <view class="section-title">成员</view>
       <view wx:if="{{students.length}}" class="list">
         <view wx:for="{{students}}" wx:key="id" class="card student-card student-link" data-id="{{item.id}}" bindtap="openStudentDetail">
           <view class="row-between">
@@ -199,7 +199,7 @@
               <view class="card-title">{{item.name}}</view>
               <view class="card-meta">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
             </view>
-            <view class="pill">{{item.classes.length}} 个班</view>
+            <view class="pill">{{item.classes.length}} 个活动组</view>
           </view>
           <view class="chip-row">
             <view wx:for="{{item.classes}}" wx:key="*this" class="chip">{{item}}</view>
@@ -207,12 +207,12 @@
           <view class="balance-list">
             <view wx:for="{{item.balances}}" wx:key="courseName" class="balance-row">
               <view>{{item.courseName}}</view>
-              <view class="balance">{{item.balance}} 课时</view>
+              <view class="balance">{{item.balance}} 次</view>
             </view>
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无学员。</view>
+      <view wx:else class="card empty-card">暂无成员。</view>
     </block>
 
     <block wx:elif="{{activeView == 'feedbacks'}}">
@@ -247,7 +247,7 @@
     </block>
 
     <block wx:else>
-      <view class="section-title">作业批阅</view>
+      <view class="section-title">任务批阅</view>
       <view wx:if="{{homeworkCheckIns.length}}" class="list">
         <view wx:for="{{homeworkCheckIns}}" wx:key="id" class="card compact-card">
           <view class="row-between">
@@ -276,7 +276,7 @@
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无作业打卡。</view>
+      <view wx:else class="card empty-card">暂无任务打卡。</view>
     </block>
   </block>
 
@@ -285,7 +285,7 @@
       <view class="sheet-handle"></view>
       <view class="sheet-head">
         <view>
-          <view class="sheet-title">点名</view>
+          <view class="sheet-title">签到</view>
           <view wx:if="{{rollCallSession}}" class="sheet-meta">
             {{rollCallSession.className}} · {{rollCallSession.courseName}}
           </view>
@@ -300,7 +300,7 @@
       <view class="roll-summary">
         <view>
           <view class="roll-num">{{rollCallSummary.present}}</view>
-          <view class="roll-label">到课</view>
+          <view class="roll-label">到场</view>
         </view>
         <view>
           <view class="roll-num">{{rollCallSummary.late}}</view>
@@ -316,7 +316,7 @@
         </view>
       </view>
       <scroll-view class="sheet-scroll" scroll-y>
-        <view wx:if="{{rollCallLoading}}" class="sheet-loading">正在加载花名册...</view>
+        <view wx:if="{{rollCallLoading}}" class="sheet-loading">正在加载名单...</view>
         <view wx:elif="{{rollCallRows.length}}" class="sheet-list">
           <view wx:for="{{rollCallRows}}" wx:for-item="student" wx:key="id" class="roll-row">
             <view class="roll-student">
@@ -342,7 +342,7 @@
             </view>
           </view>
         </view>
-        <view wx:else class="sheet-empty">本课次暂无学员。</view>
+        <view wx:else class="sheet-empty">本场暂无成员。</view>
       </scroll-view>
       <view wx:if="{{rollCallError}}" class="sheet-error">{{rollCallError}}</view>
       <button
@@ -351,7 +351,7 @@
         disabled="{{rollCallSaving || rollCallLoading}}"
         bindtap="submitRollCall"
       >
-        {{rollCallSaving ? '保存中...' : '完成点名'}}
+        {{rollCallSaving ? '保存中...' : '完成签到'}}
       </button>
     </view>
   </view>
@@ -361,7 +361,7 @@
       <view class="sheet-handle"></view>
       <view class="sheet-head">
         <view>
-          <view class="sheet-title">课堂互动</view>
+          <view class="sheet-title">活动互动</view>
           <view wx:if="{{feedbackSession}}" class="sheet-meta">
             {{feedbackSession.className}} · {{feedbackSession.courseName}}
           </view>
@@ -378,8 +378,8 @@
         <view wx:elif="{{feedbackRows.length}}" class="sheet-list">
           <view class="assignment-box">
             <view class="assignment-head">
-              <view class="roll-name">全班作业</view>
-              <view class="card-meta">不填则不布置统一作业</view>
+              <view class="roll-name">活动组任务</view>
+              <view class="card-meta">不填则不布置统一任务</view>
             </view>
             <view class="template-row">
               <view
@@ -396,7 +396,7 @@
               class="feedback-input assignment-input"
               value="{{classAssignmentContent}}"
               bindinput="updateClassAssignment"
-              placeholder="全班统一作业"
+              placeholder="活动组统一任务"
               maxlength="2000"
             />
           </view>
@@ -420,11 +420,11 @@
               value="{{student.content}}"
               data-id="{{student.id}}"
               bindinput="updateFeedbackContent"
-              placeholder="课堂表现、掌握情况、课后建议，可不填"
+              placeholder="活动表现、掌握情况、后续建议，可不填"
               maxlength="2000"
             />
             <view class="personal-assignment-toggle" data-id="{{student.id}}" bindtap="togglePersonalAssignment">
-              {{student.personalAssignmentEnabled ? '取消单独作业' : '单独布置作业'}}
+              {{student.personalAssignmentEnabled ? '取消单独任务' : '单独布置任务'}}
             </view>
             <textarea
               wx:if="{{student.personalAssignmentEnabled}}"
@@ -432,7 +432,7 @@
               value="{{student.assignmentContent}}"
               data-id="{{student.id}}"
               bindinput="updateStudentAssignment"
-              placeholder="该学员的单独作业，会覆盖全班作业"
+              placeholder="该成员的单独任务，会覆盖全组任务"
               maxlength="2000"
             />
             <view wx:if="{{student.imageUrls.length}}" class="homework-images">
@@ -448,7 +448,7 @@
             </view>
           </view>
         </view>
-        <view wx:else class="sheet-empty">本课次暂无正式学员。</view>
+        <view wx:else class="sheet-empty">本场暂无正式成员。</view>
       </scroll-view>
       <view wx:if="{{feedbackError}}" class="sheet-error">{{feedbackError}}</view>
       <button
@@ -467,7 +467,7 @@
       <view class="sheet-handle"></view>
       <view class="sheet-head">
         <view>
-          <view class="sheet-title">批阅作业</view>
+          <view class="sheet-title">批阅任务</view>
           <view wx:if="{{reviewTarget}}" class="sheet-meta">
             {{reviewTarget.studentName}} · {{reviewTarget.courseName}}
           </view>
@@ -527,7 +527,7 @@
             placeholder="填写练习建议或订正要求"
             maxlength="2000"
           />
-          <view wx:else class="review-ok-hint">确认通过后，家长端会看到作业已批阅。</view>
+          <view wx:else class="review-ok-hint">确认通过后，成长中心会看到任务已批阅。</view>
         </block>
       </scroll-view>
       <view wx:if="{{reviewError}}" class="sheet-error">{{reviewError}}</view>

@@ -9,6 +9,7 @@ import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
 import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
+import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import { NotificationsService } from '../notifications/service.js';
 import type { AppModule } from '../types.js';
@@ -120,6 +121,25 @@ const teacherHomeworkReviewSchema = z.object({
   teacherFeedback: z.string().trim().max(2000).default(''),
   rating: z.number().int().min(0).max(5).default(0),
 });
+
+const teacherUploadTokenSchema = z.object({
+  filename: z.string().trim().min(1).max(200),
+});
+
+const teacherStudentWorkSchema = z
+  .object({
+    studentId: z.string().uuid(),
+    courseId: z.string().uuid().optional().nullable(),
+    classId: z.string().uuid().optional().nullable(),
+    classSessionId: z.string().uuid().optional().nullable(),
+    title: z.string().trim().max(160).default('作品展示'),
+    description: z.string().trim().max(2000).default(''),
+    imageUrls: z.array(z.string().trim().url().max(500)).min(1).max(9),
+    frameStyle: z.enum(['classic', 'gallery', 'paper']).default('classic'),
+  })
+  .refine((value) => value.title || value.description || value.imageUrls.length > 0, {
+    message: '请上传作品图片',
+  });
 
 const teacherLessonFeedbackSchema = z.object({
   classAssignmentContent: z.string().trim().max(2000).default(''),
@@ -701,6 +721,57 @@ export const teachingModule: AppModule = {
       });
     }
 
+    function canAccessStudentWork(
+      scope: TeacherHomeworkScope,
+      item: typeof schema.studentWorks.$inferSelect,
+    ) {
+      if (!scope.studentIds.has(item.studentId)) {
+        return false;
+      }
+      if (item.classSessionId) {
+        const session = scope.sessionById.get(item.classSessionId);
+        return Boolean(session && scope.classIds.has(session.classId));
+      }
+      if (item.classId) {
+        return scope.classIds.has(item.classId);
+      }
+      return !item.courseId || scope.courseIds.has(item.courseId);
+    }
+
+    function enrichTeacherStudentWorks(
+      scope: TeacherHomeworkScope,
+      items: (typeof schema.studentWorks.$inferSelect)[],
+    ) {
+      return items.map((item) => {
+        const session = item.classSessionId
+          ? (scope.sessionById.get(item.classSessionId) ?? null)
+          : null;
+        const classGroup =
+          (item.classId ? (scope.classById.get(item.classId) ?? null) : null) ??
+          (session ? (scope.classById.get(session.classId) ?? null) : null) ??
+          (item.courseId
+            ? (scope.classByStudentCourse.get(`${item.studentId}:${item.courseId}`) ?? null)
+            : null);
+        const teacher =
+          (item.teacherId ? (scope.teacherById.get(item.teacherId) ?? null) : null) ??
+          (classGroup?.teacherId ? (scope.teacherById.get(classGroup.teacherId) ?? null) : null);
+        return {
+          ...item,
+          student: scope.studentById.get(item.studentId)
+            ? {
+                id: item.studentId,
+                name: scope.studentById.get(item.studentId)!.name,
+                grade: scope.studentById.get(item.studentId)!.grade,
+              }
+            : null,
+          course: item.courseId ? (scope.courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+        };
+      });
+    }
+
     app.get(
       '/public/teacher/sessions/:sessionId/attendance',
       { preHandler: app.requireRole('teacher') },
@@ -937,6 +1008,127 @@ export const teachingModule: AppModule = {
           .where(inArray(schema.homeworkAssignments.classId, Array.from(scope.classIds)))
           .orderBy(desc(schema.homeworkAssignments.createdAt));
         return { homeworkAssignments: enrichTeacherHomeworkAssignments(scope, items) };
+      },
+    );
+
+    app.get(
+      '/public/teacher/student-works',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        const studentIds = Array.from(scope.studentIds);
+        if (studentIds.length === 0) {
+          return { studentWorks: [] };
+        }
+        const items = await app.db
+          .select()
+          .from(schema.studentWorks)
+          .where(inArray(schema.studentWorks.studentId, studentIds))
+          .orderBy(desc(schema.studentWorks.createdAt));
+        return {
+          studentWorks: enrichTeacherStudentWorks(
+            scope,
+            items.filter((item) => canAccessStudentWork(scope, item)),
+          ),
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/student-works',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const body = teacherStudentWorkSchema.parse(request.body);
+        const scope = await loadTeacherHomeworkScope(request.account!.id);
+        if (!scope.studentIds.has(body.studentId)) {
+          throw Object.assign(new Error('无权操作该成员'), { statusCode: 403 });
+        }
+
+        let courseId = body.courseId ?? null;
+        let classId = body.classId ?? null;
+        let teacherId = scope.teacherId ?? null;
+
+        if (body.classSessionId) {
+          const session = scope.sessionById.get(body.classSessionId);
+          if (!session || !scope.classIds.has(session.classId)) {
+            throw Object.assign(new Error('无权操作该安排'), { statusCode: 403 });
+          }
+          const classGroup = scope.classById.get(session.classId);
+          if (!classGroup) {
+            throw notFound('Class not found');
+          }
+          classId = classGroup.id;
+          courseId = classGroup.courseId;
+          teacherId = session.teacherId ?? classGroup.teacherId ?? teacherId;
+        } else if (classId) {
+          const classGroup = scope.classById.get(classId);
+          if (!classGroup || !scope.classIds.has(classId)) {
+            throw Object.assign(new Error('无权操作该活动组'), { statusCode: 403 });
+          }
+          courseId = classGroup.courseId;
+          teacherId = classGroup.teacherId ?? teacherId;
+        } else if (courseId && !scope.courseIds.has(courseId)) {
+          throw Object.assign(new Error('无权操作该活动'), { statusCode: 403 });
+        } else if (!courseId) {
+          const firstClass = Array.from(scope.classByStudentCourse.entries()).find(([key]) =>
+            key.startsWith(`${body.studentId}:`),
+          )?.[1];
+          courseId = firstClass?.courseId ?? null;
+          classId = firstClass?.id ?? null;
+        }
+
+        const candidate = {
+          id: '',
+          accountId: request.account!.id,
+          studentId: body.studentId,
+          courseId,
+          classId,
+          classSessionId: body.classSessionId ?? null,
+          teacherId,
+          title: body.title || '作品展示',
+          description: body.description,
+          imageUrls: body.imageUrls,
+          frameStyle: body.frameStyle,
+          source: 'teacher',
+          status: 'published',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        if (!canAccessStudentWork(scope, candidate)) {
+          throw Object.assign(new Error('无权发布该作品'), { statusCode: 403 });
+        }
+
+        const [item] = await app.db
+          .insert(schema.studentWorks)
+          .values({
+            accountId: request.account!.id,
+            studentId: body.studentId,
+            courseId,
+            classId,
+            classSessionId: body.classSessionId ?? null,
+            teacherId,
+            title: body.title || '作品展示',
+            description: body.description,
+            imageUrls: body.imageUrls,
+            frameStyle: body.frameStyle,
+            source: 'teacher',
+          })
+          .returning();
+
+        return {
+          studentWork: enrichTeacherStudentWorks(scope, [item])[0],
+          message: '作品已发布',
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/upload-token',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const body = teacherUploadTokenSchema.parse(request.body);
+        const qiniu = new QiniuSettingsService(app.db, app.appEnv);
+        return qiniu.createUploadToken({ filename: body.filename, prefix: 'teacher-works' });
       },
     );
 

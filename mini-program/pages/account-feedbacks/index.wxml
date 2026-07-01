@@ -1,4 +1,4 @@
-<custom-navbar title="课后点评" show-back="{{true}}" />
+<custom-navbar title="互动反馈" show-back="{{true}}" />
 <view class="page">
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">
@@ -7,8 +7,8 @@
   </view>
   <block wx:else>
     <view class="page-head">
-      <view class="section-title">课后点评</view>
-      <view class="row-meta">查看老师对课堂表现、练习重点和后续建议的记录。</view>
+      <view class="section-title">互动反馈</view>
+      <view class="row-meta">查看机构人员对活动表现、练习重点和后续建议的记录。</view>
     </view>
 
     <view wx:if="{{lessonFeedbacks.length}}" class="feedback-list">
@@ -24,7 +24,7 @@
         <view class="feedback-content">{{item.content}}</view>
         <view wx:if="{{item.homeworkAssignment}}" class="assignment-note">
           <view class="assignment-note-title">
-            {{item.homeworkAssignment.isPersonal ? '个人作业' : '课后作业'}}
+            {{item.homeworkAssignment.isPersonal ? '个人任务' : '活动任务'}}
           </view>
           <view class="assignment-note-content">{{item.homeworkAssignment.content}}</view>
         </view>
@@ -43,6 +43,6 @@
         </view>
       </view>
     </view>
-    <view wx:else class="empty compact-empty">暂无课后点评</view>
+    <view wx:else class="empty compact-empty">暂无互动反馈</view>
   </block>
 </view>

@@ -1,3 +1,33 @@
+.homework-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6rpx;
+  margin-bottom: 22rpx;
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.76);
+  overflow: hidden;
+  padding: 6rpx;
+}
+
+.homework-tab {
+  display: flex;
+  min-width: 0;
+  height: 62rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  color: #6b6258;
+  font-size: 23rpx;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.homework-tab.active {
+  background: #211f1c;
+  color: #fff;
+}
+
 .homework-form {
   display: grid;
   gap: 18rpx;

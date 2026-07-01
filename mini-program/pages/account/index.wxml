@@ -14,7 +14,7 @@
       <view class="hub-top">
         <view>
           <view class="hub-title">
-            家长中心
+            成长中心
           </view>
         </view>
         <navigator
@@ -22,9 +22,10 @@
           url="/pages/account-profile/index"
           hover-class="profile-hover"
         >
+          <view wx:if="{{stats.unreadNotifications}}" class="profile-dot"></view>
           <view class="profile-avatar">{{avatarText}}</view>
           <view class="profile-info">
-            <view class="profile-name">{{account.displayName || '家长'}}</view>
+            <view class="profile-name">{{account.displayName || '微信用户'}}</view>
             <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
             <view wx:else class="profile-phone muted">微信登录</view>
           </view>
@@ -34,17 +35,17 @@
       <view class="hero-metrics">
         <navigator class="hero-metric" url="/pages/account-students/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.childCount}}</view>
-          <view class="metric-label">孩子</view>
+          <view class="metric-label">成长档案</view>
         </navigator>
         <navigator class="hero-metric" url="/pages/account-lessons/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.totalBalance}}</view>
-          <view class="metric-label">剩余课时</view>
+          <view class="metric-label">服务次数</view>
         </navigator>
         <navigator class="hero-metric" url="/pages/account-interactions/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.interactionStars}}</view>
           <view class="metric-label">本月星星</view>
         </navigator>
-        <navigator class="hero-metric" url="/pages/account-orders/index" hover-class="metric-hover">
+        <navigator class="hero-metric" url="/pages/account-tasks/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.pendingTasks}}</view>
           <view class="metric-label">待处理</view>
         </navigator>
@@ -55,104 +56,148 @@
       初始密码：{{defaultPassword}}。手机号账号已同步创建。
     </view>
 
-    <view wx:for="{{entryGroups}}" wx:key="title" class="section entry-panel">
-      <view class="entry-title">{{item.title}}</view>
-      <view class="entry-grid">
-        <navigator
-          wx:for="{{item.entries}}"
-          wx:for-item="entry"
-          wx:key="key"
-          class="entry-item"
-          url="{{entry.url}}"
-          hover-class="entry-hover"
-        >
-          <view class="entry-symbol">{{entry.symbol}}</view>
-          <view class="entry-label">{{entry.label}}</view>
-          <view wx:if="{{entry.badge}}" class="entry-badge">{{entry.badge}}</view>
-        </navigator>
-      </view>
-    </view>
-
-    <view class="section panel">
-      <view class="section-head">
-        <view class="section-title">我的孩子</view>
-        <navigator class="section-link" url="/pages/account-students/index">全部</navigator>
-      </view>
-      <view wx:if="{{childSummaries.length}}" class="child-list">
-        <navigator
-          wx:for="{{childSummaries}}"
-          wx:key="id"
-          class="child-card"
-          url="/pages/account-students/index"
-          hover-class="child-card-hover"
-        >
-          <view class="child-card-head">
-            <view>
-              <view class="child-name">{{item.name}}</view>
-              <view class="child-meta">{{item.meta}}</view>
-            </view>
-          </view>
-          <view wx:if="{{item.courses.length}}" class="child-course-list">
-            <view
-              wx:for="{{item.courses}}"
-              wx:for-item="course"
-              wx:key="key"
-              class="child-course"
-            >
-              <view class="child-course-title">{{course.courseName}}</view>
-              <view class="child-course-line">校区：{{course.campusName}}</view>
-              <view class="child-course-line">班级：{{course.className}}</view>
-              <view class="child-course-line">老师：{{course.teacherName}}</view>
-            </view>
-          </view>
-          <view wx:else class="child-empty">{{item.emptyCourseText}}</view>
-        </navigator>
-      </view>
-      <view wx:else class="empty compact-empty">暂未关联孩子，请联系机构绑定学员档案。</view>
-    </view>
-
-    <view class="section overview-grid">
-      <view class="panel overview-card">
-        <view class="section-title">下一节课</view>
-        <block wx:if="{{nextLesson}}">
-          <view class="next-time">{{nextLesson.startsAtLabel}}</view>
-          <view class="next-title">{{nextLesson.courseName}} · {{nextLesson.title}}</view>
-          <view class="next-meta">
-            {{nextLesson.student.name}} · {{nextLesson.class.name}} · {{nextLesson.classroomName}}
-          </view>
-          <navigator class="inline-action" url="/pages/account-attendance/index">查看课程</navigator>
-        </block>
-        <view wx:else class="empty compact-empty">近期暂无正式课程安排</view>
-      </view>
-
-      <view class="panel overview-card">
-        <view class="section-title">待办</view>
-        <navigator
-          wx:for="{{todoItems}}"
-          wx:key="key"
-          class="todo-row"
-          url="{{item.url}}"
-          hover-class="todo-hover"
-        >
-          <view class="todo-label">{{item.label}}</view>
-          <view class="todo-value">{{item.value}}</view>
-        </navigator>
-      </view>
-    </view>
-
-    <view class="section panel">
-      <view class="section-head">
-        <view class="section-title">最新互动</view>
-        <navigator class="section-link" url="/pages/account-interactions/index">全部</navigator>
-      </view>
-      <block wx:if="{{latestFeedback}}">
-        <view class="feedback-title">
-          {{latestFeedback.studentName}} · {{latestFeedback.courseName}}
+    <navigator
+      wx:if="{{reservationReminder}}"
+      class="section core-panel reservation-reminder"
+      url="/pages/account-trials/index"
+      hover-class="core-link-hover"
+    >
+      <view class="reservation-head">
+        <view>
+          <view class="reservation-kicker">预约提醒</view>
+          <view class="reservation-title">{{reservationReminder.title}}</view>
         </view>
-        <view class="feedback-meta">{{latestFeedback.teacherName}} · {{latestFeedback.createdAtLabel}}</view>
-        <view class="feedback-content">{{latestFeedback.content}}</view>
+        <view class="reservation-status">{{reservationReminder.statusLine}}</view>
+      </view>
+      <view class="reservation-lines">
+        <view>时间：{{reservationReminder.timeLine}}</view>
+        <view>活动：{{reservationReminder.courseLine}}</view>
+        <view>空间：{{reservationReminder.locationLine}}</view>
+      </view>
+      <view class="reservation-link">查看全部体验席位</view>
+    </navigator>
+
+    <view class="section core-panel">
+      <view class="core-head">
+        <view class="core-title">最近安排</view>
+        <navigator
+          class="core-link"
+          url="/pages/account-schedule/index"
+          hover-class="core-link-hover"
+        >
+          全部排期
+        </navigator>
+      </view>
+      <block wx:if="{{nextLesson}}">
+        <view class="next-lesson-card">
+          <view class="next-lesson-content">
+            <view class="lesson-date-row">
+              <view class="lesson-date">{{nextLesson.dateLabel}}</view>
+              <view class="lesson-time">{{nextLesson.timeRangeLabel}}</view>
+            </view>
+            <view class="lesson-lines">
+              <view class="lesson-line">活动：{{nextLesson.courseLine}}</view>
+              <view class="lesson-line">活动组：{{nextLesson.classLine}}</view>
+              <view class="lesson-line">空间：{{nextLesson.locationLine}}</view>
+            </view>
+          </view>
+          <view wx:if="{{nextLesson.checkedIn}}" class="attendance-status next-lesson-status">
+            {{nextLesson.attendanceStatusLabel}}
+          </view>
+          <button
+            wx:elif="{{nextLesson.canCheckIn}}"
+            class="mini-button core-checkin-button"
+            data-session-id="{{nextLesson.sessionId}}"
+            data-student-id="{{nextLesson.student.id}}"
+            data-key="{{nextLesson.checkInKey}}"
+            loading="{{checkingInKey == nextLesson.checkInKey}}"
+            disabled="{{checkingInKey == nextLesson.checkInKey}}"
+            bindtap="onParentCheckIn"
+          >
+            签到
+          </button>
+          <view wx:else class="attendance-status disabled next-lesson-status">待开放</view>
+        </view>
       </block>
-      <view wx:else class="empty compact-empty">暂无课后点评</view>
+      <view wx:else class="empty compact-empty core-empty">近期暂无安排</view>
+    </view>
+
+    <view class="section core-panel">
+      <view class="core-head">
+        <view class="core-title">成长互动</view>
+        <navigator
+          class="core-link"
+          url="/pages/account-interactions/index"
+          hover-class="core-link-hover"
+        >
+          查看全部
+        </navigator>
+      </view>
+      <view class="interaction-actions">
+        <navigator
+          class="interaction-action"
+          url="/pages/account-interactions/index"
+          hover-class="interaction-action-hover"
+        >
+          <view class="interaction-action-icon amber">
+            <image src="{{guestIcons.star}}" mode="aspectFit" />
+          </view>
+          <view class="interaction-action-label">活动表现</view>
+        </navigator>
+        <navigator
+          class="interaction-action"
+          url="/pages/account-homework/index?tab=assignments"
+          hover-class="interaction-action-hover"
+        >
+          <view class="interaction-action-icon green">
+            <image src="{{guestIcons.check}}" mode="aspectFit" />
+          </view>
+          <view class="interaction-action-label">查看任务</view>
+          <view wx:if="{{stats.homeworkAssignments}}" class="interaction-action-badge">
+            {{stats.homeworkAssignments}}
+          </view>
+        </navigator>
+        <navigator
+          class="interaction-action"
+          url="/pages/account-homework/index?tab=checkin"
+          hover-class="interaction-action-hover"
+        >
+          <view class="interaction-action-icon blue">
+            <image src="{{guestIcons.message}}" mode="aspectFit" />
+          </view>
+          <view class="interaction-action-label">快捷打卡</view>
+        </navigator>
+        <navigator
+          class="interaction-action"
+          url="/pages/account-homework/index?tab=records"
+          hover-class="interaction-action-hover"
+        >
+          <view class="interaction-action-icon violet">
+            <image src="{{guestIcons.clock}}" mode="aspectFit" />
+          </view>
+          <view class="interaction-action-label">打卡记录</view>
+        </navigator>
+        <navigator
+          class="interaction-action"
+          url="/pages/account-gallery/index"
+          hover-class="interaction-action-hover"
+        >
+          <view class="interaction-action-icon rose">
+            <image src="{{guestIcons.calendar}}" mode="aspectFit" />
+          </view>
+          <view class="interaction-action-label">作品展示</view>
+        </navigator>
+        <navigator
+          class="interaction-action"
+          url="/pages/account-growth-report/index"
+          hover-class="interaction-action-hover"
+        >
+          <view class="interaction-action-icon teal">
+            <image src="{{guestIcons.users}}" mode="aspectFit" />
+          </view>
+          <view class="interaction-action-label">成长报告</view>
+        </navigator>
+      </view>
     </view>
 
     <view class="logout-wrap">
@@ -188,7 +233,7 @@
         <view class="guest-title-icon">
           <image class="guest-title-image" src="{{guestIcons.parent}}" mode="aspectFit" />
         </view>
-        <view>家长中心</view>
+        <view>成长中心</view>
       </view>
       <view class="guest-grid">
         <view class="guest-tool">
@@ -196,8 +241,8 @@
             <image class="guest-tool-image" src="{{guestIcons.calendar}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">孩子课表</view>
-            <view class="guest-tool-desc">查看上课安排</view>
+            <view class="guest-tool-title">活动排期</view>
+            <view class="guest-tool-desc">查看活动安排</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -205,8 +250,8 @@
             <image class="guest-tool-image" src="{{guestIcons.clock}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">课时记录</view>
-            <view class="guest-tool-desc">了解余额与明细</view>
+            <view class="guest-tool-title">服务记录</view>
+            <view class="guest-tool-desc">了解次数与明细</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -214,8 +259,8 @@
             <image class="guest-tool-image" src="{{guestIcons.headset}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">预约试听</view>
-            <view class="guest-tool-desc">管理试听与报名</view>
+            <view class="guest-tool-title">体验预约</view>
+            <view class="guest-tool-desc">管理预约与报名</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -224,7 +269,7 @@
           </view>
           <view>
             <view class="guest-tool-title">成长反馈</view>
-            <view class="guest-tool-desc">接收老师通知</view>
+            <view class="guest-tool-desc">接收服务通知</view>
           </view>
         </view>
       </view>
@@ -235,7 +280,7 @@
         <view class="guest-title-icon teacher">
           <image class="guest-title-image" src="{{guestIcons.teacher}}" mode="aspectFit" />
         </view>
-        <view>老师工作台</view>
+        <view>机构工作台</view>
       </view>
       <view class="guest-grid">
         <view class="guest-tool">
@@ -243,8 +288,8 @@
             <image class="guest-tool-image" src="{{guestIcons.calendarCheck}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">今日课表</view>
-            <view class="guest-tool-desc">查看当天课程</view>
+            <view class="guest-tool-title">日程排期</view>
+            <view class="guest-tool-desc">查看当天安排</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -252,8 +297,8 @@
             <image class="guest-tool-image" src="{{guestIcons.users}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">学员管理</view>
-            <view class="guest-tool-desc">查看学员信息</view>
+            <view class="guest-tool-title">成员管理</view>
+            <view class="guest-tool-desc">查看成员信息</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -261,8 +306,8 @@
             <image class="guest-tool-image" src="{{guestIcons.check}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">点名</view>
-            <view class="guest-tool-desc">处理课堂签到</view>
+            <view class="guest-tool-title">签到管理</view>
+            <view class="guest-tool-desc">处理现场签到</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -270,8 +315,8 @@
             <image class="guest-tool-image" src="{{guestIcons.star}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">课后反馈</view>
-            <view class="guest-tool-desc">记录课堂表现</view>
+            <view class="guest-tool-title">互动反馈</view>
+            <view class="guest-tool-desc">记录现场表现</view>
           </view>
         </view>
       </view>
@@ -282,7 +327,7 @@
     <view class="login-sheet" catchtap="noop">
       <view class="sheet-handle"></view>
       <view class="sheet-title">授权手机号</view>
-      <view class="sheet-desc">当前微信还未绑定账号，授权手机号后将自动进入家长中心或老师工作台。</view>
+      <view class="sheet-desc">当前微信还未绑定账号，授权手机号后将自动进入成长中心或机构工作台。</view>
       <button
         class="btn btn-primary bind-button"
         open-type="getPhoneNumber"

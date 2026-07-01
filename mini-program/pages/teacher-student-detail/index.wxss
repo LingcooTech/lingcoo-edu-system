@@ -75,8 +75,8 @@
 
 .detail-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10rpx;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6rpx;
   margin-top: 24rpx;
   border-radius: 22rpx;
   background: #fff;
@@ -90,7 +90,7 @@
   justify-content: center;
   border-radius: 16rpx;
   color: #57534e;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 850;
 }
 
@@ -197,4 +197,145 @@
 .class-enroll-button[disabled] {
   background: #eee9e2;
   color: #9a948b;
+}
+
+.work-publish-card {
+  display: grid;
+  gap: 18rpx;
+}
+
+.work-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 150rpx;
+  line-height: 1.6;
+  padding: 22rpx 24rpx;
+}
+
+.work-frame-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8rpx;
+  border-radius: 999rpx;
+  background: #f5f1eb;
+  padding: 6rpx;
+}
+
+.work-frame-option {
+  display: flex;
+  min-width: 0;
+  height: 56rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  color: #6b6258;
+  font-size: 22rpx;
+  font-weight: 850;
+}
+
+.work-frame-option.active {
+  background: #211f1c;
+  color: #fff;
+}
+
+.work-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+.work-image-cell {
+  position: relative;
+  width: 150rpx;
+  height: 150rpx;
+}
+
+.work-image-thumb {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 16rpx;
+  background: #eef1ee;
+}
+
+.work-image-remove {
+  position: absolute;
+  top: -12rpx;
+  right: -12rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 999rpx;
+  background: rgba(33, 31, 28, 0.78);
+  color: #fff;
+  font-size: 30rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+
+.work-image-add {
+  display: flex;
+  width: 150rpx;
+  height: 150rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx dashed rgba(33, 31, 28, 0.22);
+  border-radius: 16rpx;
+  background: #fbfaf7;
+  color: #8b857c;
+}
+
+.work-image-add-plus {
+  font-size: 48rpx;
+  line-height: 1;
+}
+
+.work-image-add-text {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+
+.work-submit-button {
+  width: 100%;
+  background: #211f1c;
+  color: #fff;
+}
+
+.student-work-card {
+  overflow: hidden;
+}
+
+.student-work-frame {
+  margin: 24rpx 24rpx 0;
+  background: #fff;
+}
+
+.frame-classic {
+  border: 14rpx solid #fff;
+  border-radius: 24rpx;
+  box-shadow: inset 0 0 0 2rpx rgba(154, 106, 75, 0.16);
+}
+
+.frame-gallery {
+  border: 20rpx solid #eee5da;
+  border-radius: 18rpx;
+  box-shadow: inset 0 0 0 4rpx #fff;
+}
+
+.frame-paper {
+  border: 16rpx solid #fbfaf7;
+  border-radius: 10rpx;
+  box-shadow: 0 10rpx 24rpx rgba(33, 31, 28, 0.08);
+  transform: rotate(-0.4deg);
+}
+
+.student-work-cover {
+  display: block;
+  width: 100%;
+  height: 330rpx;
+  border-radius: 10rpx;
+  background: #ece8df;
+}
+
+.student-work-body {
+  padding: 24rpx;
 }

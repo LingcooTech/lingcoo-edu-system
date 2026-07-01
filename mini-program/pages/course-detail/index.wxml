@@ -1,10 +1,10 @@
-<custom-navbar title="课程详情" show-back="{{true}}" />
+<custom-navbar title="活动详情" show-back="{{true}}" />
 <view class="page course-detail-page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
-    <view class="section-title">课程不存在或已下架</view>
-    <button class="btn btn-outline empty-button" bindtap="goCourses">查看全部课程</button>
+    <view class="section-title">活动不存在或已下架</view>
+    <button class="btn btn-outline empty-button" bindtap="goCourses">查看全部活动</button>
   </view>
 
   <block wx:else>
@@ -17,15 +17,15 @@
       <view class="body-text summary">{{course.summary}}</view>
       <image wx:if="{{course.coverImageUrl}}" class="course-cover" src="{{course.coverImageUrl}}" mode="aspectFill" />
       <view class="meta-row">
-        <text>{{course.durationMinutes}} 分钟/节</text>
-        <text>{{packages.length ? packages.length + (onlinePackageSalesAllowed ? ' 个课时包' : ' 个参考方案') : '暂未上架课时包'}}</text>
+        <text>{{course.durationMinutes}} 分钟/次</text>
+        <text>{{packages.length ? packages.length + (onlinePackageSalesAllowed ? ' 个服务包' : ' 个参考方案') : '暂未上架服务包'}}</text>
       </view>
     </view>
 
     <view class="section card info-card">
-      <view class="info-row">课程提供方：{{providerLabel}}</view>
-      <view class="info-row">授课老师：{{teacherLabel}}</view>
-      <view class="info-row">授课校区：{{locationLabel}}</view>
+      <view class="info-row">合作机构：{{providerLabel}}</view>
+      <view class="info-row">指导老师：{{teacherLabel}}</view>
+      <view class="info-row">空间：{{locationLabel}}</view>
       <view wx:if="{{receiverLabel}}" class="info-row">收款方：{{receiverLabel}}</view>
     </view>
 
@@ -34,7 +34,7 @@
     </view>
 
     <view class="section">
-      <view class="section-title">{{onlinePackageSalesAllowed ? '课时包' : '正式课程参考方案'}}</view>
+      <view class="section-title">{{onlinePackageSalesAllowed ? '服务包' : '常规活动参考方案'}}</view>
       <view wx:if="{{packages.length}}" class="package-list">
         <view wx:for="{{packages}}" wx:key="id" class="card package-card">
           <view class="row-between">
@@ -49,21 +49,21 @@
           </view>
           <view wx:if="{{item.description}}" class="body-text package-desc">{{item.description}}</view>
           <button wx:if="{{onlinePackageSalesAllowed}}" class="package-button" data-id="{{item.id}}" bindtap="onBuyTap">
-            <text>购买课时包</text>
+            <text>购买服务包</text>
           </button>
         </view>
       </view>
-      <view wx:else class="empty">{{onlinePackageSalesAllowed ? '课时包暂未上架，可先预约试听。' : '暂无正式课程参考方案，可先预约试听。'}}</view>
+      <view wx:else class="empty">{{onlinePackageSalesAllowed ? '服务包暂未上架，可先预约体验。' : '暂无常规活动参考方案，可先预约体验。'}}</view>
     </view>
 
     <view wx:if="{{trialNotice}}" class="section card info-card">
-      <view class="section-title">试听预约说明</view>
+      <view class="section-title">体验预约说明</view>
       <view class="body-text package-desc">{{trialNotice}}</view>
     </view>
 
     <view class="sticky-cta app-bottom-bar">
       <button class="btn btn-outline sticky-button secondary" bindtap="onPhoneTap">电话联系</button>
-      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听</button>
+      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约体验</button>
     </view>
 
     <view wx:if="{{showCheckoutForm && selectedPackage}}" class="sheet-mask" bindtap="closeCheckout">
@@ -77,7 +77,7 @@
         ></view>
         <view class="row-between checkout-heading">
           <view>
-            <view class="section-title">购买课时包</view>
+            <view class="section-title">购买服务包</view>
             <view class="muted form-hint">{{selectedPackage.name}} · {{selectedPackage.lessonLabel}} · {{selectedPackage.priceLabel}}</view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeCheckout">×</view>
@@ -89,13 +89,13 @@
               <view class="order-no">{{checkoutOrder.orderNo}}</view>
               <view class="order-status paid">已支付</view>
             </view>
-            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 课时</view>
+            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 次</view>
           </view>
           <form class="form-gap child-profile-form" bindsubmit="onCompleteCheckoutStudent">
             <input class="form-field" name="studentName" placeholder="孩子姓名" />
             <input class="form-field" name="grade" placeholder="年级 / 年龄（选填）" />
             <button class="btn btn-primary checkout-submit" form-type="submit" loading="{{completingChildProfile}}" disabled="{{completingChildProfile}}">
-              {{completingChildProfile ? '保存中...' : '开通课时'}}
+              {{completingChildProfile ? '保存中...' : '开通服务'}}
             </button>
           </form>
         </block>
@@ -106,7 +106,7 @@
               <view class="order-no">{{checkoutOrder.orderNo}}</view>
               <view class="order-status {{checkoutOrder.status}}">{{checkoutOrder.statusLabel}}</view>
             </view>
-            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 课时</view>
+            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 次</view>
             <view wx:if="{{checkoutDefaultPassword}}" class="password-note">
               初始密码：{{checkoutDefaultPassword}}。后续可用手机号登录家长中心。
             </view>
@@ -142,8 +142,8 @@
         ></view>
         <view class="row-between checkout-heading">
           <view>
-            <view class="section-title">预约试听</view>
-            <view class="muted form-hint">提交后老师会电话确认上课时间。</view>
+            <view class="section-title">预约体验</view>
+            <view class="muted form-hint">提交后工作人员会电话确认体验时间。</view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeTrial">×</view>
         </view>

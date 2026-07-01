@@ -18,11 +18,18 @@ import {
 } from '../../utils/parent-center';
 
 const MAX_IMAGES = 9;
+type HomeworkTab = 'assignments' | 'checkin' | 'records';
+
+function normalizeTab(value?: string): HomeworkTab {
+  if (value === 'checkin' || value === 'records') return value;
+  return 'assignments';
+}
 
 Page({
   data: {
     loading: true,
     needLogin: false,
+    activeTab: 'assignments' as HomeworkTab,
     submitting: false,
     uploading: false,
     targets: [] as HomeworkTarget[],
@@ -35,7 +42,8 @@ Page({
     maxImages: MAX_IMAGES,
   },
 
-  onLoad() {
+  onLoad(options?: { tab?: string }) {
+    this.setData({ activeTab: normalizeTab(options?.tab) });
     this.load();
   },
 
@@ -45,6 +53,12 @@ Page({
 
   goLogin() {
     wx.switchTab({ url: '/pages/account/index' });
+  },
+
+  onSwitchTab(event: { currentTarget: { dataset: { tab?: string } } }) {
+    const activeTab = normalizeTab(event.currentTarget.dataset.tab);
+    if (activeTab === this.data.activeTab) return;
+    this.setData({ activeTab });
   },
 
   async load() {
@@ -189,7 +203,7 @@ Page({
     const images = this.data.images as string[];
 
     if (!target) {
-      wx.showToast({ title: '请选择学员', icon: 'none' });
+      wx.showToast({ title: '请选择成员', icon: 'none' });
       return;
     }
     if (!content && images.length === 0) {

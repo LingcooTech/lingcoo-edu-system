@@ -628,6 +628,46 @@ export interface HomeworkAssignment {
   teacher?: { id: string; name: string } | null;
 }
 
+export interface StudentWork {
+  id: string;
+  accountId?: string | null;
+  studentId: string;
+  courseId?: string | null;
+  classId?: string | null;
+  classSessionId?: string | null;
+  teacherId?: string | null;
+  title: string;
+  description: string;
+  imageUrls: string[];
+  frameStyle: 'classic' | 'gallery' | 'paper' | string;
+  source: 'parent' | 'teacher' | string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string; grade?: string } | null;
+  course?: Course | null;
+  session?: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    topic: string;
+    status: string;
+  } | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+}
+
+export interface CreateStudentWorkInput {
+  studentId: string;
+  courseId?: string | null;
+  classId?: string | null;
+  classSessionId?: string | null;
+  title?: string;
+  description?: string;
+  imageUrls: string[];
+  frameStyle?: 'classic' | 'gallery' | 'paper';
+}
+
 export interface ParentNotification {
   id: string;
   category: string;
@@ -1143,6 +1183,19 @@ export function createParentHomeworkCheckIn(input: {
   });
 }
 
+export async function fetchParentStudentWorks(): Promise<StudentWork[]> {
+  return (await request<{ studentWorks: StudentWork[] }>('/public/me/student-works')).studentWorks;
+}
+
+export function createParentStudentWork(
+  input: CreateStudentWorkInput,
+): Promise<{ studentWork: StudentWork; message: string }> {
+  return request('/public/me/student-works', {
+    method: 'POST',
+    data: input,
+  });
+}
+
 export async function fetchParentNotifications(): Promise<ParentNotification[]> {
   return (await request<{ notifications: ParentNotification[] }>('/public/me/notifications'))
     .notifications;
@@ -1171,6 +1224,13 @@ export function createParentUploadToken(filename: string): Promise<ParentUploadT
   return request<ParentUploadToken>('/public/me/upload-token', {
     method: 'POST',
     data: { filename },
+  });
+}
+
+export function createParentStudentWorkUploadToken(filename: string): Promise<ParentUploadToken> {
+  return request<ParentUploadToken>('/public/me/upload-token', {
+    method: 'POST',
+    data: { filename, prefix: 'student-works' },
   });
 }
 
@@ -1260,6 +1320,28 @@ export async function fetchTeacherHomeworkAssignments(): Promise<HomeworkAssignm
       '/public/teacher/homework-assignments',
     )
   ).homeworkAssignments;
+}
+
+export async function fetchTeacherStudentWorks(): Promise<StudentWork[]> {
+  return (
+    await request<{ studentWorks: StudentWork[] }>('/public/teacher/student-works')
+  ).studentWorks;
+}
+
+export function createTeacherStudentWork(
+  input: CreateStudentWorkInput,
+): Promise<{ studentWork: StudentWork; message: string }> {
+  return request('/public/teacher/student-works', {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export function createTeacherUploadToken(filename: string): Promise<ParentUploadToken> {
+  return request<ParentUploadToken>('/public/teacher/upload-token', {
+    method: 'POST',
+    data: { filename },
+  });
 }
 
 export function fetchTeacherSessionAttendance(

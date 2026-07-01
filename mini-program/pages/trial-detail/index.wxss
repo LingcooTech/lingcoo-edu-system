@@ -3,10 +3,22 @@
 }
 
 .header,
+.info-card,
 .fee-card,
 .order-card,
 .form-card {
   padding: 26rpx;
+}
+
+.info-card {
+  display: grid;
+  gap: 14rpx;
+}
+
+.info-row {
+  color: #57534e;
+  font-size: 26rpx;
+  line-height: 1.55;
 }
 
 .trial-title {

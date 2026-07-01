@@ -47,7 +47,23 @@ const homeworkCheckInSchema = z
 
 const parentUploadTokenSchema = z.object({
   filename: z.string().trim().min(1).max(200),
+  prefix: z.enum(['parent-homework', 'student-works']).optional(),
 });
+
+const studentWorkSchema = z
+  .object({
+    studentId: z.string().uuid(),
+    courseId: z.string().uuid().optional().nullable(),
+    classId: z.string().uuid().optional().nullable(),
+    classSessionId: z.string().uuid().optional().nullable(),
+    title: z.string().trim().max(160).default('作品展示'),
+    description: z.string().trim().max(2000).default(''),
+    imageUrls: z.array(z.string().trim().url().max(500)).min(1).max(9),
+    frameStyle: z.enum(['classic', 'gallery', 'paper']).default('classic'),
+  })
+  .refine((value) => value.title || value.description || value.imageUrls.length > 0, {
+    message: '请上传作品图片',
+  });
 
 function canRescheduleSeatReservation(
   reservation: typeof schema.seatReservations.$inferSelect,
@@ -258,6 +274,46 @@ export const parentCenterModule: AppModule = {
                 isPersonal: Boolean(homeworkAssignment.studentId),
               }
             : null,
+        };
+      });
+    }
+
+    async function enrichStudentWorks(
+      students: (typeof schema.students.$inferSelect)[],
+      items: (typeof schema.studentWorks.$inferSelect)[],
+    ) {
+      if (items.length === 0) {
+        return [];
+      }
+      const [courses, sessions, classes, teachers] = await Promise.all([
+        catalogRepo.listCourses(app.db),
+        schedulingRepo.listClassSessions(app.db),
+        schedulingRepo.listClasses(app.db),
+        teachingRepo.listTeachers(app.db),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const sessionById = new Map(sessions.map((session) => [session.id, session]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+
+      return items.map((item) => {
+        const session = item.classSessionId ? (sessionById.get(item.classSessionId) ?? null) : null;
+        const classGroup =
+          (item.classId ? (classById.get(item.classId) ?? null) : null) ??
+          (session ? (classById.get(session.classId) ?? null) : null);
+        const teacher =
+          (item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null) ??
+          (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);
+        return {
+          ...item,
+          student: studentById.get(item.studentId)
+            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+            : null,
+          course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
+          session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
         };
       });
     }
@@ -903,13 +959,93 @@ export const parentCenterModule: AppModule = {
       },
     );
 
+    app.get('/public/me/student-works', { preHandler: app.requireParent }, async (request) => {
+      const { students } = await resolveChildren(request.account!.id);
+      const studentIds = students.map((student) => student.id);
+      if (studentIds.length === 0) {
+        return { studentWorks: [] };
+      }
+      const items = await app.db
+        .select()
+        .from(schema.studentWorks)
+        .where(inArray(schema.studentWorks.studentId, studentIds))
+        .orderBy(desc(schema.studentWorks.createdAt));
+      return { studentWorks: await enrichStudentWorks(students, items) };
+    });
+
+    app.post('/public/me/student-works', { preHandler: app.requireParent }, async (request) => {
+      const body = studentWorkSchema.parse(request.body);
+      const { students } = await resolveChildren(request.account!.id);
+      requireOwnedStudent(students, body.studentId);
+
+      let courseId = body.courseId ?? null;
+      let classId = body.classId ?? null;
+      let teacherId: string | null = null;
+
+      if (body.classSessionId) {
+        const session = await schedulingRepo.findSession(app.db, body.classSessionId);
+        if (!session) {
+          throw httpError(404, 'Class session not found');
+        }
+        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        if (!classGroup) {
+          throw httpError(404, 'Class not found');
+        }
+        const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
+        if (!enrollments.some((enrollment) => enrollment.studentId === body.studentId)) {
+          throw httpError(422, '该成员未加入此活动组');
+        }
+        classId = classGroup.id;
+        courseId = classGroup.courseId;
+        teacherId = session.teacherId ?? classGroup.teacherId ?? null;
+      } else if (classId) {
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup) {
+          throw httpError(404, 'Class not found');
+        }
+        const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
+        if (!enrollments.some((enrollment) => enrollment.studentId === body.studentId)) {
+          throw httpError(422, '该成员未加入此活动组');
+        }
+        courseId = classGroup.courseId;
+        teacherId = classGroup.teacherId ?? null;
+      } else if (courseId) {
+        await assertCourseBelongsToStudent(body.studentId, courseId);
+      }
+
+      const [item] = await app.db
+        .insert(schema.studentWorks)
+        .values({
+          accountId: request.account!.id,
+          studentId: body.studentId,
+          courseId,
+          classId,
+          classSessionId: body.classSessionId ?? null,
+          teacherId,
+          title: body.title || '作品展示',
+          description: body.description,
+          imageUrls: body.imageUrls,
+          frameStyle: body.frameStyle,
+          source: 'parent',
+        })
+        .returning();
+
+      return {
+        studentWork: (await enrichStudentWorks(students, [item]))[0],
+        message: '作品已发布',
+      };
+    });
+
     // Issues a short-lived Qiniu upload token so the Mini Program can upload
     // homework photos directly to object storage (wx.uploadFile), then submit
     // the returned public URL with the homework check-in.
     app.post('/public/me/upload-token', { preHandler: app.requireParent }, async (request) => {
       const body = parentUploadTokenSchema.parse(request.body);
       const qiniu = new QiniuSettingsService(app.db, app.appEnv);
-      return qiniu.createUploadToken({ filename: body.filename, prefix: 'parent-homework' });
+      return qiniu.createUploadToken({
+        filename: body.filename,
+        prefix: body.prefix ?? 'parent-homework',
+      });
     });
 
     app.get('/public/me/notifications', { preHandler: app.requireParent }, async (request) => {

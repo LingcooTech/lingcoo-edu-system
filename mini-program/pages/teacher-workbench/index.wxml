@@ -1,4 +1,4 @@
-<custom-navbar title="老师工作台" show-back="{{true}}" />
+<custom-navbar title="机构工作台" show-back="{{true}}" />
 <view class="page teacher-workbench-page">
   <teacher-workbench-panel id="teacherWorkbench" />
 </view>

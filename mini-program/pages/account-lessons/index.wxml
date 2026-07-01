@@ -1,4 +1,4 @@
-<custom-navbar title="课时信息" show-back="{{true}}" />
+<custom-navbar title="服务次数" show-back="{{true}}" />
 <view class="page lessons-page">
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">
@@ -49,9 +49,9 @@
             >
               ×
             </button>
-            <view class="renewal-title">课时不多了</view>
+            <view class="renewal-title">服务次数不多了</view>
             <view class="renewal-desc">
-              剩余 {{item.balance}} 课时，可提前续费，避免影响后续排课。
+              剩余 {{item.balance}} 次，可提前续费，避免影响后续安排。
             </view>
             <view class="renewal-package">
               {{item.renewal.packageName}} · {{item.renewal.packageLessonLabel}} ·
@@ -72,31 +72,31 @@
           <view class="lesson-summary">
             <view class="lesson-summary-item">
               <view class="summary-value">{{item.balance}}</view>
-              <view class="summary-label">剩余课时</view>
+              <view class="summary-label">剩余次数</view>
             </view>
             <view class="lesson-summary-item">
               <view class="summary-value">{{item.consumedCount}}</view>
-              <view class="summary-label">已上课次</view>
+              <view class="summary-label">已参与</view>
             </view>
           </view>
 
           <view class="record-tabs">
-            <button
+            <view
               class="record-tab {{item.activeRecordTab == 'upcoming' ? 'active' : ''}}"
               data-id="{{item.id}}"
               data-tab="upcoming"
               bindtap="onRecordTabChange"
             >
-              待上课次
-            </button>
-            <button
+              待参与
+            </view>
+            <view
               class="record-tab {{item.activeRecordTab == 'attendance' ? 'active' : ''}}"
               data-id="{{item.id}}"
               data-tab="attendance"
               bindtap="onRecordTabChange"
             >
-              上课记录
-            </button>
+              参与记录
+            </view>
           </view>
 
           <block wx:if="{{item.activeRecordTab == 'upcoming'}}">
@@ -104,13 +104,13 @@
               <view wx:for="{{item.upcoming}}" wx:for-item="event" wx:key="id" class="record-row">
                 <view class="record-main">
                   <view class="record-time">{{event.startsAtLabel}}</view>
-                  <view class="record-topic">{{event.title || '常规课'}}</view>
+                  <view class="record-topic">{{event.title || '常规活动'}}</view>
                   <view class="record-meta">{{event.class.name}} · {{event.classroomName}}</view>
                 </view>
-                <view class="record-status pending">待上课</view>
+                <view class="record-status pending">待参与</view>
               </view>
             </view>
-            <view wx:else class="empty compact-empty">暂无待上课次</view>
+            <view wx:else class="empty compact-empty">暂无待参与安排</view>
           </block>
 
           <block wx:else>
@@ -118,17 +118,17 @@
               <view wx:for="{{item.attendance}}" wx:for-item="record" wx:key="id" class="record-row">
                 <view class="record-main">
                   <view class="record-time">{{record.startsAtLabel}}</view>
-                  <view class="record-topic">{{record.topic || '常规课'}}</view>
+                  <view class="record-topic">{{record.topic || '常规活动'}}</view>
                   <view class="record-meta">{{record.className}}</view>
                 </view>
                 <view class="record-status">{{record.statusLabel}}</view>
               </view>
             </view>
-            <view wx:else class="empty compact-empty">暂无上课记录</view>
+            <view wx:else class="empty compact-empty">暂无参与记录</view>
           </block>
         </view>
       </view>
     </view>
-    <view wx:else class="empty compact-empty">暂无课时账户</view>
+    <view wx:else class="empty compact-empty">暂无服务账户</view>
   </block>
 </view>

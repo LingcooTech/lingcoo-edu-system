@@ -67,8 +67,8 @@ function packagePriceAmount(pkg: CoursePackage): number {
 
 function packageLessonLabel(pkg: CoursePackage): string {
   return pkg.giftedLessonCount
-    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
-    : `${pkg.lessonCount} 课时`;
+    ? `${pkg.lessonCount} 次 + 赠 ${pkg.giftedLessonCount} 次`
+    : `${pkg.lessonCount} 次`;
 }
 
 function pickRenewalPackage(packages: CoursePackage[]): CoursePackage | null {
@@ -232,7 +232,7 @@ Page({
         const renewal = renewals.get(item.id) ?? null;
         return {
           ...item,
-          balanceLabel: `${item.balance} 课时`,
+          balanceLabel: `${item.balance} 次`,
           renewal: renewal && !dismissed.has(renewal.key) ? renewal : null,
           upcoming,
           attendance: accountAttendance,
@@ -415,7 +415,7 @@ Page({
         await requestWechatPayment(intent);
         const paidOrder = await syncOrderPayment(orderNo);
         if (paidOrder.status !== 'paid') {
-          throw new Error('支付结果同步中，请稍后在课时信息中查看');
+          throw new Error('支付结果同步中，请稍后在服务次数中查看');
         }
         await this.finishRenewalPayment(orderNo, paidOrder);
         return;
@@ -425,7 +425,7 @@ Page({
       }
     }
 
-    await this.offerRenewalMockPayment(orderNo, '未登录家长中心，暂不能发起小程序微信支付。');
+    await this.offerRenewalMockPayment(orderNo, '未登录成长中心，暂不能发起小程序微信支付。');
   },
 
   async offerRenewalMockPayment(orderNo: string, reason?: string) {
@@ -471,7 +471,7 @@ Page({
     await this.load();
     wx.showModal({
       title: '续费成功',
-      content: '课时已到账，可在课时信息中查看明细。',
+      content: '服务次数已到账，可在服务次数中查看明细。',
       showCancel: false,
     });
   },

@@ -41,8 +41,8 @@ function packagePriceAmount(pkg: CoursePackage): number {
 
 function packageLessonLabel(pkg: CoursePackage): string {
   return pkg.giftedLessonCount
-    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
-    : `${pkg.lessonCount} 课时`;
+    ? `${pkg.lessonCount} 次 + 赠 ${pkg.giftedLessonCount} 次`
+    : `${pkg.lessonCount} 次`;
 }
 
 function campusLabel(campuses: PublicCampus[]): string {
@@ -164,7 +164,7 @@ Page({
   onShareAppMessage() {
     const course = this.data.course;
     return shareCard(
-      (course && course.name) || '课程详情',
+      (course && course.name) || '活动详情',
       `/pages/course-detail/index?slug=${(course && course.slug) || ''}`,
       course && course.coverImageUrl,
     );
@@ -173,7 +173,7 @@ Page({
   onShareTimeline() {
     const course = this.data.course;
     return timelineCard(
-      (course && course.name) || '课程详情',
+      (course && course.name) || '活动详情',
       `slug=${(course && course.slug) || ''}`,
       course && course.coverImageUrl,
     );
@@ -220,7 +220,7 @@ Page({
         defaultTeacher: payload.defaultTeacher ?? null,
         paymentReceiverInstitution: payload.paymentReceiverInstitution ?? null,
         onlinePackageSalesAllowed,
-        providerLabel: payload.providerInstitution?.name || '平台自有 / 待确认',
+        providerLabel: payload.providerInstitution?.name || '合作机构待确认',
         teacherLabel: defaultTeachers.length
           ? defaultTeachers.map((teacher) => teacher.name).join(' / ')
           : '场次确认',
@@ -279,14 +279,14 @@ Page({
 
   onBuyTap(event: { currentTarget: { dataset: { id?: string } } }) {
     if (!this.data.onlinePackageSalesAllowed) {
-      wx.showToast({ title: '请先预约试听，到店确认正式方案', icon: 'none' });
+      wx.showToast({ title: '请先预约体验，到店确认常规方案', icon: 'none' });
       return;
     }
     const packageId = event.currentTarget.dataset.id;
     const packages = this.data.packages as PackageItem[];
     const selectedPackage = packages.find((item: PackageItem) => item.id === packageId) ?? null;
     if (!selectedPackage) {
-      wx.showToast({ title: '课时包不存在', icon: 'none' });
+      wx.showToast({ title: '服务包不存在', icon: 'none' });
       return;
     }
     this.setData({
@@ -306,7 +306,7 @@ Page({
   closeCheckout() {
     if (this.data.submittingOrder || this.data.payingOrder) return;
     if (this.data.childProfileRequired) {
-      wx.showToast({ title: '请先完善孩子信息以开通课时', icon: 'none' });
+      wx.showToast({ title: '请先完善孩子信息以开通服务', icon: 'none' });
       return;
     }
     this.setData({
@@ -470,8 +470,8 @@ Page({
       };
       this.setData({ checkoutOrder: nextOrder, childProfileRequired: false });
       wx.showModal({
-        title: '已开通课时',
-        content: '孩子信息已完善，课时已到账，可在家长中心查看。',
+        title: '已开通服务',
+        content: '孩子信息已完善，服务次数已到账，可在家长中心查看。',
         showCancel: false,
         success: () => wx.switchTab({ url: '/pages/account/index' }),
       });
@@ -545,7 +545,7 @@ Page({
         title: '开发模拟支付',
         content: reason
           ? `${reason}\n\n当前可使用 mock-pay 完成开发环境验证。`
-          : '当前可使用 mock-pay 完成开发环境验证，并给孩子增加课时。',
+          : '当前可使用 mock-pay 完成开发环境验证，并给孩子增加服务次数。',
         confirmText: '模拟支付',
         success: async (result) => {
           if (!result.confirm) return;
@@ -576,8 +576,8 @@ Page({
     wx.showModal({
       title: '支付成功',
       content: this.data.checkoutDefaultPassword
-        ? `课时已到账。手机号账号初始密码：${this.data.checkoutDefaultPassword}`
-        : '课时已到账，可到家长中心查看。',
+        ? `服务次数已到账。手机号账号初始密码：${this.data.checkoutDefaultPassword}`
+        : '服务次数已到账，可到家长中心查看。',
       showCancel: true,
       confirmText: '去查看',
       success: (result) => {
@@ -641,7 +641,7 @@ Page({
       });
       wx.showModal({
         title: '提交成功',
-        content: '老师会尽快联系确认试听时间。',
+        content: '工作人员会尽快联系确认体验时间。',
         showCancel: false,
         success: () => {
           this.setData({ showTrialForm: false });

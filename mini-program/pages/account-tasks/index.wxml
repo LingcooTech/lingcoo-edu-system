@@ -1,0 +1,85 @@
+<custom-navbar title="待处理" show-back="{{true}}" />
+<view class="page tasks-page">
+  <skeleton wx:if="{{loading}}" variant="list" />
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    请先在“我的”登录
+    <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
+  </view>
+  <block wx:else>
+    <view class="tasks-hero card">
+      <view>
+        <view class="tasks-kicker">当前待处理</view>
+        <view class="tasks-count">{{pendingCount}}</view>
+      </view>
+      <view class="tasks-desc">只显示需要你现在处理的订单和体验席位。</view>
+    </view>
+
+    <block wx:if="{{pendingCount}}">
+      <view wx:if="{{pendingOrders.length}}" class="section card panel">
+        <view class="section-title">待支付订单</view>
+        <view class="item-list">
+          <view wx:for="{{pendingOrders}}" wx:key="id" class="stack-row">
+            <view class="row-between">
+              <view>
+                <view class="row-title">{{item.packageName}}</view>
+                <view class="row-meta">{{item.studentName}} · {{item.courseName}}</view>
+              </view>
+              <view class="order-status {{item.status}}">{{item.statusLabel}}</view>
+            </view>
+            <view class="order-line">
+              <view class="row-meta">{{item.createdAtLabel}}</view>
+              <view class="order-amount">{{item.amountLabel}}</view>
+            </view>
+            <navigator
+              class="mini-button task-link"
+              url="/pages/account-profile/index"
+              hover-class="task-link-hover"
+            >
+              查看订单
+            </navigator>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{pendingReservations.length}}" class="section card panel">
+        <view class="section-title">待处理体验席位</view>
+        <view class="item-list">
+          <view wx:for="{{pendingReservations}}" wx:key="id" class="stack-row">
+            <view class="row-between">
+              <view>
+                <view class="row-title">{{item.trialSession ? item.trialSession.title : '体验预约'}}</view>
+                <view class="row-meta">{{item.courseName}} · {{item.studentName}}</view>
+              </view>
+              <view class="seat-status {{item.reservationStatus}}">{{item.reservationStatusLabel}}</view>
+            </view>
+            <view class="row-meta">{{item.startsAtLabel}} · {{item.campusName}}</view>
+            <view class="order-line">
+              <view class="row-meta">{{item.paymentStatusLabel}} · {{item.checkInStatusLabel}}</view>
+              <view class="order-amount">{{item.feeLabel}}</view>
+            </view>
+            <navigator
+              class="mini-button task-link"
+              url="/pages/account-trials/index"
+              hover-class="task-link-hover"
+            >
+              查看席位
+            </navigator>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <view wx:else class="card panel tasks-empty">
+      <view class="tasks-empty-mark">✓</view>
+      <view class="tasks-empty-title">暂无待处理事项</view>
+      <view class="tasks-empty-desc">订单、体验占位和资料补充完成后，这里会保持清空。</view>
+      <navigator
+        class="mini-button tasks-empty-link"
+        url="/pages/account-profile/index"
+        hover-class="task-link-hover"
+      >
+        查看订单记录
+      </navigator>
+    </view>
+  </block>
+</view>

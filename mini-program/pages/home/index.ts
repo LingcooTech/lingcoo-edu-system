@@ -142,7 +142,7 @@ const initialState: HomeState = {
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
-  ctaText: '预约试听',
+  ctaText: '预约体验',
   ctaLink: '/courses',
   stats: [],
   highlights: [],
@@ -179,16 +179,16 @@ function createHomeChromeState() {
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
-  const metaText = [teacher.teachingYears ? `${teacher.teachingYears}教学` : '', specialtiesText]
+  const metaText = [teacher.teachingYears ? `${teacher.teachingYears}服务经验` : '', specialtiesText]
     .filter(Boolean)
     .join(' · ');
   return {
     id: teacher.id,
     name: teacher.name,
     initial: teacher.name.slice(0, 1) || '师',
-    title: teacher.title || '教师档案',
+    title: teacher.title || '伙伴档案',
     avatarUrl: teacher.avatarUrl || '',
-    tagline: teacher.tagline?.trim() || specialtiesText || '查看老师档案与授课方向',
+    tagline: teacher.tagline?.trim() || specialtiesText || '查看伙伴档案与活动方向',
     specialtiesText,
     metaText,
   };
@@ -257,7 +257,7 @@ function platformTitleFor(brandName: string, configuredTitle?: string) {
 function platformIntroFallbackFor(brandName: string) {
   const brand = brandName.trim();
   const subject = brand ? (brand.endsWith('平台') ? brand : `${brand}预约平台`) : '预约平台';
-  return `${subject}负责线上课程展示、试听预约、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排。`;
+  return `${subject}负责线上活动展示、体验预约、线索留存与家长沟通入口，帮助家长更清楚地了解活动安排。`;
 }
 
 function toState(
@@ -282,7 +282,7 @@ function toState(
     about?.operatorIntro || platformIntroFallbackFor(home.organization.brandName);
   const aboutTeachingIntro =
     about?.brandCooperation ||
-    '教学机构负责课程研发、师资安排、课堂交付与课后反馈。家长可结合课程详情、教师团队和成长故事，判断课程是否适合孩子当前阶段。';
+    '入驻机构负责活动研发、人员安排、现场实施与后续反馈。家长可结合活动详情、伙伴资源和成长故事，判断活动是否适合孩子当前阶段。';
 
   return {
     ...createHomeChromeState(),
@@ -306,7 +306,7 @@ function toState(
     aboutTeachingTitle:
       about?.brandCooperationTitle && about.brandCooperationTitle !== '品牌合作'
         ? about.brandCooperationTitle
-        : '教学机构',
+        : '入驻机构',
     aboutTeachingIntro,
     aboutTeachingIntroParagraphs: toParagraphs(aboutTeachingIntro),
     aboutBlocks: about?.bodyBlocks || [],
@@ -315,7 +315,7 @@ function toState(
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
-    ctaText: profile.ctaText || '预约试听',
+    ctaText: profile.ctaText || '预约体验',
     ctaLink: profile.ctaLink || '/courses',
     stats: profile.stats ?? [],
     highlights: (profile.highlights ?? []).map(toHighlightCard),
@@ -333,7 +333,7 @@ function toState(
       hasLocation: campus.latitude != null && campus.longitude != null,
       imageUrls: campus.environmentImageUrls ?? [],
     })),
-    growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
+    growthLoopTitle: profile.growthLoop?.title || '让活动围绕孩子持续迭代',
     growthLoopSummary: profile.growthLoop?.summary || '',
     growthLoopSteps: (profile.growthLoop?.steps ?? []).map((step, index) => ({
       title: step.title,
@@ -352,7 +352,7 @@ function toState(
       startsAtLabel: formatDateTime(session.startsAt),
       reservationFeeLabel:
         session.reservationFeeAmount > 0
-          ? `${money(session.reservationFeeAmount)} 试听席位保留费`
+          ? `${money(session.reservationFeeAmount)} 体验席位保留费`
           : '',
     })),
     trustVisible: trustTeachers.length > 0,

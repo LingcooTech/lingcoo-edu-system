@@ -149,10 +149,10 @@
           </view>
         </navigator>
         <button class="more-row" bindtap="goTeachers">
-          <text>查看全部教师</text>
+          <text>查看全部</text>
         </button>
       </view>
-      <view wx:else class="empty">师资信息整理中</view>
+      <view wx:else class="empty">伙伴资源整理中</view>
     </view>
 
     <view wx:if="{{activeHomeTab == 'campuses'}}" class="tab-content campus-list">
@@ -206,7 +206,7 @@
           </view>
         </navigator>
         <button class="more-row" bindtap="goStories">
-          <text>查看全部成长故事</text>
+          <text>查看全部</text>
         </button>
       </view>
       <view wx:else class="empty compact-empty">成长故事整理中</view>

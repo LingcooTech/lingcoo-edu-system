@@ -15,11 +15,15 @@
     "pages/account-profile/index",
     "pages/account-students/index",
     "pages/account-lessons/index",
+    "pages/account-tasks/index",
     "pages/account-orders/index",
     "pages/account-trials/index",
     "pages/account-attendance/index",
+    "pages/account-schedule/index",
     "pages/account-interactions/index",
     "pages/account-homework/index",
+    "pages/account-gallery/index",
+    "pages/account-growth-report/index",
     "pages/account-feedbacks/index",
     "pages/account-notifications/index",
     "pages/teacher-workbench/index",
@@ -46,15 +50,15 @@
       },
       {
         "pagePath": "pages/courses/index",
-        "text": "课程"
+        "text": "活动"
       },
       {
         "pagePath": "pages/trials/index",
-        "text": "试听"
+        "text": "预约"
       },
       {
         "pagePath": "pages/schedule/index",
-        "text": "课表"
+        "text": "排期"
       },
       {
         "pagePath": "pages/account/index",

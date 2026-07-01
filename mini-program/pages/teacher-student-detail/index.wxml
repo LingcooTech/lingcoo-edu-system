@@ -15,7 +15,7 @@
         </view>
         <view>
           <view class="stat-value">{{profile.totalBalance}}</view>
-          <view class="stat-label">课时</view>
+          <view class="stat-label">服务次数</view>
         </view>
         <view>
           <view class="stat-value">{{profile.totalStars}}</view>
@@ -44,7 +44,7 @@
             <view class="row-title">{{item.name}}</view>
             <view class="row-meta">{{item.courseName}} · {{item.classroomName}}</view>
           </view>
-          <view class="balance">{{item.balance}} 课时</view>
+          <view class="balance">{{item.balance}} 次</view>
         </view>
       </view>
       <view wx:else class="card empty-card">暂无班级信息。</view>
@@ -108,7 +108,7 @@
       <view wx:else class="card empty-card">暂无课堂互动。</view>
     </block>
 
-    <block wx:else>
+    <block wx:elif="{{activeTab == 'homework'}}">
       <view class="section-title">作业记录</view>
       <view wx:if="{{homework.length}}" class="list">
         <view wx:for="{{homework}}" wx:key="id" class="card text-card">
@@ -125,6 +125,100 @@
         </view>
       </view>
       <view wx:else class="card empty-card">暂无作业记录。</view>
+    </block>
+
+    <block wx:else>
+      <view class="section-title">发布作品</view>
+      <view class="card text-card work-publish-card">
+        <picker
+          wx:if="{{workClassLabels.length}}"
+          mode="selector"
+          range="{{workClassLabels}}"
+          value="{{workClassIndex}}"
+          bindchange="onWorkClassChange"
+        >
+          <view class="picker-field">{{workClassLabels[workClassIndex]}}</view>
+        </picker>
+        <input
+          class="form-field"
+          value="{{workTitle}}"
+          placeholder="作品标题，可不填"
+          bindinput="onWorkTitleInput"
+        />
+        <textarea
+          class="form-field work-textarea"
+          value="{{workDescription}}"
+          placeholder="作品说明，可不填"
+          bindinput="onWorkDescriptionInput"
+        />
+        <view class="work-frame-options">
+          <view
+            wx:for="{{workFrameOptions}}"
+            wx:key="key"
+            class="{{item.className}}"
+            data-key="{{item.key}}"
+            bindtap="onWorkFrameChange"
+          >
+            {{item.label}}
+          </view>
+        </view>
+        <view class="work-image-grid">
+          <view wx:for="{{workImages}}" wx:key="*this" class="work-image-cell">
+            <image
+              class="work-image-thumb"
+              src="{{item}}"
+              mode="aspectFill"
+              data-index="{{index}}"
+              bindtap="onPreviewWorkDraft"
+            />
+            <view class="work-image-remove" data-index="{{index}}" catchtap="onRemoveWorkImage">×</view>
+          </view>
+          <view
+            wx:if="{{workImages.length < maxWorkImages}}"
+            class="work-image-add"
+            bindtap="onChooseWorkImages"
+          >
+            <view class="work-image-add-plus">＋</view>
+            <view class="work-image-add-text">{{workUploading ? '上传中' : '加作品'}}</view>
+          </view>
+        </view>
+        <button
+          class="mini-button work-submit-button"
+          loading="{{workSubmitting}}"
+          disabled="{{workSubmitting || workUploading}}"
+          bindtap="submitStudentWork"
+        >
+          {{workSubmitting ? '发布中...' : '发布作品'}}
+        </button>
+      </view>
+
+      <view class="section-title">作品墙</view>
+      <view wx:if="{{works.length}}" class="list">
+        <view wx:for="{{works}}" wx:key="id" class="card student-work-card">
+          <view class="{{item.frameClass}}">
+            <image
+              class="student-work-cover"
+              src="{{item.coverUrl}}"
+              mode="aspectFill"
+              data-url="{{item.coverUrl}}"
+              data-urls="{{item.imageUrls}}"
+              bindtap="onPreviewWork"
+            />
+          </view>
+          <view class="student-work-body">
+            <view class="row-between">
+              <view>
+                <view class="row-title">{{item.titleLabel}}</view>
+                <view class="row-meta">{{item.courseName}}{{item.className ? ' · ' + item.className : ''}}</view>
+              </view>
+              <view class="status-pill">{{item.sourceLabel}}</view>
+            </view>
+            <view wx:if="{{item.description}}" class="text-content">{{item.description}}</view>
+            <view class="row-meta">{{item.createdAtLabel}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">暂无作品。</view>
     </block>
   </block>
 </view>

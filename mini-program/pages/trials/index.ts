@@ -1,8 +1,10 @@
 import {
   fetchTrialSessions,
+  fetchPublicInstitutions,
   loadHome,
   type Course,
   type PublicCampus,
+  type PublicInstitution,
   type TrialSession,
 } from '../../services/api';
 import { formatDateTime, money } from '../../utils/format';
@@ -15,6 +17,8 @@ type TrialListItem = TrialSession & {
   endsAtLabel: string;
   capacityLabel: string;
   reservationFeeLabel: string;
+  providerInstitutionId: string;
+  providerLabel: string;
 };
 
 interface FilterOption {
@@ -29,7 +33,18 @@ const TIME_FILTERS: Array<{ key: TimeFilter; label: string }> = [
   { key: 'all', label: '全部' },
 ];
 
-function toTrialItem(item: TrialSession): TrialListItem {
+function providerName(course: Course | undefined, institutions: PublicInstitution[]): string {
+  if (!course) return '合作机构待确认';
+  const institution = institutions.find((item) => item.id === course.providerInstitutionId);
+  return institution?.name || course.paymentReceiverName || '合作机构待确认';
+}
+
+function toTrialItem(
+  item: TrialSession,
+  coursesById: Map<string, Course>,
+  institutions: PublicInstitution[],
+): TrialListItem {
+  const course = coursesById.get(item.courseId);
   return {
     ...item,
     startsAtLabel: formatDateTime(item.startsAt),
@@ -37,6 +52,8 @@ function toTrialItem(item: TrialSession): TrialListItem {
     capacityLabel: `${item.bookedCount}/${item.capacity}`,
     reservationFeeLabel:
       item.reservationFeeAmount > 0 ? `${money(item.reservationFeeAmount)} 席位保留费` : '免费预约',
+    providerInstitutionId: course?.providerInstitutionId || '',
+    providerLabel: providerName(course, institutions),
   };
 }
 
@@ -86,15 +103,22 @@ function timeRangeForFilter(filter: TimeFilter, now = new Date()) {
 
 function courseOptions(courses: Course[]): FilterOption[] {
   return [
-    { label: '全部课程', value: '' },
+    { label: '活动', value: '' },
     ...courses.map((course) => ({ label: course.name, value: course.id })),
   ];
 }
 
 function campusOptions(campuses: PublicCampus[]): FilterOption[] {
   return [
-    { label: '全部校区', value: '' },
+    { label: '空间', value: '' },
     ...campuses.map((campus) => ({ label: campus.name, value: campus.id })),
+  ];
+}
+
+function institutionOptions(institutions: PublicInstitution[]): FilterOption[] {
+  return [
+    { label: '合作机构', value: '' },
+    ...institutions.map((institution) => ({ label: institution.name, value: institution.id })),
   ];
 }
 
@@ -102,6 +126,7 @@ function filterTrials(
   trials: TrialListItem[],
   filter: {
     timeFilter: TimeFilter;
+    institutionId: string;
     courseId: string;
     campusId: string;
     showFull: boolean;
@@ -113,6 +138,7 @@ function filterTrials(
       const startsAt = new Date(trial.startsAt);
       if (startsAt < range.from) return false;
       if (range.to && startsAt > range.to) return false;
+      if (filter.institutionId && trial.providerInstitutionId !== filter.institutionId) return false;
       if (filter.courseId && trial.courseId !== filter.courseId) return false;
       if (filter.campusId && trial.campusId !== filter.campusId) return false;
       if (!filter.showFull && trial.bookedCount >= trial.capacity) return false;
@@ -129,8 +155,10 @@ Page({
     trials: [] as TrialListItem[],
     timeFilters: TIME_FILTERS,
     activeTimeFilter: 'next_14' as TimeFilter,
-    courseOptions: [{ label: '全部课程', value: '' }] as FilterOption[],
-    campusOptions: [{ label: '全部校区', value: '' }] as FilterOption[],
+    institutionOptions: [{ label: '合作机构', value: '' }] as FilterOption[],
+    courseOptions: [{ label: '活动', value: '' }] as FilterOption[],
+    campusOptions: [{ label: '空间', value: '' }] as FilterOption[],
+    selectedInstitutionIndex: 0,
     selectedCourseIndex: 0,
     selectedCampusIndex: 0,
     showFull: false,
@@ -141,11 +169,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('预约试听 · 成长教室', '/pages/trials/index');
+    return shareCard('体验预约 · 成长空间', '/pages/trials/index');
   },
 
   onShareTimeline() {
-    return timelineCard('预约试听 · 成长教室', '');
+    return timelineCard('体验预约 · 成长空间', '');
   },
 
   async onPullDownRefresh() {
@@ -167,11 +195,18 @@ Page({
         fetchTrialSessions(),
         loadHome().catch(() => null),
       ]);
-      const allTrials = trialSessions.map(toTrialItem);
+      const institutions = await fetchPublicInstitutions().catch(() => []);
       const courses = home?.featuredCourses ?? [];
+      const coursesById = new Map(courses.map((course) => [course.id, course]));
       const campuses = home?.campuses ?? [];
+      const allTrials = trialSessions.map((item) => toTrialItem(item, coursesById, institutions));
+      const nextInstitutionOptions = institutionOptions(institutions);
       const nextCourseOptions = courseOptions(courses);
       const nextCampusOptions = campusOptions(campuses);
+      const selectedInstitutionIndex = Math.min(
+        this.data.selectedInstitutionIndex,
+        nextInstitutionOptions.length - 1,
+      );
       const selectedCourseIndex = Math.min(
         this.data.selectedCourseIndex,
         nextCourseOptions.length - 1,
@@ -182,6 +217,7 @@ Page({
       );
       const filter = {
         timeFilter: this.data.activeTimeFilter,
+        institutionId: nextInstitutionOptions[selectedInstitutionIndex]?.value ?? '',
         courseId: nextCourseOptions[selectedCourseIndex]?.value ?? '',
         campusId: nextCampusOptions[selectedCampusIndex]?.value ?? '',
         showFull: this.data.showFull,
@@ -189,8 +225,10 @@ Page({
       this.setData({
         loading: false,
         allTrials,
+        institutionOptions: nextInstitutionOptions,
         courseOptions: nextCourseOptions,
         campusOptions: nextCampusOptions,
+        selectedInstitutionIndex,
         selectedCourseIndex,
         selectedCampusIndex,
         trials: filterTrials(allTrials, filter),
@@ -211,12 +249,31 @@ Page({
   onTimeFilterTap(event: { currentTarget: { dataset: { key?: TimeFilter } } }) {
     const key = event.currentTarget.dataset.key;
     if (!key) return;
+    const institutionOptions = this.data.institutionOptions as FilterOption[];
     const courseOptions = this.data.courseOptions as FilterOption[];
     const campusOptions = this.data.campusOptions as FilterOption[];
     this.setData({
       activeTimeFilter: key,
       trials: filterTrials(this.data.allTrials as TrialListItem[], {
         timeFilter: key,
+        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
+        courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
+        campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
+        showFull: Boolean(this.data.showFull),
+      }),
+    });
+  },
+
+  onInstitutionChange(event: { detail: { value: string } }) {
+    const selectedInstitutionIndex = Number(event.detail.value) || 0;
+    const institutionOptions = this.data.institutionOptions as FilterOption[];
+    const courseOptions = this.data.courseOptions as FilterOption[];
+    const campusOptions = this.data.campusOptions as FilterOption[];
+    this.setData({
+      selectedInstitutionIndex,
+      trials: filterTrials(this.data.allTrials as TrialListItem[], {
+        timeFilter: this.data.activeTimeFilter as TimeFilter,
+        institutionId: institutionOptions[selectedInstitutionIndex]?.value ?? '',
         courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
         campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
         showFull: Boolean(this.data.showFull),
@@ -226,12 +283,14 @@ Page({
 
   onCourseChange(event: { detail: { value: string } }) {
     const selectedCourseIndex = Number(event.detail.value) || 0;
+    const institutionOptions = this.data.institutionOptions as FilterOption[];
     const courseOptions = this.data.courseOptions as FilterOption[];
     const campusOptions = this.data.campusOptions as FilterOption[];
     this.setData({
       selectedCourseIndex,
       trials: filterTrials(this.data.allTrials as TrialListItem[], {
         timeFilter: this.data.activeTimeFilter as TimeFilter,
+        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
         courseId: courseOptions[selectedCourseIndex]?.value ?? '',
         campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
         showFull: Boolean(this.data.showFull),
@@ -241,12 +300,14 @@ Page({
 
   onCampusChange(event: { detail: { value: string } }) {
     const selectedCampusIndex = Number(event.detail.value) || 0;
+    const institutionOptions = this.data.institutionOptions as FilterOption[];
     const courseOptions = this.data.courseOptions as FilterOption[];
     const campusOptions = this.data.campusOptions as FilterOption[];
     this.setData({
       selectedCampusIndex,
       trials: filterTrials(this.data.allTrials as TrialListItem[], {
         timeFilter: this.data.activeTimeFilter as TimeFilter,
+        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
         courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
         campusId: campusOptions[selectedCampusIndex]?.value ?? '',
         showFull: Boolean(this.data.showFull),
@@ -256,12 +317,14 @@ Page({
 
   onToggleFull() {
     const showFull = !this.data.showFull;
+    const institutionOptions = this.data.institutionOptions as FilterOption[];
     const courseOptions = this.data.courseOptions as FilterOption[];
     const campusOptions = this.data.campusOptions as FilterOption[];
     this.setData({
       showFull,
       trials: filterTrials(this.data.allTrials as TrialListItem[], {
         timeFilter: this.data.activeTimeFilter as TimeFilter,
+        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
         courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
         campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
         showFull,

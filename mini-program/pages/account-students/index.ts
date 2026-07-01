@@ -31,7 +31,7 @@ function childStatusLabel(status: string) {
 }
 
 function childMeta(child: ParentChild): string {
-  return [child.grade, child.school].filter(Boolean).join(' · ') || '学员';
+  return [child.grade, child.school].filter(Boolean).join(' · ') || '成长成员';
 }
 
 function summarizeChildCourses(
@@ -43,9 +43,9 @@ function summarizeChildCourses(
     courseById.set(item.courseId, {
       key: item.courseId,
       courseName: item.courseName,
-      className: '待分班',
-      campusName: '校区待确认',
-      teacherName: '老师待确认',
+      className: '待分组',
+      campusName: '空间待确认',
+      teacherName: '机构人员待确认',
     });
   }
 
@@ -54,10 +54,10 @@ function summarizeChildCourses(
     const existing = courseId ? courseById.get(courseId) : null;
     const summary: ChildCourseSummary = {
       key: courseId || enrollment.id,
-      courseName: enrollment.course?.name || existing?.courseName || '课程待确认',
-      className: enrollment.className || '班级待确认',
-      campusName: enrollment.campus?.name || '校区待确认',
-      teacherName: enrollment.teacher?.name || '老师待确认',
+      courseName: enrollment.course?.name || existing?.courseName || '活动待确认',
+      className: enrollment.className || '活动组待确认',
+      campusName: enrollment.campus?.name || '空间待确认',
+      teacherName: enrollment.teacher?.name || '机构人员待确认',
     };
     if (courseId) {
       courseById.set(courseId, summary);
@@ -113,7 +113,7 @@ Page({
           meta: childMeta(child),
           statusLabel: childStatusLabel(child.status),
           courses: summarizeChildCourses(child, lessonItemsByStudentId.get(child.id) ?? []),
-          emptyCourseText: '暂未开通正式课程',
+          emptyCourseText: '暂未开通常规活动',
         })),
         needLogin: false,
         loading: false,

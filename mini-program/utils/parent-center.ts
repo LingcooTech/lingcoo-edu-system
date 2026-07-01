@@ -123,27 +123,27 @@ export function reservationStatusLabel(status: string): string {
 
 export function checkInStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    pending: '待到课',
+    pending: '待到场',
     checked_in: '已签到',
-    no_show: '未到课',
+    no_show: '未到场',
   };
   return labels[status] || status;
 }
 
 export function orderTitle(order: ParentOrder): string {
-  if (order.orderType === 'seat_reservation') return '试听席位保留费';
-  if (order.orderType === 'manual_package_grant') return order.package?.name || '线下课时包';
-  return order.package?.name || `${order.lessonCount} 课时包`;
+  if (order.orderType === 'seat_reservation') return '体验席位保留费';
+  if (order.orderType === 'manual_package_grant') return order.package?.name || '线下服务包';
+  return order.package?.name || `${order.lessonCount} 次服务包`;
 }
 
 export function attendanceStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    present: '到课',
+    present: '到场',
     late: '迟到',
     leave: '请假',
     absent: '缺勤',
-    makeup: '补课',
-    trial: '试听',
+    makeup: '补参与',
+    trial: '体验',
   };
   return labels[status] || status;
 }

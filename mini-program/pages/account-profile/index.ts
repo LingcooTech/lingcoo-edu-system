@@ -5,8 +5,16 @@ import {
   fetchParentOrders,
   hasToken,
   logout,
+  markParentNotificationRead,
   type AuthAccount,
 } from '../../services/api';
+import {
+  notificationStatusLabel,
+  toNotificationItem,
+  toOrderItem,
+  type NotificationItem,
+  type OrderItem,
+} from '../../utils/parent-center';
 
 type ProfileStats = {
   orderCount: number;
@@ -34,6 +42,9 @@ Page({
     account: null as AuthAccount | null,
     avatarText: '家',
     stats: emptyStats(),
+    activeTab: 'notifications' as 'notifications' | 'orders',
+    notifications: [] as NotificationItem[],
+    orders: [] as OrderItem[],
   },
 
   onLoad() {
@@ -44,13 +55,26 @@ Page({
     this.load().finally(() => wx.stopPullDownRefresh());
   },
 
+  onSwitchTab(event: { currentTarget: { dataset: { tab?: 'notifications' | 'orders' } } }) {
+    const tab = event.currentTarget.dataset.tab;
+    if (!tab || tab === this.data.activeTab) return;
+    this.setData({ activeTab: tab });
+  },
+
   goLogin() {
     wx.switchTab({ url: '/pages/account/index' });
   },
 
   async load() {
     if (!hasToken()) {
-      this.setData({ needLogin: true, loading: false, account: null, stats: emptyStats() });
+      this.setData({
+        needLogin: true,
+        loading: false,
+        account: null,
+        stats: emptyStats(),
+        notifications: [],
+        orders: [],
+      });
       return;
     }
     this.setData({ loading: true });
@@ -63,10 +87,17 @@ Page({
       const account = me.account;
       if (!account || account.role !== 'parent') {
         clearToken();
-        this.setData({ needLogin: true, loading: false, account: null, stats: emptyStats() });
+        this.setData({
+          needLogin: true,
+          loading: false,
+          account: null,
+          stats: emptyStats(),
+          notifications: [],
+          orders: [],
+        });
         return;
       }
-      const source = account.displayName || account.phone || '家长';
+      const source = account.displayName || account.phone || '微信用户';
       const pendingOrders = orders.filter((item) => item.status === 'pending').length;
       const unreadNotifications = notifications.filter((item) => item.status === 'unread').length;
       this.setData({
@@ -79,6 +110,8 @@ Page({
           unreadNotifications,
           unreadNotificationsLabel: unreadNotifications ? `${unreadNotifications} 未读` : '查看',
         },
+        notifications: notifications.map(toNotificationItem),
+        orders: orders.map(toOrderItem),
         needLogin: false,
         loading: false,
       });
@@ -86,6 +119,33 @@ Page({
       this.setData({ loading: false });
       wx.showToast({
         title: error instanceof Error ? error.message : '加载失败',
+        icon: 'none',
+      });
+    }
+  },
+
+  async onMarkNotificationRead(event: { currentTarget: { dataset: { id?: string } } }) {
+    const id = event.currentTarget.dataset.id;
+    if (!id) return;
+    try {
+      const updated = await markParentNotificationRead(id);
+      const notifications = (this.data.notifications as NotificationItem[]).map((item) =>
+        item.id === id
+          ? { ...item, status: updated.status, statusLabel: notificationStatusLabel(updated.status) }
+          : item,
+      );
+      const unreadNotifications = notifications.filter((item) => item.status === 'unread').length;
+      this.setData({
+        notifications,
+        stats: {
+          ...this.data.stats,
+          unreadNotifications,
+          unreadNotificationsLabel: unreadNotifications ? `${unreadNotifications} 未读` : '查看',
+        },
+      });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '操作失败',
         icon: 'none',
       });
     }

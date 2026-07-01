@@ -1,4 +1,4 @@
-<custom-navbar title="家长账号" show-back="{{true}}" />
+<custom-navbar title="成长账号" show-back="{{true}}" />
 <view class="page profile-page">
   <skeleton wx:if="{{loading}}" variant="hub" />
   <view wx:elif="{{needLogin}}" class="empty login-empty">
@@ -9,60 +9,99 @@
     <view class="profile-hero">
       <view class="profile-avatar-large">{{avatarText}}</view>
       <view class="profile-copy">
-        <view class="profile-role">家长账号</view>
-        <view class="profile-name-large">{{account.displayName || '家长'}}</view>
+        <view class="profile-role">成长账号</view>
+        <view class="profile-name-large">{{account.displayName || '微信用户'}}</view>
         <view wx:if="{{account.phone}}" class="profile-phone-large">{{account.phone}}</view>
         <view wx:else class="profile-phone-large">微信授权登录</view>
       </view>
     </view>
 
     <view class="profile-stats">
-      <navigator class="profile-stat" url="/pages/account-orders/index" hover-class="profile-hover">
-        <view class="profile-stat-value">{{stats.orderCount}}</view>
-        <view class="profile-stat-label">订单</view>
-      </navigator>
-      <navigator class="profile-stat" url="/pages/account-orders/index" hover-class="profile-hover">
-        <view class="profile-stat-value">{{stats.pendingOrders}}</view>
-        <view class="profile-stat-label">待付款</view>
-      </navigator>
-      <navigator class="profile-stat" url="/pages/account-notifications/index" hover-class="profile-hover">
+      <view
+        class="profile-stat"
+        data-tab="notifications"
+        hover-class="profile-hover"
+        bindtap="onSwitchTab"
+      >
         <view class="profile-stat-value">{{stats.unreadNotifications}}</view>
         <view class="profile-stat-label">未读通知</view>
-      </navigator>
+      </view>
+      <view
+        class="profile-stat"
+        data-tab="orders"
+        hover-class="profile-hover"
+        bindtap="onSwitchTab"
+      >
+        <view class="profile-stat-value">{{stats.orderCount}}</view>
+        <view class="profile-stat-label">订单</view>
+      </view>
+      <view
+        class="profile-stat"
+        data-tab="orders"
+        hover-class="profile-hover"
+        bindtap="onSwitchTab"
+      >
+        <view class="profile-stat-value">{{stats.pendingOrders}}</view>
+        <view class="profile-stat-label">待付款</view>
+      </view>
     </view>
 
-    <view class="section card profile-panel">
-      <view class="section-title">账号相关</view>
-      <view class="profile-actions">
-        <navigator class="profile-action" url="/pages/account-orders/index" hover-class="profile-hover">
-          <view>
-            <view class="profile-action-title">订单记录</view>
-            <view class="profile-action-desc">查看课时包、试听占位和支付状态</view>
-          </view>
-          <view class="profile-action-side">{{stats.pendingOrdersLabel}}</view>
-        </navigator>
-        <navigator class="profile-action" url="/pages/account-notifications/index" hover-class="profile-hover">
-          <view>
-            <view class="profile-action-title">通知消息</view>
-            <view class="profile-action-desc">接收课程提醒、缴费和老师通知</view>
-          </view>
-          <view class="profile-action-side">{{stats.unreadNotificationsLabel}}</view>
-        </navigator>
-        <navigator class="profile-action" url="/pages/account-students/index" hover-class="profile-hover">
-          <view>
-            <view class="profile-action-title">孩子档案</view>
-            <view class="profile-action-desc">查看已绑定孩子和课程归属</view>
-          </view>
-          <view class="profile-action-side">进入</view>
-        </navigator>
-        <navigator class="profile-action" url="/pages/account-lessons/index" hover-class="profile-hover">
-          <view>
-            <view class="profile-action-title">课时信息</view>
-            <view class="profile-action-desc">查看课程账户、余额和上课记录</view>
-          </view>
-          <view class="profile-action-side">进入</view>
-        </navigator>
+    <view class="section account-tabs">
+      <view
+        class="account-tab {{activeTab == 'notifications' ? 'active' : ''}}"
+        data-tab="notifications"
+        bindtap="onSwitchTab"
+      >
+        通知
       </view>
+      <view
+        class="account-tab {{activeTab == 'orders' ? 'active' : ''}}"
+        data-tab="orders"
+        bindtap="onSwitchTab"
+      >
+        订单
+      </view>
+    </view>
+
+    <view wx:if="{{activeTab == 'notifications'}}" class="section card profile-panel">
+      <view wx:if="{{notifications.length}}" class="item-list">
+        <view wx:for="{{notifications}}" wx:key="id" class="notification-row">
+          <view class="row-between">
+            <view class="row-title">{{item.title}}</view>
+            <view class="notice-status {{item.status}}">{{item.statusLabel}}</view>
+          </view>
+          <view wx:if="{{item.body}}" class="notice-body">{{item.body}}</view>
+          <view class="notice-footer">
+            <view class="row-meta">{{item.createdAtLabel}}</view>
+            <button
+              wx:if="{{item.status == 'unread'}}"
+              class="mini-button"
+              data-id="{{item.id}}"
+              bindtap="onMarkNotificationRead"
+            >
+              已读
+            </button>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无通知</view>
+    </view>
+
+    <view wx:else class="section card profile-panel">
+      <view wx:if="{{orders.length}}" class="item-list">
+        <view wx:for="{{orders}}" wx:key="id" class="stack-row">
+          <view class="row-between">
+            <view class="row-title">{{item.packageName}}</view>
+            <view class="order-status {{item.status}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="row-meta">{{item.studentName}} · {{item.courseName}}</view>
+          <view class="order-line">
+            <view class="row-meta">{{item.createdAtLabel}}</view>
+            <view class="order-amount">{{item.amountLabel}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty compact-empty">暂无订单</view>
     </view>
 
     <view class="logout-wrap">

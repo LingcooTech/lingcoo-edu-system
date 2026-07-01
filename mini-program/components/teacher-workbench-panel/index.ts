@@ -79,9 +79,9 @@ type TeacherNoticeItem = {
 };
 
 const VIEW_TABS: Array<{ key: ActiveView; label: string; iconSrc: string }> = [
-  { key: 'schedule', label: '课表', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
-  { key: 'classes', label: '班级', iconSrc: TEACHER_WORKBENCH_ICONS.classes },
-  { key: 'students', label: '学员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
+  { key: 'schedule', label: '排期', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
+  { key: 'classes', label: '活动组', iconSrc: TEACHER_WORKBENCH_ICONS.classes },
+  { key: 'students', label: '成员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
   { key: 'feedbacks', label: '互动', iconSrc: TEACHER_WORKBENCH_ICONS.feedbacks },
   { key: 'homework', label: '批阅', iconSrc: TEACHER_WORKBENCH_ICONS.homework },
 ];
@@ -100,8 +100,8 @@ const FEEDBACK_SCOPE_TABS: Array<{ key: FeedbackScope; label: string }> = [
 
 const CLASS_STATUS_LABEL: Record<string, string> = {
   recruiting: '招生中',
-  active: '开课中',
-  completed: '已结课',
+  active: '进行中',
+  completed: '已完成',
   paused: '暂停',
   archived: '已归档',
 };
@@ -113,21 +113,21 @@ const HOMEWORK_STATUS_LABEL: Record<string, string> = {
 };
 
 const ATTENDANCE_STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
-  { value: 'present', label: '到课' },
+  { value: 'present', label: '到场' },
   { value: 'late', label: '迟到' },
   { value: 'leave', label: '请假' },
   { value: 'absent', label: '缺勤' },
-  { value: 'makeup', label: '补课' },
-  { value: 'trial', label: '试听' },
+  { value: 'makeup', label: '补参与' },
+  { value: 'trial', label: '体验' },
 ];
 
 const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
-  present: '到课',
+  present: '到场',
   late: '迟到',
   leave: '请假',
   absent: '缺勤',
-  makeup: '补课',
-  trial: '试听',
+  makeup: '补参与',
+  trial: '体验',
 };
 
 function addDays(date: Date, days: number) {
@@ -213,7 +213,7 @@ function normalizeTeacherNotification(item: TeacherNotification): TeacherNoticeI
     item.category === 'teacher.student.enrolled'
       ? '查看分班'
       : item.category === 'teacher.trial.reserved'
-        ? '查看试听'
+        ? '查看体验'
         : '查看';
   return {
     id: item.id,
@@ -236,11 +236,11 @@ function formatSheetSession(event: TeacherCalendarEvent): SheetSession {
     endsAt: event.endsAt,
     dateLabel: dateLabel(event.startsAt),
     timeLabel: timeRange(event.startsAt, event.endsAt),
-    title: event.title || '上课内容',
+    title: event.title || '活动内容',
     status: event.status,
-    className: event.class?.name || '班级',
-    courseName: event.course?.name || '课程',
-    classroomName: event.classroom?.name || '教室待确认',
+    className: event.class?.name || '活动组',
+    courseName: event.course?.name || '活动',
+    classroomName: event.classroom?.name || '空间待确认',
   };
 }
 
@@ -287,17 +287,17 @@ function feedbackScopeClassName(activeScope: FeedbackScope, key: FeedbackScope) 
 }
 
 function summaryTitle(metricScope: MetricScope) {
-  if (metricScope === 'today') return '今日授课';
-  if (metricScope === 'week') return '本周授课';
-  return '本月授课';
+  if (metricScope === 'today') return '今日安排';
+  if (metricScope === 'week') return '本周安排';
+  return '本月安排';
 }
 
 function normalizeClass(classGroup: TeacherClass) {
   return {
     ...classGroup,
     statusLabel: CLASS_STATUS_LABEL[classGroup.status] ?? classGroup.status,
-    courseName: classGroup.course?.name || '课程',
-    classroomName: classGroup.classroom?.name || '教室待确认',
+    courseName: classGroup.course?.name || '活动',
+    classroomName: classGroup.classroom?.name || '空间待确认',
     remainingSeats: Math.max(classGroup.capacity - classGroup.students.length, 0),
     students: classGroup.students.map((student) => ({
       ...student,
@@ -313,10 +313,10 @@ function normalizeEvent(event: TeacherCalendarEvent) {
     ...event,
     dateLabel: dateLabel(event.startsAt),
     timeLabel: timeRange(event.startsAt, event.endsAt),
-    className: event.class?.name || '班级',
-    courseName: event.course?.name || '课程',
-    classroomName: event.classroom?.name || '教室待确认',
-    statusLabel: pending ? '未点名' : event.status === 'completed' ? '已完成' : '已排课',
+    className: event.class?.name || '活动组',
+    courseName: event.course?.name || '活动',
+    classroomName: event.classroom?.name || '空间待确认',
+    statusLabel: pending ? '未签到' : event.status === 'completed' ? '已完成' : '已排期',
     leaveCount: event.attendanceSummary?.leave ?? 0,
     pending,
   };
@@ -351,7 +351,7 @@ Component({
     pendingAttentionCount: 0,
     todayCourseCount: 0,
     todayPendingCount: 0,
-    todaySummaryText: '今天暂无排课',
+    todaySummaryText: '今天暂无排期',
     calendarExpanded: false,
     monthLabel: '',
     monthWeekdays: ['日', '一', '二', '三', '四', '五', '六'],
@@ -373,7 +373,7 @@ Component({
         interactionStatusLabel: string;
       }
     >,
-    feedbackEmptyText: '今天暂无可互动课次。',
+    feedbackEmptyText: '今天暂无可互动场次。',
     homeworkCheckIns: [] as Array<
       TeacherHomeworkCheckIn & {
         statusLabel: string;
@@ -401,7 +401,7 @@ Component({
     feedbackSession: null as SheetSession | null,
     feedbackRows: [] as FeedbackRow[],
     classAssignmentContent: '',
-    assignmentTemplates: ['复习本节重点', '完成练习一页', '整理课堂笔记'],
+    assignmentTemplates: ['复习本次重点', '完成练习一页', '整理活动记录'],
     starOptions: [1, 2, 3, 4, 5],
     reviewVisible: false,
     reviewSaving: false,
@@ -464,9 +464,9 @@ Component({
           ...item,
           statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus,
           dateLabel: formatDateTime(item.createdAt),
-          studentName: item.student?.name || '学员',
+          studentName: item.student?.name || '成员',
           courseName: item.course?.name || item.title,
-          className: item.class?.name || '班级',
+          className: item.class?.name || '活动组',
         })),
         selectedDateKey,
       });
@@ -587,9 +587,9 @@ Component({
       history: historyFeedbackEvents,
     };
     const feedbackEmptyTextMap: Record<FeedbackScope, string> = {
-      today: '今天暂无可互动课次。',
-      pending: '近14天暂无待补互动课次。',
-      history: '近30天暂无历史互动课次。',
+      today: '今天暂无可互动场次。',
+      pending: '近14天暂无待补互动场次。',
+      history: '近30天暂无历史互动场次。',
     };
     const activeFeedbackScope = this.data.activeFeedbackScope as FeedbackScope;
     this.setData({
@@ -620,7 +620,7 @@ Component({
       },
       todayCourseCount: todayEvents.length,
       todayPendingCount: todayPendingEvents.length,
-      todaySummaryText: todayEvents.length ? `今天共有 ${todayEvents.length} 节课` : '今天暂无排课',
+      todaySummaryText: todayEvents.length ? `今天共有 ${todayEvents.length} 场活动` : '今天暂无排期',
       todayPendingEvents: todayPendingEvents.map(normalizeEvent),
       selectedEvents: calendarEvents
         .filter((event) => dateKey(new Date(event.startsAt)) === this.data.selectedDateKey)
@@ -770,7 +770,7 @@ Component({
           recorded: Boolean(record),
           recordedStatus,
           draftStatus,
-          statusLabel: record ? ATTENDANCE_STATUS_LABEL[record.status] : '待点名',
+          statusLabel: record ? ATTENDANCE_STATUS_LABEL[record.status] : '待签到',
         };
       });
       this.setData({
@@ -805,17 +805,17 @@ Component({
       .filter((row) => !row.recorded)
       .map((row) => ({ studentId: row.id, status: row.draftStatus }));
     if (records.length === 0) {
-      wx.showToast({ title: '已完成点名', icon: 'none' });
+      wx.showToast({ title: '已完成签到', icon: 'none' });
       return;
     }
     this.setData({ rollCallSaving: true, rollCallError: '' });
     try {
       await recordTeacherAttendance(session.id, records);
-      wx.showToast({ title: '点名已保存', icon: 'success' });
+      wx.showToast({ title: '签到已保存', icon: 'success' });
       this.setData({ rollCallVisible: false });
       await this.reload();
     } catch (error) {
-      this.setData({ rollCallError: error instanceof Error ? error.message : '点名保存失败' });
+      this.setData({ rollCallError: error instanceof Error ? error.message : '签到保存失败' });
     } finally {
       this.setData({ rollCallSaving: false });
     }

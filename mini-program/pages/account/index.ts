@@ -2,9 +2,9 @@ import {
   bindWechatMiniPhone,
   clearToken,
   fetchMe,
-  fetchParentCalendar,
   fetchParentChildren,
   fetchParentCheckInSessions,
+  fetchParentHomeworkAssignments,
   fetchParentHomeworkCheckIns,
   fetchParentLessonAccounts,
   fetchParentLessonFeedbacks,
@@ -14,123 +14,57 @@ import {
   hasToken,
   logout,
   setToken,
+  submitParentCheckIn,
   wechatMiniLogin,
   type AuthAccount,
-  type ParentChild,
+  type ParentSeatReservation,
 } from '../../services/api';
 import {
-  toCalendarEventItem,
-  toLessonAccountItem,
-  toLessonFeedbackItem,
-  type CalendarEventItem,
-  type LessonAccountItem,
-  type LessonFeedbackItem,
+  orderStatusLabel,
+  reservationStatusLabel,
+  toCheckInItem,
+  type CheckInItem,
 } from '../../utils/parent-center';
+import { formatDateTime } from '../../utils/format';
 import { GUEST_ACCOUNT_ICONS } from '../../utils/icons';
 
 type HubStats = {
   childCount: number;
   totalBalance: number;
-  pendingCheckIns: number;
   interactionStars: number;
   pendingTasks: number;
   unreadNotifications: number;
+  homeworkAssignments: number;
 };
 
 function emptyStats(): HubStats {
   return {
     childCount: 0,
     totalBalance: 0,
-    pendingCheckIns: 0,
     interactionStars: 0,
     pendingTasks: 0,
     unreadNotifications: 0,
+    homeworkAssignments: 0,
   };
 }
 
-type ChildSummary = {
-  id: string;
-  name: string;
-  meta: string;
-  courses: ChildCourseSummary[];
-  emptyCourseText: string;
+type NextLessonCard = CheckInItem & {
+  dateLabel: string;
+  timeRangeLabel: string;
+  courseLine: string;
+  classLine: string;
+  locationLine: string;
 };
 
-type ChildCourseSummary = {
-  key: string;
-  courseName: string;
-  className: string;
-  campusName: string;
-  teacherName: string;
-};
-
-type TodoItem = {
-  key: string;
-  label: string;
-  value: number;
-  url: string;
-};
-
-type QuickEntry = {
-  key: string;
-  symbol: string;
-  label: string;
-  group: string;
-  url: string;
-  badge: number;
-};
-
-type QuickGroup = {
+type ReservationReminder = {
   title: string;
-  entries: QuickEntry[];
+  courseLine: string;
+  timeLine: string;
+  locationLine: string;
+  statusLine: string;
 };
 
 type PhoneAuthEvent = { detail: { code?: string; errMsg?: string } };
-
-function childMeta(child: ParentChild): string {
-  return [child.grade, child.school].filter(Boolean).join(' · ') || '学员';
-}
-
-function summarizeChildCourses(
-  child: ParentChild,
-  lessonItems: LessonAccountItem[],
-): ChildCourseSummary[] {
-  const courseById = new Map<string, ChildCourseSummary>();
-  for (const item of lessonItems) {
-    courseById.set(item.courseId, {
-      key: item.courseId,
-      courseName: item.courseName,
-      className: '待分班',
-      campusName: '校区待确认',
-      teacherName: '老师待确认',
-    });
-  }
-
-  for (const enrollment of child.enrollments ?? []) {
-    const courseId = enrollment.course?.id;
-    const existing = courseId ? courseById.get(courseId) : null;
-    const summary: ChildCourseSummary = {
-      key: courseId || enrollment.id,
-      courseName: enrollment.course?.name || existing?.courseName || '课程待确认',
-      className: enrollment.className || '班级待确认',
-      campusName: enrollment.campus?.name || '校区待确认',
-      teacherName: enrollment.teacher?.name || '老师待确认',
-    };
-    if (courseId) {
-      courseById.set(courseId, summary);
-    } else {
-      courseById.set(enrollment.id, summary);
-    }
-  }
-
-  return Array.from(courseById.values());
-}
-
-function nextThirtyDays() {
-  const from = new Date();
-  const to = new Date(from.getTime() + 30 * 24 * 60 * 60 * 1000);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
 
 function currentMonthStartsAt() {
   const now = new Date();
@@ -142,72 +76,66 @@ function isCurrentMonth(value?: string | null) {
   return new Date(value).getTime() >= currentMonthStartsAt();
 }
 
-const ENTRIES = [
-  {
-    key: 'schedule',
-    symbol: '表',
-    label: '课程表',
-    group: '课前准备',
-    url: '/pages/account-attendance/index',
-  },
-  {
-    key: 'students',
-    symbol: '孩',
-    label: '学员档案',
-    group: '课前准备',
-    url: '/pages/account-students/index',
-  },
-  {
-    key: 'trials',
-    symbol: '试',
-    label: '试听席位',
-    group: '课前准备',
-    url: '/pages/account-trials/index',
-  },
-  {
-    key: 'feedbacks',
-    symbol: '评',
-    label: '课堂互动',
-    group: '课后服务',
-    url: '/pages/account-interactions/index',
-  },
-  {
-    key: 'homework',
-    symbol: '作',
-    label: '作业打卡',
-    group: '课后服务',
-    url: '/pages/account-homework/index',
-  },
-  {
-    key: 'notifications',
-    symbol: '信',
-    label: '通知消息',
-    group: '课后服务',
-    url: '/pages/account-notifications/index',
-  },
-  {
-    key: 'orders',
-    symbol: '单',
-    label: '订单记录',
-    group: '个人中心',
-    url: '/pages/account-orders/index',
-  },
-] satisfies Array<Omit<QuickEntry, 'badge'>>;
-
 const ACCOUNT_TAB_INDEX = 4;
 
-function withBadges(entries: Array<Omit<QuickEntry, 'badge'>>, counts: Record<string, number>) {
-  return entries.map((entry) => ({ ...entry, badge: counts[entry.key] ?? 0 }));
+function timeLabel(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function groupEntries(entries: QuickEntry[]): QuickGroup[] {
-  const titles = ['课前准备', '课后服务', '个人中心'];
-  return titles
-    .map((title) => ({
-      title,
-      entries: entries.filter((entry) => entry.group === title),
-    }))
-    .filter((group) => group.entries.length > 0);
+function dateLabel(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  return `${date.getMonth() + 1}月${date.getDate()}日 周${weekdays[date.getDay()]}`;
+}
+
+function toNextLessonCard(item: CheckInItem): NextLessonCard {
+  return {
+    ...item,
+    dateLabel: dateLabel(item.startsAt),
+    timeRangeLabel: `${timeLabel(item.startsAt)}-${timeLabel(item.endsAt)}`,
+    courseLine: item.courseName,
+    classLine: item.class?.name || '活动组待确认',
+    locationLine: item.classroomName,
+  };
+}
+
+function reservationTimeValue(item: ParentSeatReservation): number {
+  const value = item.trialSession?.startsAt || item.createdAt;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function isActiveReservation(item: ParentSeatReservation): boolean {
+  if (item.reservationStatus === 'cancelled' || item.reservationStatus === 'expired') {
+    return false;
+  }
+  if (item.checkInStatus === 'checked_in' || item.checkInStatus === 'no_show') {
+    return false;
+  }
+  return true;
+}
+
+function toReservationReminder(items: ParentSeatReservation[]): ReservationReminder | null {
+  const reservation = items
+    .filter(isActiveReservation)
+    .sort((a, b) => reservationTimeValue(a) - reservationTimeValue(b))[0];
+  if (!reservation) return null;
+  return {
+    title: reservation.trialSession?.title || reservation.course?.name || '体验预约',
+    courseLine: reservation.course?.name || '活动待确认',
+    timeLine: reservation.trialSession?.startsAt
+      ? formatDateTime(reservation.trialSession.startsAt)
+      : '时间待确认',
+    locationLine: reservation.campus?.name || '空间待确认',
+    statusLine: `${reservationStatusLabel(reservation.reservationStatus)} · ${orderStatusLabel(
+      reservation.paymentStatus,
+    )}`,
+  };
 }
 
 Page({
@@ -223,12 +151,10 @@ Page({
     defaultPassword: '',
     avatarText: '我',
     guestIcons: GUEST_ACCOUNT_ICONS,
-    entryGroups: groupEntries(withBadges(ENTRIES, {})) as QuickGroup[],
     stats: emptyStats(),
-    childSummaries: [] as ChildSummary[],
-    nextLesson: null as CalendarEventItem | null,
-    latestFeedback: null as LessonFeedbackItem | null,
-    todoItems: [] as TodoItem[],
+    nextLesson: null as NextLessonCard | null,
+    reservationReminder: null as ReservationReminder | null,
+    checkingInKey: '',
   },
 
   onShow() {
@@ -311,8 +237,8 @@ Page({
         checkInSessions,
         seatReservations,
         homeworkCheckIns,
+        homeworkAssignments,
         lessonFeedbacks,
-        calendarEvents,
       ] = await Promise.all([
         fetchParentChildren(),
         fetchParentLessonAccounts(),
@@ -321,28 +247,9 @@ Page({
         fetchParentCheckInSessions(),
         fetchParentSeatReservations(),
         fetchParentHomeworkCheckIns(),
+        fetchParentHomeworkAssignments(),
         fetchParentLessonFeedbacks(),
-        fetchParentCalendar(nextThirtyDays()),
       ]);
-      const lessonItems = lessonAccounts.map(toLessonAccountItem);
-      const lessonItemsByStudentId = new Map<string, LessonAccountItem[]>();
-      for (const item of lessonItems) {
-        lessonItemsByStudentId.set(item.studentId, [
-          ...(lessonItemsByStudentId.get(item.studentId) ?? []),
-          item,
-        ]);
-      }
-      const childSummaries = children.slice(0, 3).map((child) => {
-        const childLessonItems = lessonItemsByStudentId.get(child.id) ?? [];
-        const courses = summarizeChildCourses(child, childLessonItems);
-        return {
-          id: child.id,
-          name: child.name,
-          meta: childMeta(child),
-          courses,
-          emptyCourseText: '暂未开通正式课程',
-        };
-      });
       const pendingOrders = orders.filter((item) => item.status === 'pending').length;
       const pendingReservations = seatReservations.filter(
         (item) =>
@@ -350,7 +257,9 @@ Page({
           item.paymentStatus === 'pending' ||
           item.reservationStatus === 'pending_payment',
       ).length;
-      const pendingCheckIns = checkInSessions.filter((item) => item.canCheckIn).length;
+      const checkInItems = checkInSessions
+        .map(toCheckInItem)
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
       const unreadNotifications = notifications.filter((item) => item.status === 'unread').length;
       const interactionStars =
         lessonFeedbacks
@@ -359,62 +268,23 @@ Page({
         homeworkCheckIns
           .filter((item) => isCurrentMonth(item.reviewedAt || item.updatedAt))
           .reduce((sum, item) => sum + Math.max(0, Number(item.rating || 0)), 0);
-      const latestFeedback = lessonFeedbacks.length
-        ? toLessonFeedbackItem(lessonFeedbacks[0])
-        : null;
-      const upcomingLessons = calendarEvents
-        .map(toCalendarEventItem)
-        .filter((event) => new Date(event.endsAt).getTime() >= Date.now())
-        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-      const pendingTasks = pendingCheckIns + pendingOrders + pendingReservations;
+      const pendingTasks = pendingOrders + pendingReservations;
       this.setData({
         stats: {
           childCount: children.length,
           totalBalance: lessonAccounts.reduce((sum, item) => sum + item.balance, 0),
-          pendingCheckIns,
           interactionStars,
           pendingTasks,
           unreadNotifications,
+          homeworkAssignments: homeworkAssignments.length,
         },
-        childSummaries,
-        nextLesson: upcomingLessons[0] ?? null,
-        latestFeedback,
-        todoItems: [
-          {
-            key: 'checkins',
-            label: '待签到课程',
-            value: pendingCheckIns,
-            url: '/pages/account-attendance/index',
-          },
-          {
-            key: 'homework',
-            label: '作业记录',
-            value: homeworkCheckIns.length,
-            url: '/pages/account-homework/index',
-          },
-          {
-            key: 'orders',
-            label: '待付款 / 待处理',
-            value: pendingOrders + pendingReservations,
-            url: '/pages/account-orders/index',
-          },
-        ],
-        entryGroups: groupEntries(
-          withBadges(ENTRIES, {
-            schedule: pendingCheckIns,
-            feedbacks: lessonFeedbacks.length,
-            homework: homeworkCheckIns.filter((item) => item.reviewStatus === 'needs_revision')
-              .length,
-            orders: pendingOrders,
-            trials: pendingReservations,
-            notifications: unreadNotifications,
-          }),
-        ),
+        nextLesson: checkInItems[0] ? toNextLessonCard(checkInItems[0]) : null,
+        reservationReminder: toReservationReminder(seatReservations),
       });
       this.updateTabBadge(unreadNotifications);
     } catch (error) {
       wx.showToast({
-        title: error instanceof Error ? error.message : '家长中心加载失败',
+        title: error instanceof Error ? error.message : '成长中心加载失败',
         icon: 'none',
       });
     }
@@ -428,13 +298,32 @@ Page({
       defaultPassword: '',
       avatarText: '我',
       stats: emptyStats(),
-      childSummaries: [],
       nextLesson: null,
-      latestFeedback: null,
-      todoItems: [],
-      entryGroups: groupEntries(withBadges(ENTRIES, {})),
+      reservationReminder: null,
+      checkingInKey: '',
     });
     this.updateTabBadge(0);
+  },
+
+  async onParentCheckIn(event: {
+    currentTarget: { dataset: { sessionId?: string; studentId?: string; key?: string } };
+  }) {
+    const { sessionId, studentId, key } = event.currentTarget.dataset;
+    if (!sessionId || !studentId || !key) return;
+    if (this.data.checkingInKey) return;
+    this.setData({ checkingInKey: key });
+    try {
+      const result = await submitParentCheckIn(sessionId, studentId);
+      await this.loadSummary();
+      wx.showToast({ title: result.message || '签到成功', icon: 'success' });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '签到失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ checkingInKey: '' });
+    }
   },
 
   updateTabBadge(unreadCount: number) {
