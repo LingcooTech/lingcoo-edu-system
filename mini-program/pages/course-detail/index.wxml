@@ -38,16 +38,14 @@
       <scroll-view scroll-x class="works-scroll" show-scrollbar="{{false}}">
         <view class="works-row">
           <view wx:for="{{studentWorks}}" wx:key="id" class="card course-work-card">
-            <view class="{{item.frameClass}}">
-              <image
-                class="course-work-image"
-                src="{{item.coverUrl}}"
-                mode="aspectFill"
-                data-url="{{item.coverUrl}}"
-                data-urls="{{item.imageUrls}}"
-                bindtap="onPreviewWork"
-              />
-            </view>
+            <image
+              class="course-work-image"
+              src="{{item.coverUrl}}"
+              mode="aspectFill"
+              data-url="{{item.coverUrl}}"
+              data-urls="{{item.imageUrls}}"
+              bindtap="onPreviewWork"
+            />
             <view class="course-work-title">{{item.title}}</view>
             <view class="course-work-meta">{{item.studentName}}</view>
           </view>

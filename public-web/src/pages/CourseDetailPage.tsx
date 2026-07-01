@@ -42,16 +42,6 @@ function mergeNotice(trialDescription?: string, reservationNotice?: string) {
   return Array.from(new Set(parts)).join('\n\n');
 }
 
-function workFrameClass(frameStyle?: string) {
-  if (frameStyle === 'classic') {
-    return 'rounded-xl border-[10px] border-white bg-white shadow-inner ring-1 ring-black/5';
-  }
-  if (frameStyle === 'paper') {
-    return '-rotate-1 rounded-lg border-[10px] border-[#fbfaf7] bg-white shadow-sm';
-  }
-  return 'rounded-xl border-[14px] border-[#eee5da] bg-white shadow-inner ring-4 ring-white';
-}
-
 export function CourseDetailPage() {
   const { slug = '' } = useParams();
   const [course, setCourse] = useState<Course | null>(null);
@@ -264,15 +254,13 @@ export function CourseDetailPage() {
                 <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
                   {studentWorks.map((work) => (
                     <article key={work.id} className="pwcard w-64 shrink-0 overflow-hidden p-3">
-                      <div className={workFrameClass(work.frameStyle)}>
-                        <img
-                          src={work.imageUrls[0]}
-                          alt={work.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-56 w-full rounded-lg object-cover"
-                        />
-                      </div>
+                      <img
+                        src={work.imageUrls[0]}
+                        alt={work.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-56 w-full rounded-xl object-cover"
+                      />
                       <div className="px-1 pt-3">
                         <div className="text-ink line-clamp-1 text-sm font-semibold">
                           {work.title || '作品展示'}

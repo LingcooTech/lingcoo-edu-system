@@ -31,7 +31,6 @@ type PackageItem = CoursePackage & {
 type WorkItem = StudentWork & {
   coverUrl: string;
   studentName: string;
-  frameClass: string;
 };
 type CheckoutOrder = ParentOrder & { amountLabel: string; statusLabel: string };
 type PhoneWx = typeof wx & {
@@ -251,7 +250,6 @@ Page({
           ...item,
           coverUrl: item.imageUrls[0] || '',
           studentName: item.student?.name || '学员',
-          frameClass: `student-work-frame frame-${item.frameStyle || 'gallery'}`,
         })),
         contentBlocks: parseBlocks(payload.course.content),
       });

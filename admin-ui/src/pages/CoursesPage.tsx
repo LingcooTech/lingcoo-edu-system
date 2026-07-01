@@ -50,7 +50,6 @@ interface StudentWorkForm {
   title: string;
   description: string;
   imageUrlsText: string;
-  frameStyle: 'classic' | 'gallery' | 'paper';
   status: 'published' | 'hidden';
 }
 
@@ -78,7 +77,6 @@ const emptyStudentWorkForm: StudentWorkForm = {
   title: '作品展示',
   description: '',
   imageUrlsText: '',
-  frameStyle: 'gallery',
   status: 'published',
 };
 
@@ -356,8 +354,6 @@ export function CoursesPage({
       title: work.title || '作品展示',
       description: work.description || '',
       imageUrlsText: listToLines(work.imageUrls),
-      frameStyle:
-        work.frameStyle === 'classic' || work.frameStyle === 'paper' ? work.frameStyle : 'gallery',
       status: work.status === 'hidden' ? 'hidden' : 'published',
     });
   }
@@ -379,7 +375,6 @@ export function CoursesPage({
         title: workForm.title.trim() || '作品展示',
         description: workForm.description.trim(),
         imageUrls,
-        frameStyle: workForm.frameStyle,
         status: workForm.status,
       };
       if (editingWork) {
@@ -786,31 +781,13 @@ export function CoursesPage({
                   </select>
                 </Field>
               </FieldRow>
-              <FieldRow>
-                <Field label="作品标题">
-                  <input
-                    className="form-input"
-                    value={workForm.title}
-                    onChange={(event) => setWorkForm({ ...workForm, title: event.target.value })}
-                  />
-                </Field>
-                <Field label="包装样式">
-                  <select
-                    className="form-input"
-                    value={workForm.frameStyle}
-                    onChange={(event) =>
-                      setWorkForm({
-                        ...workForm,
-                        frameStyle: event.target.value as StudentWorkForm['frameStyle'],
-                      })
-                    }
-                  >
-                    <option value="gallery">展览框</option>
-                    <option value="classic">经典框</option>
-                    <option value="paper">纸张框</option>
-                  </select>
-                </Field>
-              </FieldRow>
+              <Field label="作品标题">
+                <input
+                  className="form-input"
+                  value={workForm.title}
+                  onChange={(event) => setWorkForm({ ...workForm, title: event.target.value })}
+                />
+              </Field>
               <Field label="作品说明">
                 <textarea
                   className="form-input h-20"

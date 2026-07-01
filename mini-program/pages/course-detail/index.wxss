@@ -91,29 +91,6 @@
   white-space: normal;
 }
 
-.student-work-frame {
-  background: #fff;
-}
-
-.frame-classic {
-  border: 10rpx solid #fff;
-  border-radius: 20rpx;
-  box-shadow: inset 0 0 0 2rpx rgba(154, 106, 75, 0.16);
-}
-
-.frame-gallery {
-  border: 14rpx solid #eee5da;
-  border-radius: 16rpx;
-  box-shadow: inset 0 0 0 4rpx #fff;
-}
-
-.frame-paper {
-  border: 12rpx solid #fbfaf7;
-  border-radius: 10rpx;
-  box-shadow: 0 8rpx 18rpx rgba(33, 31, 28, 0.08);
-  transform: rotate(-0.4deg);
-}
-
 .course-work-image {
   display: block;
   width: 100%;
