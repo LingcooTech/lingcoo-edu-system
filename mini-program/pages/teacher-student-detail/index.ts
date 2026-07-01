@@ -83,7 +83,6 @@ type WorkRow = StudentWork & {
   className: string;
   sourceLabel: string;
   coverUrl: string;
-  frameClass: string;
 };
 
 type ActiveTab = 'overview' | 'attendance' | 'interactions' | 'homework' | 'works';
@@ -109,12 +108,6 @@ const DETAIL_TABS: Array<{ key: ActiveTab; label: string }> = [
   { key: 'interactions', label: '互动' },
   { key: 'homework', label: '作业' },
   { key: 'works', label: '作品' },
-];
-
-const WORK_FRAME_OPTIONS = [
-  { key: 'classic', label: '经典框' },
-  { key: 'gallery', label: '展览框' },
-  { key: 'paper', label: '纸张框' },
 ];
 
 function pad(input: number) {
@@ -157,9 +150,9 @@ function toWorkRow(item: StudentWork): WorkRow {
     titleLabel: item.title || '作品展示',
     courseName: item.course?.name || '活动',
     className: item.class?.name || '',
-    sourceLabel: item.source === 'teacher' ? '机构上传' : '家长上传',
+    sourceLabel:
+      item.source === 'teacher' ? '机构上传' : item.source === 'parent' ? '家长上传' : '后台精选',
     coverUrl: item.imageUrls[0] || '',
-    frameClass: `student-work-frame frame-${item.frameStyle || 'classic'}`,
   };
 }
 
@@ -187,11 +180,6 @@ Page({
     workImages: [] as string[],
     workClassIndex: 0,
     workClassLabels: [] as string[],
-    workFrameStyle: 'classic' as 'classic' | 'gallery' | 'paper',
-    workFrameOptions: WORK_FRAME_OPTIONS.map((item) => ({
-      ...item,
-      className: item.key === 'classic' ? 'work-frame-option active' : 'work-frame-option',
-    })),
     workUploading: false,
     workSubmitting: false,
     maxWorkImages: MAX_WORK_IMAGES,
@@ -418,19 +406,6 @@ Page({
     this.setData({ workDescription: event.detail.value || '' });
   },
 
-  onWorkFrameChange(event: {
-    currentTarget: { dataset: { key?: 'classic' | 'gallery' | 'paper' } };
-  }) {
-    const key = event.currentTarget.dataset.key || 'classic';
-    this.setData({
-      workFrameStyle: key,
-      workFrameOptions: WORK_FRAME_OPTIONS.map((item) => ({
-        ...item,
-        className: item.key === key ? 'work-frame-option active' : 'work-frame-option',
-      })),
-    });
-  },
-
   onChooseWorkImages() {
     const remaining = MAX_WORK_IMAGES - (this.data.workImages as string[]).length;
     if (remaining <= 0) {
@@ -529,7 +504,6 @@ Page({
         title: String(this.data.workTitle || '').trim() || '作品展示',
         description: String(this.data.workDescription || '').trim(),
         imageUrls: workImages,
-        frameStyle: this.data.workFrameStyle,
       });
       this.setData({ workTitle: '', workDescription: '', workImages: [] });
       await this.reload();

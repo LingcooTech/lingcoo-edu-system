@@ -1,9 +1,13 @@
 import { z } from 'zod';
+import { desc, eq } from 'drizzle-orm';
 
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
+import * as peopleRepo from '../../db/repositories/people.js';
+import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as schema from '../../db/schema.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import type { AppModule } from '../types.js';
 
@@ -47,6 +51,20 @@ const courseSchema = z.object({
 });
 
 const courseUpdateSchema = z.object(courseShape).partial();
+
+const studentWorkSchema = z.object({
+  studentId: z.string().uuid(),
+  classId: z.string().uuid().nullable().optional(),
+  classSessionId: z.string().uuid().nullable().optional(),
+  teacherId: z.string().uuid().nullable().optional(),
+  title: z.string().trim().max(160).default('作品展示'),
+  description: z.string().trim().max(2000).default(''),
+  imageUrls: z.array(z.string().trim().url().max(500)).min(1).max(12),
+  frameStyle: z.enum(['classic', 'gallery', 'paper']).default('gallery'),
+  status: z.enum(['published', 'hidden']).default('published'),
+});
+
+const studentWorkUpdateSchema = studentWorkSchema.partial();
 
 const packageShape = {
   courseId: z.string().uuid().nullable().optional(),
@@ -189,6 +207,50 @@ function normalizePackageUpdate(body: z.infer<typeof packageUpdateSchema>) {
 export const catalogModule: AppModule = {
   name: 'catalog',
   async register(app) {
+    async function enrichStudentWorks(items: (typeof schema.studentWorks.$inferSelect)[]) {
+      if (items.length === 0) {
+        return [];
+      }
+      const [students, courses, classes, sessions, teachers] = await Promise.all([
+        peopleRepo.listStudents(app.db),
+        catalogRepo.listCourses(app.db),
+        schedulingRepo.listClasses(app.db),
+        schedulingRepo.listClassSessions(app.db),
+        teachingRepo.listTeachers(app.db),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const sessionById = new Map(sessions.map((session) => [session.id, session]));
+      const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
+
+      return items.map((item) => {
+        const session = item.classSessionId ? (sessionById.get(item.classSessionId) ?? null) : null;
+        const classGroup =
+          (item.classId ? (classById.get(item.classId) ?? null) : null) ??
+          (session ? (classById.get(session.classId) ?? null) : null);
+        const teacher =
+          (item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null) ??
+          (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);
+        const student = studentById.get(item.studentId);
+        return {
+          ...item,
+          student: student
+            ? {
+                id: student.id,
+                name: student.name,
+                grade: student.grade,
+                school: student.school,
+              }
+            : null,
+          course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          session,
+          teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+        };
+      });
+    }
+
     app.get('/v1/course-series', { preHandler: app.requireAdmin }, async () => {
       return { courseSeries: await catalogRepo.listCourseSeries(app.db) };
     });
@@ -245,6 +307,91 @@ export const catalogModule: AppModule = {
       }
       return { course };
     });
+
+    app.get(
+      '/v1/courses/:courseId/student-works',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseId } = request.params as { courseId: string };
+        await catalogRepo.requireCourse(app.db, courseId);
+        const items = await app.db
+          .select()
+          .from(schema.studentWorks)
+          .where(eq(schema.studentWorks.courseId, courseId))
+          .orderBy(desc(schema.studentWorks.createdAt));
+        return { studentWorks: await enrichStudentWorks(items) };
+      },
+    );
+
+    app.post(
+      '/v1/courses/:courseId/student-works',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { courseId } = request.params as { courseId: string };
+        const body = studentWorkSchema.parse(request.body);
+        await Promise.all([
+          catalogRepo.requireCourse(app.db, courseId),
+          peopleRepo.requireStudent(app.db, body.studentId),
+        ]);
+        const [item] = await app.db
+          .insert(schema.studentWorks)
+          .values({
+            courseId,
+            studentId: body.studentId,
+            classId: body.classId ?? null,
+            classSessionId: body.classSessionId ?? null,
+            teacherId: body.teacherId ?? null,
+            title: body.title || '作品展示',
+            description: body.description,
+            imageUrls: body.imageUrls,
+            frameStyle: body.frameStyle,
+            status: body.status,
+            source: 'admin',
+          })
+          .returning();
+        return { studentWork: (await enrichStudentWorks([item]))[0] };
+      },
+    );
+
+    app.patch(
+      '/v1/student-works/:studentWorkId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { studentWorkId } = request.params as { studentWorkId: string };
+        const body = studentWorkUpdateSchema.parse(request.body);
+        const patch = Object.fromEntries(
+          Object.entries(body).filter(([, value]) => value !== undefined),
+        ) as Partial<typeof schema.studentWorks.$inferInsert>;
+        if (body.studentId) {
+          await peopleRepo.requireStudent(app.db, body.studentId);
+        }
+        const [item] = await app.db
+          .update(schema.studentWorks)
+          .set({ ...patch, updatedAt: new Date() })
+          .where(eq(schema.studentWorks.id, studentWorkId))
+          .returning();
+        if (!item) {
+          throw Object.assign(new Error('Student work not found'), { statusCode: 404 });
+        }
+        return { studentWork: (await enrichStudentWorks([item]))[0] };
+      },
+    );
+
+    app.delete(
+      '/v1/student-works/:studentWorkId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { studentWorkId } = request.params as { studentWorkId: string };
+        const [item] = await app.db
+          .delete(schema.studentWorks)
+          .where(eq(schema.studentWorks.id, studentWorkId))
+          .returning();
+        if (!item) {
+          throw Object.assign(new Error('Student work not found'), { statusCode: 404 });
+        }
+        return { studentWork: item };
+      },
+    );
 
     app.delete('/v1/courses/:courseId', { preHandler: app.requireAdmin }, async (request) => {
       const { courseId } = request.params as { courseId: string };
@@ -318,6 +465,7 @@ export const catalogModule: AppModule = {
         paymentReceiverInstitution,
         classrooms,
         campuses,
+        studentWorks,
       ] = await Promise.all([
         packagesRepo.listActivePackagesForCourse(app.db, course.id, course.courseSeriesId),
         organizationRepo.requireOrganization(app.db),
@@ -340,6 +488,11 @@ export const catalogModule: AppModule = {
               : [],
         ),
         organizationRepo.listCampuses(app.db),
+        app.db
+          .select()
+          .from(schema.studentWorks)
+          .where(eq(schema.studentWorks.courseId, course.id))
+          .orderBy(desc(schema.studentWorks.createdAt)),
       ]);
       const classroom = classrooms[0] ?? null;
       const campusIds = new Set(classrooms.map((item) => item.campusId));
@@ -360,6 +513,9 @@ export const catalogModule: AppModule = {
         campus,
         campuses: selectedCampuses,
         paymentReceiverInstitution,
+        studentWorks: await enrichStudentWorks(
+          studentWorks.filter((item) => item.status === 'published'),
+        ),
         businessModel,
       };
     });

@@ -238,6 +238,7 @@ export interface CourseDetail {
   campus?: PublicCampus | null;
   campuses?: PublicCampus[];
   paymentReceiverInstitution?: PublicInstitution | null;
+  studentWorks?: StudentWork[];
   businessModel: BusinessModelSettings;
 }
 
@@ -1187,15 +1188,6 @@ export async function fetchParentStudentWorks(): Promise<StudentWork[]> {
   return (await request<{ studentWorks: StudentWork[] }>('/public/me/student-works')).studentWorks;
 }
 
-export function createParentStudentWork(
-  input: CreateStudentWorkInput,
-): Promise<{ studentWork: StudentWork; message: string }> {
-  return request('/public/me/student-works', {
-    method: 'POST',
-    data: input,
-  });
-}
-
 export async function fetchParentNotifications(): Promise<ParentNotification[]> {
   return (await request<{ notifications: ParentNotification[] }>('/public/me/notifications'))
     .notifications;
@@ -1224,13 +1216,6 @@ export function createParentUploadToken(filename: string): Promise<ParentUploadT
   return request<ParentUploadToken>('/public/me/upload-token', {
     method: 'POST',
     data: { filename },
-  });
-}
-
-export function createParentStudentWorkUploadToken(filename: string): Promise<ParentUploadToken> {
-  return request<ParentUploadToken>('/public/me/upload-token', {
-    method: 'POST',
-    data: { filename, prefix: 'student-works' },
   });
 }
 

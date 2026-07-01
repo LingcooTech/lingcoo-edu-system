@@ -33,6 +33,28 @@
       <block-renderer blocks="{{contentBlocks}}" />
     </view>
 
+    <view wx:if="{{studentWorks.length}}" class="section">
+      <view class="section-title">学员作品</view>
+      <scroll-view scroll-x class="works-scroll" show-scrollbar="{{false}}">
+        <view class="works-row">
+          <view wx:for="{{studentWorks}}" wx:key="id" class="card course-work-card">
+            <view class="{{item.frameClass}}">
+              <image
+                class="course-work-image"
+                src="{{item.coverUrl}}"
+                mode="aspectFill"
+                data-url="{{item.coverUrl}}"
+                data-urls="{{item.imageUrls}}"
+                bindtap="onPreviewWork"
+              />
+            </view>
+            <view class="course-work-title">{{item.title}}</view>
+            <view class="course-work-meta">{{item.studentName}}</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
     <view class="section">
       <view class="section-title">{{onlinePackageSalesAllowed ? '服务包' : '常规活动参考方案'}}</view>
       <view wx:if="{{packages.length}}" class="package-list">

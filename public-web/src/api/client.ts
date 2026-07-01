@@ -31,6 +31,22 @@ export interface Course {
   content?: string;
 }
 
+export interface StudentWork {
+  id: string;
+  studentId: string;
+  courseId?: string | null;
+  title: string;
+  description: string;
+  imageUrls: string[];
+  frameStyle: 'classic' | 'gallery' | 'paper' | string;
+  source: string;
+  status: string;
+  createdAt: string;
+  student?: { id: string; name: string; grade?: string; school?: string | null } | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+}
+
 export interface TrialSession {
   id: string;
   campusId: string;
@@ -466,6 +482,7 @@ export interface CourseDetail {
   campus?: PublicCampus | null;
   campuses?: PublicCampus[];
   paymentReceiverInstitution?: PublicInstitution | null;
+  studentWorks?: StudentWork[];
   businessModel: BusinessModelSettings;
 }
 

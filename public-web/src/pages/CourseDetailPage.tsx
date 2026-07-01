@@ -10,6 +10,7 @@ import {
   type PublicCampus,
   type PublicInstitution,
   type PublicTeacher,
+  type StudentWork,
 } from '@/api/client';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { parseBlocks } from '@/components/blocks/blocks';
@@ -41,6 +42,16 @@ function mergeNotice(trialDescription?: string, reservationNotice?: string) {
   return Array.from(new Set(parts)).join('\n\n');
 }
 
+function workFrameClass(frameStyle?: string) {
+  if (frameStyle === 'classic') {
+    return 'rounded-xl border-[10px] border-white bg-white shadow-inner ring-1 ring-black/5';
+  }
+  if (frameStyle === 'paper') {
+    return '-rotate-1 rounded-lg border-[10px] border-[#fbfaf7] bg-white shadow-sm';
+  }
+  return 'rounded-xl border-[14px] border-[#eee5da] bg-white shadow-inner ring-4 ring-white';
+}
+
 export function CourseDetailPage() {
   const { slug = '' } = useParams();
   const [course, setCourse] = useState<Course | null>(null);
@@ -51,6 +62,7 @@ export function CourseDetailPage() {
   const [defaultTeachers, setDefaultTeachers] = useState<PublicTeacher[]>([]);
   const [campus, setCampus] = useState<PublicCampus | null>(null);
   const [campuses, setCampuses] = useState<PublicCampus[]>([]);
+  const [studentWorks, setStudentWorks] = useState<StudentWork[]>([]);
   const [paymentReceiverInstitution, setPaymentReceiverInstitution] =
     useState<PublicInstitution | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound'>('loading');
@@ -91,6 +103,7 @@ export function CourseDetailPage() {
         setCampuses(
           payload.campuses?.length ? payload.campuses : payload.campus ? [payload.campus] : [],
         );
+        setStudentWorks(payload.studentWorks ?? []);
         setPaymentReceiverInstitution(payload.paymentReceiverInstitution ?? null);
         setStatus('ready');
       })
@@ -238,6 +251,40 @@ export function CourseDetailPage() {
               <div className="mt-8">
                 <RichTextRenderer content={course.content} />
               </div>
+            ) : null}
+
+            {studentWorks.length > 0 ? (
+              <section className="mt-8">
+                <div className="mb-4 flex items-end justify-between gap-4">
+                  <div>
+                    <h2 className="text-ink text-xl font-semibold">学员作品</h2>
+                    <p className="text-muted mt-1 text-sm">来自活动现场与阶段成果展示</p>
+                  </div>
+                </div>
+                <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+                  {studentWorks.map((work) => (
+                    <article key={work.id} className="pwcard w-64 shrink-0 overflow-hidden p-3">
+                      <div className={workFrameClass(work.frameStyle)}>
+                        <img
+                          src={work.imageUrls[0]}
+                          alt={work.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-56 w-full rounded-lg object-cover"
+                        />
+                      </div>
+                      <div className="px-1 pt-3">
+                        <div className="text-ink line-clamp-1 text-sm font-semibold">
+                          {work.title || '作品展示'}
+                        </div>
+                        <div className="text-muted mt-1 text-xs">
+                          {work.student?.name || '学员作品'}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
             ) : null}
           </article>
 

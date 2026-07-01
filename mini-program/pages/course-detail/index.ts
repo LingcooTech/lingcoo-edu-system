@@ -17,6 +17,7 @@ import {
   type PublicTeacher,
   type ParentOrder,
   type PaymentIntent,
+  type StudentWork,
 } from '../../services/api';
 import { money } from '../../utils/format';
 import { parseBlocks, type Block } from '../../utils/blocks';
@@ -26,6 +27,11 @@ type PackageItem = CoursePackage & {
   priceLabel: string;
   lessonLabel: string;
   originalPriceLabel: string;
+};
+type WorkItem = StudentWork & {
+  coverUrl: string;
+  studentName: string;
+  frameClass: string;
 };
 type CheckoutOrder = ParentOrder & { amountLabel: string; statusLabel: string };
 type PhoneWx = typeof wx & {
@@ -138,6 +144,7 @@ Page({
     receiverLabel: '',
     contactPhone: '',
     packages: [] as PackageItem[],
+    studentWorks: [] as WorkItem[],
     contentBlocks: [] as Block[],
     showTrialForm: false,
     submittingTrial: false,
@@ -240,6 +247,12 @@ Page({
               ? ''
               : money(item.priceAmount),
         })),
+        studentWorks: (payload.studentWorks || []).map((item) => ({
+          ...item,
+          coverUrl: item.imageUrls[0] || '',
+          studentName: item.student?.name || '学员',
+          frameClass: `student-work-frame frame-${item.frameStyle || 'gallery'}`,
+        })),
         contentBlocks: parseBlocks(payload.course.content),
       });
     } catch {
@@ -302,6 +315,13 @@ Page({
       childProfileRequired: false,
       completingChildProfile: false,
     });
+  },
+
+  onPreviewWork(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
+    const { url, urls } = event.currentTarget.dataset;
+    if (url && Array.isArray(urls) && urls.length) {
+      wx.previewImage({ urls, current: url });
+    }
   },
 
   closeCheckout() {

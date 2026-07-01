@@ -47,23 +47,7 @@ const homeworkCheckInSchema = z
 
 const parentUploadTokenSchema = z.object({
   filename: z.string().trim().min(1).max(200),
-  prefix: z.enum(['parent-homework', 'student-works']).optional(),
 });
-
-const studentWorkSchema = z
-  .object({
-    studentId: z.string().uuid(),
-    courseId: z.string().uuid().optional().nullable(),
-    classId: z.string().uuid().optional().nullable(),
-    classSessionId: z.string().uuid().optional().nullable(),
-    title: z.string().trim().max(160).default('作品展示'),
-    description: z.string().trim().max(2000).default(''),
-    imageUrls: z.array(z.string().trim().url().max(500)).min(1).max(9),
-    frameStyle: z.enum(['classic', 'gallery', 'paper']).default('classic'),
-  })
-  .refine((value) => value.title || value.description || value.imageUrls.length > 0, {
-    message: '请上传作品图片',
-  });
 
 function canRescheduleSeatReservation(
   reservation: typeof schema.seatReservations.$inferSelect,
@@ -968,72 +952,14 @@ export const parentCenterModule: AppModule = {
       const items = await app.db
         .select()
         .from(schema.studentWorks)
-        .where(inArray(schema.studentWorks.studentId, studentIds))
+        .where(
+          and(
+            inArray(schema.studentWorks.studentId, studentIds),
+            eq(schema.studentWorks.status, 'published'),
+          ),
+        )
         .orderBy(desc(schema.studentWorks.createdAt));
       return { studentWorks: await enrichStudentWorks(students, items) };
-    });
-
-    app.post('/public/me/student-works', { preHandler: app.requireParent }, async (request) => {
-      const body = studentWorkSchema.parse(request.body);
-      const { students } = await resolveChildren(request.account!.id);
-      requireOwnedStudent(students, body.studentId);
-
-      let courseId = body.courseId ?? null;
-      let classId = body.classId ?? null;
-      let teacherId: string | null = null;
-
-      if (body.classSessionId) {
-        const session = await schedulingRepo.findSession(app.db, body.classSessionId);
-        if (!session) {
-          throw httpError(404, 'Class session not found');
-        }
-        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-        if (!classGroup) {
-          throw httpError(404, 'Class not found');
-        }
-        const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
-        if (!enrollments.some((enrollment) => enrollment.studentId === body.studentId)) {
-          throw httpError(422, '该成员未加入此活动组');
-        }
-        classId = classGroup.id;
-        courseId = classGroup.courseId;
-        teacherId = session.teacherId ?? classGroup.teacherId ?? null;
-      } else if (classId) {
-        const classGroup = await schedulingRepo.findClass(app.db, classId);
-        if (!classGroup) {
-          throw httpError(404, 'Class not found');
-        }
-        const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
-        if (!enrollments.some((enrollment) => enrollment.studentId === body.studentId)) {
-          throw httpError(422, '该成员未加入此活动组');
-        }
-        courseId = classGroup.courseId;
-        teacherId = classGroup.teacherId ?? null;
-      } else if (courseId) {
-        await assertCourseBelongsToStudent(body.studentId, courseId);
-      }
-
-      const [item] = await app.db
-        .insert(schema.studentWorks)
-        .values({
-          accountId: request.account!.id,
-          studentId: body.studentId,
-          courseId,
-          classId,
-          classSessionId: body.classSessionId ?? null,
-          teacherId,
-          title: body.title || '作品展示',
-          description: body.description,
-          imageUrls: body.imageUrls,
-          frameStyle: body.frameStyle,
-          source: 'parent',
-        })
-        .returning();
-
-      return {
-        studentWork: (await enrichStudentWorks(students, [item]))[0],
-        message: '作品已发布',
-      };
     });
 
     // Issues a short-lived Qiniu upload token so the Mini Program can upload
@@ -1042,10 +968,7 @@ export const parentCenterModule: AppModule = {
     app.post('/public/me/upload-token', { preHandler: app.requireParent }, async (request) => {
       const body = parentUploadTokenSchema.parse(request.body);
       const qiniu = new QiniuSettingsService(app.db, app.appEnv);
-      return qiniu.createUploadToken({
-        filename: body.filename,
-        prefix: body.prefix ?? 'parent-homework',
-      });
+      return qiniu.createUploadToken({ filename: body.filename, prefix: 'parent-homework' });
     });
 
     app.get('/public/me/notifications', { preHandler: app.requireParent }, async (request) => {

@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Campus, Classroom, Course, CourseSeries, Institution, Teacher } from '@/api/types';
+import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
+import type {
+  Campus,
+  Classroom,
+  Course,
+  CourseSeries,
+  Institution,
+  Student,
+  StudentWork,
+  Teacher,
+} from '@/api/types';
 import { parseBlocks, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { QiniuImageField } from '@/components/shared/QiniuImageField';
+import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
@@ -36,6 +45,15 @@ interface CourseForm {
   status: 'draft' | 'published' | 'archived';
 }
 
+interface StudentWorkForm {
+  studentId: string;
+  title: string;
+  description: string;
+  imageUrlsText: string;
+  frameStyle: 'classic' | 'gallery' | 'paper';
+  status: 'published' | 'hidden';
+}
+
 const emptyCourseForm: CourseForm = {
   courseSeriesId: '',
   slug: '',
@@ -54,6 +72,26 @@ const emptyCourseForm: CourseForm = {
   content: '',
   status: 'draft',
 };
+
+const emptyStudentWorkForm: StudentWorkForm = {
+  studentId: '',
+  title: '作品展示',
+  description: '',
+  imageUrlsText: '',
+  frameStyle: 'gallery',
+  status: 'published',
+};
+
+function linesToList(value: string): string[] {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function listToLines(value?: string[] | null): string {
+  return (value ?? []).join('\n');
+}
 
 function blockToText(block: Block): string {
   switch (block.type) {
@@ -214,6 +252,7 @@ export function CoursesPage({
   const { data: courseSeries } = useApiResource<CourseSeries>('/v1/course-series', 'courseSeries');
   const { data: institutions } = useApiResource<Institution>('/v1/institutions', 'institutions');
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
+  const { data: students } = useApiResource<Student>('/v1/students', 'students');
   const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
   const { data: campuses } = useApiResource<Campus>('/v1/campuses', 'campuses');
   const institutionName = useMemo(
@@ -231,10 +270,19 @@ export function CoursesPage({
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [studentWorks, setStudentWorks] = useState<StudentWork[]>([]);
+  const [loadingWorks, setLoadingWorks] = useState(false);
+  const [editingWork, setEditingWork] = useState<StudentWork | null>(null);
+  const [workForm, setWorkForm] = useState<StudentWorkForm>(emptyStudentWorkForm);
+  const [savingWork, setSavingWork] = useState(false);
+  const [deletingWorkId, setDeletingWorkId] = useState('');
 
   const openCreate = useCallback(() => {
     setEditing(null);
     setForm(emptyCourseForm);
+    setStudentWorks([]);
+    setEditingWork(null);
+    setWorkForm(emptyStudentWorkForm);
     setOpen(true);
   }, []);
 
@@ -248,6 +296,24 @@ export function CoursesPage({
     setEditing(course);
     setForm(courseToForm(course));
     setOpen(true);
+    setEditingWork(null);
+    setWorkForm(emptyStudentWorkForm);
+    void loadStudentWorks(course.id);
+  }
+
+  async function loadStudentWorks(courseId: string) {
+    setLoadingWorks(true);
+    try {
+      const payload = await api<{ studentWorks: StudentWork[] }>(
+        `${COURSE_BASE()}/${courseId}/student-works`,
+      );
+      setStudentWorks(payload.studentWorks);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '作品加载失败');
+      setStudentWorks([]);
+    } finally {
+      setLoadingWorks(false);
+    }
   }
 
   async function submit() {
@@ -275,6 +341,85 @@ export function CoursesPage({
       toast.error(err instanceof Error ? err.message : '保存失败');
     } finally {
       setSaving(false);
+    }
+  }
+
+  function resetWorkForm() {
+    setEditingWork(null);
+    setWorkForm(emptyStudentWorkForm);
+  }
+
+  function editWork(work: StudentWork) {
+    setEditingWork(work);
+    setWorkForm({
+      studentId: work.studentId,
+      title: work.title || '作品展示',
+      description: work.description || '',
+      imageUrlsText: listToLines(work.imageUrls),
+      frameStyle:
+        work.frameStyle === 'classic' || work.frameStyle === 'paper' ? work.frameStyle : 'gallery',
+      status: work.status === 'hidden' ? 'hidden' : 'published',
+    });
+  }
+
+  async function submitWork() {
+    if (!editing) {
+      toast.error('请先保存课程，再上传作品');
+      return;
+    }
+    const imageUrls = linesToList(workForm.imageUrlsText);
+    if (!workForm.studentId) {
+      toast.error('请选择学员');
+      return;
+    }
+    if (imageUrls.length === 0) {
+      toast.error('请上传至少一张作品图片');
+      return;
+    }
+    setSavingWork(true);
+    try {
+      const payload = {
+        studentId: workForm.studentId,
+        title: workForm.title.trim() || '作品展示',
+        description: workForm.description.trim(),
+        imageUrls,
+        frameStyle: workForm.frameStyle,
+        status: workForm.status,
+      };
+      if (editingWork) {
+        const { studentWork } = await apiPatch<{ studentWork: StudentWork }>(
+          `/v1/student-works/${editingWork.id}`,
+          payload,
+        );
+        setStudentWorks(studentWorks.map((item) => (item.id === studentWork.id ? studentWork : item)));
+        toast.success('作品已更新');
+      } else {
+        const { studentWork } = await apiPost<{ studentWork: StudentWork }>(
+          `${COURSE_BASE()}/${editing.id}/student-works`,
+          payload,
+        );
+        setStudentWorks([studentWork, ...studentWorks]);
+        toast.success('作品已添加');
+      }
+      resetWorkForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '作品保存失败');
+    } finally {
+      setSavingWork(false);
+    }
+  }
+
+  async function deleteWork(work: StudentWork) {
+    setDeletingWorkId(work.id);
+    try {
+      await apiDelete<{ studentWork: StudentWork }>(`/v1/student-works/${work.id}`);
+      setStudentWorks(studentWorks.filter((item) => item.id !== work.id));
+      if (editingWork?.id === work.id) resetWorkForm();
+      toast.success('作品已删除');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '作品删除失败');
+    } finally {
+      setDeletingWorkId('');
     }
   }
 
@@ -592,6 +737,197 @@ export function CoursesPage({
             prefix="courses/content"
           />
         </div>
+
+        {editing ? (
+          <section className="mt-6 rounded-xl border border-border/80 bg-muted/30 p-4">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">学员作品</h3>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  上传老师或后台处理完成的作品，发布后会显示在活动详情和家长端作品墙。
+                </p>
+              </div>
+              <button type="button" className="btn btn-secondary" onClick={resetWorkForm}>
+                <ImagePlus className="h-4 w-4" />
+                新作品
+              </button>
+            </div>
+
+            <div className="rounded-lg border border-border bg-background p-3">
+              <FieldRow>
+                <Field label="关联学员" required>
+                  <select
+                    className="form-input"
+                    value={workForm.studentId}
+                    onChange={(event) =>
+                      setWorkForm({ ...workForm, studentId: event.target.value })
+                    }
+                  >
+                    <option value="">请选择学员</option>
+                    {students
+                      .filter((student) => student.status !== 'archived')
+                      .map((student) => (
+                        <option key={student.id} value={student.id}>
+                          {student.name} · {student.grade || '未填年级'}
+                          {student.guardian?.phone ? ` · ${student.guardian.phone}` : ''}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="展示状态">
+                  <select
+                    className="form-input"
+                    value={workForm.status}
+                    onChange={(event) =>
+                      setWorkForm({
+                        ...workForm,
+                        status: event.target.value as StudentWorkForm['status'],
+                      })
+                    }
+                  >
+                    <option value="published">发布展示</option>
+                    <option value="hidden">暂不展示</option>
+                  </select>
+                </Field>
+              </FieldRow>
+              <FieldRow>
+                <Field label="作品标题">
+                  <input
+                    className="form-input"
+                    value={workForm.title}
+                    onChange={(event) => setWorkForm({ ...workForm, title: event.target.value })}
+                  />
+                </Field>
+                <Field label="包装样式">
+                  <select
+                    className="form-input"
+                    value={workForm.frameStyle}
+                    onChange={(event) =>
+                      setWorkForm({
+                        ...workForm,
+                        frameStyle: event.target.value as StudentWorkForm['frameStyle'],
+                      })
+                    }
+                  >
+                    <option value="gallery">展览框</option>
+                    <option value="classic">经典框</option>
+                    <option value="paper">纸张框</option>
+                  </select>
+                </Field>
+              </FieldRow>
+              <Field label="作品说明">
+                <textarea
+                  className="form-input h-20"
+                  value={workForm.description}
+                  onChange={(event) =>
+                    setWorkForm({ ...workForm, description: event.target.value })
+                  }
+                />
+              </Field>
+              <QiniuGalleryField
+                label="作品图片"
+                hint="建议上传已裁剪、加框或排版完成的成品图，可多张。"
+                value={workForm.imageUrlsText}
+                onChange={(imageUrlsText) => setWorkForm({ ...workForm, imageUrlsText })}
+                prefix={`courses/works/${editing.slug}`}
+              />
+              <div className="flex justify-end gap-2">
+                {editingWork ? (
+                  <button type="button" className="btn btn-secondary" onClick={resetWorkForm}>
+                    取消编辑
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={submitWork}
+                  disabled={savingWork}
+                >
+                  {savingWork ? '保存中...' : editingWork ? '更新作品' : '添加作品'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {loadingWorks ? (
+                <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                  作品加载中...
+                </div>
+              ) : studentWorks.length > 0 ? (
+                studentWorks.map((work) => (
+                  <div
+                    key={work.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row"
+                  >
+                    <div className="grid grid-cols-3 gap-1 sm:w-44">
+                      {work.imageUrls.slice(0, 3).map((url) => (
+                        <div
+                          key={url}
+                          className="aspect-square overflow-hidden rounded-md border bg-white"
+                        >
+                          <img
+                            src={url}
+                            alt={work.title}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{work.title || '作品展示'}</span>
+                        <StatusPill
+                          tone={work.status === 'published' ? 'ok' : 'neutral'}
+                          label={work.status === 'published' ? '已发布' : '已隐藏'}
+                        />
+                      </div>
+                      <div className="text-muted-foreground mt-1 text-sm">
+                        {work.student?.name || '未知学员'}
+                        {work.student?.grade ? ` · ${work.student.grade}` : ''}
+                        {work.imageUrls.length ? ` · ${work.imageUrls.length} 张图` : ''}
+                      </div>
+                      {work.description ? (
+                        <p className="text-muted-foreground mt-2 line-clamp-2 text-sm">
+                          {work.description}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 gap-2 sm:flex-col">
+                      <button
+                        type="button"
+                        className="btn btn-ghost px-2 py-1"
+                        onClick={() => editWork(work)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost px-2 py-1 text-red-600"
+                        disabled={deletingWorkId === work.id}
+                        onClick={() => void deleteWork(work)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {deletingWorkId === work.id ? '删除中...' : '删除'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                  暂无学员作品。
+                </div>
+              )}
+            </div>
+          </section>
+        ) : (
+          <section className="mt-6 rounded-xl border border-dashed border-border p-4">
+            <h3 className="text-sm font-semibold">学员作品</h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              保存课程后，可在编辑课程中上传和发布学员作品。
+            </p>
+          </section>
+        )}
       </Drawer>
 
       <ConfirmDialog

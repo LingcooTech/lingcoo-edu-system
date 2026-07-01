@@ -37,6 +37,28 @@ export interface Course {
   content?: string;
 }
 
+export interface StudentWork {
+  id: string;
+  accountId?: string | null;
+  studentId: string;
+  courseId?: string | null;
+  classId?: string | null;
+  classSessionId?: string | null;
+  teacherId?: string | null;
+  title: string;
+  description: string;
+  imageUrls: string[];
+  frameStyle: 'classic' | 'gallery' | 'paper' | string;
+  source: string;
+  status: 'published' | 'hidden' | string;
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; name: string; grade?: string; school?: string | null } | null;
+  course?: Course | null;
+  class?: { id: string; name: string } | null;
+  teacher?: { id: string; name: string } | null;
+}
+
 export interface CourseSeries {
   id: string;
   slug: string;

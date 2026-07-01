@@ -6,71 +6,6 @@
     <button class="btn btn-primary login-empty-btn" bindtap="goLogin">去登录</button>
   </view>
   <block wx:else>
-    <view class="card panel publish-panel">
-      <view class="section-title">发布作品</view>
-      <picker
-        wx:if="{{targetLabels.length}}"
-        mode="selector"
-        range="{{targetLabels}}"
-        value="{{targetIndex}}"
-        bindchange="onTargetChange"
-      >
-        <view class="picker-field">{{targetLabels[targetIndex]}}</view>
-      </picker>
-      <view wx:else class="empty compact-empty">暂无可发布作品的成员</view>
-
-      <input
-        class="form-field"
-        value="{{title}}"
-        placeholder="作品标题，可不填"
-        bindinput="onTitleInput"
-      />
-      <textarea
-        class="form-field gallery-textarea"
-        value="{{description}}"
-        placeholder="作品说明，可不填"
-        bindinput="onDescriptionInput"
-      />
-
-      <view class="frame-options">
-        <view
-          wx:for="{{frameOptions}}"
-          wx:key="key"
-          class="{{item.className}}"
-          data-key="{{item.key}}"
-          bindtap="onFrameChange"
-        >
-          {{item.label}}
-        </view>
-      </view>
-
-      <view class="image-grid">
-        <view wx:for="{{images}}" wx:key="*this" class="image-cell">
-          <image
-            class="image-thumb"
-            src="{{item}}"
-            mode="aspectFill"
-            data-index="{{index}}"
-            bindtap="onPreviewImage"
-          />
-          <view class="image-remove" data-index="{{index}}" catchtap="onRemoveImage">×</view>
-        </view>
-        <view wx:if="{{images.length < maxImages}}" class="image-add" bindtap="onChooseImages">
-          <view class="image-add-plus">＋</view>
-          <view class="image-add-text">{{uploading ? '上传中' : '加作品'}}</view>
-        </view>
-      </view>
-
-      <button
-        class="btn btn-primary publish-button"
-        loading="{{submitting}}"
-        disabled="{{submitting || uploading || !targetLabels.length}}"
-        bindtap="onSubmit"
-      >
-        {{submitting ? '发布中...' : '发布作品'}}
-      </button>
-    </view>
-
     <view class="gallery-head">
       <view class="section-title">作品墙</view>
       <view class="gallery-count">{{works.length}} 件</view>
@@ -107,7 +42,7 @@
     <view wx:else class="card panel gallery-empty">
       <view class="gallery-mark"></view>
       <view class="gallery-title">暂无作品</view>
-      <view class="gallery-desc">上传作品后，会在这里按时间形成孩子的作品墙。</view>
+      <view class="gallery-desc">机构整理发布后，会在这里形成孩子的作品墙。</view>
     </view>
   </block>
 </view>

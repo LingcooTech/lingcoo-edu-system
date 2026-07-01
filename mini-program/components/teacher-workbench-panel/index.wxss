@@ -867,6 +867,9 @@
 .roll-row,
 .feedback-row,
 .review-origin {
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
   border: 1rpx solid rgba(33, 31, 28, 0.07);
   border-radius: 22rpx;
   background: #fff;
@@ -905,20 +908,29 @@
 
 .status-grid {
   display: grid;
+  box-sizing: border-box;
+  width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10rpx;
   margin-top: 18rpx;
 }
 
 .status-option {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
   min-height: 62rpx;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
   border: 1rpx solid rgba(33, 31, 28, 0.08);
   border-radius: 16rpx;
   background: #f6f4f0;
   color: #57534e;
   font-size: 23rpx;
   font-weight: 800;
-  line-height: 62rpx;
+  line-height: 1.2;
+  margin: 0;
   padding: 0;
 }
 

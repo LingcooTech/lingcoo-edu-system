@@ -3,7 +3,7 @@
   <skeleton wx:if="{{loading}}" variant="hub" />
   <block wx:else>
     <view wx:if="{{profile}}" class="profile-card">
-      <view>
+      <view class="profile-info">
         <view class="profile-eyebrow">学员档案</view>
         <view class="profile-name">{{profile.name}}</view>
         <view class="profile-meta">{{profile.grade}}{{profile.school ? ' · ' + profile.school : ''}}</view>
@@ -151,17 +151,6 @@
           placeholder="作品说明，可不填"
           bindinput="onWorkDescriptionInput"
         />
-        <view class="work-frame-options">
-          <view
-            wx:for="{{workFrameOptions}}"
-            wx:key="key"
-            class="{{item.className}}"
-            data-key="{{item.key}}"
-            bindtap="onWorkFrameChange"
-          >
-            {{item.label}}
-          </view>
-        </view>
         <view class="work-image-grid">
           <view wx:for="{{workImages}}" wx:key="*this" class="work-image-cell">
             <image
@@ -193,9 +182,9 @@
       </view>
 
       <view class="section-title">作品墙</view>
-      <view wx:if="{{works.length}}" class="list">
-        <view wx:for="{{works}}" wx:key="id" class="card student-work-card">
-          <view class="{{item.frameClass}}">
+      <scroll-view wx:if="{{works.length}}" class="student-works-scroll" scroll-x show-scrollbar="{{false}}">
+        <view class="student-works-row">
+          <view wx:for="{{works}}" wx:key="id" class="card student-work-card">
             <image
               class="student-work-cover"
               src="{{item.coverUrl}}"
@@ -204,20 +193,18 @@
               data-urls="{{item.imageUrls}}"
               bindtap="onPreviewWork"
             />
-          </view>
-          <view class="student-work-body">
-            <view class="row-between">
-              <view>
+            <view class="student-work-body">
+              <view class="student-work-head">
                 <view class="row-title">{{item.titleLabel}}</view>
                 <view class="row-meta">{{item.courseName}}{{item.className ? ' · ' + item.className : ''}}</view>
               </view>
-              <view class="status-pill">{{item.sourceLabel}}</view>
+              <view class="status-pill student-work-source">{{item.sourceLabel}}</view>
+              <view wx:if="{{item.description}}" class="student-work-desc">{{item.description}}</view>
+              <view class="row-meta">{{item.createdAtLabel}}</view>
             </view>
-            <view wx:if="{{item.description}}" class="text-content">{{item.description}}</view>
-            <view class="row-meta">{{item.createdAtLabel}}</view>
           </view>
         </view>
-      </view>
+      </scroll-view>
       <view wx:else class="card empty-card">暂无作品。</view>
     </block>
   </block>
