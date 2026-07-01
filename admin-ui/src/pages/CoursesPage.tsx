@@ -352,7 +352,7 @@ export function CoursesPage({
   function editWork(work: StudentWork) {
     setEditingWork(work);
     setWorkForm({
-      studentId: work.studentId,
+      studentId: work.studentId || '',
       title: work.title || '作品展示',
       description: work.description || '',
       imageUrlsText: listToLines(work.imageUrls),
@@ -368,10 +368,6 @@ export function CoursesPage({
       return;
     }
     const imageUrls = linesToList(workForm.imageUrlsText);
-    if (!workForm.studentId) {
-      toast.error('请选择学员');
-      return;
-    }
     if (imageUrls.length === 0) {
       toast.error('请上传至少一张作品图片');
       return;
@@ -379,7 +375,7 @@ export function CoursesPage({
     setSavingWork(true);
     try {
       const payload = {
-        studentId: workForm.studentId,
+        studentId: workForm.studentId || null,
         title: workForm.title.trim() || '作品展示',
         description: workForm.description.trim(),
         imageUrls,
@@ -755,7 +751,7 @@ export function CoursesPage({
 
             <div className="rounded-lg border border-border bg-background p-3">
               <FieldRow>
-                <Field label="关联学员" required>
+                <Field label="关联学员">
                   <select
                     className="form-input"
                     value={workForm.studentId}
@@ -763,7 +759,7 @@ export function CoursesPage({
                       setWorkForm({ ...workForm, studentId: event.target.value })
                     }
                   >
-                    <option value="">请选择学员</option>
+                    <option value="">不关联学员，仅作为活动作品展示</option>
                     {students
                       .filter((student) => student.status !== 'archived')
                       .map((student) => (
@@ -882,7 +878,7 @@ export function CoursesPage({
                         />
                       </div>
                       <div className="text-muted-foreground mt-1 text-sm">
-                        {work.student?.name || '未知学员'}
+                        {work.student?.name || '课程展示'}
                         {work.student?.grade ? ` · ${work.student.grade}` : ''}
                         {work.imageUrls.length ? ` · ${work.imageUrls.length} 张图` : ''}
                       </div>

@@ -725,6 +725,9 @@ export const teachingModule: AppModule = {
       scope: TeacherHomeworkScope,
       item: typeof schema.studentWorks.$inferSelect,
     ) {
+      if (!item.studentId) {
+        return false;
+      }
       if (!scope.studentIds.has(item.studentId)) {
         return false;
       }
@@ -749,7 +752,7 @@ export const teachingModule: AppModule = {
         const classGroup =
           (item.classId ? (scope.classById.get(item.classId) ?? null) : null) ??
           (session ? (scope.classById.get(session.classId) ?? null) : null) ??
-          (item.courseId
+          (item.studentId && item.courseId
             ? (scope.classByStudentCourse.get(`${item.studentId}:${item.courseId}`) ?? null)
             : null);
         const teacher =
@@ -757,7 +760,7 @@ export const teachingModule: AppModule = {
           (classGroup?.teacherId ? (scope.teacherById.get(classGroup.teacherId) ?? null) : null);
         return {
           ...item,
-          student: scope.studentById.get(item.studentId)
+          student: item.studentId && scope.studentById.get(item.studentId)
             ? {
                 id: item.studentId,
                 name: scope.studentById.get(item.studentId)!.name,

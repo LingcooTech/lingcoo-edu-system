@@ -33,7 +33,7 @@ export interface Course {
 
 export interface StudentWork {
   id: string;
-  studentId: string;
+  studentId?: string | null;
   courseId?: string | null;
   title: string;
   description: string;

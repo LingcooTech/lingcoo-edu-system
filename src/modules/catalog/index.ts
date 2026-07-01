@@ -53,7 +53,7 @@ const courseSchema = z.object({
 const courseUpdateSchema = z.object(courseShape).partial();
 
 const studentWorkSchema = z.object({
-  studentId: z.string().uuid(),
+  studentId: z.string().uuid().nullable().optional(),
   classId: z.string().uuid().nullable().optional(),
   classSessionId: z.string().uuid().nullable().optional(),
   teacherId: z.string().uuid().nullable().optional(),
@@ -232,7 +232,7 @@ export const catalogModule: AppModule = {
         const teacher =
           (item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null) ??
           (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);
-        const student = studentById.get(item.studentId);
+        const student = item.studentId ? studentById.get(item.studentId) : null;
         return {
           ...item,
           student: student
@@ -329,15 +329,15 @@ export const catalogModule: AppModule = {
       async (request) => {
         const { courseId } = request.params as { courseId: string };
         const body = studentWorkSchema.parse(request.body);
-        await Promise.all([
-          catalogRepo.requireCourse(app.db, courseId),
-          peopleRepo.requireStudent(app.db, body.studentId),
-        ]);
+        await catalogRepo.requireCourse(app.db, courseId);
+        if (body.studentId) {
+          await peopleRepo.requireStudent(app.db, body.studentId);
+        }
         const [item] = await app.db
           .insert(schema.studentWorks)
           .values({
             courseId,
-            studentId: body.studentId,
+            studentId: body.studentId ?? null,
             classId: body.classId ?? null,
             classSessionId: body.classSessionId ?? null,
             teacherId: body.teacherId ?? null,

@@ -40,7 +40,7 @@ export interface Course {
 export interface StudentWork {
   id: string;
   accountId?: string | null;
-  studentId: string;
+  studentId?: string | null;
   courseId?: string | null;
   classId?: string | null;
   classSessionId?: string | null;

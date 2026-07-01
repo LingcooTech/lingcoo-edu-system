@@ -189,7 +189,7 @@ export const parentCenterModule: AppModule = {
         const classGroup = session ? (classById.get(session.classId) ?? null) : null;
         return {
           ...item,
-          student: studentById.get(item.studentId)
+          student: item.studentId && studentById.get(item.studentId)
             ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
             : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
@@ -243,7 +243,7 @@ export const parentCenterModule: AppModule = {
         const homeworkAssignment = personalAssignment ?? classAssignment;
         return {
           ...item,
-          student: studentById.get(item.studentId)
+          student: item.studentId && studentById.get(item.studentId)
             ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
             : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
@@ -291,7 +291,7 @@ export const parentCenterModule: AppModule = {
           (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);
         return {
           ...item,
-          student: studentById.get(item.studentId)
+          student: item.studentId && studentById.get(item.studentId)
             ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
             : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,

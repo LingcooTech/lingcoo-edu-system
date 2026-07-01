@@ -747,9 +747,7 @@ export const studentWorks = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => students.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'cascade' }),
     courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
     classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
     classSessionId: uuid('class_session_id').references(() => classSessions.id, {
