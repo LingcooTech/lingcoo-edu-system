@@ -70,7 +70,11 @@ Page({
   async onSubscribeLessonNotifications() {
     this.setData({ subscribingReminders: true });
     try {
-      const result = await requestSubscribe(['lesson_reminder', 'lesson_consumed']);
+      const result = await requestSubscribe([
+        'lesson_reminder',
+        'lesson_consumed',
+        'learning_update',
+      ]);
       const accepted = Object.values(result).some((value) => value === 'accept');
       wx.showToast({
         title: accepted ? '订阅成功' : '未授权',

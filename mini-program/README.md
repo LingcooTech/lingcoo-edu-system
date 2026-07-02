@@ -57,10 +57,11 @@
 WECHAT_MINI_PROGRAM_APP_ID=你的 AppID
 WECHAT_MINI_PROGRAM_APP_SECRET=你的 AppSecret
 WECHAT_MINI_PROGRAM_STATE=developer|trial|formal
-WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID=预约试听模板 ID
+WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID=预约通知模板 ID
 WECHAT_MINI_SUBSCRIBE_PAYMENT_TEMPLATE_ID=支付成功模板 ID
-WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID=课前提醒模板 ID
-WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID=课消通知模板 ID
+WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID=日程提醒模板 ID
+WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID=核销成功模板 ID
+WECHAT_MINI_SUBSCRIBE_LEARNING_UPDATE_TEMPLATE_ID=线上活动任务发布模板 ID
 ```
 
 真实小程序支付还需要在后台支付设置或运行环境里配置微信商户参数；其中微信支付 `appId` 应使用同一个小程序 AppID：
@@ -81,10 +82,11 @@ WECHAT_PAY_NOTIFY_URL=https://你的 API 域名/public/payment/wechat/notify
 
 当前后端发送时使用以下字段名，请在微信公众平台创建模板时保持关键词顺序/类型一致：
 
-- 预约试听：`thing1` 学员、`thing2` 课程/活动、`thing3` 状态、`time4` 提交时间。
-- 支付成功：`character_string1` 订单号、`amount2` 金额、`thing3` 到账说明、`time4` 支付时间。
-- 课前提醒：`thing1` 学员、`thing2` 课程/班级、`time3` 上课时间、`thing4` 上课地点。
-- 课消通知：`thing1` 学员、`thing2` 课程/班级、`thing3` 扣课说明、`time4` 上课时间。
+- 预约通知（模板 461）：`name1` 预约人、`thing13` 预约项目、`phrase14` 预约状态、`date3` 预约时间。
+- 支付成功通知（模板 2298）：`character_string2` 订单号、`amount11` 订单金额、`thing9` 订单状态、`time8` 支付时间。
+- 日程提醒（模板 9296）：`thing17` 参与者、`thing1` 活动名称、`time2` 活动时间、`thing3` 活动地点。
+- 核销成功通知（模板 1016）：`thing16` 姓名、`thing8` 活动名称、`number3` 核销数量、`date5` 核销时间、`number4` 剩余数量。
+- 线上活动任务发布通知（模板 25521）：`thing1` 活动名称、`thing2` 任务名称、`time3` 开始时间。
 
 ## 下一步后端/小程序闭环
 

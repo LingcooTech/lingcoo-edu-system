@@ -33,7 +33,8 @@ export type WechatMiniSubscribeTemplateKey =
   | 'trial_registration'
   | 'payment_success'
   | 'lesson_reminder'
-  | 'lesson_consumed';
+  | 'lesson_consumed'
+  | 'learning_update';
 
 export interface WechatMiniSubscribeTemplate {
   key: WechatMiniSubscribeTemplateKey;
@@ -81,7 +82,7 @@ export function getWechatMiniSubscribeTemplates(env: AppEnv): WechatMiniSubscrib
   const templates: WechatMiniSubscribeTemplate[] = [
     {
       key: 'trial_registration',
-      label: '预约试听通知',
+      label: '预约通知',
       templateId: env.WECHAT_MINI_SUBSCRIBE_TRIAL_TEMPLATE_ID?.trim() ?? '',
     },
     {
@@ -91,13 +92,18 @@ export function getWechatMiniSubscribeTemplates(env: AppEnv): WechatMiniSubscrib
     },
     {
       key: 'lesson_reminder',
-      label: '课前提醒',
+      label: '日程提醒',
       templateId: env.WECHAT_MINI_SUBSCRIBE_LESSON_REMINDER_TEMPLATE_ID?.trim() ?? '',
     },
     {
       key: 'lesson_consumed',
-      label: '课消通知',
+      label: '核销成功通知',
       templateId: env.WECHAT_MINI_SUBSCRIBE_LESSON_CONSUMED_TEMPLATE_ID?.trim() ?? '',
+    },
+    {
+      key: 'learning_update',
+      label: '线上活动任务发布通知',
+      templateId: env.WECHAT_MINI_SUBSCRIBE_LEARNING_UPDATE_TEMPLATE_ID?.trim() ?? '',
     },
   ];
   return templates.filter((item) => Boolean(item.templateId));

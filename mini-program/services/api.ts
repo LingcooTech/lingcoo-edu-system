@@ -335,7 +335,8 @@ export type SubscribeTemplateKey =
   | 'trial_registration'
   | 'payment_success'
   | 'lesson_reminder'
-  | 'lesson_consumed';
+  | 'lesson_consumed'
+  | 'learning_update';
 
 export interface WechatMiniSubscribeTemplate {
   key: SubscribeTemplateKey;

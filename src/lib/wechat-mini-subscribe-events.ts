@@ -43,10 +43,10 @@ export async function sendTrialRegistrationSubscribe(input: {
       templateId,
       page: input.page ?? '/pages/account/index',
       data: {
-        thing1: { value: shortValue(input.studentName, '学员') },
-        thing2: { value: shortValue(input.courseName, '试听预约') },
-        thing3: { value: '老师将电话确认' },
-        time4: { value: formatMessageTime() },
+        name1: { value: shortValue(input.studentName, '学员', 10) },
+        thing13: { value: shortValue(input.courseName, '预约活动') },
+        phrase14: { value: '预约成功' },
+        date3: { value: formatMessageTime() },
       },
     });
     if (!result.sent) {

@@ -10,6 +10,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
 import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
+import { LearningNotificationService } from '../notifications/learning-notification-service.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import { NotificationsService } from '../notifications/service.js';
 import type { AppModule } from '../types.js';
@@ -171,10 +172,20 @@ function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
 }
 
+function compactText(value: string | null | undefined, fallback: string, maxLength = 80) {
+  const normalized = value?.trim() || fallback;
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+}
+
 export const teachingModule: AppModule = {
   name: 'teaching',
   async register(app) {
     const lessonNotifications = new LessonNotificationService({
+      db: app.db,
+      env: app.appEnv,
+      log: app.log,
+    });
+    const learningNotifications = new LearningNotificationService({
       db: app.db,
       env: app.appEnv,
       log: app.log,
@@ -609,6 +620,33 @@ export const teachingModule: AppModule = {
 
     type TeacherHomeworkScope = Awaited<ReturnType<typeof loadTeacherHomeworkScope>>;
 
+    async function notifyLearningSafely(
+      input: Parameters<LearningNotificationService['notifyStudent']>[0],
+    ) {
+      try {
+        await learningNotifications.notifyStudent(input);
+      } catch (error) {
+        app.log.warn(
+          { err: error, sourceEventName: input.sourceEventName },
+          'learning notification failed',
+        );
+      }
+    }
+
+    function studentName(scope: TeacherHomeworkScope, studentId: string) {
+      return scope.studentById.get(studentId)?.name || '孩子';
+    }
+
+    function classCourseLabel(
+      scope: TeacherHomeworkScope,
+      classId?: string | null,
+      courseId?: string | null,
+    ) {
+      const className = classId ? scope.classById.get(classId)?.name : '';
+      const courseName = courseId ? scope.courseById.get(courseId)?.name : '';
+      return [courseName, className].filter(Boolean).join(' · ') || '活动';
+    }
+
     function canAccessHomework(
       scope: TeacherHomeworkScope,
       item: typeof schema.homeworkCheckIns.$inferSelect,
@@ -990,6 +1028,77 @@ export const teachingModule: AppModule = {
           .from(schema.homeworkAssignments)
           .where(eq(schema.homeworkAssignments.classSessionId, sessionId))
           .orderBy(desc(schema.homeworkAssignments.updatedAt));
+        const notificationStamp = Date.now();
+        const lessonLabel = classCourseLabel(scope, classGroup.id, classGroup.courseId);
+        await Promise.all([
+          ...updatedItems.map((item) => {
+            const ratingText = item.rating > 0 ? `，获得 ${item.rating} 星` : '';
+            return notifyLearningSafely({
+              studentId: item.studentId,
+              studentName: studentName(scope, item.studentId),
+              title: '课堂互动已更新',
+              body: compactText(
+                item.content ||
+                  `${studentName(scope, item.studentId)} 的课堂表现已更新${ratingText}`,
+                '课堂表现已更新',
+              ),
+              updateType: '课堂互动',
+              page: '/pages/account-interactions/index',
+              sourceEventName: 'learning.feedback',
+              dedupeKey: `learning.feedback:${sessionId}:${item.studentId}:${notificationStamp}`,
+              meta: {
+                sessionId,
+                studentId: item.studentId,
+                courseId: classGroup.courseId,
+                classId: classGroup.id,
+              },
+            });
+          }),
+          ...(body.classAssignmentContent
+            ? enrollments.map((enrollment) =>
+                notifyLearningSafely({
+                  studentId: enrollment.studentId,
+                  studentName: studentName(scope, enrollment.studentId),
+                  title: '活动任务已布置',
+                  body: compactText(body.classAssignmentContent, '有新的活动任务'),
+                  updateType: '任务布置',
+                  page: '/pages/account-homework/index',
+                  sourceEventName: 'homework.assignment',
+                  dedupeKey:
+                    `homework.assignment:${sessionId}:class:` +
+                    `${enrollment.studentId}:${notificationStamp}`,
+                  meta: {
+                    sessionId,
+                    studentId: enrollment.studentId,
+                    courseId: classGroup.courseId,
+                    classId: classGroup.id,
+                    scope: 'class',
+                  },
+                }),
+              )
+            : []),
+          ...body.studentAssignments
+            .filter((assignment) => assignment.content)
+            .map((assignment) =>
+              notifyLearningSafely({
+                studentId: assignment.studentId,
+                studentName: studentName(scope, assignment.studentId),
+                title: '个人任务已布置',
+                body: compactText(assignment.content, `${lessonLabel} 有新的个人任务`),
+                updateType: '任务布置',
+                page: '/pages/account-homework/index',
+                sourceEventName: 'homework.assignment',
+                dedupeKey: `homework.assignment:${sessionId}:${assignment.studentId}:${notificationStamp}`,
+                meta: {
+                  sessionId,
+                  studentId: assignment.studentId,
+                  courseId: classGroup.courseId,
+                  classId: classGroup.id,
+                  scope: 'student',
+                },
+              }),
+            ),
+        ]);
         return {
           lessonFeedbacks: enrichTeacherLessonFeedbacks(scope, updatedItems),
           homeworkAssignments: enrichTeacherHomeworkAssignments(scope, assignments),
@@ -1118,6 +1227,27 @@ export const teachingModule: AppModule = {
           })
           .returning();
 
+        await notifyLearningSafely({
+          studentId: item.studentId!,
+          studentName: studentName(scope, item.studentId!),
+          title: '作品已发布',
+          body: compactText(
+            `${studentName(scope, item.studentId!)} 的作品「${item.title || '作品展示'}」已发布`,
+            '作品已发布',
+          ),
+          updateType: '作品展示',
+          page: '/pages/account-gallery/index',
+          level: 'success',
+          sourceEventName: 'student.work.published',
+          dedupeKey: `student.work.published:${item.id}`,
+          meta: {
+            studentWorkId: item.id,
+            studentId: item.studentId,
+            courseId: item.courseId,
+            classId: item.classId,
+          },
+        });
+
         return {
           studentWork: enrichTeacherStudentWorks(scope, [item])[0],
           message: '作品已发布',
@@ -1199,6 +1329,29 @@ export const teachingModule: AppModule = {
         if (!updated) {
           throw notFound('Homework check-in not found');
         }
+
+        const reviewStatusText = body.reviewStatus === 'needs_revision' ? '需要订正' : '已批阅';
+        const ratingText = body.rating > 0 ? `，${body.rating} 星` : '';
+        await notifyLearningSafely({
+          studentId: updated.studentId,
+          studentName: studentName(scope, updated.studentId),
+          title: '任务批阅已更新',
+          body: compactText(
+            body.teacherFeedback || `老师已批阅打卡，结果：${reviewStatusText}${ratingText}`,
+            '任务批阅已更新',
+          ),
+          updateType: '任务批阅',
+          page: '/pages/account-homework/index',
+          sourceEventName: 'homework.review',
+          dedupeKey: `homework.review:${homeworkCheckInId}:${updated.updatedAt.getTime()}`,
+          meta: {
+            homeworkCheckInId,
+            studentId: updated.studentId,
+            courseId: updated.courseId,
+            classSessionId: updated.classSessionId,
+            reviewStatus: updated.reviewStatus,
+          },
+        });
 
         return { homeworkCheckIn: enrichTeacherHomework(scope, [updated])[0] };
       },

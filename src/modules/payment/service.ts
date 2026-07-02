@@ -433,9 +433,9 @@ export class PaymentService {
         templateId,
         page: '/pages/account/index',
         data: {
-          character_string1: { value: order.orderNo },
-          amount2: { value: formatAmount(order.amount) },
-          thing3: {
+          character_string2: { value: order.orderNo },
+          amount11: { value: formatAmount(order.amount) },
+          thing9: {
             value:
               order.orderType === 'seat_reservation'
                 ? seatReserved
@@ -445,7 +445,7 @@ export class PaymentService {
                   ? `${order.lessonCount} 课时已到账`
                   : '待完善孩子信息',
           },
-          time4: { value: formatMessageTime(order.paidAt ?? new Date()) },
+          time8: { value: formatMessageTime(order.paidAt ?? new Date()) },
         },
       });
       if (!result.sent) {

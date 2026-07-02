@@ -164,10 +164,10 @@ export class LessonNotificationService {
       title: '课前提醒',
       body: `${target.studentName} 将在 ${startTime} 上课：${lessonName}。${classroomText}`,
       data: {
-        thing1: { value: shortValue(target.studentName, '学员') },
-        thing2: { value: shortValue(lessonName, '课程') },
-        time3: { value: formatMessageTime(target.startsAt) },
-        thing4: { value: shortValue(target.classroomName, '校区教室') },
+        thing17: { value: shortValue(target.studentName, '学员') },
+        thing1: { value: shortValue(lessonName, '活动') },
+        time2: { value: formatMessageTime(target.startsAt) },
+        thing3: { value: shortValue(target.classroomName, '活动地点') },
       },
       meta: {
         sessionId: target.sessionId,
@@ -185,6 +185,7 @@ export class LessonNotificationService {
   ) {
     const lessonName = `${target.courseName}（${target.className}）`;
     const balanceText = balance === null ? '已扣减 1 课时' : `扣减 1 课时，剩余 ${balance} 课时`;
+    const remainingCount = Math.max(balance ?? 0, 0);
 
     return this.notifyTargetParents({
       target,
@@ -195,10 +196,11 @@ export class LessonNotificationService {
       title: '课时已扣减',
       body: `${target.studentName} 已完成 ${formatDisplayTime(target.startsAt)} 的 ${lessonName}，${balanceText}。`,
       data: {
-        thing1: { value: shortValue(target.studentName, '学员') },
-        thing2: { value: shortValue(lessonName, '课程') },
-        thing3: { value: shortValue(balanceText, '已扣减 1 课时') },
-        time4: { value: formatMessageTime(target.startsAt) },
+        thing16: { value: shortValue(target.studentName, '学员') },
+        thing8: { value: shortValue(lessonName, '活动') },
+        number3: { value: '1' },
+        date5: { value: formatMessageTime(target.startsAt) },
+        number4: { value: String(remainingCount) },
       },
       meta: {
         sessionId: target.sessionId,
