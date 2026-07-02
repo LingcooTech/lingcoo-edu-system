@@ -162,7 +162,7 @@ Page({
       this.setData({ booting: !this.data.account });
       this.loadSession();
     } else {
-      this.updateTabBadge(0);
+      this.resetAccountState();
     }
   },
 
