@@ -73,7 +73,7 @@
 
 .works-scroll {
   width: 100%;
-  margin-top: 18rpx;
+  overflow: hidden;
   white-space: nowrap;
 }
 
@@ -84,34 +84,26 @@
 }
 
 .course-work-card {
-  display: inline-block;
-  width: 300rpx;
-  padding: 18rpx;
-  vertical-align: top;
+  display: inline-flex;
+  width: 702rpx;
+  flex: 0 0 702rpx;
+  flex-direction: column;
+  overflow: hidden;
   white-space: normal;
 }
 
 .course-work-image {
   display: block;
   width: 100%;
-  height: 240rpx;
-  border-radius: 10rpx;
+  height: 420rpx;
   background: #ece8df;
 }
 
-.course-work-title {
-  margin-top: 14rpx;
-  color: #211f1c;
-  font-size: 26rpx;
-  font-weight: 850;
-  line-height: 1.35;
-}
-
 .course-work-meta {
-  margin-top: 6rpx;
+  padding: 22rpx 24rpx;
   color: #8b857c;
-  font-size: 22rpx;
-  line-height: 1.35;
+  font-size: 25rpx;
+  line-height: 1.45;
 }
 
 .notice-block {

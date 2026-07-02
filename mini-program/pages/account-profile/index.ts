@@ -15,6 +15,7 @@ import {
   type NotificationItem,
   type OrderItem,
 } from '../../utils/parent-center';
+import { requestSubscribe } from '../../services/subscribe';
 
 type ProfileStats = {
   orderCount: number;
@@ -39,6 +40,7 @@ Page({
     loading: true,
     needLogin: false,
     loggingOut: false,
+    subscribingReminders: false,
     account: null as AuthAccount | null,
     avatarText: '家',
     stats: emptyStats(),
@@ -131,7 +133,11 @@ Page({
       const updated = await markParentNotificationRead(id);
       const notifications = (this.data.notifications as NotificationItem[]).map((item) =>
         item.id === id
-          ? { ...item, status: updated.status, statusLabel: notificationStatusLabel(updated.status) }
+          ? {
+              ...item,
+              status: updated.status,
+              statusLabel: notificationStatusLabel(updated.status),
+            }
           : item,
       );
       const unreadNotifications = notifications.filter((item) => item.status === 'unread').length;
@@ -148,6 +154,24 @@ Page({
         title: error instanceof Error ? error.message : '操作失败',
         icon: 'none',
       });
+    }
+  },
+
+  async onSubscribeLessonNotifications() {
+    this.setData({ subscribingReminders: true });
+    try {
+      const result = await requestSubscribe([
+        'lesson_reminder',
+        'lesson_consumed',
+        'learning_update',
+      ]);
+      const accepted = Object.values(result).some((value) => value === 'accept');
+      wx.showToast({
+        title: accepted ? '订阅成功' : '未授权',
+        icon: accepted ? 'success' : 'none',
+      });
+    } finally {
+      this.setData({ subscribingReminders: false });
     }
   },
 

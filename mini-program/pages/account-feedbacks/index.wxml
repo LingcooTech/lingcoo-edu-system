@@ -8,7 +8,7 @@
   <block wx:else>
     <view class="page-head">
       <view class="section-title">互动反馈</view>
-      <view class="row-meta">查看机构人员对活动表现、练习重点和后续建议的记录。</view>
+      <view class="row-meta">查看机构导师对活动表现、练习重点和后续建议的记录。</view>
     </view>
 
     <view wx:if="{{lessonFeedbacks.length}}" class="feedback-list">

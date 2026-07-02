@@ -230,9 +230,6 @@ export const authModule: AppModule = {
         if (account.status !== 'active') {
           throw httpError(403, '账号已停用');
         }
-        if (account.role === 'admin') {
-          throw httpError(403, '管理员账号请使用网页后台登录');
-        }
         const token = await signIn(reply, account);
         return { bound: true, token, account: publicAccount(account) };
       }
@@ -280,9 +277,6 @@ export const authModule: AppModule = {
       );
       let account = await accountsRepo.findByPhone(app.db, phone);
 
-      if (account && account.role === 'admin') {
-        throw httpError(409, '管理员账号请使用网页后台登录');
-      }
       if (account && account.status !== 'active') {
         throw httpError(403, '账号已停用');
       }

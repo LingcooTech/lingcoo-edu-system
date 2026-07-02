@@ -1,4 +1,5 @@
 import { attendanceModule } from './attendance/index.js';
+import { adminMiniModule } from './admin-mini/index.js';
 import { authModule } from './auth/index.js';
 import { catalogModule } from './catalog/index.js';
 import { contentModule } from './content/index.js';
@@ -32,6 +33,7 @@ export const appModules: AppModule[] = [
   schedulingModule,
   courseContractsModule,
   attendanceModule,
+  adminMiniModule,
   lessonModule,
   financeModule,
   reportModule,

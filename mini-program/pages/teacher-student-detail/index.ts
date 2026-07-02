@@ -81,7 +81,6 @@ type WorkRow = StudentWork & {
   titleLabel: string;
   courseName: string;
   className: string;
-  sourceLabel: string;
   coverUrl: string;
 };
 
@@ -150,8 +149,6 @@ function toWorkRow(item: StudentWork): WorkRow {
     titleLabel: item.title || '作品展示',
     courseName: item.course?.name || '活动',
     className: item.class?.name || '',
-    sourceLabel:
-      item.source === 'teacher' ? '机构上传' : item.source === 'parent' ? '家长上传' : '后台精选',
     coverUrl: item.imageUrls[0] || '',
   };
 }

@@ -327,18 +327,18 @@
               <view wx:if="{{student.recorded}}" class="recorded-pill">{{student.statusLabel}}</view>
             </view>
             <view class="status-grid">
-              <button
+              <view
                 wx:for="{{attendanceStatusOptions}}"
                 wx:for-item="option"
                 wx:key="value"
-                class="status-option {{student.draftStatus == option.value ? 'status-option-active' : ''}}"
-                disabled="{{student.recorded}}"
+                class="status-option {{student.draftStatus == option.value ? 'status-option-active' : ''}} {{student.recorded ? 'status-option-disabled' : ''}}"
+                aria-role="button"
                 data-id="{{student.id}}"
                 data-status="{{option.value}}"
                 bindtap="selectRollCallStatus"
               >
                 {{option.label}}
-              </button>
+              </view>
             </view>
           </view>
         </view>

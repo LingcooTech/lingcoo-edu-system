@@ -45,7 +45,7 @@ function summarizeChildCourses(
       courseName: item.courseName,
       className: '待分组',
       campusName: '空间待确认',
-      teacherName: '机构人员待确认',
+      teacherName: '机构导师待确认',
     });
   }
 

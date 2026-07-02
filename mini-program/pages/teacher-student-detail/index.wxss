@@ -283,19 +283,21 @@
 
 .student-works-scroll {
   width: 100%;
+  overflow: hidden;
   white-space: nowrap;
 }
 
 .student-works-row {
-  display: flex;
+  display: inline-flex;
   gap: 18rpx;
   padding-bottom: 8rpx;
+  padding-right: 30rpx;
 }
 
 .student-work-card {
   display: inline-flex;
-  width: 330rpx;
-  flex: 0 0 330rpx;
+  width: 702rpx;
+  flex: 0 0 702rpx;
   flex-direction: column;
   overflow: hidden;
   white-space: normal;
@@ -318,10 +320,6 @@
 .student-work-head {
   display: grid;
   gap: 4rpx;
-}
-
-.student-work-source {
-  margin-top: 14rpx;
 }
 
 .student-work-desc {

@@ -30,7 +30,8 @@ type PackageItem = CoursePackage & {
 };
 type WorkItem = StudentWork & {
   coverUrl: string;
-  studentName: string;
+  courseName: string;
+  className: string;
 };
 type CheckoutOrder = ParentOrder & { amountLabel: string; statusLabel: string };
 type PhoneWx = typeof wx & {
@@ -249,7 +250,8 @@ Page({
         studentWorks: (payload.studentWorks || []).map((item) => ({
           ...item,
           coverUrl: item.imageUrls[0] || '',
-          studentName: item.student?.name || '学员',
+          courseName: item.course?.name || payload.course.name,
+          className: item.class?.name || '',
         })),
         contentBlocks: parseBlocks(payload.course.content),
       });

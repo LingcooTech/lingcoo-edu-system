@@ -34,7 +34,6 @@
     </view>
 
     <view wx:if="{{studentWorks.length}}" class="section">
-      <view class="section-title">学员作品</view>
       <scroll-view scroll-x class="works-scroll" show-scrollbar="{{false}}">
         <view class="works-row">
           <view wx:for="{{studentWorks}}" wx:key="id" class="card course-work-card">
@@ -46,8 +45,7 @@
               data-urls="{{item.imageUrls}}"
               bindtap="onPreviewWork"
             />
-            <view class="course-work-title">{{item.title}}</view>
-            <view class="course-work-meta">{{item.studentName}}</view>
+            <view class="course-work-meta">{{item.courseName}}{{item.className ? ' · ' + item.className : ''}}</view>
           </view>
         </view>
       </scroll-view>

@@ -64,6 +64,20 @@
     </view>
 
     <view wx:if="{{activeTab == 'notifications'}}" class="section card profile-panel">
+      <view class="subscribe-card">
+        <view>
+          <view class="subscribe-title">微信提醒</view>
+          <view class="subscribe-desc">订阅后可收到活动前提醒、服务次数扣减和学习动态。</view>
+        </view>
+        <button
+          class="mini-button subscribe-action"
+          loading="{{subscribingReminders}}"
+          disabled="{{subscribingReminders}}"
+          bindtap="onSubscribeLessonNotifications"
+        >
+          {{subscribingReminders ? '请求中' : '订阅'}}
+        </button>
+      </view>
       <view wx:if="{{notifications.length}}" class="item-list">
         <view wx:for="{{notifications}}" wx:key="id" class="notification-row">
           <view class="row-between">

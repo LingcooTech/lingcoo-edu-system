@@ -395,6 +395,78 @@ export interface AuthAccount {
   mustChangePassword: boolean;
 }
 
+export interface AdminMetricSummary {
+  todaySessions: number;
+  todayLeads: number;
+  monthRevenue: number;
+  monthRevenueLabel: number;
+  paidOrders: number;
+  pendingOrders: number;
+  activeStudents: number;
+  lowLessonAccounts: number;
+}
+
+export interface AdminOrderSummary {
+  id: string;
+  orderNo: string;
+  status: string;
+  amount: number;
+  paidAmount: number;
+  amountLabel: number;
+  paidAmountLabel: number;
+  studentName: string;
+  courseName: string;
+  createdAt: string;
+}
+
+export interface AdminStudentSummary {
+  id: string;
+  name: string;
+  grade: string;
+  school: string;
+  status: string;
+  guardianName: string;
+  guardianPhone: string;
+  balance: number;
+  createdAt: string;
+}
+
+export interface AdminSessionSummary {
+  id: string;
+  topic: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  className: string;
+  courseName: string;
+  teacherName: string;
+  classroomName: string;
+}
+
+export interface AdminOverview {
+  metrics: AdminMetricSummary;
+  recentOrders: AdminOrderSummary[];
+  recentStudents: AdminStudentSummary[];
+  upcomingSessions: AdminSessionSummary[];
+}
+
+export interface AdminSearchResult {
+  keyword: string;
+  students: ParentChild[];
+  guardians: Array<{ id: string; name: string; phone: string; createdAt: string }>;
+  orders: Array<{
+    id: string;
+    orderNo: string;
+    status: string;
+    amountLabel: number;
+    paidAmountLabel: number;
+    studentName: string;
+    courseName: string;
+    createdAt: string;
+  }>;
+  courses: Course[];
+}
+
 export interface ParentChild {
   id: string;
   guardianId?: string | null;
@@ -1220,6 +1292,14 @@ export function createParentUploadToken(filename: string): Promise<ParentUploadT
   });
 }
 
+export function fetchAdminOverview(): Promise<AdminOverview> {
+  return request('/public/admin/overview');
+}
+
+export function searchAdminData(keyword: string): Promise<AdminSearchResult> {
+  return request(`/public/admin/search${buildQueryString({ q: keyword })}`);
+}
+
 export async function fetchTeacherDashboard(): Promise<{
   sessions: TeacherClassSession[];
   classes: TeacherClass[];
@@ -1309,9 +1389,8 @@ export async function fetchTeacherHomeworkAssignments(): Promise<HomeworkAssignm
 }
 
 export async function fetchTeacherStudentWorks(): Promise<StudentWork[]> {
-  return (
-    await request<{ studentWorks: StudentWork[] }>('/public/teacher/student-works')
-  ).studentWorks;
+  return (await request<{ studentWorks: StudentWork[] }>('/public/teacher/student-works'))
+    .studentWorks;
 }
 
 export function createTeacherStudentWork(

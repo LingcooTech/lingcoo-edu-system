@@ -198,7 +198,6 @@
                 <view class="row-title">{{item.titleLabel}}</view>
                 <view class="row-meta">{{item.courseName}}{{item.className ? ' · ' + item.className : ''}}</view>
               </view>
-              <view class="status-pill student-work-source">{{item.sourceLabel}}</view>
               <view wx:if="{{item.description}}" class="student-work-desc">{{item.description}}</view>
               <view class="row-meta">{{item.createdAtLabel}}</view>
             </view>

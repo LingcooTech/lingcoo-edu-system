@@ -168,6 +168,13 @@ Page({
 
   onPullDownRefresh() {
     if (hasToken()) {
+      if (this.data.account?.role === 'admin') {
+        const panel = this.selectComponent('#adminDashboard') as {
+          refresh?: () => Promise<void>;
+        } | null;
+        Promise.resolve(panel?.refresh?.()).finally(() => wx.stopPullDownRefresh());
+        return;
+      }
       if (this.data.account?.role === 'teacher') {
         const panel = this.selectComponent('#teacherWorkbench') as {
           refresh?: () => Promise<void>;
@@ -197,7 +204,7 @@ Page({
         this.resetAccountState();
         return;
       }
-      if (payload.account.role === 'teacher') {
+      if (payload.account.role === 'admin' || payload.account.role === 'teacher') {
         this.applyAccount(payload.account);
         this.updateTabBadge(0);
         return;
@@ -351,7 +358,7 @@ Page({
           const payload = await wechatMiniLogin(result.code);
           if (payload.bound) {
             setToken(payload.token);
-            if (payload.account.role === 'teacher') {
+            if (payload.account.role === 'admin' || payload.account.role === 'teacher') {
               this.applyAccount(payload.account);
               this.setData({ defaultPassword: '', bindToken: '', loginSheetVisible: false });
               this.updateTabBadge(0);
@@ -425,7 +432,7 @@ Page({
         defaultPassword: payload.account.role === 'parent' ? payload.defaultPassword || '' : '',
         loginSheetVisible: false,
       });
-      if (payload.account.role === 'teacher') {
+      if (payload.account.role === 'admin' || payload.account.role === 'teacher') {
         this.updateTabBadge(0);
         wx.showToast({ title: '绑定成功', icon: 'success' });
         return;

@@ -95,6 +95,38 @@
   padding: 28rpx 24rpx;
 }
 
+.subscribe-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-bottom: 22rpx;
+  border-radius: 22rpx;
+  background: #fbfaf7;
+  padding: 22rpx;
+}
+
+.subscribe-title {
+  color: #211f1c;
+  font-size: 27rpx;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.subscribe-desc {
+  margin-top: 6rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.subscribe-action {
+  width: 150rpx;
+  min-width: 150rpx;
+  background: #211f1c;
+  color: #fff;
+}
+
 .account-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
