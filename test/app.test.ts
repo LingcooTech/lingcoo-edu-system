@@ -2275,7 +2275,7 @@ test('sends upcoming lesson reminders idempotently', async () => {
     assert.equal(sentPayload.touser, fixture.openid);
     assert.equal(sentPayload.template_id, 'reminder-template-id');
     assert.equal(sentPayload.data.thing17.value, fixture.student.name.slice(0, 20));
-    assert.equal(sentPayload.data.thing1.value, 'Lesson Notify Course（Lesson Notify Class）');
+    assert.equal(sentPayload.data.thing1.value, 'Lesson Notify Course');
 
     const [notification] = await app.db
       .select()
@@ -2351,7 +2351,7 @@ test('creates lesson consumption notifications after admin attendance once', asy
     };
     assert.equal(sentPayload.template_id, 'consumed-template-id');
     assert.equal(sentPayload.data.thing16.value, fixture.student.name.slice(0, 20));
-    assert.equal(sentPayload.data.thing8.value, 'Lesson Notify Course（Lesson Notify Class）');
+    assert.equal(sentPayload.data.thing8.value, 'Lesson Notify Course');
     assert.equal(sentPayload.data.number3.value, '1');
     assert.equal(sentPayload.data.number4.value, '4');
 
