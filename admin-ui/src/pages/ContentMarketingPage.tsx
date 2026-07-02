@@ -15,10 +15,10 @@ import {
 import type { ContentItem, ContentSourceType, ContentStatus } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { CoverImageField } from '@/components/shared/CoverImageField';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { ResourceToolbar } from '@/components/shared/ResourceToolbar';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
@@ -39,6 +39,7 @@ interface ContentForm {
   excerpt: string;
   content: string;
   coverUrl: string;
+  coverThumbUrl: string;
   authorName: string;
   status: ContentStatus;
   isPinned: boolean;
@@ -54,6 +55,7 @@ const EMPTY_FORM: ContentForm = {
   excerpt: '',
   content: '',
   coverUrl: '',
+  coverThumbUrl: '',
   authorName: '',
   status: 'draft',
   isPinned: false,
@@ -84,6 +86,7 @@ function toForm(item: ContentItem): ContentForm {
     excerpt: item.excerpt ?? '',
     content: item.content,
     coverUrl: item.coverUrl ?? '',
+    coverThumbUrl: item.coverThumbUrl ?? '',
     authorName: item.authorName ?? '',
     status: item.status,
     isPinned: Boolean(item.isPinned),
@@ -100,6 +103,7 @@ function toPayload(form: ContentForm): ContentUpsertInput {
     excerpt: form.excerpt.trim(),
     content: articleContentToHtml(form.content),
     coverUrl: form.coverUrl.trim(),
+    coverThumbUrl: form.coverThumbUrl.trim(),
     authorName: form.authorName.trim(),
     status: form.status,
     isPinned: form.isPinned,
@@ -737,7 +741,7 @@ export function ContentMarketingPage() {
               </select>
             </Field>
           </FieldRow>
-          <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+          <label className="border-border/70 bg-muted/20 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
             <input
               type="checkbox"
               checked={form.isPinned}
@@ -753,11 +757,17 @@ export function ContentMarketingPage() {
               placeholder="如：二年级学员 小羽"
             />
           </Field>
-          <QiniuImageField
+          <CoverImageField
             label="封面图"
             value={form.coverUrl}
+            thumbValue={form.coverThumbUrl}
             onChange={(coverUrl) => patchForm({ coverUrl })}
+            onThumbChange={(coverThumbUrl) => patchForm({ coverThumbUrl })}
             prefix="content/covers"
+            thumbPrefix="content/thumbs"
+            cropLabel="成长故事列表缩略图"
+            cropHint="用于首页和成长故事列表；未设置时会回退使用封面图。"
+            aspectRatio={16 / 9}
           />
           <FieldRow>
             <Field label="来源 ID">

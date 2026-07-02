@@ -38,7 +38,7 @@
   <skeleton wx:if="{{loading}}" variant="list" />
   <view wx:elif="{{courses.length}}" class="course-list">
     <navigator wx:for="{{courses}}" wx:key="id" class="card course-card" url="/pages/course-detail/index?slug={{item.slug}}">
-      <image wx:if="{{item.coverImageUrl}}" class="course-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+      <image wx:if="{{item.coverThumbUrl || item.coverImageUrl}}" class="course-cover" src="{{item.coverThumbUrl || item.coverImageUrl}}" mode="aspectFill" />
       <view class="row-between">
         <view class="course-name">{{item.name}}</view>
         <view class="price">{{item.priceLabel}}</view>

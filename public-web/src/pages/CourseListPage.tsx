@@ -130,10 +130,10 @@ export function CourseListPage() {
                 to={`/courses/${course.slug}`}
                 className="pwcard pwcard-hover flex flex-col overflow-hidden no-underline"
               >
-                {course.coverImageUrl ? (
+                {course.coverThumbUrl || course.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
-                      src={course.coverImageUrl}
+                      src={course.coverThumbUrl || course.coverImageUrl || ''}
                       alt={course.name}
                       loading="lazy"
                       decoding="async"

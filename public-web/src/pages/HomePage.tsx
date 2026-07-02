@@ -427,10 +427,10 @@ export function HomePage() {
                 to={`/courses/${course.slug}`}
                 className="pwcard block w-[78vw] shrink-0 snap-start overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-[20rem] md:w-[21rem]"
               >
-                {course.coverImageUrl ? (
+                {course.coverThumbUrl || course.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
-                      src={course.coverImageUrl}
+                      src={course.coverThumbUrl || course.coverImageUrl || ''}
                       alt={course.name}
                       loading="lazy"
                       decoding="async"
@@ -495,10 +495,10 @@ export function HomePage() {
                 to={`/trials/${session.id}`}
                 className="pwcard block w-[78vw] shrink-0 snap-start overflow-hidden shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-[20rem] md:w-[21rem]"
               >
-                {session.coverImageUrl ? (
+                {session.coverThumbUrl || session.coverImageUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
-                      src={session.coverImageUrl}
+                      src={session.coverThumbUrl || session.coverImageUrl || ''}
                       alt={session.title}
                       loading="lazy"
                       decoding="async"
@@ -568,10 +568,10 @@ export function HomePage() {
                 to={`/stories/${story.slug}`}
                 className="pwcard mobile-rail-card mobile-rail-card-sm group block overflow-hidden no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                {story.coverUrl ? (
+                {story.coverThumbUrl || story.coverUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
-                      src={story.coverUrl}
+                      src={story.coverThumbUrl || story.coverUrl || ''}
                       alt={story.title}
                       loading="lazy"
                       decoding="async"

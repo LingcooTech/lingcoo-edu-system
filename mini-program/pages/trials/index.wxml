@@ -67,7 +67,7 @@
       url="/pages/trial-detail/index?id={{item.id}}"
       hover-class="trial-card-hover"
     >
-      <image wx:if="{{item.coverImageUrl}}" class="trial-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+      <image wx:if="{{item.coverThumbUrl || item.coverImageUrl}}" class="trial-cover" src="{{item.coverThumbUrl || item.coverImageUrl}}" mode="aspectFill" />
       <view wx:else class="trial-cover trial-cover-fallback">试</view>
       <view class="trial-body">
         <view class="trial-card-title">{{item.title}}</view>

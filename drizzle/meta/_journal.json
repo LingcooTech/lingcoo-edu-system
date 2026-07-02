@@ -288,6 +288,13 @@
       "when": 1783036800000,
       "tag": "0040_optional_student_works_student",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1783123200000,
+      "tag": "0041_cover_thumb_urls",
+      "breakpoints": true
     }
   ]
 }

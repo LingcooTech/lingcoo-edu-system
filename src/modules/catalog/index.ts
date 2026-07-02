@@ -31,6 +31,7 @@ const courseShape = {
   trialDescription: z.string(),
   reservationNotice: z.string(),
   coverImageUrl: z.string().max(500).nullable().optional(),
+  coverThumbUrl: z.string().max(500).nullable().optional(),
   onlineSalesEnabled: z.boolean(),
   summary: z.string(),
   content: z.string(),
@@ -99,8 +100,7 @@ const packageUpdateSchema = z
   .partial()
   .refine(
     (body) => {
-      const scopeChanged =
-        Object.hasOwn(body, 'courseId') || Object.hasOwn(body, 'courseSeriesId');
+      const scopeChanged = Object.hasOwn(body, 'courseId') || Object.hasOwn(body, 'courseSeriesId');
       return !scopeChanged || Boolean(body.courseId || body.courseSeriesId);
     },
     {
@@ -179,7 +179,9 @@ function normalizeCourseUpdate(body: z.infer<typeof courseUpdateSchema>) {
   return patch;
 }
 
-function normalizePackageCreate(body: z.infer<typeof packageSchema>): packagesRepo.NewCoursePackage {
+function normalizePackageCreate(
+  body: z.infer<typeof packageSchema>,
+): packagesRepo.NewCoursePackage {
   return {
     ...body,
     courseId: body.courseId ?? null,

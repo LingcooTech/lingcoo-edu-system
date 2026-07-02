@@ -31,6 +31,7 @@ export interface Course {
   trialDescription?: string;
   reservationNotice?: string;
   coverImageUrl?: string | null;
+  coverThumbUrl?: string | null;
   onlineSalesEnabled?: boolean;
   status: string;
   summary: string;
@@ -78,6 +79,7 @@ export interface ContentItem {
   excerpt: string | null;
   content: string;
   coverUrl: string | null;
+  coverThumbUrl: string | null;
   authorName: string | null;
   sourceType: ContentSourceType;
   sourceId: string | null;
@@ -290,6 +292,7 @@ export interface TrialSession {
   reservationFeeAmount: number;
   reservationNotice: string;
   coverImageUrl?: string | null;
+  coverThumbUrl?: string | null;
   status: string;
 }
 

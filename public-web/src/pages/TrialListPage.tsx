@@ -27,6 +27,7 @@ interface TrialGroup {
   key: string;
   title: string;
   coverImageUrl?: string | null;
+  coverThumbUrl?: string | null;
   course?: Course;
   campus?: { id: string; name: string; address: string | null };
   reservationFeeAmount: number;
@@ -147,6 +148,7 @@ export function TrialListPage() {
         session.courseId,
         session.campusId,
         session.title,
+        session.coverThumbUrl ?? '',
         session.coverImageUrl ?? '',
         session.reservationFeeAmount,
       ].join('|');
@@ -159,6 +161,7 @@ export function TrialListPage() {
         key,
         title: session.title,
         coverImageUrl: session.coverImageUrl,
+        coverThumbUrl: session.coverThumbUrl,
         course: courseById.get(session.courseId),
         campus: campusById.get(session.campusId),
         reservationFeeAmount: session.reservationFeeAmount,
@@ -265,7 +268,7 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
 
   return (
     <article className="pwcard overflow-hidden">
-      {group.coverImageUrl ? (
+      {group.coverThumbUrl || group.coverImageUrl ? (
         primaryHref ? (
           <Link
             to={primaryHref}
@@ -273,7 +276,7 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
             aria-label={`查看${group.title}最近场次`}
           >
             <img
-              src={group.coverImageUrl}
+              src={group.coverThumbUrl || group.coverImageUrl || ''}
               alt={group.title}
               loading="lazy"
               decoding="async"
@@ -283,7 +286,7 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
         ) : (
           <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
             <img
-              src={group.coverImageUrl}
+              src={group.coverThumbUrl || group.coverImageUrl || ''}
               alt={group.title}
               loading="lazy"
               decoding="async"
@@ -371,7 +374,7 @@ function TrialGroupCard({ group }: { group: TrialGroup }) {
         {firstSession && (
           <Link
             to={`/trials/${firstSession.id}`}
-            className="text-ink mt-3 inline-flex items-center gap-1 text-sm font-medium hover:text-brand"
+            className="text-ink hover:text-brand mt-3 inline-flex items-center gap-1 text-sm font-medium"
           >
             查看最近场次
             <ArrowRight className="h-4 w-4" />

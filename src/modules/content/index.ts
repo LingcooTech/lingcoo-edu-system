@@ -47,6 +47,7 @@ const upsertContentSchema = z.object({
   excerpt: z.string().trim().max(500).optional(),
   content: z.string().trim().max(200000).default(''),
   coverUrl: z.string().trim().url().optional().or(z.literal('')),
+  coverThumbUrl: z.string().trim().url().optional().or(z.literal('')),
   authorName: z.string().trim().max(120).optional(),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
   sourceType: z.enum(['manual', 'wordpress', 'notion', 'wechat']).default('manual'),
@@ -616,6 +617,7 @@ class ContentService {
       excerpt?: string;
       content: string;
       coverUrl?: string;
+      coverThumbUrl?: string;
       authorName?: string;
       status: ContentStatus;
       sourceType: ContentSourceType;
@@ -642,6 +644,7 @@ class ContentService {
       excerpt,
       content: input.content,
       coverUrl: normalizeOptionalUrl(input.coverUrl) ?? null,
+      coverThumbUrl: normalizeOptionalUrl(input.coverThumbUrl) ?? null,
       authorName: normalizeString(input.authorName) || null,
       sourceType: input.sourceType,
       sourceId: normalizeString(input.sourceId) || null,

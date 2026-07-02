@@ -36,6 +36,7 @@ const trialSessionSchema = z.object({
   reservationFeeAmount: z.number().int().nonnegative().default(0),
   reservationNotice: z.string().default(''),
   coverImageUrl: z.string().max(500).nullable().optional(),
+  coverThumbUrl: z.string().max(500).nullable().optional(),
   status: z.enum(['open', 'closed', 'cancelled']).default('open'),
 });
 
@@ -732,6 +733,7 @@ export const trialModule: AppModule = {
         reservationFeeAmount: body.reservationFeeAmount,
         reservationNotice: body.reservationNotice,
         coverImageUrl: body.coverImageUrl ?? null,
+        coverThumbUrl: body.coverThumbUrl ?? null,
         status: body.status,
         bookedCount: 0,
       });
@@ -761,6 +763,7 @@ export const trialModule: AppModule = {
           reservationFeeAmount: body.reservationFeeAmount,
           reservationNotice: body.reservationNotice,
           coverImageUrl: body.coverImageUrl ?? null,
+          coverThumbUrl: body.coverThumbUrl ?? null,
           status: body.status,
           bookedCount: 0,
         });

@@ -163,11 +163,36 @@ const initialState: HomeState = {
 };
 
 const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
-  { key: 'intro', label: '品牌介绍', iconUrl: HOME_QUICK_ACTIONS_ICONS.intro, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.introActive },
-  { key: 'advantages', label: '成长理念', iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.advantagesActive },
-  { key: 'campuses', label: '空间环境', iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.campusesActive },
-  { key: 'teachers', label: '伙伴资源', iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.teachersActive },
-  { key: 'stories', label: '成长故事', iconUrl: HOME_QUICK_ACTIONS_ICONS.stories, activeIconUrl: HOME_QUICK_ACTIONS_ICONS.storiesActive },
+  {
+    key: 'intro',
+    label: '品牌介绍',
+    iconUrl: HOME_QUICK_ACTIONS_ICONS.intro,
+    activeIconUrl: HOME_QUICK_ACTIONS_ICONS.introActive,
+  },
+  {
+    key: 'advantages',
+    label: '成长理念',
+    iconUrl: HOME_QUICK_ACTIONS_ICONS.advantages,
+    activeIconUrl: HOME_QUICK_ACTIONS_ICONS.advantagesActive,
+  },
+  {
+    key: 'campuses',
+    label: '空间环境',
+    iconUrl: HOME_QUICK_ACTIONS_ICONS.campuses,
+    activeIconUrl: HOME_QUICK_ACTIONS_ICONS.campusesActive,
+  },
+  {
+    key: 'teachers',
+    label: '伙伴资源',
+    iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers,
+    activeIconUrl: HOME_QUICK_ACTIONS_ICONS.teachersActive,
+  },
+  {
+    key: 'stories',
+    label: '成长故事',
+    iconUrl: HOME_QUICK_ACTIONS_ICONS.stories,
+    activeIconUrl: HOME_QUICK_ACTIONS_ICONS.storiesActive,
+  },
 ];
 
 function createHomeChromeState() {
@@ -179,7 +204,10 @@ function createHomeChromeState() {
 
 function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
   const specialtiesText = teacher.specialties.slice(0, 2).join(' / ');
-  const metaText = [teacher.teachingYears ? `${teacher.teachingYears}服务经验` : '', specialtiesText]
+  const metaText = [
+    teacher.teachingYears ? `${teacher.teachingYears}服务经验` : '',
+    specialtiesText,
+  ]
     .filter(Boolean)
     .join(' · ');
   return {
@@ -221,7 +249,7 @@ function toStudentStoryCard(item: ContentItem): HomeStudentStoryCard {
   return {
     slug: item.slug,
     title: item.title,
-    coverImageUrl: item.coverUrl ?? '',
+    coverImageUrl: item.coverThumbUrl || item.coverUrl || '',
     excerpt: item.excerpt || item.content,
   };
 }

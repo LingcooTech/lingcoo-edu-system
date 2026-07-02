@@ -13,7 +13,7 @@ function toStoryCard(item: ContentItem): StoryCard {
     slug: item.slug,
     title: item.title,
     excerpt: item.excerpt || item.content,
-    coverImageUrl: item.coverUrl || '',
+    coverImageUrl: item.coverThumbUrl || item.coverUrl || '',
   };
 }
 

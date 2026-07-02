@@ -140,6 +140,7 @@ export interface ContentUpsertInput {
   excerpt?: string;
   content: string;
   coverUrl?: string;
+  coverThumbUrl?: string;
   authorName?: string;
   status: ContentStatus;
   sourceType: ContentSourceType;

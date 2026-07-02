@@ -95,10 +95,10 @@ export function StoriesPage() {
                 to={`/stories/${story.slug}`}
                 className="pwcard pwcard-hover group flex flex-col overflow-hidden no-underline"
               >
-                {story.coverUrl ? (
+                {story.coverThumbUrl || story.coverUrl ? (
                   <div className="bg-brand-soft aspect-[16/9] overflow-hidden">
                     <img
-                      src={story.coverUrl}
+                      src={story.coverThumbUrl || story.coverUrl || ''}
                       alt={story.title}
                       loading="lazy"
                       decoding="async"

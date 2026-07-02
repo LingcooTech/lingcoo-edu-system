@@ -15,10 +15,11 @@ import type {
 import { parseBlocks, type Block } from '@/components/editor/blocks';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { CoverImageField } from '@/components/shared/CoverImageField';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { QiniuGalleryField, QiniuImageField } from '@/components/shared/QiniuImageField';
+import { QiniuGalleryField } from '@/components/shared/QiniuImageField';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
@@ -39,6 +40,7 @@ interface CourseForm {
   paymentReceiverInstitutionId: string;
   trialDescription: string;
   coverImageUrl: string;
+  coverThumbUrl: string;
   onlineSalesEnabled: boolean;
   summary: string;
   content: string;
@@ -66,6 +68,7 @@ const emptyCourseForm: CourseForm = {
   paymentReceiverInstitutionId: '',
   trialDescription: '',
   coverImageUrl: '',
+  coverThumbUrl: '',
   onlineSalesEnabled: true,
   summary: '',
   content: '',
@@ -165,6 +168,7 @@ function courseToForm(course: Course): CourseForm {
       (course.paymentReceiverType === 'provider' ? (course.providerInstitutionId ?? '') : ''),
     trialDescription: mergeTrialNotice(course.trialDescription, course.reservationNotice),
     coverImageUrl: course.coverImageUrl ?? '',
+    coverThumbUrl: course.coverThumbUrl ?? '',
     onlineSalesEnabled: course.onlineSalesEnabled ?? true,
     summary: course.summary ?? '',
     content: contentToEditableText(course.content),
@@ -226,6 +230,7 @@ function courseFormToPayload(
     trialDescription: form.trialDescription,
     reservationNotice: '',
     coverImageUrl: form.coverImageUrl.trim() || null,
+    coverThumbUrl: form.coverThumbUrl.trim() || null,
     onlineSalesEnabled: form.onlineSalesEnabled,
     summary: form.summary,
     content: form.content,
@@ -382,7 +387,9 @@ export function CoursesPage({
           `/v1/student-works/${editingWork.id}`,
           payload,
         );
-        setStudentWorks(studentWorks.map((item) => (item.id === studentWork.id ? studentWork : item)));
+        setStudentWorks(
+          studentWorks.map((item) => (item.id === studentWork.id ? studentWork : item)),
+        );
         toast.success('作品已更新');
       } else {
         const { studentWork } = await apiPost<{ studentWork: StudentWork }>(
@@ -706,12 +713,18 @@ export function CoursesPage({
             onChange={(e) => setForm({ ...form, summary: e.target.value })}
           />
         </Field>
-        <QiniuImageField
+        <CoverImageField
           label="课程封面"
-          hint="展示在首页课程卡片和课程详情页"
+          hint="详情页优先使用原图，建议上传 1200×600 横图"
           value={form.coverImageUrl}
+          thumbValue={form.coverThumbUrl}
           onChange={(coverImageUrl) => setForm({ ...form, coverImageUrl })}
+          onThumbChange={(coverThumbUrl) => setForm({ ...form, coverThumbUrl })}
           prefix="courses/cover"
+          thumbPrefix="courses/thumb"
+          cropLabel="课程列表缩略图"
+          cropHint="用于小程序活动列表卡片；未设置时会回退使用课程封面。"
+          aspectRatio={2}
         />
         <Field label="试听预约说明">
           <textarea
@@ -730,7 +743,7 @@ export function CoursesPage({
         </div>
 
         {editing ? (
-          <section className="mt-6 rounded-xl border border-border/80 bg-muted/30 p-4">
+          <section className="border-border/80 bg-muted/30 mt-6 rounded-xl border p-4">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-sm font-semibold">学员作品</h3>
@@ -744,7 +757,7 @@ export function CoursesPage({
               </button>
             </div>
 
-            <div className="rounded-lg border border-border bg-background p-3">
+            <div className="border-border bg-background rounded-lg border p-3">
               <FieldRow>
                 <Field label="关联学员">
                   <select
@@ -830,7 +843,7 @@ export function CoursesPage({
                 studentWorks.map((work) => (
                   <div
                     key={work.id}
-                    className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row"
+                    className="border-border bg-background flex flex-col gap-3 rounded-lg border p-3 sm:flex-row"
                   >
                     <div className="grid grid-cols-3 gap-1 sm:w-44">
                       {work.imageUrls.slice(0, 3).map((url) => (
@@ -838,11 +851,7 @@ export function CoursesPage({
                           key={url}
                           className="aspect-square overflow-hidden rounded-md border bg-white"
                         >
-                          <img
-                            src={url}
-                            alt={work.title}
-                            className="h-full w-full object-cover"
-                          />
+                          <img src={url} alt={work.title} className="h-full w-full object-cover" />
                         </div>
                       ))}
                     </div>
@@ -894,7 +903,7 @@ export function CoursesPage({
             </div>
           </section>
         ) : (
-          <section className="mt-6 rounded-xl border border-dashed border-border p-4">
+          <section className="border-border mt-6 rounded-xl border border-dashed p-4">
             <h3 className="text-sm font-semibold">学员作品</h3>
             <p className="text-muted-foreground mt-1 text-sm">
               保存课程后，可在编辑课程中上传和发布学员作品。

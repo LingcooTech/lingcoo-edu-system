@@ -22,6 +22,7 @@ export interface Course {
   trialDescription?: string;
   reservationNotice?: string;
   coverImageUrl?: string | null;
+  coverThumbUrl?: string | null;
   onlineSalesEnabled?: boolean;
   packageCount?: number;
   startingPriceAmount?: number | null;
@@ -68,6 +69,7 @@ export interface TrialSession {
   reservationFeeAmount: number;
   reservationNotice: string;
   coverImageUrl?: string | null;
+  coverThumbUrl?: string | null;
 }
 
 export type ContentSourceType = 'manual' | 'wordpress' | 'notion' | 'wechat';
@@ -80,6 +82,7 @@ export interface ContentItem {
   excerpt: string | null;
   content: string;
   coverUrl: string | null;
+  coverThumbUrl: string | null;
   authorName: string | null;
   sourceType: ContentSourceType;
   sourceId: string | null;

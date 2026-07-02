@@ -26,10 +26,10 @@ import type {
 } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { CoverImageField } from '@/components/shared/CoverImageField';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
-import { QiniuImageField } from '@/components/shared/QiniuImageField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime, money } from '@/lib/utils';
@@ -61,6 +61,7 @@ interface TrialForm {
   reservationFeeYuan: string;
   reservationNotice: string;
   coverImageUrl: string;
+  coverThumbUrl: string;
   status: 'open' | 'closed' | 'cancelled';
 }
 
@@ -173,6 +174,7 @@ function defaultForm(campuses: Campus[], courses: Course[]): TrialForm {
     reservationFeeYuan: '0',
     reservationNotice: '',
     coverImageUrl: '',
+    coverThumbUrl: '',
     status: 'open',
   };
 }
@@ -566,6 +568,7 @@ export function TrialsPage() {
       reservationFeeYuan: String((session.reservationFeeAmount ?? 0) / 100),
       reservationNotice: session.reservationNotice ?? '',
       coverImageUrl: session.coverImageUrl ?? '',
+      coverThumbUrl: session.coverThumbUrl ?? '',
       status: session.status as TrialForm['status'],
     });
     setOpen(true);
@@ -611,6 +614,7 @@ export function TrialsPage() {
         reservationFeeAmount: Math.round((Number(form.reservationFeeYuan) || 0) * 100),
         reservationNotice: form.reservationNotice,
         coverImageUrl: form.coverImageUrl.trim() || null,
+        coverThumbUrl: form.coverThumbUrl.trim() || null,
         status: form.status,
       };
 
@@ -1017,12 +1021,18 @@ export function TrialsPage() {
             />
           </Field>
         </FieldRow>
-        <QiniuImageField
+        <CoverImageField
           label="试听封面"
-          hint="展示在首页公开课卡片和试听详情页"
+          hint="详情页优先使用原图，建议上传 1200×600 横图"
           value={form.coverImageUrl}
+          thumbValue={form.coverThumbUrl}
           onChange={(coverImageUrl) => setForm({ ...form, coverImageUrl })}
+          onThumbChange={(coverThumbUrl) => setForm({ ...form, coverThumbUrl })}
           prefix="trials/cover"
+          thumbPrefix="trials/thumb"
+          cropLabel="预约列表缩略图"
+          cropHint="用于小程序预约列表方形卡片；未设置时会回退使用试听封面。"
+          aspectRatio={1}
         />
       </Drawer>
 
