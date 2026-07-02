@@ -434,7 +434,7 @@ test('exposes configured WeChat Mini Program subscribe templates', async () => {
     assert.deepEqual(response.json().templates, [
       {
         key: 'trial_registration',
-        label: '预约试听通知',
+        label: '预约通知',
         templateId: 'trial-template-id',
       },
       {
@@ -444,12 +444,12 @@ test('exposes configured WeChat Mini Program subscribe templates', async () => {
       },
       {
         key: 'lesson_reminder',
-        label: '课前提醒',
+        label: '日程提醒',
         templateId: 'reminder-template-id',
       },
       {
         key: 'lesson_consumed',
-        label: '课消通知',
+        label: '核销成功通知',
         templateId: 'consumed-template-id',
       },
     ]);
@@ -2274,7 +2274,8 @@ test('sends upcoming lesson reminders idempotently', async () => {
     };
     assert.equal(sentPayload.touser, fixture.openid);
     assert.equal(sentPayload.template_id, 'reminder-template-id');
-    assert.equal(sentPayload.data.thing1.value, fixture.student.name.slice(0, 20));
+    assert.equal(sentPayload.data.thing17.value, fixture.student.name.slice(0, 20));
+    assert.equal(sentPayload.data.thing1.value, 'Lesson Notify Course（Lesson Notify Class）');
 
     const [notification] = await app.db
       .select()
@@ -2349,7 +2350,10 @@ test('creates lesson consumption notifications after admin attendance once', asy
       data: Record<string, { value: string }>;
     };
     assert.equal(sentPayload.template_id, 'consumed-template-id');
-    assert.equal(sentPayload.data.thing3.value, '扣减 1 课时，剩余 4 课时');
+    assert.equal(sentPayload.data.thing16.value, fixture.student.name.slice(0, 20));
+    assert.equal(sentPayload.data.thing8.value, 'Lesson Notify Course（Lesson Notify Class）');
+    assert.equal(sentPayload.data.number3.value, '1');
+    assert.equal(sentPayload.data.number4.value, '4');
 
     const secondResponse = await app.inject({
       method: 'POST',
