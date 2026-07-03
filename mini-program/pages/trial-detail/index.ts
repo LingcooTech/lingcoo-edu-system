@@ -52,7 +52,7 @@ function orderStatusLabel(status: string): string {
     cancelled: '已取消',
     refunded: '已退款',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 function payloadString(payload: Record<string, unknown>, key: string): string {
@@ -458,8 +458,8 @@ Page({
     wx.showModal({
       title: '开发模拟支付',
       content: reason
-        ? `${reason}\n\n当前可使用 mock-pay 完成开发环境验证。`
-        : '当前可使用 mock-pay 完成开发环境验证，并保留试听席位。',
+        ? `${reason}\n\n当前可使用模拟支付完成开发环境验证。`
+        : '当前可使用模拟支付完成开发环境验证，并保留试听席位。',
       confirmText: '模拟支付',
       success: async (result) => {
         if (!result.confirm) return;

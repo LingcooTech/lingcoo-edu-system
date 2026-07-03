@@ -18,7 +18,7 @@
       <image wx:if="{{course.coverImageUrl}}" class="course-cover" src="{{course.coverImageUrl}}" mode="aspectFill" />
       <view class="meta-row">
         <text>{{course.durationMinutes}} 分钟/次</text>
-        <text>{{packages.length ? packages.length + (onlinePackageSalesAllowed ? ' 个服务包' : ' 个参考方案') : '暂未上架服务包'}}</text>
+        <text>{{packages.length ? packages.length + (onlinePackageSalesAllowed ? ' 个课时包' : ' 个参考方案') : '暂未上架课时包'}}</text>
       </view>
     </view>
 
@@ -52,7 +52,7 @@
     </view>
 
     <view class="section">
-      <view class="section-title">{{onlinePackageSalesAllowed ? '服务包' : '常规课程参考方案'}}</view>
+      <view class="section-title">{{onlinePackageSalesAllowed ? '课时包' : '常规课程参考方案'}}</view>
       <view wx:if="{{packages.length}}" class="package-list">
         <view wx:for="{{packages}}" wx:key="id" class="card package-card">
           <view class="row-between">
@@ -67,11 +67,11 @@
           </view>
           <view wx:if="{{item.description}}" class="body-text package-desc">{{item.description}}</view>
           <button wx:if="{{onlinePackageSalesAllowed}}" class="package-button" data-id="{{item.id}}" bindtap="onBuyTap">
-            <text>购买服务包</text>
+            <text>购买课时包</text>
           </button>
         </view>
       </view>
-      <view wx:else class="empty">{{onlinePackageSalesAllowed ? '服务包暂未上架，可先预约试听。' : '暂无常规课程参考方案，可先预约试听。'}}</view>
+      <view wx:else class="empty">{{onlinePackageSalesAllowed ? '课时包暂未上架，可先预约试听。' : '暂无常规课程参考方案，可先预约试听。'}}</view>
     </view>
 
     <view wx:if="{{trialNotice}}" class="section card info-card">
@@ -95,7 +95,7 @@
         ></view>
         <view class="row-between checkout-heading">
           <view>
-            <view class="section-title">购买服务包</view>
+            <view class="section-title">购买课时包</view>
             <view class="muted form-hint">{{selectedPackage.name}} · {{selectedPackage.lessonLabel}} · {{selectedPackage.priceLabel}}</view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeCheckout">×</view>
@@ -107,7 +107,7 @@
               <view class="order-no">{{checkoutOrder.orderNo}}</view>
               <view class="order-status paid">已支付</view>
             </view>
-            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 次</view>
+            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 课时</view>
           </view>
           <form class="form-gap child-profile-form" bindsubmit="onCompleteCheckoutStudent">
             <input class="form-field" name="studentName" placeholder="孩子姓名" />
@@ -124,7 +124,7 @@
               <view class="order-no">{{checkoutOrder.orderNo}}</view>
               <view class="order-status {{checkoutOrder.status}}">{{checkoutOrder.statusLabel}}</view>
             </view>
-            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 次</view>
+            <view class="muted order-meta">{{checkoutOrder.amountLabel}} · {{checkoutOrder.lessonCount}} 课时</view>
             <view wx:if="{{checkoutDefaultPassword}}" class="password-note">
               初始密码：{{checkoutDefaultPassword}}。后续可用手机号登录家长中心。
             </view>

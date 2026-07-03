@@ -15,7 +15,7 @@
         </view>
         <view>
           <view class="stat-value">{{profile.totalBalance}}</view>
-          <view class="stat-label">服务次数</view>
+          <view class="stat-label">课时数</view>
         </view>
         <view>
           <view class="stat-value">{{profile.totalStars}}</view>
@@ -44,7 +44,7 @@
             <view class="row-title">{{item.name}}</view>
             <view class="row-meta">{{item.courseName}} · {{item.classroomName}}</view>
           </view>
-          <view class="balance">{{item.balance}} 次</view>
+          <view class="balance">{{item.balance}} 课时</view>
         </view>
       </view>
       <view wx:else class="card empty-card">暂无班级信息。</view>

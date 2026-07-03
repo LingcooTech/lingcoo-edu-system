@@ -47,8 +47,8 @@ function packagePriceAmount(pkg: CoursePackage): number {
 
 function packageLessonLabel(pkg: CoursePackage): string {
   return pkg.giftedLessonCount
-    ? `${pkg.lessonCount} 次 + 赠 ${pkg.giftedLessonCount} 次`
-    : `${pkg.lessonCount} 次`;
+    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
+    : `${pkg.lessonCount} 课时`;
 }
 
 function campusLabel(campuses: PublicCampus[]): string {
@@ -74,7 +74,7 @@ function orderStatusLabel(status: string): string {
     cancelled: '已取消',
     refunded: '已退款',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 function payloadString(payload: Record<string, unknown>, key: string): string {
@@ -300,7 +300,7 @@ Page({
     const packages = this.data.packages as PackageItem[];
     const selectedPackage = packages.find((item: PackageItem) => item.id === packageId) ?? null;
     if (!selectedPackage) {
-      wx.showToast({ title: '服务包不存在', icon: 'none' });
+      wx.showToast({ title: '课时包不存在', icon: 'none' });
       return;
     }
     this.setData({
@@ -492,7 +492,7 @@ Page({
       this.setData({ checkoutOrder: nextOrder, childProfileRequired: false });
       wx.showModal({
         title: '已开通服务',
-        content: '孩子信息已完善，服务次数已到账，可在家长中心查看。',
+        content: '孩子信息已完善，课时已到账，可在家长中心查看。',
         showCancel: false,
         success: () => wx.switchTab({ url: '/pages/account/index' }),
       });
@@ -565,8 +565,8 @@ Page({
       wx.showModal({
         title: '开发模拟支付',
         content: reason
-          ? `${reason}\n\n当前可使用 mock-pay 完成开发环境验证。`
-          : '当前可使用 mock-pay 完成开发环境验证，并给孩子增加服务次数。',
+          ? `${reason}\n\n当前可使用模拟支付完成开发环境验证。`
+          : '当前可使用模拟支付完成开发环境验证，并给孩子增加课时。',
         confirmText: '模拟支付',
         success: async (result) => {
           if (!result.confirm) return;
@@ -597,8 +597,8 @@ Page({
     wx.showModal({
       title: '支付成功',
       content: this.data.checkoutDefaultPassword
-        ? `服务次数已到账。手机号账号初始密码：${this.data.checkoutDefaultPassword}`
-        : '服务次数已到账，可到家长中心查看。',
+        ? `课时已到账。手机号账号初始密码：${this.data.checkoutDefaultPassword}`
+        : '课时已到账，可到家长中心查看。',
       showCancel: true,
       confirmText: '去查看',
       success: (result) => {

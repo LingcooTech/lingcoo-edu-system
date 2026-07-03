@@ -162,7 +162,7 @@
           <view class="row-meta">家长：{{item.guardianName || '待绑定'}} {{item.guardianPhone}}</view>
           <view class="order-line">
             <view class="row-meta">{{item.createdAtLabel}}</view>
-            <view class="order-money">{{item.balance}} 次</view>
+            <view class="order-money">{{item.balance}} 课时</view>
           </view>
         </view>
       </view>

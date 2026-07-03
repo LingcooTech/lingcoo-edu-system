@@ -295,7 +295,7 @@ function summaryTitle(metricScope: MetricScope) {
 function normalizeClass(classGroup: TeacherClass) {
   return {
     ...classGroup,
-    statusLabel: CLASS_STATUS_LABEL[classGroup.status] ?? classGroup.status,
+    statusLabel: CLASS_STATUS_LABEL[classGroup.status] ?? '未知状态',
     courseName: classGroup.course?.name || '课程',
     classroomName: classGroup.classroom?.name || '空间待确认',
     remainingSeats: Math.max(classGroup.capacity - classGroup.students.length, 0),
@@ -462,7 +462,7 @@ Component({
         pendingAttentionCount: teacherNotifications.filter((item) => item.status === 'unread').length,
         homeworkCheckIns: homeworkCheckIns.map((item) => ({
           ...item,
-          statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus,
+          statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? '未知状态',
           dateLabel: formatDateTime(item.createdAt),
           studentName: item.student?.name || '成员',
           courseName: item.course?.name || item.title,

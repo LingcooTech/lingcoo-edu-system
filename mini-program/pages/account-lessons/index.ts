@@ -67,8 +67,8 @@ function packagePriceAmount(pkg: CoursePackage): number {
 
 function packageLessonLabel(pkg: CoursePackage): string {
   return pkg.giftedLessonCount
-    ? `${pkg.lessonCount} 次 + 赠 ${pkg.giftedLessonCount} 次`
-    : `${pkg.lessonCount} 次`;
+    ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
+    : `${pkg.lessonCount} 课时`;
 }
 
 function pickRenewalPackage(packages: CoursePackage[]): CoursePackage | null {
@@ -232,7 +232,7 @@ Page({
         const renewal = renewals.get(item.id) ?? null;
         return {
           ...item,
-          balanceLabel: `${item.balance} 次`,
+          balanceLabel: `${item.balance} 课时`,
           renewal: renewal && !dismissed.has(renewal.key) ? renewal : null,
           upcoming,
           attendance: accountAttendance,
@@ -415,7 +415,7 @@ Page({
         await requestWechatPayment(intent);
         const paidOrder = await syncOrderPayment(orderNo);
         if (paidOrder.status !== 'paid') {
-          throw new Error('支付结果同步中，请稍后在服务次数中查看');
+          throw new Error('支付结果同步中，请稍后查看课时数');
         }
         await this.finishRenewalPayment(orderNo, paidOrder);
         return;
@@ -443,8 +443,8 @@ Page({
       wx.showModal({
         title: '开发模拟支付',
         content: reason
-          ? `${reason}\n\n当前可使用 mock-pay 完成续费流程验证。`
-          : '当前可使用 mock-pay 完成续费流程验证。',
+          ? `${reason}\n\n当前可使用模拟支付完成续费流程验证。`
+          : '当前可使用模拟支付完成续费流程验证。',
         confirmText: '模拟支付',
         success: async (result) => {
           if (!result.confirm) return;
@@ -471,7 +471,7 @@ Page({
     await this.load();
     wx.showModal({
       title: '续费成功',
-      content: '服务次数已到账，可在服务次数中查看明细。',
+      content: '课时已到账，可查看课时明细。',
       showCancel: false,
     });
   },

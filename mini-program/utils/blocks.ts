@@ -117,21 +117,20 @@ function parseMarkdownImage(value: string) {
 
 function decodeHtmlEntities(value: string) {
   return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)));
 }
 
 function textFromHtml(value: string) {
-  return decodeHtmlEntities(
-    value
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/?[^>]+>/g, '')
-      .trim(),
-  );
+  return decodeHtmlEntities(value.replace(/<br\s*\/?>/gi, '\n').replace(/<\/?[^>]+>/g, ''))
+    .replace(/\u00a0/g, ' ')
+    .trim();
 }
 
 function parseLegacyHtml(value: string): Block[] {

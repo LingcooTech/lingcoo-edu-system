@@ -108,7 +108,7 @@ export function orderStatusLabel(status: string): string {
     cancelled: '已取消',
     refunded: '已退款',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 export function reservationStatusLabel(status: string): string {
@@ -118,7 +118,7 @@ export function reservationStatusLabel(status: string): string {
     cancelled: '已取消',
     expired: '已过期',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 export function checkInStatusLabel(status: string): string {
@@ -127,13 +127,13 @@ export function checkInStatusLabel(status: string): string {
     checked_in: '已签到',
     no_show: '未到场',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 export function orderTitle(order: ParentOrder): string {
   if (order.orderType === 'seat_reservation') return '试听席位保留费';
-  if (order.orderType === 'manual_package_grant') return order.package?.name || '线下服务包';
-  return order.package?.name || `${order.lessonCount} 次服务包`;
+  if (order.orderType === 'manual_package_grant') return order.package?.name || '线下课时包';
+  return order.package?.name || `${order.lessonCount} 课时包`;
 }
 
 export function attendanceStatusLabel(status: string): string {
@@ -145,13 +145,13 @@ export function attendanceStatusLabel(status: string): string {
     makeup: '补参与',
     trial: '试听',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 export function notificationStatusLabel(status: string): string {
   if (status === 'unread') return '未读';
   if (status === 'read') return '已读';
-  return status;
+  return '未知状态';
 }
 
 export function homeworkReviewStatusLabel(status: string): string {
@@ -160,7 +160,7 @@ export function homeworkReviewStatusLabel(status: string): string {
     reviewed: '已批阅',
     needs_revision: '需订正',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 export function ratingLabel(rating?: number | null): string {

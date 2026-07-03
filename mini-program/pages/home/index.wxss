@@ -494,9 +494,8 @@
 
 .trust-teacher-card {
   display: flex;
-  min-height: 176rpx;
   align-items: center;
-  gap: 22rpx;
+  gap: 20rpx;
   overflow: hidden;
   border-radius: 22rpx;
   background: #fff;

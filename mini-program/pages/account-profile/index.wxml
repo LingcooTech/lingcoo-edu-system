@@ -67,7 +67,7 @@
       <view class="subscribe-card">
         <view>
           <view class="subscribe-title">微信提醒</view>
-          <view class="subscribe-desc">订阅后可收到课程前提醒、服务次数扣减和学习动态。</view>
+          <view class="subscribe-desc">订阅后可收到课程前提醒、课时扣减和学习动态。</view>
         </view>
         <button
           class="mini-button subscribe-action"

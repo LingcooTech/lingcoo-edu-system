@@ -27,7 +27,7 @@ function childStatusLabel(status: string) {
     inactive: '停用',
     archived: '已归档',
   };
-  return labels[status] || status;
+  return labels[status] || '未知状态';
 }
 
 function childMeta(child: ParentChild): string {

@@ -15,12 +15,24 @@ const TABS: Array<{ key: AdminTab; label: string }> = [
 ];
 
 const STATUS_LABEL: Record<string, string> = {
+  scheduled: '已排课',
+  in_progress: '进行中',
+  completed: '已完成',
   pending: '待支付',
+  unpaid: '未支付',
+  pending_payment: '待支付',
   paid: '已支付',
   cancelled: '已取消',
+  canceled: '已取消',
   refunded: '已退款',
+  reserved: '已保留',
+  expired: '已过期',
+  draft: '草稿',
+  published: '已发布',
+  recruiting: '招生中',
   active: '正常',
   inactive: '停用',
+  paused: '暂停',
   archived: '归档',
 };
 
@@ -38,7 +50,7 @@ function formatDateTime(value?: string) {
 }
 
 function statusLabel(value: string) {
-  return STATUS_LABEL[value] || value;
+  return STATUS_LABEL[value] || '未知状态';
 }
 
 function toOverviewView(overview: AdminOverview | null) {

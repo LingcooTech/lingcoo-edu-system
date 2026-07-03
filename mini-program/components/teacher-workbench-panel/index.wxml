@@ -182,7 +182,7 @@
                 <view class="student-name">{{student.name}}</view>
                 <view class="card-meta">{{student.grade}}{{student.school ? ' · ' + student.school : ''}}</view>
               </view>
-              <view class="balance">{{student.lessonBalanceLabel}} 次</view>
+              <view class="balance">{{student.lessonBalanceLabel}} 课时</view>
             </view>
           </view>
         </view>
@@ -207,7 +207,7 @@
           <view class="balance-list">
             <view wx:for="{{item.balances}}" wx:key="courseName" class="balance-row">
               <view>{{item.courseName}}</view>
-              <view class="balance">{{item.balance}} 次</view>
+              <view class="balance">{{item.balance}} 课时</view>
             </view>
           </view>
         </view>

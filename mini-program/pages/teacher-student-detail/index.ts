@@ -278,7 +278,7 @@ Page({
                 dateLabel: event ? formatDateTime(event.startsAt) : '',
                 title: event?.title || '场次',
                 className: event?.class?.name || payload.class?.name || '班级',
-                statusLabel: ATTENDANCE_STATUS_LABEL[record.status] ?? record.status,
+                statusLabel: ATTENDANCE_STATUS_LABEL[record.status] ?? '未知状态',
                 lessonDelta: record.lessonDelta,
               };
             }),
@@ -316,7 +316,7 @@ Page({
           id: item.id,
           dateLabel: formatDateTime(item.createdAt),
           title: item.course?.name || item.title,
-          statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? item.reviewStatus,
+          statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? '未知状态',
           content: item.content || '',
           teacherFeedback: item.teacherFeedback || '',
           rating: item.rating || 0,

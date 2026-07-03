@@ -47,7 +47,7 @@
         </navigator>
         <navigator class="hero-metric" url="/pages/account-lessons/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.totalBalance}}</view>
-          <view class="metric-label">服务次数</view>
+          <view class="metric-label">课时数</view>
         </navigator>
         <navigator class="hero-metric" url="/pages/account-interactions/index" hover-class="metric-hover">
           <view class="metric-value">{{stats.interactionStars}}</view>

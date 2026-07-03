@@ -191,12 +191,12 @@
 .search-card {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 10rpx;
   margin-top: 24rpx;
   border-radius: 24rpx;
   background: #fff;
   box-shadow: 0 8rpx 22rpx rgba(33, 31, 28, 0.05);
-  padding: 16rpx;
+  padding: 14rpx;
 }
 
 .search-input {
@@ -211,10 +211,20 @@
 }
 
 .search-button {
-  width: 132rpx;
-  min-width: 132rpx;
+  display: flex;
+  width: 92rpx;
+  max-width: 92rpx;
+  height: 70rpx;
+  flex: 0 0 92rpx;
+  align-items: center;
+  justify-content: center;
   background: #211f1c;
   color: #fff;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 70rpx;
+  margin: 0;
+  padding: 0;
 }
 
 .search-result {
