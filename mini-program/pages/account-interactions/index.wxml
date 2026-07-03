@@ -33,7 +33,7 @@
       <view class="summary-grid">
         <view>
           <view class="summary-small-value">{{stats.feedbackCount}}</view>
-          <view class="summary-small-label">课程表现</view>
+          <view class="summary-small-label">课堂表现</view>
         </view>
         <view>
           <view class="summary-small-value">{{stats.homeworkCount}}</view>
@@ -41,7 +41,7 @@
         </view>
         <view>
           <view class="summary-small-value">{{stats.assignmentCount}}</view>
-          <view class="summary-small-label">布置任务</view>
+          <view class="summary-small-label">课后作业</view>
         </view>
       </view>
     </view>
@@ -52,7 +52,7 @@
         data-tab="feedbacks"
         bindtap="onTabChange"
       >
-        课程表现
+        课堂表现
       </view>
       <view
         class="interaction-tab {{activeTab == 'homework' ? 'active' : ''}}"
@@ -66,7 +66,7 @@
         data-tab="assignments"
         bindtap="onTabChange"
       >
-        布置任务
+        课后作业
       </view>
     </view>
 
@@ -155,7 +155,7 @@
           <view class="interaction-content">{{item.content}}</view>
         </view>
       </view>
-      <view wx:else class="empty compact-empty">暂无布置任务</view>
+      <view wx:else class="empty compact-empty">暂无课后作业</view>
     </block>
   </block>
 </view>

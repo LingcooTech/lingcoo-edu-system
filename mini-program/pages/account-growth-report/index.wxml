@@ -21,7 +21,7 @@
       </view>
       <view class="report-stat">
         <view class="report-stat-value">{{stats.feedbackCount}}</view>
-        <view class="report-stat-label">课程表现</view>
+        <view class="report-stat-label">课堂表现</view>
       </view>
       <view class="report-stat">
         <view class="report-stat-value">{{stats.homeworkCount}}</view>
@@ -29,7 +29,7 @@
       </view>
       <view class="report-stat">
         <view class="report-stat-value">{{stats.assignmentCount}}</view>
-        <view class="report-stat-label">布置任务</view>
+        <view class="report-stat-label">课后作业</view>
       </view>
     </view>
 

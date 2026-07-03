@@ -9,7 +9,7 @@
 
   <block wx:else>
     <view wx:if="{{story.coverUrl}}" class="story-hero">
-      <image class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
+      <image class="story-cover" src="{{story.coverUrl}}" mode="widthFix" />
     </view>
 
     <view class="story-title {{story.coverUrl ? '' : 'story-title-first'}}">{{story.title}}</view>

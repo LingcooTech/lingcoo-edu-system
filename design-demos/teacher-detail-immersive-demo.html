@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>老师详情沉浸式 Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #ece8df;
+        color: #211f1c;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      .stage {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 28px;
+      }
+
+      .phone {
+        width: min(390px, 100%);
+        height: 844px;
+        overflow: hidden;
+        border-radius: 32px;
+        background: #f7f4ee;
+        box-shadow: 0 28px 80px rgba(52, 41, 28, 0.22);
+        position: relative;
+      }
+
+      .nav {
+        position: absolute;
+        z-index: 5;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 92px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 0 24px 16px;
+        color: #211f1c;
+        font-size: 18px;
+        background: linear-gradient(rgba(247, 244, 238, 0.88), rgba(247, 244, 238, 0));
+      }
+
+      .back {
+        position: absolute;
+        left: 22px;
+        bottom: 18px;
+        width: 18px;
+        height: 18px;
+        border-left: 2px solid #211f1c;
+        border-bottom: 2px solid #211f1c;
+        transform: rotate(45deg);
+      }
+
+      .screen {
+        height: 100%;
+        overflow: auto;
+        padding-bottom: 94px;
+      }
+
+      .hero {
+        position: relative;
+        min-height: 398px;
+        padding: 112px 24px 24px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 80% 14%, rgba(173, 209, 227, 0.72), transparent 34%),
+          radial-gradient(circle at 10% 20%, rgba(239, 202, 141, 0.72), transparent 30%),
+          linear-gradient(135deg, #fbf3e3 0%, #f4efe8 48%, #e8f1f6 100%);
+      }
+
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 78px 16px auto auto;
+        width: 178px;
+        height: 244px;
+        border-radius: 88px 88px 26px 26px;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2)),
+          url('https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=520&q=80')
+            center / cover;
+        box-shadow: 0 18px 44px rgba(93, 70, 48, 0.2);
+      }
+
+      .hero::after {
+        content: '墨';
+        position: absolute;
+        right: 18px;
+        bottom: 52px;
+        width: 58px;
+        height: 58px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(154, 106, 75, 0.88);
+        color: #fff;
+        font-size: 26px;
+        font-weight: 700;
+        transform: rotate(-12deg);
+      }
+
+      .eyebrow {
+        color: #8b6a52;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .name {
+        margin-top: 10px;
+        max-width: 190px;
+        font-size: 43px;
+        line-height: 1.05;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .title {
+        margin-top: 14px;
+        max-width: 190px;
+        color: #5f5a52;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .chips {
+        display: flex;
+        gap: 8px;
+        margin-top: 22px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        border: 1px solid rgba(154, 106, 75, 0.18);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        color: #8f6042;
+        padding: 6px 11px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .panel {
+        margin: -38px 18px 18px;
+        position: relative;
+        z-index: 2;
+        border: 1px solid rgba(50, 42, 33, 0.08);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 16px 38px rgba(73, 56, 38, 0.1);
+        backdrop-filter: blur(16px);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        overflow: hidden;
+      }
+
+      .stat {
+        padding: 18px 10px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 21px;
+        line-height: 1.2;
+      }
+
+      .stat span {
+        display: block;
+        margin-top: 4px;
+        color: #817b72;
+        font-size: 12px;
+      }
+
+      .content {
+        padding: 0 18px 24px;
+      }
+
+      .card {
+        margin-top: 16px;
+        border-radius: 22px;
+        background: #fff;
+        padding: 20px;
+        box-shadow: 0 10px 26px rgba(50, 42, 33, 0.06);
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 20px;
+        font-weight: 800;
+      }
+
+      .quote {
+        margin-top: 14px;
+        border-left: 4px solid #9a6a4b;
+        padding-left: 14px;
+        color: #3f3a34;
+        font-size: 16px;
+        line-height: 1.8;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 64px 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .year {
+        color: #9a6a4b;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .timeline-text {
+        color: #4e4942;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .course {
+        margin-top: 14px;
+        border-radius: 18px;
+        background: #f8f4ec;
+        padding: 16px;
+      }
+
+      .course h3 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .course p {
+        margin: 7px 0 0;
+        color: #777067;
+        font-size: 13px;
+      }
+
+      .scroller {
+        display: flex;
+        gap: 12px;
+        margin: 16px -20px 0;
+        overflow-x: auto;
+        padding: 0 20px 2px;
+        scrollbar-width: none;
+      }
+
+      .scroller::-webkit-scrollbar {
+        display: none;
+      }
+
+      .photo-card {
+        flex: 0 0 250px;
+        overflow: hidden;
+        border-radius: 20px;
+        background: #f0ebe2;
+      }
+
+      .photo {
+        height: 158px;
+        background: linear-gradient(135deg, #d7c0a5, #f4efe7);
+        position: relative;
+      }
+
+      .photo.work {
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08)),
+          url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=520&q=80')
+            center / cover;
+      }
+
+      .photo.classroom {
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08)),
+          url('https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=520&q=80')
+            center / cover;
+      }
+
+      .photo-caption {
+        padding: 12px 14px 14px;
+        color: #4a453f;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .bottom {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        border-top: 1px solid rgba(33, 31, 28, 0.08);
+        background: rgba(255, 255, 255, 0.94);
+        padding: 14px 20px 22px;
+      }
+
+      .btn {
+        height: 46px;
+        border: 0;
+        border-radius: 999px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .btn.secondary {
+        background: #f0ebe4;
+        color: #5b5147;
+      }
+
+      .btn.primary {
+        background: #9a6a4b;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage">
+      <section class="phone">
+        <div class="nav"><i class="back"></i>导师介绍</div>
+        <div class="screen">
+          <header class="hero">
+            <div class="eyebrow">亦安书画 · 硬笔书法导师</div>
+            <div class="name">田欣雨</div>
+            <div class="title">用稳定、耐心的课堂节奏，帮助孩子把字写稳，也把心沉下来。</div>
+            <div class="chips">
+              <span class="chip">硬笔启蒙</span>
+              <span class="chip">习惯养成</span>
+              <span class="chip">结构训练</span>
+            </div>
+          </header>
+
+          <div class="panel">
+            <div class="stats">
+              <div class="stat"><strong>3000h</strong><span>习书时长</span></div>
+              <div class="stat"><strong>8年</strong><span>教学经验</span></div>
+              <div class="stat"><strong>500+</strong><span>累计学员</span></div>
+            </div>
+          </div>
+
+          <div class="content">
+            <section class="card">
+              <div class="section-title">教学理念</div>
+              <div class="quote">
+                字不是一次写好的。先让孩子看见结构，再让手跟上节奏，最后把稳定变成习惯。
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="section-title">经历与特质</div>
+              <div class="timeline">
+                <div class="timeline-item">
+                  <div class="year">2017</div>
+                  <div class="timeline-text">开始少儿硬笔教学，长期负责基础班结构训练。</div>
+                </div>
+                <div class="timeline-item">
+                  <div class="year">2021</div>
+                  <div class="timeline-text">
+                    参与研发分龄书写训练体系，重点关注握笔、坐姿和控笔。
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="year">现在</div>
+                  <div class="timeline-text">
+                    持续记录课堂表现和作业反馈，让家长能看见每次进步。
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="section-title">主讲课程</div>
+              <div class="course">
+                <h3>少儿硬笔书法基础班</h3>
+                <p>6-10岁 · 80分钟/次 · 基础控笔与结构训练</p>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="section-title">课堂实拍</div>
+              <div class="scroller">
+                <div class="photo-card">
+                  <div class="photo classroom"></div>
+                  <div class="photo-caption">一对一纠正握笔与坐姿</div>
+                </div>
+                <div class="photo-card">
+                  <div class="photo"></div>
+                  <div class="photo-caption">课堂节奏稳定，孩子更容易进入状态</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="section-title">学员作品</div>
+              <div class="scroller">
+                <div class="photo-card">
+                  <div class="photo work"></div>
+                  <div class="photo-caption">结构练习作品</div>
+                </div>
+                <div class="photo-card">
+                  <div class="photo"></div>
+                  <div class="photo-caption">阶段性对比记录</div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <footer class="bottom">
+          <button class="btn secondary">微信咨询</button>
+          <button class="btn primary">预约试听</button>
+        </footer>
+      </section>
+    </main>
+  </body>
+</html>

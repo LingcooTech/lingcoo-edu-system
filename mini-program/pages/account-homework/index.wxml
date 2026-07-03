@@ -12,7 +12,7 @@
         data-tab="assignments"
         bindtap="onSwitchTab"
       >
-        查看任务
+        查看作业
       </view>
       <view
         class="homework-tab {{activeTab == 'checkin' ? 'active' : ''}}"
@@ -31,7 +31,7 @@
     </view>
 
     <view wx:if="{{activeTab == 'assignments' || activeTab == 'checkin'}}" class="card panel">
-      <view class="section-title">机构布置</view>
+      <view class="section-title">课后作业</view>
       <view wx:if="{{homeworkAssignments.length}}" class="item-list">
         <view wx:for="{{homeworkAssignments}}" wx:key="id" class="stack-row">
           <view class="row-between">
@@ -44,7 +44,7 @@
           <view class="attendance-topic">{{item.content}}</view>
         </view>
       </view>
-      <view wx:else class="empty compact-empty">暂无机构布置的任务</view>
+      <view wx:else class="empty compact-empty">暂无课后作业</view>
     </view>
 
     <view wx:if="{{activeTab == 'checkin'}}" class="section card panel">

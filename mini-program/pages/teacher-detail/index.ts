@@ -50,9 +50,9 @@ function buildProfileSections(teacher: PublicTeacher): ProfileSection[] {
 
 function buildStats(teacher: PublicTeacher): StatItem[] {
   return [
+    { label: '习书时长', value: teacher.practiceDuration ?? '' },
     { label: '教学经验', value: teacher.teachingYears ?? '' },
     { label: '累计学员', value: teacher.studentCount ?? '' },
-    { label: '续班率', value: teacher.retentionRate ?? '' },
   ].filter((item) => item.value.trim().length > 0);
 }
 

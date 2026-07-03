@@ -150,7 +150,7 @@
           <view class="interaction-action-icon amber">
             <image src="{{guestIcons.star}}" mode="aspectFit" />
           </view>
-          <view class="interaction-action-label">课程表现</view>
+          <view class="interaction-action-label">课堂表现</view>
         </navigator>
         <navigator
           class="interaction-action"
@@ -160,7 +160,7 @@
           <view class="interaction-action-icon green">
             <image src="{{guestIcons.check}}" mode="aspectFit" />
           </view>
-          <view class="interaction-action-label">查看任务</view>
+          <view class="interaction-action-label">查看作业</view>
           <view wx:if="{{stats.homeworkAssignments}}" class="interaction-action-badge">
             {{stats.homeworkAssignments}}
           </view>

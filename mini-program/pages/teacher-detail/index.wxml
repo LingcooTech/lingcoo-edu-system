@@ -90,16 +90,32 @@
 
     <view wx:if="{{teacher.classPhotoUrls.length}}" class="card profile-card">
       <view class="section-title">课堂实拍</view>
-      <view class="photo-grid">
-        <image wx:for="{{teacher.classPhotoUrls}}" wx:key="*this" class="photo" src="{{item}}" mode="aspectFill" />
-      </view>
+      <scroll-view class="photo-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="photo-track">
+          <image
+            wx:for="{{teacher.classPhotoUrls}}"
+            wx:key="*this"
+            class="photo photo-slide"
+            src="{{item}}"
+            mode="aspectFill"
+          />
+        </view>
+      </scroll-view>
     </view>
 
     <view wx:if="{{teacher.studentWorkUrls.length}}" class="card profile-card">
       <view class="section-title">学员作品</view>
-      <view class="photo-grid">
-        <image wx:for="{{teacher.studentWorkUrls}}" wx:key="*this" class="photo" src="{{item}}" mode="aspectFill" />
-      </view>
+      <scroll-view class="photo-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="photo-track">
+          <image
+            wx:for="{{teacher.studentWorkUrls}}"
+            wx:key="*this"
+            class="photo photo-slide"
+            src="{{item}}"
+            mode="aspectFill"
+          />
+        </view>
+      </scroll-view>
     </view>
 
     <view wx:if="{{teacher.parentTestimonials.length}}" class="card profile-card">

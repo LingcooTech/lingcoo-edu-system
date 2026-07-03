@@ -36,7 +36,7 @@ interface TeacherForm {
   achievements: string;
   teachingYears: string;
   studentCount: string;
-  retentionRate: string;
+  practiceDuration: string;
   teachingPhilosophy: string;
   classPhotoUrlsText: string;
   studentWorkUrlsText: string;
@@ -71,7 +71,7 @@ const emptyTeacherForm: TeacherForm = {
   achievements: '',
   teachingYears: '',
   studentCount: '',
-  retentionRate: '',
+  practiceDuration: '',
   teachingPhilosophy: '',
   classPhotoUrlsText: '',
   studentWorkUrlsText: '',
@@ -122,7 +122,7 @@ export function TeachersPage({
             achievements: teacher.achievements ?? '',
             teachingYears: teacher.teachingYears ?? '',
             studentCount: teacher.studentCount ?? '',
-            retentionRate: teacher.retentionRate ?? '',
+            practiceDuration: teacher.practiceDuration ?? teacher.retentionRate ?? '',
             teachingPhilosophy: teacher.teachingPhilosophy ?? '',
             classPhotoUrlsText: listToLines(teacher.classPhotoUrls),
             studentWorkUrlsText: listToLines(teacher.studentWorkUrls),
@@ -163,7 +163,7 @@ export function TeachersPage({
         achievements: form.achievements.trim(),
         teachingYears: form.teachingYears.trim(),
         studentCount: form.studentCount.trim(),
-        retentionRate: form.retentionRate.trim(),
+        practiceDuration: form.practiceDuration.trim(),
         teachingPhilosophy: form.teachingPhilosophy.trim(),
         classPhotoUrls: linesToList(form.classPhotoUrlsText),
         studentWorkUrls: linesToList(form.studentWorkUrlsText),
@@ -352,7 +352,7 @@ export function TeachersPage({
             onChange={(event) => setForm({ ...form, specialties: event.target.value })}
           />
         </Field>
-        <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+        <label className="border-border/70 bg-muted/20 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
           <input
             type="checkbox"
             checked={form.isPinned}
@@ -377,12 +377,12 @@ export function TeachersPage({
               onChange={(event) => setForm({ ...form, studentCount: event.target.value })}
             />
           </Field>
-          <Field label="续班率">
+          <Field label="习书时长">
             <input
               className="form-input"
-              placeholder="如 95%"
-              value={form.retentionRate}
-              onChange={(event) => setForm({ ...form, retentionRate: event.target.value })}
+              placeholder="如 8年 / 3000小时"
+              value={form.practiceDuration}
+              onChange={(event) => setForm({ ...form, practiceDuration: event.target.value })}
             />
           </Field>
         </div>

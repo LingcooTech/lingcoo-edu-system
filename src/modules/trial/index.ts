@@ -119,6 +119,13 @@ function toPublicInstitution(institution: typeof schema.institutions.$inferSelec
   };
 }
 
+function toPublicTeacher<T extends typeof schema.teachers.$inferSelect>(teacher: T) {
+  return {
+    ...teacher,
+    practiceDuration: teacher.retentionRate,
+  };
+}
+
 function unprocessable(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 422 });
 }
@@ -292,7 +299,10 @@ export const trialModule: AppModule = {
         trialSessions,
         contentItems: contentItems.items,
         campuses,
-        teachers: teachers.filter((teacher) => teacher.status !== 'archived').slice(0, 5),
+        teachers: teachers
+          .filter((teacher) => teacher.status !== 'archived')
+          .slice(0, 5)
+          .map(toPublicTeacher),
       };
     });
 
@@ -352,7 +362,9 @@ export const trialModule: AppModule = {
 
     app.get('/public/teachers', async () => {
       const teachers = await teachingRepo.listTeachers(app.db);
-      return { teachers: teachers.filter((teacher) => teacher.status !== 'archived') };
+      return {
+        teachers: teachers.filter((teacher) => teacher.status !== 'archived').map(toPublicTeacher),
+      };
     });
 
     app.get('/public/institutions', async () => {
@@ -385,9 +397,11 @@ export const trialModule: AppModule = {
 
       return {
         institution: toPublicInstitution(institution),
-        teachers: teachers.filter(
-          (teacher) => teacher.institutionId === institution.id && teacher.status !== 'archived',
-        ),
+        teachers: teachers
+          .filter(
+            (teacher) => teacher.institutionId === institution.id && teacher.status !== 'archived',
+          )
+          .map(toPublicTeacher),
         courses: institutionCourses,
         businessModel,
       };
@@ -416,7 +430,7 @@ export const trialModule: AppModule = {
         courses.filter((course) => taughtCourseIds.has(course.id)),
       );
       return {
-        teacher,
+        teacher: toPublicTeacher(teacher),
         institution: institution
           ? { id: institution.id, name: institution.name, logoUrl: institution.logoUrl }
           : null,

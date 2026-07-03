@@ -30,6 +30,7 @@ const teacherSchema = z.object({
   teachingYears: z.string().max(40).optional(),
   studentCount: z.string().max(40).optional(),
   retentionRate: z.string().max(40).optional(),
+  practiceDuration: z.string().max(40).optional(),
   teachingPhilosophy: z.string().default(''),
   classPhotoUrls: z.array(z.string().min(1).max(500)).max(24).default([]),
   studentWorkUrls: z.array(z.string().min(1).max(500)).max(24).default([]),
@@ -41,6 +42,25 @@ const teacherSchema = z.object({
 });
 
 const teacherUpdateSchema = teacherSchema.partial();
+
+type TeacherRow = typeof schema.teachers.$inferSelect;
+
+function normalizeTeacherBody<T extends { practiceDuration?: string; retentionRate?: string }>(
+  body: T,
+): Omit<T, 'practiceDuration'> {
+  const { practiceDuration, ...rest } = body;
+  return {
+    ...rest,
+    retentionRate: practiceDuration ?? body.retentionRate,
+  } as Omit<T, 'practiceDuration'>;
+}
+
+function toTeacherDto<T extends TeacherRow>(teacher: T) {
+  return {
+    ...teacher,
+    practiceDuration: teacher.retentionRate,
+  };
+}
 
 const institutionImageCaptionSchema = z.object({
   imageUrl: z.string().trim().max(500).default(''),
@@ -1358,7 +1378,8 @@ export const teachingModule: AppModule = {
     );
 
     app.get('/v1/teachers', { preHandler: app.requireAdmin }, async () => {
-      return { teachers: await teachingRepo.listTeachers(app.db) };
+      const teachers = await teachingRepo.listTeachers(app.db);
+      return { teachers: teachers.map(toTeacherDto) };
     });
 
     // When a teacher resource carries a phone number, provision a teacher login
@@ -1408,25 +1429,29 @@ export const teachingModule: AppModule = {
 
     app.post('/v1/teachers', { preHandler: app.requireAdmin }, async (request) => {
       const body = teacherSchema.parse(request.body);
-      const teacher = await teachingRepo.createTeacher(app.db, body);
+      const teacher = await teachingRepo.createTeacher(app.db, normalizeTeacherBody(body));
       const account = await ensureTeacherAccount(teacher);
-      return { teacher, ...account };
+      return { teacher: toTeacherDto(teacher), ...account };
     });
 
     app.patch('/v1/teachers/:teacherId', { preHandler: app.requireAdmin }, async (request) => {
       const { teacherId } = request.params as { teacherId: string };
       const body = teacherUpdateSchema.parse(request.body);
-      const teacher = await teachingRepo.updateTeacher(app.db, teacherId, body);
+      const teacher = await teachingRepo.updateTeacher(
+        app.db,
+        teacherId,
+        normalizeTeacherBody(body),
+      );
       if (!teacher) throw notFound('Teacher not found');
       const account = await ensureTeacherAccount(teacher);
-      return { teacher, ...account };
+      return { teacher: toTeacherDto(teacher), ...account };
     });
 
     app.delete('/v1/teachers/:teacherId', { preHandler: app.requireAdmin }, async (request) => {
       const { teacherId } = request.params as { teacherId: string };
       const teacher = await teachingRepo.deleteTeacher(app.db, teacherId);
       if (!teacher) throw notFound('Teacher not found');
-      return { teacher };
+      return { teacher: toTeacherDto(teacher) };
     });
 
     app.get('/v1/institutions', { preHandler: app.requireAdmin }, async () => {

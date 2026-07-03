@@ -17,7 +17,7 @@ interface FilterOption {
 
 function institutionOptions(institutions: PublicInstitution[]): FilterOption[] {
   return [
-    { label: '合作机构', value: '' },
+    { label: '机构', value: '' },
     ...institutions.map((institution) => ({ label: institution.name, value: institution.id })),
   ];
 }
@@ -61,7 +61,7 @@ Page({
     allCourses: [] as CourseListItem[],
     courses: [] as CourseListItem[],
     businessModel: null as BusinessModelSettings | null,
-    institutionOptions: [{ label: '合作机构', value: '' }] as FilterOption[],
+    institutionOptions: [{ label: '机构', value: '' }] as FilterOption[],
     categoryOptions: [{ label: '全部分类', value: '' }] as FilterOption[],
     selectedInstitutionIndex: 0,
     selectedCategoryIndex: 0,

@@ -420,11 +420,11 @@
               value="{{student.content}}"
               data-id="{{student.id}}"
               bindinput="updateFeedbackContent"
-              placeholder="课程表现、掌握情况、后续建议，可不填"
+              placeholder="课堂表现、掌握情况、后续建议，可不填"
               maxlength="2000"
             />
             <view class="personal-assignment-toggle" data-id="{{student.id}}" bindtap="togglePersonalAssignment">
-              {{student.personalAssignmentEnabled ? '取消单独任务' : '单独布置任务'}}
+              {{student.personalAssignmentEnabled ? '取消单独任务' : '单独课后作业'}}
             </view>
             <textarea
               wx:if="{{student.personalAssignmentEnabled}}"

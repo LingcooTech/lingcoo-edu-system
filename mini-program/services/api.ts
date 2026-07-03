@@ -362,7 +362,7 @@ export interface PublicTeacher {
   achievements?: string | null;
   teachingYears?: string | null;
   studentCount?: string | null;
-  retentionRate?: string | null;
+  practiceDuration?: string | null;
   teachingPhilosophy?: string | null;
   classPhotoUrls: string[];
   studentWorkUrls: string[];
