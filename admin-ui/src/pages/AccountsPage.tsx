@@ -5,6 +5,7 @@ import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Account, AccountRole, Guardian, Teacher } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { AdminTabs, type AdminTabItem } from '@/components/shared/AdminTabs';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
@@ -19,6 +20,8 @@ const ROLE_LABEL: Record<AccountRole, string> = {
   teacher: '老师',
   parent: '家长',
 };
+
+type AccountRoleFilter = 'all' | AccountRole;
 
 interface AccountForm {
   role: AccountRole;
@@ -81,15 +84,44 @@ export function AccountsPage() {
   const [defaultPassword, setDefaultPassword] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [unbindingWechatId, setUnbindingWechatId] = useState<string>('');
+  const [activeRole, setActiveRole] = useState<AccountRoleFilter>('all');
 
   const teacherOptions = useMemo(
     () => teachers.filter((teacher) => teacher.status !== 'archived'),
     [teachers],
   );
 
+  const roleCounts = useMemo(
+    () => ({
+      all: accounts.length,
+      admin: accounts.filter((account) => account.role === 'admin').length,
+      teacher: accounts.filter((account) => account.role === 'teacher').length,
+      parent: accounts.filter((account) => account.role === 'parent').length,
+    }),
+    [accounts],
+  );
+
+  const roleTabs = useMemo<AdminTabItem<AccountRoleFilter>[]>(
+    () => [
+      { key: 'all', label: '全部账号', badge: roleCounts.all },
+      { key: 'admin', label: ROLE_LABEL.admin, badge: roleCounts.admin },
+      { key: 'teacher', label: ROLE_LABEL.teacher, badge: roleCounts.teacher },
+      { key: 'parent', label: ROLE_LABEL.parent, badge: roleCounts.parent },
+    ],
+    [roleCounts],
+  );
+
+  const filteredAccounts = useMemo(
+    () =>
+      activeRole === 'all'
+        ? accounts
+        : accounts.filter((account) => account.role === activeRole),
+    [accounts, activeRole],
+  );
+
   function openCreate() {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, role: activeRole === 'all' ? 'parent' : activeRole });
     setDefaultPassword('');
     setOpen(true);
   }
@@ -207,6 +239,13 @@ export function AccountsPage() {
         </button>
       }
     >
+      <AdminTabs
+        tabs={roleTabs}
+        activeKey={activeRole}
+        onChange={setActiveRole}
+        variant="table"
+        className="mb-4"
+      />
       <DataTable
         columns={[
           {
@@ -301,7 +340,7 @@ export function AccountsPage() {
             ),
           },
         ]}
-        data={accounts}
+        data={filteredAccounts}
       />
 
       <Drawer
