@@ -8,44 +8,35 @@
   </view>
 
   <block wx:else>
-    <view class="header card">
-      <view class="header-main">
-        <view class="teacher-head">
-          <image wx:if="{{teacher.avatarUrl}}" class="avatar" src="{{teacher.avatarUrl}}" mode="aspectFill" />
-          <view wx:else class="avatar fallback">师</view>
-          <view class="teacher-main">
-            <view class="teacher-name">{{teacher.name}}</view>
-            <view wx:if="{{teacher.title}}" class="muted teacher-title">{{teacher.title}}</view>
+    <view class="header">
+      <view class="header-grid">
+        <view class="teacher-main">
+          <view wx:if="{{institution || teacher.title}}" class="teacher-kicker">
+            <text wx:if="{{institution}}">{{institution.name}}</text>
+            <text wx:if="{{institution && teacher.title}}"> · </text>
+            <text wx:if="{{teacher.title}}">{{teacher.title}}</text>
           </view>
+          <view class="teacher-name">{{teacher.name}}</view>
+          <view wx:if="{{teacher.tagline}}" class="tagline">{{teacher.tagline}}</view>
         </view>
-
-      </view>
-      <view
-        wx:if="{{institution}}"
-        class="institution-corner {{institution.logoUrl ? 'institution-logo-only' : 'institution'}}"
-      >
-        <image
-          wx:if="{{institution.logoUrl}}"
-          class="institution-logo"
-          src="{{institution.logoUrl}}"
-          mode="aspectFit"
-        />
-        <text wx:else>{{institution.name}}</text>
+        <image wx:if="{{teacher.avatarUrl}}" class="avatar" src="{{teacher.avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar fallback">师</view>
       </view>
 
-      <view wx:if="{{teacher.tagline}}" class="tagline">{{teacher.tagline}}</view>
+      <scroll-view wx:if="{{teacher.specialties.length}}" class="specialties" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="specialties-track">
+          <text wx:for="{{teacher.specialties}}" wx:for-item="spec" wx:key="*this" class="chip">{{spec}}</text>
+        </view>
+      </scroll-view>
+    </view>
 
+    <view class="stats-shell">
       <view wx:if="{{statItems.length}}" class="stats">
         <view wx:for="{{statItems}}" wx:key="label" class="stat-card">
           <view class="stat-value">{{item.value}}</view>
           <view class="stat-label">{{item.label}}</view>
         </view>
       </view>
-
-      <view wx:if="{{teacher.specialties.length}}" class="specialties">
-        <text wx:for="{{teacher.specialties}}" wx:for-item="spec" wx:key="*this" class="chip">{{spec}}</text>
-      </view>
-
     </view>
 
     <view wx:if="{{teacher.teachingPhilosophy}}" class="card profile-card">

@@ -11,7 +11,7 @@
 
       body {
         margin: 0;
-        background: #ece8df;
+        background: #ebe6dd;
         color: #211f1c;
         font-family:
           -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
@@ -25,13 +25,13 @@
       }
 
       .phone {
+        position: relative;
         width: min(390px, 100%);
         height: 844px;
         overflow: hidden;
         border-radius: 32px;
-        background: #f7f4ee;
-        box-shadow: 0 28px 80px rgba(52, 41, 28, 0.22);
-        position: relative;
+        background: #f6f2eb;
+        box-shadow: 0 28px 80px rgba(52, 41, 28, 0.2);
       }
 
       .nav {
@@ -45,9 +45,8 @@
         align-items: flex-end;
         justify-content: center;
         padding: 0 24px 16px;
-        color: #211f1c;
+        background: linear-gradient(rgba(246, 242, 235, 0.92), rgba(246, 242, 235, 0));
         font-size: 18px;
-        background: linear-gradient(rgba(247, 244, 238, 0.88), rgba(247, 244, 238, 0));
       }
 
       .back {
@@ -64,124 +63,141 @@
       .screen {
         height: 100%;
         overflow: auto;
-        padding-bottom: 94px;
+        padding-bottom: 96px;
       }
 
       .hero {
         position: relative;
-        min-height: 398px;
-        padding: 112px 24px 24px;
+        min-height: 392px;
+        padding: 112px 22px 24px;
         overflow: hidden;
         background:
-          radial-gradient(circle at 80% 14%, rgba(173, 209, 227, 0.72), transparent 34%),
-          radial-gradient(circle at 10% 20%, rgba(239, 202, 141, 0.72), transparent 30%),
-          linear-gradient(135deg, #fbf3e3 0%, #f4efe8 48%, #e8f1f6 100%);
-      }
-
-      .hero::before {
-        content: '';
-        position: absolute;
-        inset: 78px 16px auto auto;
-        width: 178px;
-        height: 244px;
-        border-radius: 88px 88px 26px 26px;
-        background:
-          linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2)),
-          url('https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=520&q=80')
-            center / cover;
-        box-shadow: 0 18px 44px rgba(93, 70, 48, 0.2);
+          radial-gradient(circle at 16% 16%, rgba(239, 210, 166, 0.72), transparent 32%),
+          radial-gradient(circle at 86% 8%, rgba(188, 215, 226, 0.68), transparent 34%),
+          linear-gradient(135deg, #fbf0dc 0%, #f5efe7 54%, #e9f1f4 100%);
       }
 
       .hero::after {
-        content: '墨';
+        content: '';
         position: absolute;
-        right: 18px;
-        bottom: 52px;
-        width: 58px;
-        height: 58px;
-        display: grid;
-        place-items: center;
+        right: -40px;
+        bottom: -76px;
+        width: 210px;
+        height: 210px;
         border-radius: 50%;
-        background: rgba(154, 106, 75, 0.88);
-        color: #fff;
-        font-size: 26px;
-        font-weight: 700;
-        transform: rotate(-12deg);
+        background: rgba(154, 106, 75, 0.08);
       }
 
-      .eyebrow {
-        color: #8b6a52;
+      .hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 148px;
+        gap: 16px;
+        align-items: end;
+      }
+
+      .institution {
+        color: #8a6347;
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 800;
       }
 
       .name {
         margin-top: 10px;
-        max-width: 190px;
-        font-size: 43px;
-        line-height: 1.05;
-        font-weight: 800;
+        font-size: 48px;
+        font-weight: 850;
+        line-height: 1.02;
         letter-spacing: 0;
       }
 
       .title {
-        margin-top: 14px;
-        max-width: 190px;
+        margin-top: 9px;
         color: #5f5a52;
         font-size: 15px;
-        line-height: 1.65;
-      }
-
-      .chips {
-        display: flex;
-        gap: 8px;
-        margin-top: 22px;
-        flex-wrap: wrap;
-      }
-
-      .chip {
-        border: 1px solid rgba(154, 106, 75, 0.18);
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.72);
-        color: #8f6042;
-        padding: 6px 11px;
-        font-size: 12px;
         font-weight: 700;
       }
 
-      .panel {
-        margin: -38px 18px 18px;
+      .tagline {
+        margin-top: 16px;
+        color: #514b43;
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      .portrait {
+        position: relative;
+        width: 148px;
+        height: 204px;
+        overflow: hidden;
+        border-radius: 28px;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.1)),
+          url('https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=480&q=80')
+            center / cover;
+      }
+
+      .chips {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        gap: 8px;
+        margin-top: 22px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+      }
+
+      .chips::-webkit-scrollbar {
+        display: none;
+      }
+
+      .chip {
+        flex: 0 0 auto;
+        border: 1px solid rgba(154, 106, 75, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.76);
+        color: #8f6042;
+        padding: 7px 12px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .stats-shell {
         position: relative;
         z-index: 2;
+        margin: -32px 18px 18px;
+        overflow: hidden;
         border: 1px solid rgba(50, 42, 33, 0.08);
         border-radius: 24px;
-        background: rgba(255, 255, 255, 0.88);
-        box-shadow: 0 16px 38px rgba(73, 56, 38, 0.1);
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 16px 36px rgba(73, 56, 38, 0.1);
         backdrop-filter: blur(16px);
       }
 
       .stats {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 1px;
-        overflow: hidden;
       }
 
       .stat {
         padding: 18px 10px;
         text-align: center;
-        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .stat + .stat {
+        border-left: 1px solid rgba(33, 31, 28, 0.07);
       }
 
       .stat strong {
         display: block;
-        font-size: 21px;
-        line-height: 1.2;
+        font-size: 22px;
+        line-height: 1.15;
       }
 
       .stat span {
         display: block;
-        margin-top: 4px;
+        margin-top: 5px;
         color: #817b72;
         font-size: 12px;
       }
@@ -192,10 +208,11 @@
 
       .card {
         margin-top: 16px;
+        border: 1px solid rgba(33, 31, 28, 0.06);
         border-radius: 22px;
         background: #fff;
         padding: 20px;
-        box-shadow: 0 10px 26px rgba(50, 42, 33, 0.06);
+        box-shadow: 0 10px 26px rgba(50, 42, 33, 0.055);
       }
 
       .section-title {
@@ -203,6 +220,12 @@
         align-items: center;
         justify-content: space-between;
         font-size: 20px;
+        font-weight: 850;
+      }
+
+      .section-link {
+        color: #9a6a4b;
+        font-size: 12px;
         font-weight: 800;
       }
 
@@ -212,32 +235,32 @@
         padding-left: 14px;
         color: #3f3a34;
         font-size: 16px;
-        line-height: 1.8;
+        line-height: 1.85;
       }
 
-      .timeline {
+      .profile-list {
         display: grid;
         gap: 12px;
         margin-top: 16px;
       }
 
-      .timeline-item {
-        display: grid;
-        grid-template-columns: 64px 1fr;
-        gap: 12px;
-        align-items: start;
+      .profile-row {
+        border-radius: 16px;
+        background: #faf6ef;
+        padding: 14px;
       }
 
-      .year {
+      .profile-label {
         color: #9a6a4b;
-        font-size: 13px;
-        font-weight: 800;
+        font-size: 12px;
+        font-weight: 850;
       }
 
-      .timeline-text {
-        color: #4e4942;
+      .profile-text {
+        margin-top: 7px;
+        color: #4f4941;
         font-size: 14px;
-        line-height: 1.65;
+        line-height: 1.68;
       }
 
       .course {
@@ -256,6 +279,7 @@
         margin: 7px 0 0;
         color: #777067;
         font-size: 13px;
+        line-height: 1.6;
       }
 
       .scroller {
@@ -272,16 +296,22 @@
       }
 
       .photo-card {
-        flex: 0 0 250px;
+        flex: 0 0 258px;
         overflow: hidden;
         border-radius: 20px;
         background: #f0ebe2;
       }
 
       .photo {
-        height: 158px;
+        height: 162px;
         background: linear-gradient(135deg, #d7c0a5, #f4efe7);
-        position: relative;
+      }
+
+      .photo.classroom {
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.08)),
+          url('https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=520&q=80')
+            center / cover;
       }
 
       .photo.work {
@@ -291,18 +321,21 @@
             center / cover;
       }
 
-      .photo.classroom {
-        background:
-          linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08)),
-          url('https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=520&q=80')
-            center / cover;
-      }
-
       .photo-caption {
         padding: 12px 14px 14px;
         color: #4a453f;
         font-size: 14px;
-        font-weight: 700;
+        font-weight: 800;
+      }
+
+      .testimonial {
+        margin-top: 14px;
+        border-radius: 18px;
+        background: #faf6ef;
+        padding: 16px;
+        color: #4f4941;
+        font-size: 14px;
+        line-height: 1.72;
       }
 
       .bottom {
@@ -323,7 +356,7 @@
         border: 0;
         border-radius: 999px;
         font-size: 15px;
-        font-weight: 800;
+        font-weight: 850;
       }
 
       .btn.secondary {
@@ -343,17 +376,24 @@
         <div class="nav"><i class="back"></i>导师介绍</div>
         <div class="screen">
           <header class="hero">
-            <div class="eyebrow">亦安书画 · 硬笔书法导师</div>
-            <div class="name">田欣雨</div>
-            <div class="title">用稳定、耐心的课堂节奏，帮助孩子把字写稳，也把心沉下来。</div>
+            <div class="hero-grid">
+              <div>
+                <div class="institution">亦安书画 · 硬笔书法导师</div>
+                <div class="name">田欣雨</div>
+                <div class="title">教学主管 / 少儿硬笔书法</div>
+                <div class="tagline">用稳定、耐心的课堂节奏，帮助孩子把字写稳，也把心沉下来。</div>
+              </div>
+              <div class="portrait"></div>
+            </div>
             <div class="chips">
               <span class="chip">硬笔启蒙</span>
               <span class="chip">习惯养成</span>
               <span class="chip">结构训练</span>
+              <span class="chip">课堂反馈</span>
             </div>
           </header>
 
-          <div class="panel">
+          <div class="stats-shell">
             <div class="stats">
               <div class="stat"><strong>3000h</strong><span>习书时长</span></div>
               <div class="stat"><strong>8年</strong><span>教学经验</span></div>
@@ -370,32 +410,41 @@
             </section>
 
             <section class="card">
-              <div class="section-title">经历与特质</div>
-              <div class="timeline">
-                <div class="timeline-item">
-                  <div class="year">2017</div>
-                  <div class="timeline-text">开始少儿硬笔教学，长期负责基础班结构训练。</div>
+              <div class="section-title">教学经历与资质</div>
+              <div class="profile-list">
+                <div class="profile-row">
+                  <div class="profile-label">毕业院校 / 专业背景</div>
+                  <div class="profile-text">书法教育方向，长期参与少儿硬笔基础训练课程研发。</div>
                 </div>
-                <div class="timeline-item">
-                  <div class="year">2021</div>
-                  <div class="timeline-text">
-                    参与研发分龄书写训练体系，重点关注握笔、坐姿和控笔。
+                <div class="profile-row">
+                  <div class="profile-label">教学经验</div>
+                  <div class="profile-text">
+                    负责启蒙、基础和进阶阶段教学，熟悉 6-12 岁孩子书写问题。
                   </div>
                 </div>
-                <div class="timeline-item">
-                  <div class="year">现在</div>
-                  <div class="timeline-text">
-                    持续记录课堂表现和作业反馈，让家长能看见每次进步。
+                <div class="profile-row">
+                  <div class="profile-label">教学风格</div>
+                  <div class="profile-text">
+                    课堂节奏稳定，先观察、再示范、再陪练，强调看得懂的进步。
+                  </div>
+                </div>
+                <div class="profile-row">
+                  <div class="profile-label">荣誉奖项 / 代表经历</div>
+                  <div class="profile-text">
+                    多次指导学员完成阶段作品展示，持续输出课堂点评和作业反馈。
                   </div>
                 </div>
               </div>
             </section>
 
             <section class="card">
-              <div class="section-title">主讲课程</div>
+              <div class="section-title">
+                主讲课程
+                <span class="section-link">查看课程</span>
+              </div>
               <div class="course">
                 <h3>少儿硬笔书法基础班</h3>
-                <p>6-10岁 · 80分钟/次 · 基础控笔与结构训练</p>
+                <p>基础控笔与结构训练 · 6-10岁 · 80分钟/次</p>
               </div>
             </section>
 
@@ -404,11 +453,11 @@
               <div class="scroller">
                 <div class="photo-card">
                   <div class="photo classroom"></div>
-                  <div class="photo-caption">一对一纠正握笔与坐姿</div>
+                  <div class="photo-caption">课堂中的示范与纠正</div>
                 </div>
                 <div class="photo-card">
                   <div class="photo"></div>
-                  <div class="photo-caption">课堂节奏稳定，孩子更容易进入状态</div>
+                  <div class="photo-caption">稳定练习，形成书写节奏</div>
                 </div>
               </div>
             </section>
@@ -422,8 +471,15 @@
                 </div>
                 <div class="photo-card">
                   <div class="photo"></div>
-                  <div class="photo-caption">阶段性对比记录</div>
+                  <div class="photo-caption">阶段性作品记录</div>
                 </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="section-title">家长评价</div>
+              <div class="testimonial">
+                “老师会把每次课堂问题讲清楚，孩子知道下一次该怎么练，家长也更放心。”
               </div>
             </section>
           </div>

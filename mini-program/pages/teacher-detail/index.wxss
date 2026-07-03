@@ -26,149 +26,148 @@
 }
 
 .teacher-detail-page {
+  padding-right: 0;
+  padding-left: 0;
   padding-bottom: calc(170rpx + env(safe-area-inset-bottom));
-  background: #f5f3ef;
+  background: #f6f2eb;
 }
 
 .header {
   position: relative;
   overflow: hidden;
-  padding: 28rpx;
-  border-color: rgba(197, 154, 84, 0.38);
-  background: #fffaf0;
+  margin-top: -18rpx;
+  padding: 54rpx 40rpx 72rpx;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(239, 210, 166, 0.76), transparent 34%),
+    radial-gradient(circle at 88% 4%, rgba(188, 215, 226, 0.72), transparent 38%),
+    linear-gradient(135deg, #fbf0dc 0%, #f5efe7 54%, #e9f1f4 100%);
 }
 
-.header-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 24rpx;
+.header::after {
+  position: absolute;
+  right: -112rpx;
+  bottom: -152rpx;
+  width: 420rpx;
+  height: 420rpx;
+  border-radius: 999rpx;
+  background: rgba(154, 106, 75, 0.08);
+  content: '';
 }
 
-.teacher-head {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-  min-width: 0;
-  flex: 1;
+.header-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 236rpx;
+  gap: 28rpx;
+  align-items: end;
 }
 
 .avatar {
-  width: 120rpx;
-  height: 120rpx;
-  flex: 0 0 120rpx;
-  border-radius: 28rpx;
+  display: block;
+  width: 236rpx;
+  height: 316rpx;
+  border-radius: 32rpx;
+  background: #efe6dc;
 }
 
 .fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1e9e1;
+  background: rgba(255, 255, 255, 0.58);
   color: #9a6a4b;
-  font-size: 40rpx;
+  font-size: 54rpx;
   font-weight: 800;
 }
 
 .teacher-main {
   min-width: 0;
-  flex: 1;
-  padding-right: 168rpx;
+}
+
+.teacher-kicker {
+  color: #8a6347;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .teacher-name {
+  margin-top: 12rpx;
   color: #211f1c;
-  font-size: 36rpx;
+  font-size: 64rpx;
   font-weight: 800;
-}
-
-.teacher-title {
-  margin-top: 8rpx;
-  font-size: 26rpx;
-}
-
-.institution {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 280rpx;
-  min-height: 48rpx;
-  margin-top: 12rpx;
-  padding: 6rpx 18rpx;
-  border: 1rpx solid rgba(197, 154, 84, 0.55);
-  border-radius: 999rpx;
-  background: #fff;
-  color: #17324d;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.institution-corner {
-  position: absolute;
-  top: 28rpx;
-  right: 28rpx;
-  margin-top: 0;
-}
-
-.institution-corner.institution,
-.institution-corner.institution-logo-only {
-  margin-top: 0;
-}
-
-.institution-logo-only {
-  display: flex;
-  align-items: center;
-  width: 160rpx;
-  height: 38rpx;
-  margin-top: 12rpx;
-}
-
-.institution-logo {
-  width: 160rpx;
-  height: 38rpx;
+  line-height: 1.04;
+  letter-spacing: 0;
 }
 
 .tagline {
-  margin-top: 24rpx;
-  color: #34403a;
+  margin-top: 22rpx;
+  color: #514b43;
   font-size: 30rpx;
-  line-height: 1.7;
+  line-height: 1.74;
 }
 
 .specialties {
+  position: relative;
+  z-index: 1;
+  margin-top: 32rpx;
+  white-space: nowrap;
+}
+
+.specialties-track {
   display: flex;
-  flex-wrap: wrap;
   gap: 12rpx;
-  margin-top: 24rpx;
+  padding-right: 6rpx;
+}
+
+.specialties .chip {
+  flex: 0 0 auto;
+  border: 1rpx solid rgba(154, 106, 75, 0.16);
+  background: rgba(255, 255, 255, 0.76);
+  color: #8f6042;
 }
 
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12rpx;
-  margin-top: 24rpx;
+}
+
+.stats-shell {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  margin: -42rpx 36rpx 0;
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18rpx 42rpx rgba(73, 56, 38, 0.1);
 }
 
 .stat-card {
-  border-radius: 18rpx;
-  background: rgba(255, 255, 255, 0.78);
-  padding: 18rpx 12rpx;
+  padding: 24rpx 12rpx;
   text-align: center;
+}
+
+.stat-card + .stat-card {
+  border-left: 1rpx solid rgba(33, 31, 28, 0.07);
 }
 
 .stat-value {
   color: #211f1c;
-  font-size: 30rpx;
+  font-size: 34rpx;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .stat-label {
-  margin-top: 4rpx;
+  margin-top: 8rpx;
   color: #8b857c;
   font-size: 22rpx;
 }
 
 .profile-card {
-  margin-top: 24rpx;
+  margin: 24rpx 36rpx 0;
   padding: 28rpx;
 }
 
