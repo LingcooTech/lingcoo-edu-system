@@ -110,6 +110,74 @@ function sanitizeBlocks(value: unknown[]): Block[] {
   return value.map(normalizeBlock).filter((block): block is Block => block !== null);
 }
 
+function parseMarkdownImage(value: string) {
+  const match = value.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+  return match ? { alt: match[1] || '', url: match[2] || '' } : null;
+}
+
+function flushParagraph(blocks: Block[], paragraph: string[]) {
+  if (paragraph.length === 0) return;
+  blocks.push({ id: genId(), type: 'paragraph', text: paragraph.join('\n') });
+  paragraph.length = 0;
+}
+
+function parseLegacyMarkdown(value: string): Block[] {
+  const blocks: Block[] = [];
+  const paragraph: string[] = [];
+  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index].trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph(blocks, paragraph);
+      index += 1;
+      continue;
+    }
+
+    const image = parseMarkdownImage(trimmed);
+    if (image) {
+      flushParagraph(blocks, paragraph);
+      blocks.push({ id: genId(), type: 'image', url: image.url, alt: image.alt, caption: '' });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      flushParagraph(blocks, paragraph);
+      blocks.push({ id: genId(), type: 'heading', level: 3, text: trimmed.slice(4).trim() });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith('## ')) {
+      flushParagraph(blocks, paragraph);
+      blocks.push({ id: genId(), type: 'heading', level: 2, text: trimmed.slice(3).trim() });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith('- ')) {
+      flushParagraph(blocks, paragraph);
+      const items: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith('- ')) {
+        items.push(lines[index].trim().slice(2).trim());
+        index += 1;
+      }
+      blocks.push({ id: genId(), type: 'list', ordered: false, items });
+      continue;
+    }
+
+    paragraph.push(line);
+    index += 1;
+  }
+
+  flushParagraph(blocks, paragraph);
+  return blocks;
+}
+
 export function parseBlocks(value: unknown): Block[] {
   if (Array.isArray(value)) return sanitizeBlocks(value);
   if (typeof value !== 'string') return [];
@@ -129,5 +197,5 @@ export function parseBlocks(value: unknown): Block[] {
     }
   }
 
-  return [{ id: genId(), type: 'paragraph', text: value }];
+  return parseLegacyMarkdown(value);
 }
