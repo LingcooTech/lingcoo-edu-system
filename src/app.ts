@@ -20,7 +20,7 @@ import type { AppEnv } from './lib/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const IMAGE_UPLOAD_BODY_LIMIT = 15 * 1024 * 1024;
+const IMAGE_UPLOAD_BODY_LIMIT = 10 * 1024 * 1024;
 const CSP_DIRECTIVES = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'", "'unsafe-inline'"],

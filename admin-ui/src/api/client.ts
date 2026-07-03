@@ -21,6 +21,13 @@ import type {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8090');
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+function bytesLabel(value: number) {
+  if (value >= 1024 * 1024) return `${Math.round(value / 1024 / 1024)}MB`;
+  if (value >= 1024) return `${Math.round(value / 1024)}KB`;
+  return `${value}B`;
+}
 
 export function getToken(): string | null {
   return localStorage.getItem('fd_edu_token');
@@ -327,6 +334,10 @@ export async function createQiniuUploadToken(input: { filename: string; prefix?:
 }
 
 export async function uploadQiniuImage(file: File, prefix?: string) {
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+    throw new Error(`图片不能超过 ${bytesLabel(MAX_IMAGE_UPLOAD_BYTES)}`);
+  }
+
   const token = getToken();
   const params = new URLSearchParams({ filename: file.name });
   if (prefix) params.set('prefix', prefix);

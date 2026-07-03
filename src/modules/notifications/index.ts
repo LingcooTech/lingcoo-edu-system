@@ -6,7 +6,7 @@ import { getWechatMiniSubscribeTemplates } from '../../lib/wechat-mini.js';
 import { NotificationsService } from './service.js';
 import type { AppModule } from '../types.js';
 
-const QINIU_UPLOAD_BODY_LIMIT = 15 * 1024 * 1024;
+const QINIU_UPLOAD_BODY_LIMIT = 10 * 1024 * 1024;
 
 const uploadTokenSchema = z.object({
   filename: z.string().min(1),
