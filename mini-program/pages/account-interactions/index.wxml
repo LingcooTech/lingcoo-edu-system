@@ -33,7 +33,7 @@
       <view class="summary-grid">
         <view>
           <view class="summary-small-value">{{stats.feedbackCount}}</view>
-          <view class="summary-small-label">活动表现</view>
+          <view class="summary-small-label">课程表现</view>
         </view>
         <view>
           <view class="summary-small-value">{{stats.homeworkCount}}</view>
@@ -52,7 +52,7 @@
         data-tab="feedbacks"
         bindtap="onTabChange"
       >
-        活动表现
+        课程表现
       </view>
       <view
         class="interaction-tab {{activeTab == 'homework' ? 'active' : ''}}"
@@ -86,7 +86,7 @@
           <view class="interaction-content">{{item.content}}</view>
           <view wx:if="{{item.homeworkAssignment}}" class="assignment-note">
             <view class="assignment-note-title">
-              {{item.homeworkAssignment.isPersonal ? '个人任务' : '活动组任务'}}
+              {{item.homeworkAssignment.isPersonal ? '个人任务' : '班级任务'}}
             </view>
             <view class="assignment-note-content">{{item.homeworkAssignment.content}}</view>
           </view>

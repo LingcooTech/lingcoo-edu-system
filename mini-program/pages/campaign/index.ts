@@ -73,7 +73,7 @@ Page({
   onShareAppMessage() {
     const campaign = this.data.payload && this.data.payload.campaign;
     return shareCard(
-      (campaign && campaign.name) || '活动报名',
+      (campaign && campaign.name) || '课程报名',
       `/pages/campaign/index?code=${this.data.code || ''}`,
       this.data.heroImageUrl,
     );
@@ -82,7 +82,7 @@ Page({
   onShareTimeline() {
     const campaign = this.data.payload && this.data.payload.campaign;
     return timelineCard(
-      (campaign && campaign.name) || '活动报名',
+      (campaign && campaign.name) || '课程报名',
       `code=${this.data.code || ''}`,
       this.data.heroImageUrl,
     );

@@ -41,7 +41,7 @@
                     "query": ""
                 },
                 {
-                    "name": "活动落地页",
+                    "name": "课程落地页",
                     "pathName": "pages/campaign/index",
                     "query": "code=summer_bridge"
                 }

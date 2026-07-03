@@ -8,7 +8,7 @@
   <block wx:else>
     <view class="page-head">
       <view class="section-title">互动反馈</view>
-      <view class="row-meta">查看机构导师对活动表现、练习重点和后续建议的记录。</view>
+      <view class="row-meta">查看导师对课程表现、练习重点和后续建议的记录。</view>
     </view>
 
     <view wx:if="{{lessonFeedbacks.length}}" class="feedback-list">
@@ -24,7 +24,7 @@
         <view class="feedback-content">{{item.content}}</view>
         <view wx:if="{{item.homeworkAssignment}}" class="assignment-note">
           <view class="assignment-note-title">
-            {{item.homeworkAssignment.isPersonal ? '个人任务' : '活动任务'}}
+            {{item.homeworkAssignment.isPersonal ? '个人任务' : '课程任务'}}
           </view>
           <view class="assignment-note-content">{{item.homeworkAssignment.content}}</view>
         </view>

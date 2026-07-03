@@ -23,7 +23,7 @@
       <view class="summary-grid">
         <view class="summary-item summary-action" data-action="schedule" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.courseCount}}</view>
-          <view class="summary-label">活动数</view>
+          <view class="summary-label">课程数</view>
         </view>
         <view class="summary-item summary-action" data-action="rollcall" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.pendingRollCall}}</view>
@@ -140,12 +140,12 @@
             </view>
           </view>
         </view>
-        <view wx:else class="empty-card">当天暂无排期。</view>
+        <view wx:else class="empty-card">当天暂无课程。</view>
       </view>
     </block>
 
     <block wx:elif="{{activeView == 'classes'}}">
-      <view class="section-title">活动组</view>
+      <view class="section-title">班级</view>
       <view wx:if="{{classes.length}}" class="list">
         <view wx:for="{{classes}}" wx:key="id" class="card class-card">
           <view class="row-between">
@@ -187,7 +187,7 @@
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无活动组。</view>
+      <view wx:else class="card empty-card">暂无班级。</view>
     </block>
 
     <block wx:elif="{{activeView == 'students'}}">
@@ -199,7 +199,7 @@
               <view class="card-title">{{item.name}}</view>
               <view class="card-meta">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
             </view>
-            <view class="pill">{{item.classes.length}} 个活动组</view>
+            <view class="pill">{{item.classes.length}} 个班级</view>
           </view>
           <view class="chip-row">
             <view wx:for="{{item.classes}}" wx:key="*this" class="chip">{{item}}</view>
@@ -361,7 +361,7 @@
       <view class="sheet-handle"></view>
       <view class="sheet-head">
         <view>
-          <view class="sheet-title">活动互动</view>
+          <view class="sheet-title">课程互动</view>
           <view wx:if="{{feedbackSession}}" class="sheet-meta">
             {{feedbackSession.className}} · {{feedbackSession.courseName}}
           </view>
@@ -378,7 +378,7 @@
         <view wx:elif="{{feedbackRows.length}}" class="sheet-list">
           <view class="assignment-box">
             <view class="assignment-head">
-              <view class="roll-name">活动组任务</view>
+              <view class="roll-name">班级任务</view>
               <view class="card-meta">不填则不布置统一任务</view>
             </view>
             <view class="template-row">
@@ -396,7 +396,7 @@
               class="feedback-input assignment-input"
               value="{{classAssignmentContent}}"
               bindinput="updateClassAssignment"
-              placeholder="活动组统一任务"
+              placeholder="班级统一任务"
               maxlength="2000"
             />
           </view>
@@ -420,7 +420,7 @@
               value="{{student.content}}"
               data-id="{{student.id}}"
               bindinput="updateFeedbackContent"
-              placeholder="活动表现、掌握情况、后续建议，可不填"
+              placeholder="课程表现、掌握情况、后续建议，可不填"
               maxlength="2000"
             />
             <view class="personal-assignment-toggle" data-id="{{student.id}}" bindtap="togglePersonalAssignment">

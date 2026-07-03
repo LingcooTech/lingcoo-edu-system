@@ -1,9 +1,9 @@
-<custom-navbar title="体验预约" show-back="{{true}}" />
+<custom-navbar title="预约试听" show-back="{{true}}" />
 <view class="page trial-detail-page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
-    <view class="section-title">体验场次不存在或已关闭</view>
+    <view class="section-title">试听场次不存在或已关闭</view>
     <button class="btn btn-outline empty-button" bindtap="goHome">返回首页</button>
   </view>
 
@@ -35,13 +35,13 @@
 
     <view class="section card info-card">
       <view class="info-row">合作机构：{{detail.providerInstitution ? detail.providerInstitution.name : '合作机构待确认'}}</view>
-      <view class="info-row">活动项目：{{detail.course.name}}</view>
+      <view class="info-row">课程项目：{{detail.course.name}}</view>
       <view class="info-row">空间：{{campusLabel}}</view>
     </view>
 
     <view wx:if="{{requiresReservationFee}}" class="section card fee-card">
       <view class="section-title">{{reservationFeeLabel}}</view>
-      <view class="body-text fee-copy">支付成功后保留本场体验名额。</view>
+      <view class="body-text fee-copy">支付成功后保留本场试听名额。</view>
       <view wx:if="{{detail.trialSession.reservationNotice}}" class="notice-text">{{detail.trialSession.reservationNotice}}</view>
     </view>
 
@@ -65,7 +65,7 @@
     <view class="sticky-cta app-bottom-bar">
       <button class="btn btn-outline sticky-button secondary" bindtap="onPhoneTap">电话联系</button>
       <button class="btn btn-primary sticky-button" bindtap="onReserveTap" disabled="{{full}}">
-        {{full ? '名额已满' : (requiresReservationFee ? '保留名额' : '预约体验')}}
+        {{full ? '名额已满' : (requiresReservationFee ? '保留名额' : '预约试听')}}
       </button>
     </view>
 
@@ -80,9 +80,9 @@
         ></view>
         <view class="row-between sheet-heading">
           <view>
-            <view class="section-title">{{requiresReservationFee ? '保留体验席位' : '预约体验'}}</view>
+            <view class="section-title">{{requiresReservationFee ? '保留试听席位' : '预约试听'}}</view>
             <view class="muted form-hint">
-              {{requiresReservationFee ? '授权微信手机号后支付席位保留费，支付完成即确认保留。' : '提交后工作人员会电话确认体验安排。'}}
+              {{requiresReservationFee ? '授权微信手机号后支付试听席位保留费，支付完成即确认保留。' : '提交后工作人员会电话确认试听安排。'}}
             </view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeReservationForm">×</view>

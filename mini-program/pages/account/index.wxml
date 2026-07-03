@@ -72,17 +72,17 @@
     >
       <view class="reservation-head">
         <view>
-          <view class="reservation-kicker">预约提醒</view>
+          <view class="reservation-kicker">试听提醒</view>
           <view class="reservation-title">{{reservationReminder.title}}</view>
         </view>
         <view class="reservation-status">{{reservationReminder.statusLine}}</view>
       </view>
       <view class="reservation-lines">
         <view>时间：{{reservationReminder.timeLine}}</view>
-        <view>活动：{{reservationReminder.courseLine}}</view>
+        <view>课程：{{reservationReminder.courseLine}}</view>
         <view>空间：{{reservationReminder.locationLine}}</view>
       </view>
-      <view class="reservation-link">查看全部体验席位</view>
+      <view class="reservation-link">查看全部试听席位</view>
     </navigator>
 
     <view class="section core-panel">
@@ -93,7 +93,7 @@
           url="/pages/account-schedule/index"
           hover-class="core-link-hover"
         >
-          全部排期
+          全部课表
         </navigator>
       </view>
       <block wx:if="{{nextLesson}}">
@@ -104,8 +104,8 @@
               <view class="lesson-time">{{nextLesson.timeRangeLabel}}</view>
             </view>
             <view class="lesson-lines">
-              <view class="lesson-line">活动：{{nextLesson.courseLine}}</view>
-              <view class="lesson-line">活动组：{{nextLesson.classLine}}</view>
+              <view class="lesson-line">课程：{{nextLesson.courseLine}}</view>
+              <view class="lesson-line">班级：{{nextLesson.classLine}}</view>
               <view class="lesson-line">空间：{{nextLesson.locationLine}}</view>
             </view>
           </view>
@@ -150,7 +150,7 @@
           <view class="interaction-action-icon amber">
             <image src="{{guestIcons.star}}" mode="aspectFit" />
           </view>
-          <view class="interaction-action-label">活动表现</view>
+          <view class="interaction-action-label">课程表现</view>
         </navigator>
         <navigator
           class="interaction-action"
@@ -249,8 +249,8 @@
             <image class="guest-tool-image" src="{{guestIcons.calendar}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">活动排期</view>
-            <view class="guest-tool-desc">查看活动安排</view>
+            <view class="guest-tool-title">课表</view>
+            <view class="guest-tool-desc">查看课程安排</view>
           </view>
         </view>
         <view class="guest-tool">
@@ -267,7 +267,7 @@
             <image class="guest-tool-image" src="{{guestIcons.headset}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">体验预约</view>
+            <view class="guest-tool-title">预约试听</view>
             <view class="guest-tool-desc">管理预约与报名</view>
           </view>
         </view>
@@ -296,7 +296,7 @@
             <image class="guest-tool-image" src="{{guestIcons.calendarCheck}}" mode="aspectFit" />
           </view>
           <view>
-            <view class="guest-tool-title">日程排期</view>
+            <view class="guest-tool-title">课表</view>
             <view class="guest-tool-desc">查看当天安排</view>
           </view>
         </view>

@@ -131,7 +131,7 @@ export function checkInStatusLabel(status: string): string {
 }
 
 export function orderTitle(order: ParentOrder): string {
-  if (order.orderType === 'seat_reservation') return '体验席位保留费';
+  if (order.orderType === 'seat_reservation') return '试听席位保留费';
   if (order.orderType === 'manual_package_grant') return order.package?.name || '线下服务包';
   return order.package?.name || `${order.lessonCount} 次服务包`;
 }
@@ -143,7 +143,7 @@ export function attendanceStatusLabel(status: string): string {
     leave: '请假',
     absent: '缺勤',
     makeup: '补参与',
-    trial: '体验',
+    trial: '试听',
   };
   return labels[status] || status;
 }

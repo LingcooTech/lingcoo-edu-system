@@ -147,7 +147,7 @@ function toWorkRow(item: StudentWork): WorkRow {
     ...item,
     createdAtLabel: formatDateTime(item.createdAt),
     titleLabel: item.title || '作品展示',
-    courseName: item.course?.name || '活动',
+    courseName: item.course?.name || '课程',
     className: item.class?.name || '',
     coverUrl: item.imageUrls[0] || '',
   };
@@ -367,7 +367,7 @@ Page({
           .map(toWorkRow),
         workClassLabels: classRows.length
           ? classRows.map((item) => `${item.name} · ${item.courseName}`)
-          : ['不绑定活动组'],
+          : ['不绑定班级'],
         workClassIndex: this.data.workClassIndex >= classRows.length ? 0 : this.data.workClassIndex,
       });
     } catch (error) {

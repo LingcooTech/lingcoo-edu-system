@@ -17,7 +17,7 @@ function toGalleryWork(item: StudentWork): GalleryWork {
     ...item,
     createdAtLabel: formatDateTime(item.createdAt),
     studentName: item.student?.name || '成员',
-    courseName: item.course?.name || '活动',
+    courseName: item.course?.name || '课程',
     className: item.class?.name || '',
     teacherName: item.teacher?.name || '',
     sourceLabel: item.source === 'teacher' ? '机构上传' : '后台精选',

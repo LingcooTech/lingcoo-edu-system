@@ -1,4 +1,4 @@
-<custom-navbar title="排期" transparent="{{!navSolid}}" />
+<custom-navbar title="课表" transparent="{{!navSolid}}" />
 <view class="page schedule-page">
   <view class="schedule-hero">
     <view class="calendar-panel {{calendarExpanded ? 'expanded' : 'collapsed'}}">
@@ -58,7 +58,7 @@
 
   <view class="schedule-body">
     <view class="section-head">
-      <view class="section-title">活动排期</view>
+      <view class="section-title">课表</view>
       <view class="selected-date">{{selectedDateLabel}}</view>
     </view>
 
@@ -84,7 +84,7 @@
 
     <view wx:else class="schedule-empty">
       <view class="empty-mark">...</view>
-      <view class="empty-text">当天暂无公开活动安排～</view>
+      <view class="empty-text">当天暂无公开课程安排～</view>
     </view>
   </view>
 </view>

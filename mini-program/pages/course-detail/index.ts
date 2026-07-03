@@ -172,7 +172,7 @@ Page({
   onShareAppMessage() {
     const course = this.data.course;
     return shareCard(
-      (course && course.name) || '活动详情',
+      (course && course.name) || '课程详情',
       `/pages/course-detail/index?slug=${(course && course.slug) || ''}`,
       course && course.coverImageUrl,
     );
@@ -181,7 +181,7 @@ Page({
   onShareTimeline() {
     const course = this.data.course;
     return timelineCard(
-      (course && course.name) || '活动详情',
+      (course && course.name) || '课程详情',
       `slug=${(course && course.slug) || ''}`,
       course && course.coverImageUrl,
     );
@@ -293,7 +293,7 @@ Page({
 
   onBuyTap(event: { currentTarget: { dataset: { id?: string } } }) {
     if (!this.data.onlinePackageSalesAllowed) {
-      wx.showToast({ title: '请先预约体验，到店确认常规方案', icon: 'none' });
+      wx.showToast({ title: '请先预约试听，到店确认常规方案', icon: 'none' });
       return;
     }
     const packageId = event.currentTarget.dataset.id;
@@ -662,7 +662,7 @@ Page({
       });
       wx.showModal({
         title: '提交成功',
-        content: '工作人员会尽快联系确认体验时间。',
+        content: '工作人员会尽快联系确认试听时间。',
         showCancel: false,
         success: () => {
           this.setData({ showTrialForm: false });

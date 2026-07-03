@@ -145,7 +145,7 @@ Page({
   onShareAppMessage() {
     const session = this.data.detail && this.data.detail.trialSession;
     return shareCard(
-      (session && session.title) || '体验预约',
+      (session && session.title) || '预约试听',
       `/pages/trial-detail/index?id=${this.data.trialSessionId || ''}`,
       session && session.coverImageUrl,
     );
@@ -154,7 +154,7 @@ Page({
   onShareTimeline() {
     const session = this.data.detail && this.data.detail.trialSession;
     return timelineCard(
-      (session && session.title) || '体验预约',
+      (session && session.title) || '预约试听',
       `id=${this.data.trialSessionId || ''}`,
       session && session.coverImageUrl,
     );
@@ -181,7 +181,7 @@ Page({
         endsAtLabel: formatDateTime(detail.trialSession.endsAt),
         campusLabel: detail.campus?.name || detail.organization.address || '地点待确认',
         reservationFeeLabel: detail.trialSession.reservationFeeAmount
-          ? `${money(detail.trialSession.reservationFeeAmount)} 席位保留费`
+          ? `${money(detail.trialSession.reservationFeeAmount)} 试听席位保留费`
           : '',
         contactPhone: extractPhone(
           detail.providerInstitution?.contact || detail.organization.phone,
@@ -335,7 +335,7 @@ Page({
       });
       wx.showModal({
         title: '预约成功',
-        content: '工作人员会尽快联系确认体验安排。',
+        content: '工作人员会尽快联系确认试听安排。',
         showCancel: false,
         success: () => {
           this.setData({ showReservationForm: false });
@@ -459,7 +459,7 @@ Page({
       title: '开发模拟支付',
       content: reason
         ? `${reason}\n\n当前可使用 mock-pay 完成开发环境验证。`
-        : '当前可使用 mock-pay 完成开发环境验证，并保留体验席位。',
+        : '当前可使用 mock-pay 完成开发环境验证，并保留试听席位。',
       confirmText: '模拟支付',
       success: async (result) => {
         if (!result.confirm) return;
@@ -498,7 +498,7 @@ Page({
         title: '支付已完成',
         content:
           seatReservation.reservationStatus === 'cancelled'
-            ? '当前体验名额暂未保留成功，工作人员会尽快联系您改期或处理退款。'
+            ? '当前试听名额暂未保留成功，工作人员会尽快联系您改期或处理退款。'
             : '支付结果已确认，席位状态同步中，请稍后在家长中心查看。',
         showCancel: false,
         success: () => {
@@ -510,7 +510,7 @@ Page({
     }
     wx.showModal({
       title: '席位已保留',
-      content: '体验席位保留费已支付，工作人员会按场次安排接待。',
+      content: '试听席位保留费已支付，工作人员会按场次安排接待。',
       showCancel: true,
       confirmText: '回首页',
       success: (result) => {

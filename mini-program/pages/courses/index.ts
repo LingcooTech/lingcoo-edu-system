@@ -73,11 +73,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('精选活动 · 成长空间', '/pages/courses/index');
+    return shareCard('精选课程 · 成长空间', '/pages/courses/index');
   },
 
   onShareTimeline() {
-    return timelineCard('精选活动 · 成长空间', '');
+    return timelineCard('精选课程 · 成长空间', '');
   },
 
   async onPullDownRefresh() {

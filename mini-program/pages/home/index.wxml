@@ -152,7 +152,7 @@
           <text>查看全部</text>
         </button>
       </view>
-      <view wx:else class="empty">伙伴资源整理中</view>
+      <view wx:else class="empty">导师介绍整理中</view>
     </view>
 
     <view wx:if="{{activeHomeTab == 'campuses'}}" class="tab-content campus-list">

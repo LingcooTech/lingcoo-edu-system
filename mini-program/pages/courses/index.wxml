@@ -1,12 +1,12 @@
-<custom-navbar title="活动" transparent="{{!navSolid}}" />
+<custom-navbar title="课程" transparent="{{!navSolid}}" />
 <view class="page courses-page">
   <view class="courses-hero">
     <view class="courses-head-shade"></view>
     <view class="courses-head-copy">
-      <view class="courses-title">选择适合孩子的活动</view>
-      <view class="courses-subtitle">活动由合作机构组织实施</view>
+      <view class="courses-title">选择适合孩子的课程</view>
+      <view class="courses-subtitle">课程由合作机构组织实施</view>
     </view>
-    <view wx:if="{{courses.length}}" class="courses-count">{{courses.length}} 个活动开放中</view>
+    <view wx:if="{{courses.length}}" class="courses-count">{{courses.length}} 个课程开放中</view>
   </view>
 
   <view class="course-filters">
@@ -48,6 +48,6 @@
       <view class="body-text summary">{{item.summary}}</view>
     </navigator>
   </view>
-  <view wx:else class="empty">活动即将上线</view>
+  <view wx:else class="empty">课程即将上线</view>
 </view>
 <tabbar />

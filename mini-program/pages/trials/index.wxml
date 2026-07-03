@@ -1,10 +1,10 @@
-<custom-navbar title="预约" transparent="{{!navSolid}}" />
+<custom-navbar title="试听" transparent="{{!navSolid}}" />
 <view class="page trials-page">
   <view class="trial-head">
     <view class="trial-head-shade"></view>
     <view class="trial-head-copy">
-      <view class="trial-title">选择合适的体验场次</view>
-      <view class="trial-subtitle">活动由合作机构实施，提交后会确认到场时间和安排。</view>
+      <view class="trial-title">选择合适的试听场次</view>
+      <view class="trial-subtitle">课程由合作机构实施，提交后会确认到场时间和安排。</view>
     </view>
   </view>
 
@@ -75,15 +75,15 @@
         <view class="trial-meta">{{item.startsAtLabel}} · 名额 {{item.capacityLabel}}</view>
         <view class="trial-foot">
           <view class="trial-fee">{{item.reservationFeeLabel}}</view>
-          <view class="trial-action">预约</view>
+          <view class="trial-action">试听</view>
         </view>
       </view>
     </navigator>
   </view>
 
   <view wx:else class="empty trial-empty">
-    近期暂无固定体验场次
-    <button class="btn btn-primary empty-button" bindtap="goCourses">查看活动预约</button>
+    近期暂无固定试听场次
+    <button class="btn btn-primary empty-button" bindtap="goCourses">查看预约试听</button>
   </view>
 </view>
 <tabbar />

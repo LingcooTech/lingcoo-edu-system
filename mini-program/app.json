@@ -50,15 +50,15 @@
       },
       {
         "pagePath": "pages/courses/index",
-        "text": "活动"
+        "text": "课程"
       },
       {
         "pagePath": "pages/trials/index",
-        "text": "预约"
+        "text": "试听"
       },
       {
         "pagePath": "pages/schedule/index",
-        "text": "排期"
+        "text": "课表"
       },
       {
         "pagePath": "pages/account/index",

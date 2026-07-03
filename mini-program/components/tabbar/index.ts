@@ -38,19 +38,19 @@ Component({
         },
         {
           pagePath: 'pages/courses/index',
-          text: '活动',
+          text: '课程',
           icon: TABBAR_ICONS.course.inactive,
           activeIcon: TABBAR_ICONS.course.active,
         },
         {
           pagePath: 'pages/trials/index',
-          text: '预约',
+          text: '试听',
           icon: TABBAR_ICONS.trial.inactive,
           activeIcon: TABBAR_ICONS.trial.active,
         },
         {
           pagePath: 'pages/schedule/index',
-          text: '排期',
+          text: '课表',
           icon: TABBAR_ICONS.schedule.inactive,
           activeIcon: TABBAR_ICONS.schedule.active,
         },

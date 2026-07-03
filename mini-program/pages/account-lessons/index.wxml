@@ -104,7 +104,7 @@
               <view wx:for="{{item.upcoming}}" wx:for-item="event" wx:key="id" class="record-row">
                 <view class="record-main">
                   <view class="record-time">{{event.startsAtLabel}}</view>
-                  <view class="record-topic">{{event.title || '常规活动'}}</view>
+                  <view class="record-topic">{{event.title || '常规课程'}}</view>
                   <view class="record-meta">{{event.class.name}} · {{event.classroomName}}</view>
                 </view>
                 <view class="record-status pending">待参与</view>
@@ -118,7 +118,7 @@
               <view wx:for="{{item.attendance}}" wx:for-item="record" wx:key="id" class="record-row">
                 <view class="record-main">
                   <view class="record-time">{{record.startsAtLabel}}</view>
-                  <view class="record-topic">{{record.topic || '常规活动'}}</view>
+                  <view class="record-topic">{{record.topic || '常规课程'}}</view>
                   <view class="record-meta">{{record.className}}</view>
                 </view>
                 <view class="record-status">{{record.statusLabel}}</view>

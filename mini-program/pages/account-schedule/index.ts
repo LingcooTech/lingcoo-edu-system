@@ -114,7 +114,7 @@ function toScheduleEventItem(
   const isTrial = item.type === 'trial_session';
   const studentNames = item.sessionId ? studentNamesBySessionId.get(item.sessionId) || [] : [];
   const time = `${timeLabel(item.startsAt)}-${timeLabel(item.endsAt)}`;
-  const courseName = item.course?.name || '活动';
+  const courseName = item.course?.name || '课程';
   const location =
     item.classroom?.name ||
     item.campus?.name ||
@@ -133,7 +133,7 @@ function toScheduleEventItem(
     courseName,
     startsAt: item.startsAt,
     startsAtLabel: time,
-    badge: isTrial ? '体验' : studentNames.length > 0 ? '我的活动' : '排期',
+    badge: isTrial ? '试听' : studentNames.length > 0 ? '我的课程' : '课表',
     meta: isTrial ? `${location}${capacityText}` : [className, location].filter(Boolean).join(' · '),
     url: isTrial
       ? `/pages/trial-detail/index?id=${encodeURIComponent(item.trialSessionId || item.id)}`
@@ -247,11 +247,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('全部排期 · 成长空间', '/pages/account-schedule/index');
+    return shareCard('全部课表 · 成长空间', '/pages/account-schedule/index');
   },
 
   onShareTimeline() {
-    return timelineCard('全部排期 · 成长空间', '');
+    return timelineCard('全部课表 · 成长空间', '');
   },
 
   async onPullDownRefresh() {
@@ -296,7 +296,7 @@ Page({
     } catch (error) {
       this.setData({ loading: false, events: [], selectedEvents: [] });
       wx.showToast({
-        title: error instanceof Error ? error.message : '排期加载失败',
+        title: error instanceof Error ? error.message : '课表加载失败',
         icon: 'none',
       });
     }

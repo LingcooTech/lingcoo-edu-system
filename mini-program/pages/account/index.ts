@@ -99,7 +99,7 @@ function toNextLessonCard(item: CheckInItem): NextLessonCard {
     dateLabel: dateLabel(item.startsAt),
     timeRangeLabel: `${timeLabel(item.startsAt)}-${timeLabel(item.endsAt)}`,
     courseLine: item.courseName,
-    classLine: item.class?.name || '活动组待确认',
+    classLine: item.class?.name || '班级待确认',
     locationLine: item.classroomName,
   };
 }
@@ -126,8 +126,8 @@ function toReservationReminder(items: ParentSeatReservation[]): ReservationRemin
     .sort((a, b) => reservationTimeValue(a) - reservationTimeValue(b))[0];
   if (!reservation) return null;
   return {
-    title: reservation.trialSession?.title || reservation.course?.name || '体验预约',
-    courseLine: reservation.course?.name || '活动待确认',
+    title: reservation.trialSession?.title || reservation.course?.name || '预约试听',
+    courseLine: reservation.course?.name || '课程待确认',
     timeLine: reservation.trialSession?.startsAt
       ? formatDateTime(reservation.trialSession.startsAt)
       : '时间待确认',

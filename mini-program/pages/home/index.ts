@@ -142,7 +142,7 @@ const initialState: HomeState = {
   bannerTitle: '',
   bannerSubtitle: '',
   bannerImages: [],
-  ctaText: '预约体验',
+  ctaText: '预约试听',
   ctaLink: '/courses',
   stats: [],
   highlights: [],
@@ -183,7 +183,7 @@ const HOME_QUICK_ACTIONS: HomeQuickAction[] = [
   },
   {
     key: 'teachers',
-    label: '伙伴资源',
+    label: '导师介绍',
     iconUrl: HOME_QUICK_ACTIONS_ICONS.teachers,
     activeIconUrl: HOME_QUICK_ACTIONS_ICONS.teachersActive,
   },
@@ -216,7 +216,7 @@ function toTeacherCard(teacher: PublicTeacher): HomeTeacherCard {
     initial: teacher.name.slice(0, 1) || '师',
     title: teacher.title || '伙伴档案',
     avatarUrl: teacher.avatarUrl || '',
-    tagline: teacher.tagline?.trim() || specialtiesText || '查看伙伴档案与活动方向',
+    tagline: teacher.tagline?.trim() || specialtiesText || '查看伙伴档案与课程方向',
     specialtiesText,
     metaText,
   };
@@ -285,7 +285,7 @@ function platformTitleFor(brandName: string, configuredTitle?: string) {
 function platformIntroFallbackFor(brandName: string) {
   const brand = brandName.trim();
   const subject = brand ? (brand.endsWith('平台') ? brand : `${brand}预约平台`) : '预约平台';
-  return `${subject}负责线上活动展示、体验预约、线索留存与家长沟通入口，帮助家长更清楚地了解活动安排。`;
+  return `${subject}负责线上课程展示、预约试听、线索留存与家长沟通入口，帮助家长更清楚地了解课程安排。`;
 }
 
 function toState(
@@ -310,7 +310,7 @@ function toState(
     about?.operatorIntro || platformIntroFallbackFor(home.organization.brandName);
   const aboutTeachingIntro =
     about?.brandCooperation ||
-    '入驻机构负责活动研发、人员安排、现场实施与后续反馈。家长可结合活动详情、伙伴资源和成长故事，判断活动是否适合孩子当前阶段。';
+    '入驻机构负责课程研发、人员安排、现场实施与后续反馈。家长可结合课程详情、导师介绍和成长故事，判断课程是否适合孩子当前阶段。';
 
   return {
     ...createHomeChromeState(),
@@ -343,7 +343,7 @@ function toState(
     bannerTitle: profile.bannerTitle || home.organization.brandName,
     bannerSubtitle: profile.bannerSubtitle,
     bannerImages,
-    ctaText: profile.ctaText || '预约体验',
+    ctaText: profile.ctaText || '预约试听',
     ctaLink: profile.ctaLink || '/courses',
     stats: profile.stats ?? [],
     highlights: (profile.highlights ?? []).map(toHighlightCard),
@@ -361,7 +361,7 @@ function toState(
       hasLocation: campus.latitude != null && campus.longitude != null,
       imageUrls: campus.environmentImageUrls ?? [],
     })),
-    growthLoopTitle: profile.growthLoop?.title || '让活动围绕孩子持续迭代',
+    growthLoopTitle: profile.growthLoop?.title || '让课程围绕孩子持续迭代',
     growthLoopSummary: profile.growthLoop?.summary || '',
     growthLoopSteps: (profile.growthLoop?.steps ?? []).map((step, index) => ({
       title: step.title,
@@ -380,7 +380,7 @@ function toState(
       startsAtLabel: formatDateTime(session.startsAt),
       reservationFeeLabel:
         session.reservationFeeAmount > 0
-          ? `${money(session.reservationFeeAmount)} 体验席位保留费`
+          ? `${money(session.reservationFeeAmount)} 试听席位保留费`
           : '',
     })),
     trustVisible: trustTeachers.length > 0,

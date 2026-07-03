@@ -1,5 +1,5 @@
 export function money(cents?: number | null): string {
-  if (cents === null || cents === undefined) return '可预约体验';
+  if (cents === null || cents === undefined) return '可预约试听';
   return `¥${(cents / 100).toFixed(2)}`;
 }
 
@@ -15,7 +15,7 @@ export function coursePriceLabel(
     input.startingPriceAmount === null ||
     input.startingPriceAmount === undefined
   ) {
-    return '可预约体验';
+    return '可预约试听';
   }
   return onlinePackageSalesEnabled
     ? `${money(input.startingPriceAmount)} 起`

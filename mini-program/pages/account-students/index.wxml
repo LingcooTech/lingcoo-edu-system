@@ -26,8 +26,8 @@
             >
               <view class="student-course-title">{{course.courseName}}</view>
               <view class="student-course-line">空间：{{course.campusName}}</view>
-              <view class="student-course-line">活动组：{{course.className}}</view>
-              <view class="student-course-line">机构导师：{{course.teacherName}}</view>
+              <view class="student-course-line">班级：{{course.className}}</view>
+              <view class="student-course-line">导师：{{course.teacherName}}</view>
             </view>
           </view>
           <view wx:else class="empty-row">{{item.emptyCourseText}}</view>

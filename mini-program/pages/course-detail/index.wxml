@@ -1,10 +1,10 @@
-<custom-navbar title="活动详情" show-back="{{true}}" />
+<custom-navbar title="课程详情" show-back="{{true}}" />
 <view class="page course-detail-page">
   <skeleton wx:if="{{loading}}" variant="detail" />
 
   <view wx:elif="{{notFound}}" class="empty-state">
-    <view class="section-title">活动不存在或已下架</view>
-    <button class="btn btn-outline empty-button" bindtap="goCourses">查看全部活动</button>
+    <view class="section-title">课程不存在或已下架</view>
+    <button class="btn btn-outline empty-button" bindtap="goCourses">查看全部课程</button>
   </view>
 
   <block wx:else>
@@ -52,7 +52,7 @@
     </view>
 
     <view class="section">
-      <view class="section-title">{{onlinePackageSalesAllowed ? '服务包' : '常规活动参考方案'}}</view>
+      <view class="section-title">{{onlinePackageSalesAllowed ? '服务包' : '常规课程参考方案'}}</view>
       <view wx:if="{{packages.length}}" class="package-list">
         <view wx:for="{{packages}}" wx:key="id" class="card package-card">
           <view class="row-between">
@@ -71,17 +71,17 @@
           </button>
         </view>
       </view>
-      <view wx:else class="empty">{{onlinePackageSalesAllowed ? '服务包暂未上架，可先预约体验。' : '暂无常规活动参考方案，可先预约体验。'}}</view>
+      <view wx:else class="empty">{{onlinePackageSalesAllowed ? '服务包暂未上架，可先预约试听。' : '暂无常规课程参考方案，可先预约试听。'}}</view>
     </view>
 
     <view wx:if="{{trialNotice}}" class="section card info-card">
-      <view class="section-title">体验预约说明</view>
+      <view class="section-title">预约试听说明</view>
       <view class="body-text package-desc">{{trialNotice}}</view>
     </view>
 
     <view class="sticky-cta app-bottom-bar">
       <button class="btn btn-outline sticky-button secondary" bindtap="onPhoneTap">电话联系</button>
-      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约体验</button>
+      <button class="btn btn-primary sticky-button" bindtap="onTrialTap">预约试听</button>
     </view>
 
     <view wx:if="{{showCheckoutForm && selectedPackage}}" class="sheet-mask" bindtap="closeCheckout">
@@ -160,8 +160,8 @@
         ></view>
         <view class="row-between checkout-heading">
           <view>
-            <view class="section-title">预约体验</view>
-            <view class="muted form-hint">提交后工作人员会电话确认体验时间。</view>
+            <view class="section-title">预约试听</view>
+            <view class="muted form-hint">提交后工作人员会电话确认试听时间。</view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeTrial">×</view>
         </view>

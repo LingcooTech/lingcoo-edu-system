@@ -51,7 +51,7 @@ function toTrialItem(
     endsAtLabel: formatDateTime(item.endsAt),
     capacityLabel: `${item.bookedCount}/${item.capacity}`,
     reservationFeeLabel:
-      item.reservationFeeAmount > 0 ? `${money(item.reservationFeeAmount)} 席位保留费` : '免费预约',
+      item.reservationFeeAmount > 0 ? `${money(item.reservationFeeAmount)} 试听席位保留费` : '免费试听',
     providerInstitutionId: course?.providerInstitutionId || '',
     providerLabel: providerName(course, institutions),
   };
@@ -103,7 +103,7 @@ function timeRangeForFilter(filter: TimeFilter, now = new Date()) {
 
 function courseOptions(courses: Course[]): FilterOption[] {
   return [
-    { label: '活动', value: '' },
+    { label: '课程', value: '' },
     ...courses.map((course) => ({ label: course.name, value: course.id })),
   ];
 }
@@ -156,7 +156,7 @@ Page({
     timeFilters: TIME_FILTERS,
     activeTimeFilter: 'next_14' as TimeFilter,
     institutionOptions: [{ label: '合作机构', value: '' }] as FilterOption[],
-    courseOptions: [{ label: '活动', value: '' }] as FilterOption[],
+    courseOptions: [{ label: '课程', value: '' }] as FilterOption[],
     campusOptions: [{ label: '空间', value: '' }] as FilterOption[],
     selectedInstitutionIndex: 0,
     selectedCourseIndex: 0,
@@ -170,11 +170,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('体验预约 · 成长空间', '/pages/trials/index');
+    return shareCard('预约试听 · 成长空间', '/pages/trials/index');
   },
 
   onShareTimeline() {
-    return timelineCard('体验预约 · 成长空间', '');
+    return timelineCard('预约试听 · 成长空间', '');
   },
 
   async onPullDownRefresh() {
