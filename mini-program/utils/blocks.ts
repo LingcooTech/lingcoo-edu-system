@@ -115,6 +115,57 @@ function parseMarkdownImage(value: string) {
   return match ? { alt: match[1] || '', url: match[2] || '' } : null;
 }
 
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function textFromHtml(value: string) {
+  return decodeHtmlEntities(
+    value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?[^>]+>/g, '')
+      .trim(),
+  );
+}
+
+function parseLegacyHtml(value: string): Block[] {
+  const blocks: Block[] = [];
+  const tokenPattern =
+    /<h([23])[^>]*>([\s\S]*?)<\/h\1>|<p[^>]*>([\s\S]*?)<\/p>|<img[^>]*src=["']([^"']+)["'][^>]*>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenPattern.exec(value)) !== null) {
+    if (match[1] && match[2]) {
+      const text = textFromHtml(match[2]);
+      if (text) {
+        blocks.push({ id: genId(), type: 'heading', level: match[1] === '3' ? 3 : 2, text });
+      }
+      continue;
+    }
+
+    if (match[3]) {
+      const text = textFromHtml(match[3]);
+      if (text) blocks.push({ id: genId(), type: 'paragraph', text });
+      continue;
+    }
+
+    if (match[4]) {
+      blocks.push({ id: genId(), type: 'image', url: decodeHtmlEntities(match[4]), caption: '' });
+    }
+  }
+
+  if (blocks.length > 0) return blocks;
+
+  const text = textFromHtml(value);
+  return text ? [{ id: genId(), type: 'paragraph', text }] : [];
+}
+
 function flushParagraph(blocks: Block[], paragraph: string[]) {
   if (paragraph.length === 0) return;
   blocks.push({ id: genId(), type: 'paragraph', text: paragraph.join('\n') });
@@ -184,6 +235,10 @@ export function parseBlocks(value: unknown): Block[] {
 
   const trimmed = value.trim();
   if (!trimmed) return [];
+
+  if (/^<[\s\S]*>$/.test(trimmed)) {
+    return parseLegacyHtml(trimmed);
+  }
 
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {

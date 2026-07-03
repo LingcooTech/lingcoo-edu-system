@@ -300,9 +300,9 @@ function TeacherAvatar({ teacher }: { teacher: PublicTeacherDetail['teacher'] })
 
 function teacherStats(teacher: PublicTeacherDetail['teacher']) {
   return [
+    { label: '习书时长', value: teacher.practiceDuration },
     { label: '教学经验', value: teacher.teachingYears },
     { label: '累计学员', value: teacher.studentCount },
-    { label: '续班率', value: teacher.retentionRate },
   ].filter((item): item is { label: string; value: string } => Boolean(item.value?.trim()));
 }
 

@@ -828,6 +828,7 @@ export interface PublicTeacher {
   teachingYears?: string | null;
   studentCount?: string | null;
   retentionRate?: string | null;
+  practiceDuration?: string | null;
   teachingPhilosophy?: string | null;
   classPhotoUrls: string[];
   studentWorkUrls: string[];

@@ -44,15 +44,14 @@
 
 .teacher-card {
   display: flex;
-  min-height: 176rpx;
   align-items: center;
-  gap: 22rpx;
+  gap: 20rpx;
   overflow: hidden;
   border: 1rpx solid rgba(33, 31, 28, 0.05);
   border-radius: 22rpx;
   background: #fff;
   box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
-  padding: 20rpx;
+  padding: 10rpx 18rpx;
 }
 
 .teacher-card:active {
@@ -62,12 +61,12 @@
 
 .teacher-avatar {
   display: flex;
-  width: 124rpx;
-  height: 124rpx;
-  flex: 0 0 124rpx;
+  width: 156rpx;
+  height: 156rpx;
+  flex: 0 0 156rpx;
   align-items: center;
   justify-content: center;
-  border-radius: 22rpx;
+  border-radius: 24rpx;
   background: #f1e9e1;
   color: #9a6a4b;
   font-size: 38rpx;
@@ -106,7 +105,7 @@
 }
 
 .teacher-meta {
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   overflow: hidden;
   color: #9a6a4b;
   font-size: 24rpx;
@@ -119,7 +118,7 @@
 .teacher-tagline {
   display: -webkit-box;
   overflow: hidden;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   color: #57534e;
   font-size: 24rpx;
   line-height: 1.45;
@@ -132,7 +131,7 @@
   align-items: center;
   max-width: 360rpx;
   min-height: 40rpx;
-  margin-top: 12rpx;
+  margin-top: 8rpx;
   padding: 4rpx 14rpx;
   border: 1rpx solid rgba(154, 106, 75, 0.28);
   border-radius: 999rpx;
@@ -147,7 +146,7 @@
   align-items: center;
   width: 128rpx;
   height: 34rpx;
-  margin-top: 12rpx;
+  margin-top: 8rpx;
 }
 
 .institution-logo {

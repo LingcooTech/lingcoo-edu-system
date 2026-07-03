@@ -5,8 +5,8 @@ type ProfileSection = {
   key: string;
   label: string;
   text: string;
-  tone: 'plain' | 'quote' | 'list';
   lines: string[];
+  isList: boolean;
 };
 type StatItem = { label: string; value: string };
 
@@ -23,29 +23,33 @@ function buildProfileSections(teacher: PublicTeacher): ProfileSection[] {
       key: 'education',
       label: '毕业院校 / 专业背景',
       text: teacher.education ?? '',
-      tone: 'plain' as const,
     },
     {
       key: 'teachingExperience',
       label: '教学经验',
       text: teacher.teachingExperience ?? '',
-      tone: 'plain' as const,
     },
     {
       key: 'teachingStyle',
       label: '教学风格',
       text: teacher.teachingStyle ?? '',
-      tone: 'quote' as const,
     },
     {
       key: 'achievements',
       label: '荣誉奖项 / 代表经历',
       text: teacher.achievements ?? '',
-      tone: 'list' as const,
     },
   ]
     .filter((section) => section.text.trim().length > 0)
-    .map((section) => ({ ...section, lines: splitLines(section.text) }));
+    .map((section) => {
+      const lines = splitLines(section.text);
+      return {
+        ...section,
+        text: lines.join('\n') || section.text.trim(),
+        lines,
+        isList: lines.length > 1,
+      };
+    });
 }
 
 function buildStats(teacher: PublicTeacher): StatItem[] {
@@ -129,6 +133,17 @@ Page({
     if (teacher?.wechatQrUrl) {
       wx.previewImage({ urls: [teacher.wechatQrUrl] });
     }
+  },
+
+  previewPhoto(event: { currentTarget: { dataset: { url?: string; type?: string } } }) {
+    const url = event.currentTarget.dataset.url;
+    if (!url) return;
+    const teacher = this.data.teacher as PublicTeacher | null;
+    const urls =
+      event.currentTarget.dataset.type === 'work'
+        ? teacher?.studentWorkUrls ?? []
+        : teacher?.classPhotoUrls ?? [];
+    wx.previewImage({ current: url, urls: urls.length ? urls : [url] });
   },
 
   goCourses() {

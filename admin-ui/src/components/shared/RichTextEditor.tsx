@@ -67,6 +67,67 @@ function parseImage(line: string) {
   return match ? { alt: match[1] || '', url: match[2] || '' } : null;
 }
 
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function stripHtml(value: string) {
+  return decodeHtmlEntities(
+    value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?[^>]+>/g, '')
+      .trim(),
+  );
+}
+
+function htmlToMarkdown(value: string) {
+  let next = value.replace(/\r\n/g, '\n');
+
+  next = next.replace(/<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi, (_, url, alt) => {
+    return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
+  });
+  next = next.replace(/<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi, (_, alt, url) => {
+    return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
+  });
+  next = next.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, (_, url) => {
+    return `\n\n![](${decodeHtmlEntities(url)})\n\n`;
+  });
+  next = next.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, text) => `\n\n## ${stripHtml(text)}\n\n`);
+  next = next.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, text) => `\n\n## ${stripHtml(text)}\n\n`);
+  next = next.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, text) => `\n\n### ${stripHtml(text)}\n\n`);
+  next = next.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, text) => {
+    return `\n\n${stripHtml(text)
+      .split('\n')
+      .map((line) => (line.trim() ? `> ${line.trim()}` : line))
+      .join('\n')}\n\n`;
+  });
+  next = next.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, text) => `\n- ${stripHtml(text)}`);
+  next = next.replace(/<\/?(ul|ol)[^>]*>/gi, '\n');
+  next = next.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, text) => `\n\n${stripHtml(text)}\n\n`);
+  next = stripHtml(next);
+
+  return next
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function looksLikeHtml(value: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(value);
+}
+
+function normalizeEditorValue(value: string) {
+  return looksLikeHtml(value) ? htmlToMarkdown(value) : value;
+}
+
 function flushParagraph(segments: PreviewSegment[], paragraph: string[]) {
   if (paragraph.length === 0) return;
   segments.push({ type: 'paragraph', lines: [...paragraph] });
@@ -264,19 +325,20 @@ export function RichTextEditor({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
-  const previewSegments = useMemo(() => parsePreview(value), [value]);
+  const editorValue = useMemo(() => normalizeEditorValue(value), [value]);
+  const previewSegments = useMemo(() => parsePreview(editorValue), [editorValue]);
 
   function replaceSelection(replacement: string) {
     const textarea = textareaRef.current;
     if (!textarea) {
-      onChange(`${value}${value ? '\n\n' : ''}${replacement}`);
+      onChange(`${editorValue}${editorValue ? '\n\n' : ''}${replacement}`);
       return;
     }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const before = value.slice(0, start);
-    const after = value.slice(end);
+    const before = editorValue.slice(0, start);
+    const after = editorValue.slice(end);
     const next = `${before}${replacement}${after}`;
     onChange(next);
 
@@ -288,7 +350,9 @@ export function RichTextEditor({
 
   function applyTool(tool: Tool) {
     const textarea = textareaRef.current;
-    const selection = textarea ? value.slice(textarea.selectionStart, textarea.selectionEnd) : '';
+    const selection = textarea
+      ? editorValue.slice(textarea.selectionStart, textarea.selectionEnd)
+      : '';
     replaceSelection(tool.apply(selection));
   }
 
@@ -352,7 +416,7 @@ export function RichTextEditor({
       <textarea
         ref={textareaRef}
         className="bg-background min-h-80 w-full resize-y px-3 py-3 text-sm leading-6 outline-none"
-        value={value}
+        value={editorValue}
         onChange={(event) => onChange(event.target.value)}
       />
       <MarkdownPreview segments={previewSegments} />

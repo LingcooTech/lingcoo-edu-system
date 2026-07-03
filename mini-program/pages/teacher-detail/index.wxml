@@ -11,10 +11,15 @@
     <view class="header">
       <view class="header-grid">
         <view class="teacher-main">
-          <view wx:if="{{institution || teacher.title}}" class="teacher-kicker">
-            <text wx:if="{{institution}}">{{institution.name}}</text>
-            <text wx:if="{{institution && teacher.title}}"> · </text>
-            <text wx:if="{{teacher.title}}">{{teacher.title}}</text>
+          <view wx:if="{{institution && institution.logoUrl}}" class="teacher-logo-row">
+            <image
+              class="teacher-kicker-logo"
+              src="{{institution.logoUrl}}"
+              mode="aspectFit"
+            />
+          </view>
+          <view wx:if="{{teacher.title}}" class="teacher-kicker">
+            <text>{{teacher.title}}</text>
           </view>
           <view class="teacher-name">{{teacher.name}}</view>
           <view wx:if="{{teacher.tagline}}" class="tagline">{{teacher.tagline}}</view>
@@ -49,15 +54,13 @@
       <view wx:if="{{profileSections.length}}" class="profile-list">
         <view wx:for="{{profileSections}}" wx:key="key" class="profile-section">
           <view class="profile-label">{{item.label}}</view>
-          <view wx:if="{{item.tone === 'list' && item.lines.length > 1}}" class="profile-lines">
-            <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="profile-line">
-              <text class="profile-dot"></text>
-              <text class="profile-line-text">{{line}}</text>
+          <view wx:if="{{item.isList}}" class="profile-list-lines">
+            <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="profile-list-line">
+              <text class="profile-list-dot"></text>
+              <text class="profile-list-text">{{line}}</text>
             </view>
           </view>
-          <view wx:else class="profile-text {{item.tone === 'quote' ? 'profile-quote' : ''}}">
-            {{item.text}}
-          </view>
+          <view wx:else class="profile-text">{{item.text}}</view>
         </view>
       </view>
       <view wx:else class="muted profile-empty">老师介绍待补充。</view>
@@ -89,6 +92,9 @@
             class="photo photo-slide"
             src="{{item}}"
             mode="aspectFill"
+            data-url="{{item}}"
+            data-type="class"
+            bindtap="previewPhoto"
           />
         </view>
       </scroll-view>
@@ -104,6 +110,9 @@
             class="photo photo-slide"
             src="{{item}}"
             mode="aspectFill"
+            data-url="{{item}}"
+            data-type="work"
+            bindtap="previewPhoto"
           />
         </view>
       </scroll-view>

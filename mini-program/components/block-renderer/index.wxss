@@ -4,7 +4,8 @@
 }
 
 .blocks.reading {
-  gap: 56rpx;
+  display: block;
+  gap: 0;
 }
 
 .block {
@@ -33,15 +34,20 @@
 }
 
 .reading .paragraph {
+  margin-bottom: 20rpx;
   color: #33302c;
-  font-size: 34rpx;
-  line-height: 2;
+  font-size: 30rpx;
+  line-height: 1.72;
 }
 
 .reading .heading {
-  margin-top: 18rpx;
-  margin-bottom: -6rpx;
+  margin-top: 38rpx;
+  margin-bottom: 24rpx;
   font-weight: 700;
+}
+
+.reading .heading:first-child {
+  margin-top: 0;
 }
 
 .reading .level-2 {
@@ -59,9 +65,15 @@
 }
 
 .reading .list-row {
+  margin-bottom: 20rpx;
   color: #33302c;
-  font-size: 34rpx;
-  line-height: 1.95;
+  font-size: 30rpx;
+  line-height: 1.78;
+}
+
+.reading .block:last-child,
+.reading .list-row:last-child {
+  margin-bottom: 0;
 }
 
 .list {

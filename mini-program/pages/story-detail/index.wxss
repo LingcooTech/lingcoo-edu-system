@@ -46,7 +46,7 @@
 }
 
 .story-title {
-  margin-top: 44rpx;
+  margin-top: 30rpx;
   color: #211f1c;
   font-size: 46rpx;
   font-weight: 400;
@@ -60,7 +60,7 @@
 
 .story-excerpt-card {
   position: relative;
-  margin-top: 34rpx;
+  margin-top: 26rpx;
   border-radius: 18rpx;
   background: #fbf8f2;
   padding: 28rpx 32rpx 28rpx 42rpx;
@@ -84,12 +84,12 @@
 }
 
 .story-body {
-  margin-top: 54rpx;
+  margin-top: 56rpx;
   overflow: hidden;
 }
 
 .story-rich {
   color: #3f3b35;
-  font-size: 34rpx;
-  line-height: 2;
+  font-size: 30rpx;
+  line-height: 1.78;
 }

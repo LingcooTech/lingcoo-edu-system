@@ -2,10 +2,6 @@ import { fetchStory, type ContentItem } from '../../services/api';
 import { parseBlocks, type Block } from '../../utils/blocks';
 import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
-function isHtmlContent(value: string) {
-  return /^\s*</.test(value);
-}
-
 Page({
   data: {
     loading: true,
@@ -51,8 +47,8 @@ Page({
       this.setData({
         loading: false,
         story,
-        blocks: isHtmlContent(content) ? [] : parseBlocks(content),
-        html: isHtmlContent(content) ? content : '',
+        blocks: parseBlocks(content),
+        html: '',
       });
     } catch {
       this.setData({ loading: false, notFound: true });

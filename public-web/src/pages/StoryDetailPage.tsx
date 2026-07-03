@@ -1,21 +1,15 @@
 import { ArrowLeft, CalendarDays } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { fetchStory, type ContentItem } from '@/api/client';
 import { Layout } from '@/components/Layout';
+import { RichTextRenderer } from '@/components/RichTextRenderer';
 import { useSeo } from '@/lib/seo';
 import { formatDateTime } from '@/lib/utils';
 
 function looksLikeHtml(value: string) {
   return /<\/?[a-z][\s\S]*>/i.test(value);
-}
-
-function textParagraphs(value: string) {
-  return value
-    .split(/\n{2,}/)
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 export function StoryDetailPage() {
@@ -41,8 +35,6 @@ export function StoryDetailPage() {
       active = false;
     };
   }, [slug]);
-
-  const paragraphs = useMemo(() => textParagraphs(story?.content ?? ''), [story?.content]);
 
   useSeo({
     title: story?.title || '成长故事',
@@ -102,7 +94,7 @@ export function StoryDetailPage() {
               {looksLikeHtml(story.content) ? (
                 <div dangerouslySetInnerHTML={{ __html: story.content }} />
               ) : (
-                paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
+                <RichTextRenderer content={story.content} />
               )}
             </div>
           </article>
