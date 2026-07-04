@@ -182,6 +182,9 @@ function cleanEditorHtml(value: string) {
   root.querySelectorAll('[data-editor-ui]').forEach((node) => node.remove());
   root.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
   root.querySelectorAll('[data-editor-widget]').forEach((node) => node.removeAttribute('data-editor-widget'));
+  root
+    .querySelectorAll('[data-active-scroll-upload]')
+    .forEach((node) => node.removeAttribute('data-active-scroll-upload'));
   root.querySelectorAll('.article-image-scroll, [data-role="image-scroll"]').forEach((node) => {
     const element = node as HTMLElement;
     element.classList.add('article-image-scroll');
@@ -310,8 +313,26 @@ export function RichTextEditor({
     }
   }
 
+  function setActiveScrollTarget(target: HTMLElement | null) {
+    const editor = editorRef.current;
+    editor
+      ?.querySelectorAll('[data-active-scroll-upload]')
+      .forEach((node) => node.removeAttribute('data-active-scroll-upload'));
+    scrollTargetRef.current = target;
+    target?.setAttribute('data-active-scroll-upload', 'true');
+  }
+
+  function getActiveScrollTarget() {
+    const editor = editorRef.current;
+    if (!editor) return null;
+    if (scrollTargetRef.current && editor.contains(scrollTargetRef.current)) {
+      return scrollTargetRef.current;
+    }
+    return editor.querySelector('[data-active-scroll-upload="true"]') as HTMLElement | null;
+  }
+
   async function uploadScrollImages(files: File[]) {
-    const target = scrollTargetRef.current;
+    const target = getActiveScrollTarget();
     if (!target) {
       toast.error('请先点击横向图片组里的上传图片');
       return;
@@ -323,9 +344,14 @@ export function RichTextEditor({
         const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
         const figure = document.createElement('figure');
         figure.innerHTML = `<img src="${htmlEscape(result.publicUrl)}" alt="${htmlEscape(alt)}" />`;
-        const actions = target.querySelector('[data-editor-ui]');
-        target.insertBefore(figure, actions);
+        const actions: Element | null = target.querySelector('[data-editor-ui]');
+        if (actions?.parentElement === target) {
+          target.insertBefore(figure, actions);
+        } else {
+          target.appendChild(figure);
+        }
       }
+      target.removeAttribute('data-active-scroll-upload');
       emitCurrentValue();
       toast.success('图片已添加到横向图片组');
     } catch (error) {
@@ -347,7 +373,8 @@ export function RichTextEditor({
     const widget = action.closest('[data-editor-widget]') as HTMLElement | null;
     switch (action.dataset.editorAction) {
       case 'upload-scroll-image':
-        scrollTargetRef.current = action.closest('.article-image-scroll') as HTMLElement | null;
+        setActiveScrollTarget(action.closest('.article-image-scroll') as HTMLElement | null);
+        if (scrollInputRef.current) scrollInputRef.current.value = '';
         scrollInputRef.current?.click();
         break;
       case 'remove-widget':
@@ -395,7 +422,7 @@ export function RichTextEditor({
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             const inserted = insertHtmlAtSelection(buildImageScrollHtml());
-            scrollTargetRef.current = inserted;
+            setActiveScrollTarget(inserted);
           }}
         >
           <Images className="h-4 w-4" />
