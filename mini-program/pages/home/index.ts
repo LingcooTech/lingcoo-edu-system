@@ -388,7 +388,7 @@ function toState(
   };
 }
 
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: initialState,
@@ -401,7 +401,7 @@ Page({
 
   onShareAppMessage() {
     return shareCard(
-      this.data.bannerTitle || '成长教室',
+      configuredShareTitle('home', this.data.bannerTitle || '成长教室'),
       '/pages/home/index',
       this.data.bannerImages && this.data.bannerImages[0],
     );
@@ -409,7 +409,7 @@ Page({
 
   onShareTimeline() {
     return timelineCard(
-      this.data.bannerTitle || '成长教室',
+      configuredShareTitle('home', this.data.bannerTitle || '成长教室'),
       '',
       this.data.bannerImages && this.data.bannerImages[0],
     );

@@ -306,6 +306,11 @@ export const trialModule: AppModule = {
       };
     });
 
+    app.get('/public/mini-share-settings', async () => {
+      const organization = await organizationRepo.requireOrganization(app.db);
+      return { miniShare: readPublicSite(organization.settings).miniShare };
+    });
+
     app.get('/public/courses', async () => {
       const [courses, organization] = await Promise.all([
         catalogRepo.listPublishedCourses(app.db),

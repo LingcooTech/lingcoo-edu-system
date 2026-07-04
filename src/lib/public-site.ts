@@ -20,6 +20,21 @@ export interface PublicSitePageCopies {
   stories: PublicPageCopy;
 }
 
+export interface MiniShareSettings {
+  home: string;
+  courses: string;
+  trials: string;
+  schedule: string;
+  teachers: string;
+  stories: string;
+  accountSchedule: string;
+  courseDetail: string;
+  trialDetail: string;
+  teacherDetail: string;
+  storyDetail: string;
+  campaign: string;
+}
+
 export interface AboutPageSettings {
   eyebrow: string;
   title: string;
@@ -36,6 +51,7 @@ export interface AboutPageSettings {
 export interface PublicSiteSettings {
   navigation: PublicNavItem[];
   pages: PublicSitePageCopies;
+  miniShare: MiniShareSettings;
   aboutPage: AboutPageSettings;
   icpNumber: string;
   icpUrl: string;
@@ -75,6 +91,21 @@ export const defaultPageCopies: PublicSitePageCopies = {
     subtitle: '记录孩子从试听、练习到形成习惯的真实变化，用故事呈现课程带来的长期影响。',
     seoTitle: '',
   },
+};
+
+export const defaultMiniShareSettings: MiniShareSettings = {
+  home: '成长教室',
+  courses: '精选课程 · 成长空间',
+  trials: '预约试听 · 成长空间',
+  schedule: '课表 · 成长空间',
+  teachers: '教师团队 · 成长教室',
+  stories: '成长故事 · 成长教室',
+  accountSchedule: '全部课表 · 成长空间',
+  courseDetail: '',
+  trialDetail: '',
+  teacherDetail: '',
+  storyDetail: '',
+  campaign: '',
 };
 
 export const defaultAboutPage: AboutPageSettings = {
@@ -183,6 +214,29 @@ function normalizePageCopies(value: unknown): PublicSitePageCopies {
   };
 }
 
+function normalizeMiniShare(value: unknown): MiniShareSettings {
+  const raw = isRecord(value) ? value : {};
+  return {
+    home: normalizeConfiguredString(raw, 'home', 120, defaultMiniShareSettings.home),
+    courses: normalizeConfiguredString(raw, 'courses', 120, defaultMiniShareSettings.courses),
+    trials: normalizeConfiguredString(raw, 'trials', 120, defaultMiniShareSettings.trials),
+    schedule: normalizeConfiguredString(raw, 'schedule', 120, defaultMiniShareSettings.schedule),
+    teachers: normalizeConfiguredString(raw, 'teachers', 120, defaultMiniShareSettings.teachers),
+    stories: normalizeConfiguredString(raw, 'stories', 120, defaultMiniShareSettings.stories),
+    accountSchedule: normalizeConfiguredString(
+      raw,
+      'accountSchedule',
+      120,
+      defaultMiniShareSettings.accountSchedule,
+    ),
+    courseDetail: normalizeConfiguredString(raw, 'courseDetail', 120, defaultMiniShareSettings.courseDetail),
+    trialDetail: normalizeConfiguredString(raw, 'trialDetail', 120, defaultMiniShareSettings.trialDetail),
+    teacherDetail: normalizeConfiguredString(raw, 'teacherDetail', 120, defaultMiniShareSettings.teacherDetail),
+    storyDetail: normalizeConfiguredString(raw, 'storyDetail', 120, defaultMiniShareSettings.storyDetail),
+    campaign: normalizeConfiguredString(raw, 'campaign', 120, defaultMiniShareSettings.campaign),
+  };
+}
+
 function normalizeAboutPage(value: unknown): AboutPageSettings {
   const raw = isRecord(value) ? value : {};
 
@@ -208,6 +262,7 @@ export function readPublicSite(settings: unknown): PublicSiteSettings {
   return {
     navigation: normalizeNavigation(raw.navigation),
     pages: normalizePageCopies(raw.pages),
+    miniShare: normalizeMiniShare(raw.miniShare),
     aboutPage: normalizeAboutPage(raw.aboutPage),
     icpNumber: normalizeString(raw.icpNumber, 80),
     icpUrl: normalizePath(raw.icpUrl),
@@ -220,6 +275,7 @@ export function normalizePublicSite(input: unknown): PublicSiteSettings {
   return {
     navigation: normalizeNavigation(raw.navigation),
     pages: normalizePageCopies(raw.pages),
+    miniShare: normalizeMiniShare(raw.miniShare),
     aboutPage: normalizeAboutPage(raw.aboutPage),
     icpNumber: normalizeString(raw.icpNumber, 80),
     icpUrl: normalizePath(raw.icpUrl),

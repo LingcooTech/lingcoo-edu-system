@@ -154,6 +154,21 @@ export interface PublicSitePageCopies {
   stories: PublicPageCopy;
 }
 
+export interface MiniShareSettings {
+  home: string;
+  courses: string;
+  trials: string;
+  schedule: string;
+  teachers: string;
+  stories: string;
+  accountSchedule: string;
+  courseDetail: string;
+  trialDetail: string;
+  teacherDetail: string;
+  storyDetail: string;
+  campaign: string;
+}
+
 export interface HomePayload {
   organization: {
     id: string;
@@ -188,6 +203,7 @@ export interface HomePayload {
         visible: boolean;
       }>;
       pages: PublicSitePageCopies;
+      miniShare: MiniShareSettings;
       aboutPage: {
         eyebrow: string;
         title: string;

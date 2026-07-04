@@ -1,5 +1,5 @@
 import { fetchStories, type ContentItem } from '../../services/api';
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 type StoryCard = {
   slug: string;
@@ -29,11 +29,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('成长故事 · 成长教室', '/pages/stories/index');
+    return shareCard(configuredShareTitle('stories', '成长故事 · 成长教室'), '/pages/stories/index');
   },
 
   onShareTimeline() {
-    return timelineCard('成长故事 · 成长教室', '');
+    return timelineCard(configuredShareTitle('stories', '成长故事 · 成长教室'), '');
   },
 
   async onPullDownRefresh() {

@@ -23,6 +23,14 @@
       <block wx:elif="{{htmlSegments.length}}">
         <block wx:for="{{htmlSegments}}" wx:key="index" wx:for-item="segment">
           <rich-text wx:if="{{segment.type == 'html'}}" class="story-rich" nodes="{{segment.html}}" />
+          <image
+            wx:elif="{{segment.type == 'image'}}"
+            class="story-single-image"
+            src="{{segment.url}}"
+            mode="widthFix"
+            data-url="{{segment.url}}"
+            bindtap="onPreviewImage"
+          />
           <scroll-view wx:else class="story-image-scroll" scroll-x enhanced show-scrollbar="{{false}}">
             <image
               wx:for="{{segment.urls}}"
@@ -33,7 +41,7 @@
               mode="aspectFill"
               data-url="{{url}}"
               data-urls="{{segment.urls}}"
-              bindtap="onPreviewImageGroup"
+              bindtap="onPreviewImage"
             />
           </scroll-view>
         </block>

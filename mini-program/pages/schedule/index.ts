@@ -5,7 +5,7 @@ import {
   type ParentCalendarEvent,
   type PublicCalendarEvent,
 } from '../../services/api';
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 type CalendarDayItem = {
   key: string;
@@ -247,11 +247,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('课表 · 成长空间', '/pages/schedule/index');
+    return shareCard(configuredShareTitle('schedule', '课表 · 成长空间'), '/pages/schedule/index');
   },
 
   onShareTimeline() {
-    return timelineCard('课表 · 成长空间', '');
+    return timelineCard(configuredShareTitle('schedule', '课表 · 成长空间'), '');
   },
 
   async onPullDownRefresh() {

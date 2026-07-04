@@ -8,7 +8,7 @@ import {
   type TrialSession,
 } from '../../services/api';
 import { formatDateTime, money } from '../../utils/format';
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 type TimeFilter = 'next_14' | 'this_week' | 'next_week' | 'all';
 
@@ -170,11 +170,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('预约试听 · 成长空间', '/pages/trials/index');
+    return shareCard(configuredShareTitle('trials', '预约试听 · 成长空间'), '/pages/trials/index');
   },
 
   onShareTimeline() {
-    return timelineCard('预约试听 · 成长空间', '');
+    return timelineCard(configuredShareTitle('trials', '预约试听 · 成长空间'), '');
   },
 
   async onPullDownRefresh() {

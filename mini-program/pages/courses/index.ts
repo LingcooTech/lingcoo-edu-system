@@ -52,7 +52,7 @@ function filterCourses(
   });
 }
 
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: {
@@ -73,11 +73,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('精选课程 · 成长空间', '/pages/courses/index');
+    return shareCard(configuredShareTitle('courses', '精选课程 · 成长空间'), '/pages/courses/index');
   },
 
   onShareTimeline() {
-    return timelineCard('精选课程 · 成长空间', '');
+    return timelineCard(configuredShareTitle('courses', '精选课程 · 成长空间'), '');
   },
 
   async onPullDownRefresh() {

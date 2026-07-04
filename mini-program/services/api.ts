@@ -150,6 +150,21 @@ export interface PublicProfileGrowthLoop {
   steps: PublicProfileGrowthLoopStep[];
 }
 
+export interface MiniShareSettings {
+  home: string;
+  courses: string;
+  trials: string;
+  schedule: string;
+  teachers: string;
+  stories: string;
+  accountSchedule: string;
+  courseDetail: string;
+  trialDetail: string;
+  teacherDetail: string;
+  storyDetail: string;
+  campaign: string;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -189,6 +204,7 @@ export interface Organization {
       teachers: { eyebrow: string; title: string; subtitle: string };
       stories: { eyebrow: string; title: string; subtitle: string };
     };
+    miniShare: MiniShareSettings;
     aboutPage: {
       eyebrow: string;
       title: string;
@@ -964,6 +980,10 @@ export function request<T>(
 
 export function loadHome(): Promise<HomePayload> {
   return request<HomePayload>('/public/home');
+}
+
+export async function fetchMiniShareSettings(): Promise<MiniShareSettings> {
+  return (await request<{ miniShare: MiniShareSettings }>('/public/mini-share-settings')).miniShare;
 }
 
 export function fetchStories(params: { limit?: number; offset?: number; search?: string } = {}) {

@@ -94,6 +94,14 @@
   line-height: 1.78;
 }
 
+.story-single-image {
+  display: block;
+  width: 100%;
+  margin: 20rpx 0 28rpx;
+  border-radius: 16rpx;
+  background: #f1e9e1;
+}
+
 .story-image-scroll {
   width: 100%;
   margin: 20rpx -40rpx 28rpx;

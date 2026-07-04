@@ -162,6 +162,22 @@ const publicSiteSchema = z
           .optional(),
       })
       .optional(),
+    miniShare: z
+      .object({
+        home: z.string().max(120).optional(),
+        courses: z.string().max(120).optional(),
+        trials: z.string().max(120).optional(),
+        schedule: z.string().max(120).optional(),
+        teachers: z.string().max(120).optional(),
+        stories: z.string().max(120).optional(),
+        accountSchedule: z.string().max(120).optional(),
+        courseDetail: z.string().max(120).optional(),
+        trialDetail: z.string().max(120).optional(),
+        teacherDetail: z.string().max(120).optional(),
+        storyDetail: z.string().max(120).optional(),
+        campaign: z.string().max(120).optional(),
+      })
+      .optional(),
     aboutPage: z
       .object({
         eyebrow: z.string().max(80).optional(),

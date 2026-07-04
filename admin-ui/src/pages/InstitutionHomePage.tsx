@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 
 import { fetchOrganization, saveOrganization } from '@/api/client';
 import type {
+  MiniShareSettings,
   PublicPageCopy,
   PublicProfile,
   PublicProfileGrowthLoop,
@@ -81,6 +82,20 @@ const DEFAULT_SITE: PublicSiteSettings = {
       seoTitle: '',
     },
   },
+  miniShare: {
+    home: '成长教室',
+    courses: '精选课程 · 成长空间',
+    trials: '预约试听 · 成长空间',
+    schedule: '课表 · 成长空间',
+    teachers: '教师团队 · 成长教室',
+    stories: '成长故事 · 成长教室',
+    accountSchedule: '全部课表 · 成长空间',
+    courseDetail: '',
+    trialDetail: '',
+    teacherDetail: '',
+    storyDetail: '',
+    campaign: '',
+  },
   aboutPage: {
     eyebrow: '',
     title: '关于我们',
@@ -101,6 +116,7 @@ const publicPageTabs = [
   { key: 'home', label: '首页' },
   { key: 'about', label: '关于我们' },
   { key: 'copy', label: '页面文案' },
+  { key: 'miniShare', label: '小程序分享' },
 ] as const;
 
 type PublicPageTabKey = (typeof publicPageTabs)[number]['key'];
@@ -237,6 +253,10 @@ function normalizeSite(value?: PublicSiteSettings): PublicSiteSettings {
   return {
     navigation: value?.navigation?.length ? value.navigation : DEFAULT_SITE.navigation,
     pages: normalizePageCopies(value?.pages),
+    miniShare: {
+      ...DEFAULT_SITE.miniShare,
+      ...value?.miniShare,
+    },
     aboutPage: {
       ...DEFAULT_SITE.aboutPage,
       ...value?.aboutPage,
@@ -305,6 +325,9 @@ export function InstitutionHomePage() {
           ) : null}
           {activeTab === 'copy' ? (
             <PageCopySettings onSaveActionChange={handleSaveActionChange} />
+          ) : null}
+          {activeTab === 'miniShare' ? (
+            <MiniShareSettingsEditor onSaveActionChange={handleSaveActionChange} />
           ) : null}
         </div>
       </div>
@@ -924,6 +947,72 @@ function PageCopySettings({ onSaveActionChange }: { onSaveActionChange: SaveActi
   );
 }
 
+function MiniShareSettingsEditor({
+  onSaveActionChange,
+}: {
+  onSaveActionChange: SaveActionChange;
+}) {
+  const toast = useToast();
+  const [form, setForm] = useState<PublicSiteSettings | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchOrganization()
+      .then((org) => setForm(normalizeSite(org.publicSite)))
+      .catch((err) => toast.error(err instanceof Error ? err.message : '加载失败'));
+  }, [toast]);
+
+  function updateMiniShare(miniShare: MiniShareSettings) {
+    setForm((current) => (current ? { ...current, miniShare } : current));
+  }
+
+  const save = useCallback(async () => {
+    if (!form || saving) return;
+    setSaving(true);
+    try {
+      const current = await fetchOrganization();
+      const publicSite = {
+        ...normalizeSite(current.publicSite),
+        miniShare: {
+          ...DEFAULT_SITE.miniShare,
+          ...form.miniShare,
+        },
+      };
+      const updated = await saveOrganization({ publicSite });
+      setForm(normalizeSite(updated.publicSite));
+      toast.success('小程序分享标题已保存');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  }, [form, saving, toast]);
+
+  useEffect(() => {
+    onSaveActionChange({
+      label: saving ? '保存中...' : '保存分享标题',
+      disabled: !form || saving,
+      onClick: save,
+    });
+    return () => onSaveActionChange(null);
+  }, [form, onSaveActionChange, save, saving]);
+
+  if (!form) {
+    return <p className="text-muted-foreground text-sm">加载中...</p>;
+  }
+
+  return (
+    <div className="content-rail space-y-5 pb-8">
+      <EditorCard
+        title="小程序页面分享标题"
+        description="配置微信小程序分享到聊天和朋友圈时使用的标题。详情页留空时使用课程名、老师名、文章标题或活动名。"
+      >
+        <MiniShareEditor value={form.miniShare} onChange={updateMiniShare} />
+      </EditorCard>
+    </div>
+  );
+}
+
 const PAGE_COPY_META: Array<{
   key: keyof PublicSiteSettings['pages'];
   label: string;
@@ -949,6 +1038,25 @@ const PAGE_COPY_META: Array<{
     label: '成长故事页',
     description: '用于 /stories 顶部文案；文章内容来自内容营销。',
   },
+];
+
+const MINI_SHARE_META: Array<{
+  key: keyof MiniShareSettings;
+  label: string;
+  hint: string;
+}> = [
+  { key: 'home', label: '首页', hint: '默认：成长教室；首页 Banner 标题仍可作为兜底。' },
+  { key: 'courses', label: '课程列表', hint: '默认：精选课程 · 成长空间' },
+  { key: 'trials', label: '试听列表', hint: '默认：预约试听 · 成长空间' },
+  { key: 'schedule', label: '课表', hint: '默认：课表 · 成长空间' },
+  { key: 'teachers', label: '教师团队', hint: '默认：教师团队 · 成长教室' },
+  { key: 'stories', label: '成长故事列表', hint: '默认：成长故事 · 成长教室' },
+  { key: 'accountSchedule', label: '全部课表', hint: '默认：全部课表 · 成长空间' },
+  { key: 'courseDetail', label: '课程详情', hint: '留空时使用当前课程名称。' },
+  { key: 'trialDetail', label: '试听详情', hint: '留空时使用当前试听场次标题。' },
+  { key: 'teacherDetail', label: '老师详情', hint: '留空时使用当前老师姓名。' },
+  { key: 'storyDetail', label: '故事详情', hint: '留空时使用当前故事标题。' },
+  { key: 'campaign', label: '活动报名', hint: '留空时使用当前活动名称。' },
 ];
 
 function PageCopyEditor({
@@ -1020,6 +1128,49 @@ function PageCopyEditor({
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function MiniShareEditor({
+  value,
+  onChange,
+}: {
+  value: MiniShareSettings;
+  onChange: (value: MiniShareSettings) => void;
+}) {
+  function patch(key: keyof MiniShareSettings, nextValue: string) {
+    onChange({ ...value, [key]: nextValue });
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {MINI_SHARE_META.map((item) => (
+        <section
+          key={item.key}
+          className="bg-background/70 border-border/80 rounded-lg border p-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">{item.label}</div>
+              <p className="text-muted-foreground mt-1 text-xs">{item.hint}</p>
+            </div>
+            <span className="bg-muted text-muted-foreground rounded-full px-2 py-1 text-[11px] font-medium">
+              {item.key}
+            </span>
+          </div>
+          <div className="mt-4">
+            <Field label="分享标题" hint="留空时使用当前页面默认标题">
+              <input
+                className="form-input"
+                value={value[item.key]}
+                maxLength={120}
+                onChange={(event) => patch(item.key, event.target.value)}
+              />
+            </Field>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

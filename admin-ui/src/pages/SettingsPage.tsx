@@ -129,6 +129,20 @@ const DEFAULT_SITE: PublicSiteSettings = {
       seoTitle: '',
     },
   },
+  miniShare: {
+    home: '成长教室',
+    courses: '精选课程 · 成长空间',
+    trials: '预约试听 · 成长空间',
+    schedule: '课表 · 成长空间',
+    teachers: '教师团队 · 成长教室',
+    stories: '成长故事 · 成长教室',
+    accountSchedule: '全部课表 · 成长空间',
+    courseDetail: '',
+    trialDetail: '',
+    teacherDetail: '',
+    storyDetail: '',
+    campaign: '',
+  },
   aboutPage: {
     eyebrow: '',
     title: '关于我们',
@@ -212,6 +226,10 @@ function normalizeSite(value?: PublicSiteSettings): PublicSiteSettings {
   return {
     navigation: value?.navigation?.length ? value.navigation : DEFAULT_SITE.navigation,
     pages: normalizePageCopies(value?.pages),
+    miniShare: {
+      ...DEFAULT_SITE.miniShare,
+      ...value?.miniShare,
+    },
     aboutPage: {
       ...DEFAULT_SITE.aboutPage,
       ...value?.aboutPage,

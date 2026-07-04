@@ -656,6 +656,21 @@ export interface PublicSitePageCopies {
   stories: PublicPageCopy;
 }
 
+export interface MiniShareSettings {
+  home: string;
+  courses: string;
+  trials: string;
+  schedule: string;
+  teachers: string;
+  stories: string;
+  accountSchedule: string;
+  courseDetail: string;
+  trialDetail: string;
+  teacherDetail: string;
+  storyDetail: string;
+  campaign: string;
+}
+
 export interface AboutPageSettings {
   eyebrow: string;
   title: string;
@@ -672,6 +687,7 @@ export interface AboutPageSettings {
 export interface PublicSiteSettings {
   navigation: PublicNavItem[];
   pages: PublicSitePageCopies;
+  miniShare: MiniShareSettings;
   aboutPage: AboutPageSettings;
   icpNumber: string;
   icpUrl: string;

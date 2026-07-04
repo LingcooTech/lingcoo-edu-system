@@ -108,7 +108,7 @@ function readPrefill(trialSessionId: string) {
   return payload || {};
 }
 
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 Page({
   data: {
@@ -146,7 +146,7 @@ Page({
   onShareAppMessage() {
     const session = this.data.detail && this.data.detail.trialSession;
     return shareCard(
-      (session && session.title) || '预约试听',
+      configuredShareTitle('trialDetail', (session && session.title) || '预约试听'),
       `/pages/trial-detail/index?id=${this.data.trialSessionId || ''}`,
       session && session.coverImageUrl,
     );
@@ -155,7 +155,7 @@ Page({
   onShareTimeline() {
     const session = this.data.detail && this.data.detail.trialSession;
     return timelineCard(
-      (session && session.title) || '预约试听',
+      configuredShareTitle('trialDetail', (session && session.title) || '预约试听'),
       `id=${this.data.trialSessionId || ''}`,
       session && session.coverImageUrl,
     );

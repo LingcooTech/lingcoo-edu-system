@@ -13,7 +13,7 @@ type TeacherCard = PublicTeacher & {
   displayTagline: string;
 };
 
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
 function toTeacherCard(
   teacher: PublicTeacher,
@@ -48,11 +48,11 @@ Page({
   },
 
   onShareAppMessage() {
-    return shareCard('教师团队 · 成长教室', '/pages/teachers/index');
+    return shareCard(configuredShareTitle('teachers', '教师团队 · 成长教室'), '/pages/teachers/index');
   },
 
   onShareTimeline() {
-    return timelineCard('教师团队 · 成长教室', '');
+    return timelineCard(configuredShareTitle('teachers', '教师团队 · 成长教室'), '');
   },
 
   async onPullDownRefresh() {

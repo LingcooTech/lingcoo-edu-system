@@ -1,8 +1,11 @@
 import { fetchStory, type ContentItem } from '../../services/api';
 import { parseBlocks, type Block } from '../../utils/blocks';
-import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
-type StoryHtmlSegment = { type: 'html'; html: string } | { type: 'imageScroll'; urls: string[] };
+type StoryHtmlSegment =
+  | { type: 'html'; html: string }
+  | { type: 'image'; url: string }
+  | { type: 'imageScroll'; urls: string[] };
 
 function looksLikeHtml(value: string) {
   return /<\/?[a-z][\s\S]*>/i.test(value);
@@ -66,6 +69,25 @@ function extractImageUrls(value: string) {
     .filter(Boolean);
 }
 
+function appendHtmlWithSingleImages(segments: StoryHtmlSegment[], value: string) {
+  const pattern =
+    /<figure\b[^>]*>[\s\S]*?<img\b[^>]*\ssrc=["']([^"']+)["'][^>]*>[\s\S]*?<\/figure>|<img\b[^>]*\ssrc=["']([^"']+)["'][^>]*>/gi;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(value)) !== null) {
+    const before = value.slice(cursor, match.index).trim();
+    if (before) segments.push({ type: 'html', html: before });
+
+    const url = match[1] || match[2];
+    if (url) segments.push({ type: 'image', url });
+    cursor = match.index + match[0].length;
+  }
+
+  const after = value.slice(cursor).trim();
+  if (after) segments.push({ type: 'html', html: after });
+}
+
 function splitStoryHtml(value: string): StoryHtmlSegment[] {
   const segments: StoryHtmlSegment[] = [];
   const pattern =
@@ -75,7 +97,7 @@ function splitStoryHtml(value: string): StoryHtmlSegment[] {
 
   while ((match = pattern.exec(value)) !== null) {
     const before = value.slice(cursor, match.index).trim();
-    if (before) segments.push({ type: 'html', html: before });
+    if (before) appendHtmlWithSingleImages(segments, before);
 
     const urls = extractImageUrls(match[1]);
     if (urls.length) segments.push({ type: 'imageScroll', urls });
@@ -83,7 +105,7 @@ function splitStoryHtml(value: string): StoryHtmlSegment[] {
   }
 
   const after = value.slice(cursor).trim();
-  if (after) segments.push({ type: 'html', html: after });
+  if (after) appendHtmlWithSingleImages(segments, after);
   return segments;
 }
 
@@ -105,7 +127,7 @@ Page({
   onShareAppMessage() {
     const story = this.data.story as ContentItem | null;
     return shareCard(
-      story?.title || '成长故事',
+      configuredShareTitle('storyDetail', story?.title || '成长故事'),
       `/pages/story-detail/index?slug=${encodeURIComponent(story?.slug || '')}`,
       story?.coverUrl || undefined,
     );
@@ -114,7 +136,7 @@ Page({
   onShareTimeline() {
     const story = this.data.story as ContentItem | null;
     return timelineCard(
-      story?.title || '成长故事',
+      configuredShareTitle('storyDetail', story?.title || '成长故事'),
       `slug=${encodeURIComponent(story?.slug || '')}`,
       story?.coverUrl || undefined,
     );
@@ -154,9 +176,9 @@ Page({
     });
   },
 
-  onPreviewImageGroup(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
+  onPreviewImage(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
     const url = event.currentTarget.dataset.url;
-    const urls = event.currentTarget.dataset.urls || [];
+    const urls = event.currentTarget.dataset.urls || (url ? [url] : []);
     if (url && urls.length) {
       wx.previewImage({ urls, current: url });
     }
