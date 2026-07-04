@@ -60,7 +60,13 @@ function buildStats(teacher: PublicTeacher): StatItem[] {
   ].filter((item) => item.value.trim().length > 0);
 }
 
-import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import {
+  configuredShareTitle,
+  enableShareMenu,
+  shareCard,
+  shareTitleWithInstitution,
+  timelineCard,
+} from '../../utils/share';
 
 Page({
   data: {
@@ -81,8 +87,12 @@ Page({
 
   onShareAppMessage() {
     const teacher = this.data.teacher;
-    return shareCard(
+    const title = shareTitleWithInstitution(
       configuredShareTitle('teacherDetail', (teacher && teacher.name) || '老师'),
+      this.data.institution?.name,
+    );
+    return shareCard(
+      title,
       `/pages/teacher-detail/index?id=${(teacher && teacher.id) || ''}`,
       teacher && teacher.avatarUrl,
     );
@@ -90,8 +100,12 @@ Page({
 
   onShareTimeline() {
     const teacher = this.data.teacher;
-    return timelineCard(
+    const title = shareTitleWithInstitution(
       configuredShareTitle('teacherDetail', (teacher && teacher.name) || '老师'),
+      this.data.institution?.name,
+    );
+    return timelineCard(
+      title,
       `id=${(teacher && teacher.id) || ''}`,
       teacher && teacher.avatarUrl,
     );

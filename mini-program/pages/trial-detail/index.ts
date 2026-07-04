@@ -108,7 +108,13 @@ function readPrefill(trialSessionId: string) {
   return payload || {};
 }
 
-import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import {
+  configuredShareTitle,
+  enableShareMenu,
+  shareCard,
+  shareTitleWithInstitution,
+  timelineCard,
+} from '../../utils/share';
 
 Page({
   data: {
@@ -144,18 +150,32 @@ Page({
   },
 
   onShareAppMessage() {
-    const session = this.data.detail && this.data.detail.trialSession;
-    return shareCard(
+    const detail = this.data.detail;
+    const session = detail && detail.trialSession;
+    const title = shareTitleWithInstitution(
       configuredShareTitle('trialDetail', (session && session.title) || '预约试听'),
+      detail?.providerInstitution?.name ||
+        detail?.organization?.brandName ||
+        detail?.organization?.name,
+    );
+    return shareCard(
+      title,
       `/pages/trial-detail/index?id=${this.data.trialSessionId || ''}`,
       session && session.coverImageUrl,
     );
   },
 
   onShareTimeline() {
-    const session = this.data.detail && this.data.detail.trialSession;
-    return timelineCard(
+    const detail = this.data.detail;
+    const session = detail && detail.trialSession;
+    const title = shareTitleWithInstitution(
       configuredShareTitle('trialDetail', (session && session.title) || '预约试听'),
+      detail?.providerInstitution?.name ||
+        detail?.organization?.brandName ||
+        detail?.organization?.name,
+    );
+    return timelineCard(
+      title,
       `id=${this.data.trialSessionId || ''}`,
       session && session.coverImageUrl,
     );

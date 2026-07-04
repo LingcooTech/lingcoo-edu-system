@@ -126,7 +126,13 @@ function loginWechatMini(): Promise<string> {
   });
 }
 
-import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import {
+  configuredShareTitle,
+  enableShareMenu,
+  shareCard,
+  shareTitleWithInstitution,
+  timelineCard,
+} from '../../utils/share';
 
 Page({
   data: {
@@ -172,8 +178,12 @@ Page({
 
   onShareAppMessage() {
     const course = this.data.course;
-    return shareCard(
+    const title = shareTitleWithInstitution(
       configuredShareTitle('courseDetail', (course && course.name) || '课程详情'),
+      this.data.providerInstitution?.name,
+    );
+    return shareCard(
+      title,
       `/pages/course-detail/index?slug=${(course && course.slug) || ''}`,
       course && course.coverImageUrl,
     );
@@ -181,8 +191,12 @@ Page({
 
   onShareTimeline() {
     const course = this.data.course;
-    return timelineCard(
+    const title = shareTitleWithInstitution(
       configuredShareTitle('courseDetail', (course && course.name) || '课程详情'),
+      this.data.providerInstitution?.name,
+    );
+    return timelineCard(
+      title,
       `slug=${(course && course.slug) || ''}`,
       course && course.coverImageUrl,
     );

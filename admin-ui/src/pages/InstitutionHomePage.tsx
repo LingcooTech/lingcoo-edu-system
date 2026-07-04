@@ -1005,7 +1005,7 @@ function MiniShareSettingsEditor({
     <div className="content-rail space-y-5 pb-8">
       <EditorCard
         title="小程序页面分享标题"
-        description="配置微信小程序分享到聊天和朋友圈时使用的标题。详情页留空时使用课程名、老师名、文章标题或活动名。"
+        description="配置微信小程序分享到聊天和朋友圈时使用的标题。课程、试听和老师详情页会自动追加机构名称；详情页留空时使用当前内容标题。"
       >
         <MiniShareEditor value={form.miniShare} onChange={updateMiniShare} />
       </EditorCard>
@@ -1052,9 +1052,9 @@ const MINI_SHARE_META: Array<{
   { key: 'teachers', label: '教师团队', hint: '默认：教师团队 · 成长教室' },
   { key: 'stories', label: '成长故事列表', hint: '默认：成长故事 · 成长教室' },
   { key: 'accountSchedule', label: '全部课表', hint: '默认：全部课表 · 成长空间' },
-  { key: 'courseDetail', label: '课程详情', hint: '留空时使用当前课程名称。' },
-  { key: 'trialDetail', label: '试听详情', hint: '留空时使用当前试听场次标题。' },
-  { key: 'teacherDetail', label: '老师详情', hint: '留空时使用当前老师姓名。' },
+  { key: 'courseDetail', label: '课程详情', hint: '留空时使用当前课程名称，并自动追加机构名称。' },
+  { key: 'trialDetail', label: '试听详情', hint: '留空时使用当前试听场次标题，并自动追加机构名称。' },
+  { key: 'teacherDetail', label: '老师详情', hint: '留空时使用当前老师姓名，并自动追加机构名称。' },
   { key: 'storyDetail', label: '故事详情', hint: '留空时使用当前故事标题。' },
   { key: 'campaign', label: '活动报名', hint: '留空时使用当前活动名称。' },
 ];

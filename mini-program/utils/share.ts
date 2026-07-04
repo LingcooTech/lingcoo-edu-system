@@ -4,6 +4,7 @@ import { fetchMiniShareSettings, type MiniShareSettings } from '../services/api'
 
 let miniShareSettings: MiniShareSettings | null = null;
 let miniShareSettingsPromise: Promise<MiniShareSettings | null> | null = null;
+let miniShareOrganizationName = '';
 
 export function shareCard(title: string, path: string, imageUrl?: string | null) {
   return imageUrl ? { title, path, imageUrl } : { title, path };
@@ -18,12 +19,22 @@ export function configuredShareTitle(key: keyof MiniShareSettings, fallback: str
   return configured || fallback;
 }
 
+export function shareTitleWithInstitution(title: string, institutionName?: string | null) {
+  const baseTitle = title.trim();
+  const suffix = (institutionName || miniShareOrganizationName).trim();
+  if (!suffix || !baseTitle || baseTitle.endsWith(`· ${suffix}`)) {
+    return baseTitle;
+  }
+  return `${baseTitle} · ${suffix}`;
+}
+
 function warmMiniShareSettings() {
   if (!miniShareSettingsPromise) {
     miniShareSettingsPromise = fetchMiniShareSettings()
-      .then((settings) => {
-        miniShareSettings = settings;
-        return settings;
+      .then((payload) => {
+        miniShareSettings = payload.miniShare;
+        miniShareOrganizationName = payload.organizationName || '';
+        return payload.miniShare;
       })
       .catch(() => {
         miniShareSettingsPromise = null;

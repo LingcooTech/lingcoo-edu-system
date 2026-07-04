@@ -165,6 +165,11 @@ export interface MiniShareSettings {
   campaign: string;
 }
 
+export interface MiniShareSettingsPayload {
+  miniShare: MiniShareSettings;
+  organizationName: string;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -982,8 +987,8 @@ export function loadHome(): Promise<HomePayload> {
   return request<HomePayload>('/public/home');
 }
 
-export async function fetchMiniShareSettings(): Promise<MiniShareSettings> {
-  return (await request<{ miniShare: MiniShareSettings }>('/public/mini-share-settings')).miniShare;
+export async function fetchMiniShareSettings(): Promise<MiniShareSettingsPayload> {
+  return request<MiniShareSettingsPayload>('/public/mini-share-settings');
 }
 
 export function fetchStories(params: { limit?: number; offset?: number; search?: string } = {}) {
