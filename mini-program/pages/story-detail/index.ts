@@ -125,19 +125,20 @@ Page({
       this.setData({ loading: false, notFound: true });
       return;
     }
-    this.setData({ loading: true, notFound: false });
+    this.setData({ loading: true, notFound: false, blocks: [], html: '', htmlSegments: [] });
     try {
       const story = await fetchStory(slug);
       const content = story.content || '';
       const contentIsHtml = looksLikeHtml(content);
       const html = contentIsHtml ? normalizeStoryHtml(content) : '';
+      const htmlSegments = html ? splitStoryHtml(html) : [];
       wx.setNavigationBarTitle({ title: story.title });
       this.setData({
         loading: false,
         story,
         blocks: contentIsHtml ? [] : parseBlocks(content),
         html,
-        htmlSegments: html ? splitStoryHtml(html) : [],
+        htmlSegments,
       });
     } catch {
       this.setData({ loading: false, notFound: true });

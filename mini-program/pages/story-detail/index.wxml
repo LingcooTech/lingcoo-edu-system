@@ -35,6 +35,7 @@
           </scroll-view>
         </block>
       </block>
+      <rich-text wx:elif="{{html}}" class="story-rich" nodes="{{html}}" />
       <view wx:else class="empty compact-empty">暂无正文</view>
     </view>
   </block>

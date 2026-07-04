@@ -338,7 +338,7 @@ export function RichTextEditor({
   }
 
   return (
-    <div className="border-border/80 bg-background overflow-hidden rounded-lg border">
+    <div className="border-border/80 bg-background flex min-h-[640px] max-h-[72vh] flex-col overflow-hidden rounded-lg border">
       <div className="border-border/80 bg-muted/30 flex flex-wrap items-center gap-1 border-b px-2 py-2">
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
@@ -393,7 +393,7 @@ export function RichTextEditor({
           }}
         />
       </div>
-      <div className="space-y-3 p-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {blocks.map((block, index) => {
           if (block.type === 'text') {
             return (
@@ -403,7 +403,7 @@ export function RichTextEditor({
                   textRefs.current[index] = node;
                   if (index === 0) textareaRef.current = node;
                 }}
-                className="bg-background border-border/70 focus:border-primary min-h-36 w-full resize-y rounded-lg border px-3 py-3 text-sm leading-6 outline-none"
+                className="bg-background border-border/70 focus:border-primary min-h-[520px] w-full resize-y overflow-y-auto rounded-lg border px-3 py-3 text-sm leading-6 outline-none"
                 value={block.text}
                 placeholder="输入正文，可使用工具栏添加标题、列表、引用、链接。"
                 onFocus={() => setFocusedTextIndex(index)}
