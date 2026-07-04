@@ -8,7 +8,7 @@
   <block wx:else>
     <view class="card panel">
       <view class="section-title">课程提醒</view>
-      <view class="row-meta subscribe-hint">订阅后可在微信收到课程前提醒、课时扣减和学习动态通知。</view>
+      <view class="row-meta subscribe-hint">订阅后可收到课程前提醒、课时扣减和学习动态通知。</view>
       <button
         class="btn btn-primary subscribe-btn"
         loading="{{subscribingReminders}}"

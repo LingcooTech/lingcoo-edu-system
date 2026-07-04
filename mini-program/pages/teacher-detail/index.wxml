@@ -126,7 +126,7 @@
     </view>
 
     <view class="teacher-bottom-bar {{teacher.wechatQrUrl ? '' : 'single'}}">
-      <button wx:if="{{teacher.wechatQrUrl}}" class="btn btn-outline bottom-btn" bindtap="previewQr">微信咨询</button>
+      <button wx:if="{{teacher.wechatQrUrl}}" class="btn btn-outline bottom-btn" bindtap="previewQr">扫码咨询</button>
       <button class="btn btn-primary bottom-btn" bindtap="goCourses">预约试听</button>
     </view>
 

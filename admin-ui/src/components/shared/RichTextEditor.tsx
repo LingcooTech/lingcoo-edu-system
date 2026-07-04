@@ -211,6 +211,9 @@ function parseEditorBlocks(value: string): EditorBlock[] {
   }
 
   flushTextBlock(blocks, text);
+  if (blocks.length > 0 && blocks[blocks.length - 1].type !== 'text') {
+    blocks.push({ type: 'text', text: '' });
+  }
   return blocks.length ? blocks : [{ type: 'text', text: '' }];
 }
 
@@ -224,7 +227,7 @@ function serializeBlocks(blocks: EditorBlock[]) {
       if (block.type === 'text') return block.text.trim();
       if (block.type === 'image') return block.url.trim() ? serializeImage(block) : '';
       const images = block.images.filter((image) => image.url.trim());
-      if (!images.length) return '';
+      if (!images.length) return ':::image-scroll\n:::';
       return `:::image-scroll\n${images.map(serializeImage).join('\n')}\n:::`;
     })
     .filter(Boolean)
@@ -244,6 +247,8 @@ export function RichTextEditor({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  const blockRefs = useRef<Record<number, HTMLElement | null>>({});
+  const textSelectionRef = useRef<{ blockIndex: number; start: number; end: number } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [focusedTextIndex, setFocusedTextIndex] = useState<number | null>(null);
   const [uploadTarget, setUploadTarget] = useState<UploadTarget>({ type: 'image' });
@@ -263,16 +268,62 @@ export function RichTextEditor({
     emit(next.length ? next : [{ type: 'text', text: '' }]);
   }
 
-  function insertBlock(block: EditorBlock, afterIndex = focusedTextIndex) {
-    const next = [...blocks];
-    const index = afterIndex === null ? next.length : afterIndex + 1;
-    next.splice(index, 0, block);
+  function rememberSelection(index: number) {
+    const textarea = textRefs.current[index];
+    if (!textarea) return;
+    textSelectionRef.current = {
+      blockIndex: index,
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    };
+    setFocusedTextIndex(index);
+  }
+
+  function scrollBlockIntoView(index: number) {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        blockRefs.current[index]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    });
+  }
+
+  function insertBlockAtCursor(block: EditorBlock) {
+    const selection =
+      focusedTextIndex !== null && blocks[focusedTextIndex]?.type === 'text'
+        ? {
+            blockIndex: focusedTextIndex,
+            start: textRefs.current[focusedTextIndex]?.selectionStart ?? 0,
+            end: textRefs.current[focusedTextIndex]?.selectionEnd ?? 0,
+          }
+        : textSelectionRef.current;
+
+    if (!selection || blocks[selection.blockIndex]?.type !== 'text') {
+      const next = [...blocks, block];
+      const insertIndex = next.length - 1;
+      if (block.type !== 'text') next.push({ type: 'text', text: '' });
+      emit(next);
+      scrollBlockIntoView(insertIndex);
+      return;
+    }
+
+    const textBlock = blocks[selection.blockIndex] as Extract<EditorBlock, { type: 'text' }>;
+    const before = textBlock.text.slice(0, selection.start);
+    const after = textBlock.text.slice(selection.end);
+    const next: EditorBlock[] = [
+      ...blocks.slice(0, selection.blockIndex),
+      ...(before.trim() ? [{ type: 'text' as const, text: before }] : []),
+      block,
+      { type: 'text', text: after },
+      ...blocks.slice(selection.blockIndex + 1),
+    ];
+    const insertIndex = blocks.slice(0, selection.blockIndex).length + (before.trim() ? 1 : 0);
     emit(next);
+    scrollBlockIntoView(insertIndex);
   }
 
   function replaceSelection(replacement: string, blockIndex = focusedTextIndex) {
     if (blockIndex === null || blocks[blockIndex]?.type !== 'text') {
-      insertBlock({ type: 'text', text: replacement });
+      insertBlockAtCursor({ type: 'text', text: replacement });
       return;
     }
 
@@ -327,7 +378,7 @@ export function RichTextEditor({
         >;
         updateBlock(uploadTarget.blockIndex, { ...block, images: [...block.images, image] });
       } else {
-        insertBlock({ type: 'image', ...image });
+        insertBlockAtCursor({ type: 'image', ...image });
       }
       toast.success('图片已上传并插入正文');
     } catch (error) {
@@ -339,7 +390,7 @@ export function RichTextEditor({
 
   return (
     <div className="border-border/80 bg-background flex min-h-[640px] max-h-[72vh] flex-col overflow-hidden rounded-lg border">
-      <div className="border-border/80 bg-muted/30 flex flex-wrap items-center gap-1 border-b px-2 py-2">
+      <div className="border-border/80 bg-muted/95 sticky top-0 z-20 flex flex-wrap items-center gap-1 border-b px-2 py-2 shadow-sm backdrop-blur">
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
           return (
@@ -377,7 +428,7 @@ export function RichTextEditor({
           className="btn btn-ghost h-8 px-2"
           title="横向图片组"
           aria-label="横向图片组"
-          onClick={() => insertBlock({ type: 'imageScroll', images: [] })}
+          onClick={() => insertBlockAtCursor({ type: 'imageScroll', images: [] })}
         >
           <Images className="h-4 w-4" />
         </button>
@@ -403,10 +454,15 @@ export function RichTextEditor({
                   textRefs.current[index] = node;
                   if (index === 0) textareaRef.current = node;
                 }}
-                className="bg-background border-border/70 focus:border-primary min-h-[520px] w-full resize-y overflow-y-auto rounded-lg border px-3 py-3 text-sm leading-6 outline-none"
+                className={`bg-background border-border/70 focus:border-primary w-full resize-y overflow-y-auto rounded-lg border px-3 py-3 text-sm leading-6 outline-none ${
+                  blocks.length === 1 ? 'min-h-[520px]' : 'min-h-44'
+                }`}
                 value={block.text}
                 placeholder="输入正文，可使用工具栏添加标题、列表、引用、链接。"
-                onFocus={() => setFocusedTextIndex(index)}
+                onFocus={() => rememberSelection(index)}
+                onSelect={() => rememberSelection(index)}
+                onKeyUp={() => rememberSelection(index)}
+                onMouseUp={() => rememberSelection(index)}
                 onChange={(event) => updateBlock(index, { ...block, text: event.target.value })}
               />
             );
@@ -414,45 +470,39 @@ export function RichTextEditor({
 
           if (block.type === 'image') {
             return (
-              <div
+              <figure
                 key={`image-${index}`}
-                className="border-border/70 bg-muted/15 rounded-lg border p-3"
+                ref={(node) => {
+                  blockRefs.current[index] = node;
+                }}
+                className="group relative overflow-hidden rounded-lg"
               >
                 {block.url ? (
                   <img
                     src={block.url}
                     alt={block.alt}
-                    className="max-h-80 w-full rounded-lg border object-contain"
+                    className="border-border/70 max-h-[520px] w-full rounded-lg border object-contain"
                   />
                 ) : null}
-                <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
-                  <input
-                    className="form-input"
-                    value={block.url}
-                    placeholder="图片 URL"
-                    onChange={(event) => updateBlock(index, { ...block, url: event.target.value })}
-                  />
-                  <input
-                    className="form-input"
-                    value={block.alt}
-                    placeholder="图片描述"
-                    onChange={(event) => updateBlock(index, { ...block, alt: event.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-red-600"
-                    onClick={() => removeBlock(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+                <button
+                  type="button"
+                  className="bg-background/95 text-muted-foreground hover:text-red-600 absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm opacity-0 transition-opacity group-hover:opacity-100"
+                  title="移除图片"
+                  aria-label="移除图片"
+                  onClick={() => removeBlock(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </figure>
             );
           }
 
           return (
             <div
               key={`scroll-${index}`}
+              ref={(node) => {
+                blockRefs.current[index] = node;
+              }}
               className="border-border/70 bg-muted/15 rounded-lg border p-3"
             >
               <div className="mb-3 flex items-center justify-between gap-3">

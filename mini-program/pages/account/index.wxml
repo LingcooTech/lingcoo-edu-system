@@ -33,9 +33,9 @@
           <view wx:if="{{stats.unreadNotifications}}" class="profile-dot"></view>
           <view class="profile-avatar">{{avatarText}}</view>
           <view class="profile-info">
-            <view class="profile-name">{{account.displayName || '微信用户'}}</view>
+            <view class="profile-name">{{account.displayName || '用户'}}</view>
             <view wx:if="{{account.phone}}" class="profile-phone">{{account.phone}}</view>
-            <view wx:else class="profile-phone muted">微信登录</view>
+            <view wx:else class="profile-phone muted">手机号快捷登录</view>
           </view>
         </navigator>
       </view>
@@ -220,7 +220,7 @@
       </view>
       <view class="guest-state">未登录</view>
       <view class="guest-title">一起见证成长</view>
-      <view class="guest-desc">授权微信可一键登录</view>
+      <view class="guest-desc">使用手机号快捷登录，查看成长与课程服务。</view>
       <button
         class="btn btn-primary guest-login-button"
         open-type="getPhoneNumber"
@@ -229,9 +229,8 @@
         disabled="{{loading || binding}}"
       >
         <view wx:if="{{loading || binding}}">登录中...</view>
-        <view wx:else class="wechat-login-content">
-          <image class="wechat-login-icon" src="{{guestIcons.wechat}}" mode="aspectFit" />
-          <view>微信一键登录</view>
+        <view wx:else class="phone-login-content">
+          <view>手机号快捷登录</view>
         </view>
       </button>
     </view>
@@ -335,7 +334,7 @@
     <view class="login-sheet" catchtap="noop">
       <view class="sheet-handle"></view>
       <view class="sheet-title">授权手机号</view>
-      <view class="sheet-desc">当前微信还未绑定账号，授权手机号后将自动进入成长中心、机构工作台或管理看板。</view>
+      <view class="sheet-desc">当前账号还未绑定手机号，授权后将自动进入成长中心、机构工作台或管理看板。</view>
       <button
         class="btn btn-primary bind-button"
         open-type="getPhoneNumber"

@@ -82,7 +82,7 @@
           <view>
             <view class="section-title">{{requiresReservationFee ? '保留试听席位' : '预约试听'}}</view>
             <view class="muted form-hint">
-              {{requiresReservationFee ? '授权微信手机号后支付试听席位保留费，支付完成即确认保留。' : '提交后工作人员会电话确认试听安排。'}}
+              {{requiresReservationFee ? '授权手机号后支付试听席位保留费，支付完成即确认保留。' : '提交后工作人员会电话确认试听安排。'}}
             </view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeReservationForm">×</view>
@@ -94,7 +94,7 @@
           <input class="form-field" name="grade" data-field="grade" bindinput="onFormFieldInput" placeholder="年级 / 年龄" value="{{grade}}" />
         </view>
         <button wx:if="{{requiresReservationFee}}" class="btn btn-primary submit-button" open-type="getPhoneNumber" bindgetphonenumber="onReservationPhoneAuth" loading="{{submitting || paying}}" disabled="{{submitting || paying || full}}">
-          {{full ? '名额已满' : (submitting || paying ? '处理中...' : '微信授权并支付')}}
+          {{full ? '名额已满' : (submitting || paying ? '处理中...' : '手机号授权并支付')}}
         </button>
         <button wx:else class="btn btn-primary submit-button" form-type="submit" loading="{{submitting || paying}}" disabled="{{submitting || paying || full}}">
           {{full ? '名额已满' : (submitting || paying ? '处理中...' : (requiresReservationFee ? '支付保留名额' : '提交预约'))}}

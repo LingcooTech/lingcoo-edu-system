@@ -66,14 +66,6 @@ export const HOME_QUICK_ACTIONS_ICONS = {
 };
 
 export const GUEST_ACCOUNT_ICONS = {
-  wechat: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-    <path fill="#FFFFFF" d="M28 14C16.4 14 7 21.7 7 31.2c0 5.4 3.1 10.3 7.9 13.4l-1.7 6.1 7.2-3.6c2.3.8 4.8 1.3 7.6 1.3 11.6 0 21-7.7 21-17.2S39.6 14 28 14Z"/>
-    <path fill="#FFFFFF" d="M42.2 28.6c8.2 0 14.8 5.5 14.8 12.3 0 3.8-2 7.2-5.3 9.5l1.2 4.5-5.2-2.6c-1.7.6-3.6.9-5.5.9-8.2 0-14.8-5.5-14.8-12.3s6.6-12.3 14.8-12.3Z"/>
-    <circle fill="#A9704C" cx="21.5" cy="28.8" r="2.6"/>
-    <circle fill="#A9704C" cx="34.4" cy="28.8" r="2.6"/>
-    <circle fill="#A9704C" cx="37.2" cy="39.7" r="2.1"/>
-    <circle fill="#A9704C" cx="47.2" cy="39.7" r="2.1"/>
-  </svg>`),
   avatar:
     'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2224%22%20r%3D%2212%22%20fill%3D%22%23A9704C%22%2F%3E%3Cpath%20d%3D%22M13%2054c3.2-12%2012.4-18%2019-18s15.8%206%2019%2018%22%20fill%3D%22%23A9704C%22%2F%3E%3C%2Fsvg%3E',
   parent:

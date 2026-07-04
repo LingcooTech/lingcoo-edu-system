@@ -135,7 +135,7 @@
         </block>
 
         <block wx:else>
-          <view class="checkout-hint">授权微信手机号后将创建订单并发起支付，支付完成后再完善孩子信息。</view>
+          <view class="checkout-hint">授权手机号后将创建订单并发起支付，支付完成后再完善孩子信息。</view>
           <button
             class="btn btn-primary checkout-submit"
             open-type="getPhoneNumber"
@@ -143,7 +143,7 @@
             loading="{{submittingOrder || payingOrder}}"
             disabled="{{submittingOrder || payingOrder}}"
           >
-            {{submittingOrder || payingOrder ? '处理中...' : '微信授权并支付'}}
+            {{submittingOrder || payingOrder ? '处理中...' : '手机号授权并支付'}}
           </button>
         </block>
       </view>

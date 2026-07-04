@@ -94,7 +94,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
   const paySign = payloadString(intent.payload, 'paySign');
 
   if (!timeStamp || !nonceStr || !packageValue || !paySign) {
-    return Promise.reject(new Error('微信支付参数不完整'));
+    return Promise.reject(new Error('支付参数不完整'));
   }
 
   return new Promise((resolve, reject) => {
@@ -105,7 +105,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
       signType,
       paySign,
       success: () => resolve(),
-      fail: (error) => reject(new Error(error.errMsg || '微信支付失败')),
+      fail: (error) => reject(new Error(error.errMsg || '支付失败')),
     });
   });
 }
@@ -118,9 +118,9 @@ function loginWechatMini(): Promise<string> {
           resolve(result.code);
           return;
         }
-        reject(new Error('微信登录失败，请稍后重试'));
+        reject(new Error('登录失败，请稍后重试'));
       },
-      fail: (error) => reject(new Error(error.errMsg || '微信登录失败，请稍后重试')),
+      fail: (error) => reject(new Error(error.errMsg || '登录失败，请稍后重试')),
     });
   });
 }
@@ -517,7 +517,7 @@ Page({
             return;
           }
           if (intent.nextAction !== 'request_payment') {
-            throw new Error('微信支付参数未就绪');
+            throw new Error('支付参数未就绪');
           }
 
           await requestWechatPayment(intent);
@@ -533,7 +533,7 @@ Page({
         }
       }
 
-      await this.offerMockPayment(orderNo, '未登录家长中心，暂不能发起小程序微信支付。');
+      await this.offerMockPayment(orderNo, '未登录家长中心，暂不能发起小程序支付。');
     } catch (error) {
       wx.showToast({
         title: error instanceof Error ? error.message : '支付初始化失败',
@@ -556,7 +556,7 @@ Page({
       if (!intent.configured || intent.nextAction !== 'mock_pay') {
         wx.showModal({
           title: '支付待配置',
-          content: reason || '订单已创建，微信支付配置完成后可继续支付。',
+          content: reason || '订单已创建，支付配置完成后可继续支付。',
           showCancel: false,
         });
         return;

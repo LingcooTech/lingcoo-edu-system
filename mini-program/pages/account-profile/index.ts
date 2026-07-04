@@ -99,7 +99,7 @@ Page({
         });
         return;
       }
-      const source = account.displayName || account.phone || '微信用户';
+      const source = account.displayName || account.phone || '用户';
       const pendingOrders = orders.filter((item) => item.status === 'pending').length;
       const unreadNotifications = notifications.filter((item) => item.status === 'unread').length;
       this.setData({

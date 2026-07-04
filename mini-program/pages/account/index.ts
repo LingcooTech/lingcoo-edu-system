@@ -399,7 +399,7 @@ Page({
   onWechatLogin(event?: PhoneAuthEvent) {
     const phoneCode = event?.detail?.code;
     if (event?.detail?.errMsg && !phoneCode) {
-      wx.showToast({ title: '将尝试使用已绑定微信登录', icon: 'none' });
+      wx.showToast({ title: '将尝试使用已绑定账号登录', icon: 'none' });
     }
     this.completeLogin(phoneCode);
   },
@@ -419,7 +419,7 @@ Page({
 
   async bindPhoneWithToken(bindToken: string, input: { phoneCode?: string; displayName?: string }) {
     if (!bindToken) {
-      wx.showToast({ title: '请先微信登录', icon: 'none' });
+      wx.showToast({ title: '请先完成快捷登录', icon: 'none' });
       return;
     }
 

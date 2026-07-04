@@ -32,10 +32,10 @@ function loginWechatMini(): Promise<string> {
         if (result.code) {
           resolve(result.code);
         } else {
-          reject(new Error('微信登录失败'));
+          reject(new Error('登录失败'));
         }
       },
-      fail: () => reject(new Error('微信登录失败')),
+      fail: () => reject(new Error('登录失败')),
     });
   });
 }
@@ -72,7 +72,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
   const paySign = payloadString(intent.payload, 'paySign');
 
   if (!timeStamp || !nonceStr || !packageValue || !paySign) {
-    return Promise.reject(new Error('微信支付参数不完整'));
+    return Promise.reject(new Error('支付参数不完整'));
   }
 
   return new Promise((resolve, reject) => {
@@ -83,7 +83,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
       signType,
       paySign,
       success: () => resolve(),
-      fail: (error) => reject(new Error(error.errMsg || '微信支付失败')),
+      fail: (error) => reject(new Error(error.errMsg || '支付失败')),
     });
   });
 }
@@ -315,7 +315,7 @@ Page({
     }
 
     if (this.data.requiresReservationFee) {
-      wx.showToast({ title: '请授权微信手机号后支付', icon: 'none' });
+      wx.showToast({ title: '请授权手机号后支付', icon: 'none' });
       return;
     }
 
@@ -416,7 +416,7 @@ Page({
           return;
         }
         if (intent.nextAction !== 'request_payment') {
-          throw new Error('微信支付参数未就绪');
+          throw new Error('支付参数未就绪');
         }
 
         await requestWechatPayment(intent);

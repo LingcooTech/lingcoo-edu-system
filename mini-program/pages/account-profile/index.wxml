@@ -10,9 +10,9 @@
       <view class="profile-avatar-large">{{avatarText}}</view>
       <view class="profile-copy">
         <view class="profile-role">成长账号</view>
-        <view class="profile-name-large">{{account.displayName || '微信用户'}}</view>
+        <view class="profile-name-large">{{account.displayName || '用户'}}</view>
         <view wx:if="{{account.phone}}" class="profile-phone-large">{{account.phone}}</view>
-        <view wx:else class="profile-phone-large">微信授权登录</view>
+        <view wx:else class="profile-phone-large">手机号快捷登录</view>
       </view>
     </view>
 
@@ -66,7 +66,7 @@
     <view wx:if="{{activeTab == 'notifications'}}" class="section card profile-panel">
       <view class="subscribe-card">
         <view>
-          <view class="subscribe-title">微信提醒</view>
+          <view class="subscribe-title">消息提醒</view>
           <view class="subscribe-desc">订阅后可收到课程前提醒、课时扣减和学习动态。</view>
         </view>
         <button

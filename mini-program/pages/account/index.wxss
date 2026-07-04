@@ -582,18 +582,11 @@
   box-shadow: 0 12rpx 28rpx rgba(154, 106, 75, 0.22);
 }
 
-.wechat-login-content {
+.phone-login-content {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-}
-
-.wechat-login-icon {
-  display: block;
-  width: 36rpx;
-  height: 36rpx;
-  flex-shrink: 0;
 }
 
 .guest-panel {
