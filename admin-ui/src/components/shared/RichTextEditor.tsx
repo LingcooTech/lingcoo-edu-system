@@ -310,12 +310,15 @@ export function RichTextEditor({
     }
   }
 
-  async function uploadScrollImages(files: FileList) {
+  async function uploadScrollImages(files: File[]) {
     const target = scrollTargetRef.current;
-    if (!target) return;
+    if (!target) {
+      toast.error('请先点击横向图片组里的上传图片');
+      return;
+    }
     setUploading(true);
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const result = await uploadQiniuImage(file, prefix);
         const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
         const figure = document.createElement('figure');
@@ -415,9 +418,9 @@ export function RichTextEditor({
           multiple
           className="hidden"
           onChange={(event) => {
-            const files = event.currentTarget.files;
+            const files = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = '';
-            if (files?.length) void uploadScrollImages(files);
+            if (files.length) void uploadScrollImages(files);
           }}
         />
       </div>
