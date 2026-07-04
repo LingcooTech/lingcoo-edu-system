@@ -218,7 +218,7 @@ function TeacherCard({ teacher }: { teacher: PublicTeacher }) {
 
 function teacherStats(teacher: PublicTeacher) {
   return [
-    { label: '习书', value: teacher.practiceDuration },
+    { label: '专业', value: teacher.practiceDuration },
     { label: '教学', value: teacher.teachingYears },
     { label: '学员', value: teacher.studentCount },
   ].filter((item): item is { label: string; value: string } => Boolean(item.value?.trim()));

@@ -377,10 +377,10 @@ export function TeachersPage({
               onChange={(event) => setForm({ ...form, studentCount: event.target.value })}
             />
           </Field>
-          <Field label="习书时长">
+          <Field label="专业积累">
             <input
               className="form-input"
-              placeholder="如 8年 / 3000小时"
+              placeholder="如 8年 / 3000小时 / 专业训练经历"
               value={form.practiceDuration}
               onChange={(event) => setForm({ ...form, practiceDuration: event.target.value })}
             />
