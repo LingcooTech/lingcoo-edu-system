@@ -1,16 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import {
-  Bold,
-  Heading2,
-  Image,
-  Images,
-  Italic,
-  Link,
-  List,
-  Quote,
-  Trash2,
-  UploadCloud,
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bold, Heading2, Image, Images, Italic, Link, List, Quote, UploadCloud } from 'lucide-react';
 
 import { uploadQiniuImage } from '@/api/client';
 import { useToast } from '@/components/shared/Toast';
@@ -18,70 +7,16 @@ import { useToast } from '@/components/shared/Toast';
 interface Tool {
   label: string;
   icon: typeof Bold;
-  apply: (selection: string) => string;
+  apply: () => void;
 }
 
-type EditorBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; alt: string; url: string }
-  | { type: 'imageScroll'; images: Array<{ alt: string; url: string }> };
-
-type UploadTarget = { type: 'image' } | { type: 'imageScroll'; blockIndex: number };
-
-const TOOLS: Tool[] = [
-  {
-    label: '标题',
-    icon: Heading2,
-    apply: (selection) => `## ${selection || '小标题'}`,
-  },
-  {
-    label: '加粗',
-    icon: Bold,
-    apply: (selection) => `**${selection || '重点文字'}**`,
-  },
-  {
-    label: '斜体',
-    icon: Italic,
-    apply: (selection) => `*${selection || '强调文字'}*`,
-  },
-  {
-    label: '列表',
-    icon: List,
-    apply: (selection) =>
-      selection
-        ? selection
-            .split('\n')
-            .map((line) => (line.trim() ? `- ${line.replace(/^- /, '')}` : line))
-            .join('\n')
-        : '- 列表项',
-  },
-  {
-    label: '引用',
-    icon: Quote,
-    apply: (selection) =>
-      selection
-        ? selection
-            .split('\n')
-            .map((line) => (line.trim() ? `> ${line.replace(/^> /, '')}` : line))
-            .join('\n')
-        : '> 引用内容',
-  },
-  {
-    label: '链接',
-    icon: Link,
-    apply: (selection) => `[${selection || '链接文字'}](https://)`,
-  },
-];
-
-function parseImage(line: string) {
-  const match = line.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
-  return match ? { alt: match[1] || '', url: match[2] || '' } : null;
-}
-
-function parseImageFromHtml(value: string) {
-  const src = value.match(/\ssrc=["']([^"']+)["']/i)?.[1] ?? '';
-  const alt = value.match(/\salt=["']([^"']*)["']/i)?.[1] ?? '';
-  return src ? { alt: stripHtml(alt), url: decodeHtmlEntities(src) } : null;
+function htmlEscape(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function decodeHtmlEntities(value: string) {
@@ -103,135 +38,162 @@ function stripHtml(value: string) {
   );
 }
 
-function htmlToMarkdown(value: string) {
-  let next = value.replace(/\r\n/g, '\n');
-
-  next = next.replace(
-    /<div[^>]*(?:class=["'][^"']*article-image-scroll[^"']*["']|data-role=["']image-scroll["'])[^>]*>([\s\S]*?)<\/div>/gi,
-    (_, inner) => {
-      const images = [...String(inner).matchAll(/<img\b[^>]*>/gi)]
-        .map((match) => parseImageFromHtml(match[0]))
-        .filter((image): image is { alt: string; url: string } => Boolean(image));
-      if (!images.length) return '\n\n';
-      return `\n\n:::image-scroll\n${images
-        .map((image) => `![${image.alt}](${image.url})`)
-        .join('\n')}\n:::\n\n`;
-    },
-  );
-  next = next.replace(
-    /<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi,
-    (_, url, alt) => {
-      return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
-    },
-  );
-  next = next.replace(
-    /<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi,
-    (_, alt, url) => {
-      return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
-    },
-  );
-  next = next.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, (_, url) => {
-    return `\n\n![](${decodeHtmlEntities(url)})\n\n`;
-  });
-  next = next.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, text) => `\n\n## ${stripHtml(text)}\n\n`);
-  next = next.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, text) => `\n\n## ${stripHtml(text)}\n\n`);
-  next = next.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, text) => `\n\n### ${stripHtml(text)}\n\n`);
-  next = next.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, text) => {
-    return `\n\n${stripHtml(text)
-      .split('\n')
-      .map((line) => (line.trim() ? `> ${line.trim()}` : line))
-      .join('\n')}\n\n`;
-  });
-  next = next.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, text) => `\n- ${stripHtml(text)}`);
-  next = next.replace(/<\/?(ul|ol)[^>]*>/gi, '\n');
-  next = next.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, text) => `\n\n${stripHtml(text)}\n\n`);
-  next = stripHtml(next);
-
-  return next
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
 function looksLikeHtml(value: string) {
   return /<\/?[a-z][\s\S]*>/i.test(value);
 }
 
-function normalizeEditorValue(value: string) {
-  return looksLikeHtml(value) ? htmlToMarkdown(value) : value;
+function parseMarkdownImage(value: string) {
+  const match = value.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+  return match ? { alt: match[1] || '', url: match[2] || '' } : null;
 }
 
-function flushTextBlock(blocks: EditorBlock[], text: string[]) {
-  const content = text.join('\n').trim();
-  if (content) blocks.push({ type: 'text', text: content });
-  text.length = 0;
+function markdownInlineToHtml(value: string) {
+  return htmlEscape(value)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)]+|\/[^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
+    );
 }
 
-function parseEditorBlocks(value: string): EditorBlock[] {
-  const blocks: EditorBlock[] = [];
-  const text: string[] = [];
+function markdownToHtml(value: string) {
+  const html: string[] = [];
+  const paragraph: string[] = [];
   const lines = value.replace(/\r\n/g, '\n').split('\n');
   let index = 0;
 
-  while (index < lines.length) {
-    const line = lines[index].trimEnd();
-    const trimmed = line.trim();
+  function flushParagraph() {
+    if (!paragraph.length) return;
+    html.push(`<p>${markdownInlineToHtml(paragraph.join(' '))}</p>`);
+    paragraph.length = 0;
+  }
 
-    if (trimmed === ':::image-scroll') {
-      flushTextBlock(blocks, text);
-      const images: Array<{ alt: string; url: string }> = [];
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (!line) {
+      flushParagraph();
+      index += 1;
+      continue;
+    }
+
+    if (line === ':::image-scroll') {
+      flushParagraph();
+      const figures: string[] = [];
       index += 1;
       while (index < lines.length && lines[index].trim() !== ':::') {
-        const image = parseImage(lines[index].trim());
-        if (image) images.push(image);
+        const image = parseMarkdownImage(lines[index].trim());
+        if (image) {
+          figures.push(
+            `<figure><img src="${htmlEscape(image.url)}" alt="${htmlEscape(image.alt)}" /></figure>`,
+          );
+        }
         index += 1;
       }
-      blocks.push({ type: 'imageScroll', images });
       if (index < lines.length && lines[index].trim() === ':::') index += 1;
+      html.push(`<div class="article-image-scroll" data-role="image-scroll">${figures.join('')}</div>`);
       continue;
     }
 
-    const image = parseImage(trimmed);
+    const image = parseMarkdownImage(line);
     if (image) {
-      flushTextBlock(blocks, text);
-      blocks.push({ type: 'image', alt: image.alt, url: image.url });
+      flushParagraph();
+      html.push(`<figure><img src="${htmlEscape(image.url)}" alt="${htmlEscape(image.alt)}" /></figure>`);
       index += 1;
       continue;
     }
 
-    if (!trimmed && text.length === 0) {
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      const level = heading[1].length;
+      html.push(`<h${level}>${markdownInlineToHtml(heading[2])}</h${level}>`);
       index += 1;
       continue;
     }
 
-    text.push(line);
+    paragraph.push(line);
     index += 1;
   }
 
-  flushTextBlock(blocks, text);
-  if (blocks.length > 0 && blocks[blocks.length - 1].type !== 'text') {
-    blocks.push({ type: 'text', text: '' });
-  }
-  return blocks.length ? blocks : [{ type: 'text', text: '' }];
+  flushParagraph();
+  return html.join('\n');
 }
 
-function serializeImage(image: { alt: string; url: string }) {
-  return `![${image.alt}](${image.url})`;
+function editorButton(label: string, action: string) {
+  return `<button type="button" data-editor-ui="true" data-editor-action="${action}" class="editor-inline-button">${label}</button>`;
 }
 
-function serializeBlocks(blocks: EditorBlock[]) {
-  return blocks
-    .map((block) => {
-      if (block.type === 'text') return block.text.trim();
-      if (block.type === 'image') return block.url.trim() ? serializeImage(block) : '';
-      const images = block.images.filter((image) => image.url.trim());
-      if (!images.length) return ':::image-scroll\n:::';
-      return `:::image-scroll\n${images.map(serializeImage).join('\n')}\n:::`;
-    })
-    .filter(Boolean)
-    .join('\n\n');
+function buildFigureHtml(url: string, alt: string) {
+  return `<figure contenteditable="false" data-editor-widget="image"><img src="${htmlEscape(url)}" alt="${htmlEscape(
+    alt,
+  )}" />${editorButton('移除', 'remove-widget')}</figure>`;
+}
+
+function buildImageScrollHtml(images: Array<{ url: string; alt: string }> = []) {
+  const figures = images
+    .map((image) => `<figure><img src="${htmlEscape(image.url)}" alt="${htmlEscape(image.alt)}" /></figure>`)
+    .join('');
+  return `<div class="article-image-scroll" data-role="image-scroll" data-editor-widget="image-scroll" contenteditable="false">${figures}<div data-editor-ui="true" class="editor-scroll-actions">${editorButton(
+    '上传图片',
+    'upload-scroll-image',
+  )}${editorButton('移除', 'remove-widget')}</div></div>`;
+}
+
+function decorateEditorHtml(value: string) {
+  const source = looksLikeHtml(value) ? value : markdownToHtml(value);
+  const doc = new DOMParser().parseFromString(`<main>${source || '<p><br></p>'}</main>`, 'text/html');
+  const root = doc.body.firstElementChild as HTMLElement;
+
+  root.querySelectorAll('[data-editor-ui]').forEach((node) => node.remove());
+  root.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+  root.querySelectorAll('[data-editor-widget]').forEach((node) => node.removeAttribute('data-editor-widget'));
+
+  root.querySelectorAll('div.article-image-scroll, div[data-role="image-scroll"]').forEach((node) => {
+    const element = node as HTMLElement;
+    element.classList.add('article-image-scroll');
+    element.setAttribute('data-role', 'image-scroll');
+    element.setAttribute('data-editor-widget', 'image-scroll');
+    element.setAttribute('contenteditable', 'false');
+    element.insertAdjacentHTML(
+      'beforeend',
+      `<div data-editor-ui="true" class="editor-scroll-actions">${editorButton(
+        '上传图片',
+        'upload-scroll-image',
+      )}${editorButton('移除', 'remove-widget')}</div>`,
+    );
+  });
+
+  root.querySelectorAll('figure').forEach((node) => {
+    if (node.closest('.article-image-scroll')) return;
+    const figure = node as HTMLElement;
+    figure.setAttribute('contenteditable', 'false');
+    figure.setAttribute('data-editor-widget', 'image');
+    figure.insertAdjacentHTML('beforeend', editorButton('移除', 'remove-widget'));
+  });
+
+  return root.innerHTML.trim() || '<p><br></p>';
+}
+
+function cleanEditorHtml(value: string) {
+  const doc = new DOMParser().parseFromString(`<main>${value}</main>`, 'text/html');
+  const root = doc.body.firstElementChild as HTMLElement;
+
+  root.querySelectorAll('[data-editor-ui]').forEach((node) => node.remove());
+  root.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+  root.querySelectorAll('[data-editor-widget]').forEach((node) => node.removeAttribute('data-editor-widget'));
+  root.querySelectorAll('.article-image-scroll, [data-role="image-scroll"]').forEach((node) => {
+    const element = node as HTMLElement;
+    element.classList.add('article-image-scroll');
+    element.setAttribute('data-role', 'image-scroll');
+    if (!element.querySelector('img')) element.remove();
+  });
+
+  return root.innerHTML.trim();
+}
+
+function isSelectionInside(container: HTMLElement, range: Range) {
+  return container.contains(range.commonAncestorContainer);
 }
 
 export function RichTextEditor({
@@ -244,142 +206,102 @@ export function RichTextEditor({
   prefix?: string;
 }) {
   const toast = useToast();
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const textRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
-  const blockRefs = useRef<Record<number, HTMLElement | null>>({});
-  const textSelectionRef = useRef<{ blockIndex: number; start: number; end: number } | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const scrollInputRef = useRef<HTMLInputElement | null>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const emittedValueRef = useRef<string>('');
+  const scrollTargetRef = useRef<HTMLElement | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [focusedTextIndex, setFocusedTextIndex] = useState<number | null>(null);
-  const [uploadTarget, setUploadTarget] = useState<UploadTarget>({ type: 'image' });
-  const editorValue = useMemo(() => normalizeEditorValue(value), [value]);
-  const blocks = useMemo(() => parseEditorBlocks(editorValue), [editorValue]);
 
-  function emit(nextBlocks: EditorBlock[]) {
-    onChange(serializeBlocks(nextBlocks));
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || value === emittedValueRef.current) return;
+    editor.innerHTML = decorateEditorHtml(value);
+  }, [value]);
+
+  function emitCurrentValue() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const cleanHtml = cleanEditorHtml(editor.innerHTML);
+    emittedValueRef.current = cleanHtml;
+    onChange(cleanHtml);
   }
 
-  function updateBlock(index: number, nextBlock: EditorBlock) {
-    emit(blocks.map((block, blockIndex) => (blockIndex === index ? nextBlock : block)));
+  function saveSelection() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (isSelectionInside(editor, range)) savedRangeRef.current = range.cloneRange();
   }
 
-  function removeBlock(index: number) {
-    const next = blocks.filter((_, blockIndex) => blockIndex !== index);
-    emit(next.length ? next : [{ type: 'text', text: '' }]);
-  }
-
-  function rememberSelection(index: number) {
-    const textarea = textRefs.current[index];
-    if (!textarea) return;
-    textSelectionRef.current = {
-      blockIndex: index,
-      start: textarea.selectionStart,
-      end: textarea.selectionEnd,
-    };
-    setFocusedTextIndex(index);
-  }
-
-  function scrollBlockIntoView(index: number) {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        blockRefs.current[index]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      });
-    });
-  }
-
-  function insertBlockAtCursor(block: EditorBlock) {
-    const selection =
-      focusedTextIndex !== null && blocks[focusedTextIndex]?.type === 'text'
-        ? {
-            blockIndex: focusedTextIndex,
-            start: textRefs.current[focusedTextIndex]?.selectionStart ?? 0,
-            end: textRefs.current[focusedTextIndex]?.selectionEnd ?? 0,
-          }
-        : textSelectionRef.current;
-
-    if (!selection || blocks[selection.blockIndex]?.type !== 'text') {
-      const next = [...blocks, block];
-      const insertIndex = next.length - 1;
-      if (block.type !== 'text') next.push({ type: 'text', text: '' });
-      emit(next);
-      scrollBlockIntoView(insertIndex);
+  function restoreSelection() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection) return;
+    editor.focus();
+    selection.removeAllRanges();
+    if (savedRangeRef.current) {
+      selection.addRange(savedRangeRef.current);
       return;
     }
-
-    const textBlock = blocks[selection.blockIndex] as Extract<EditorBlock, { type: 'text' }>;
-    const before = textBlock.text.slice(0, selection.start);
-    const after = textBlock.text.slice(selection.end);
-    const next: EditorBlock[] = [
-      ...blocks.slice(0, selection.blockIndex),
-      ...(before.trim() ? [{ type: 'text' as const, text: before }] : []),
-      block,
-      { type: 'text', text: after },
-      ...blocks.slice(selection.blockIndex + 1),
-    ];
-    const insertIndex = blocks.slice(0, selection.blockIndex).length + (before.trim() ? 1 : 0);
-    emit(next);
-    scrollBlockIntoView(insertIndex);
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.addRange(range);
+    savedRangeRef.current = range.cloneRange();
   }
 
-  function replaceSelection(replacement: string, blockIndex = focusedTextIndex) {
-    if (blockIndex === null || blocks[blockIndex]?.type !== 'text') {
-      insertBlockAtCursor({ type: 'text', text: replacement });
-      return;
+  function insertHtmlAtSelection(html: string) {
+    restoreSelection();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const fragment = range.createContextualFragment(`${html}<p><br></p>`);
+    const inserted = fragment.firstElementChild as HTMLElement | null;
+    const lastNode = fragment.lastChild;
+    range.insertNode(fragment);
+    if (lastNode) {
+      range.setStartAfter(lastNode);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      savedRangeRef.current = range.cloneRange();
     }
-
-    const textarea = textRefs.current[blockIndex] ?? textareaRef.current;
-    const block = blocks[blockIndex] as Extract<EditorBlock, { type: 'text' }>;
-    if (!textarea) {
-      updateBlock(blockIndex, {
-        ...block,
-        text: `${block.text}${block.text ? '\n' : ''}${replacement}`,
-      });
-      return;
-    }
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const before = block.text.slice(0, start);
-    const after = block.text.slice(end);
-    const next = `${before}${replacement}${after}`;
-    updateBlock(blockIndex, { ...block, text: next });
-
-    window.requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start, start + replacement.length);
-    });
+    emitCurrentValue();
+    return inserted;
   }
 
-  function applyTool(tool: Tool) {
-    const textarea =
-      focusedTextIndex === null ? textareaRef.current : textRefs.current[focusedTextIndex];
-    const block =
-      focusedTextIndex === null || blocks[focusedTextIndex]?.type !== 'text'
-        ? null
-        : (blocks[focusedTextIndex] as Extract<EditorBlock, { type: 'text' }>);
-    const selection = textarea
-      ? (block?.text ?? '').slice(textarea.selectionStart, textarea.selectionEnd)
-      : '';
-    replaceSelection(tool.apply(selection));
+  function applyCommand(command: string, valueArg?: string) {
+    restoreSelection();
+    document.execCommand(command, false, valueArg);
+    saveSelection();
+    emitCurrentValue();
   }
 
-  async function upload(file: File) {
+  const tools: Tool[] = [
+    { label: '标题', icon: Heading2, apply: () => applyCommand('formatBlock', 'h2') },
+    { label: '加粗', icon: Bold, apply: () => applyCommand('bold') },
+    { label: '斜体', icon: Italic, apply: () => applyCommand('italic') },
+    { label: '列表', icon: List, apply: () => applyCommand('insertUnorderedList') },
+    { label: '引用', icon: Quote, apply: () => applyCommand('formatBlock', 'blockquote') },
+    {
+      label: '链接',
+      icon: Link,
+      apply: () => {
+        const href = window.prompt('输入链接地址');
+        if (href) applyCommand('createLink', href);
+      },
+    },
+  ];
+
+  async function uploadSingleImage(file: File) {
     setUploading(true);
     try {
       const result = await uploadQiniuImage(file, prefix);
-      const image = { alt: file.name.replace(/\.[^.]+$/, '') || '图片', url: result.publicUrl };
-      if (
-        uploadTarget.type === 'imageScroll' &&
-        blocks[uploadTarget.blockIndex]?.type === 'imageScroll'
-      ) {
-        const block = blocks[uploadTarget.blockIndex] as Extract<
-          EditorBlock,
-          { type: 'imageScroll' }
-        >;
-        updateBlock(uploadTarget.blockIndex, { ...block, images: [...block.images, image] });
-      } else {
-        insertBlockAtCursor({ type: 'image', ...image });
-      }
+      insertHtmlAtSelection(buildFigureHtml(result.publicUrl, file.name.replace(/\.[^.]+$/, '') || '图片'));
       toast.success('图片已上传并插入正文');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '上传失败');
@@ -388,10 +310,54 @@ export function RichTextEditor({
     }
   }
 
+  async function uploadScrollImages(files: FileList) {
+    const target = scrollTargetRef.current;
+    if (!target) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const result = await uploadQiniuImage(file, prefix);
+        const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
+        const figure = document.createElement('figure');
+        figure.innerHTML = `<img src="${htmlEscape(result.publicUrl)}" alt="${htmlEscape(alt)}" />`;
+        const actions = target.querySelector('[data-editor-ui]');
+        target.insertBefore(figure, actions);
+      }
+      emitCurrentValue();
+      toast.success('图片已添加到横向图片组');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '上传失败');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleEditorClick(event: React.MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    const action = target.closest('[data-editor-action]') as HTMLElement | null;
+    if (!action) {
+      saveSelection();
+      return;
+    }
+
+    event.preventDefault();
+    const widget = action.closest('[data-editor-widget]') as HTMLElement | null;
+    switch (action.dataset.editorAction) {
+      case 'upload-scroll-image':
+        scrollTargetRef.current = action.closest('.article-image-scroll') as HTMLElement | null;
+        scrollInputRef.current?.click();
+        break;
+      case 'remove-widget':
+        widget?.remove();
+        emitCurrentValue();
+        break;
+    }
+  }
+
   return (
-    <div className="border-border/80 bg-background flex min-h-[640px] max-h-[72vh] flex-col overflow-hidden rounded-lg border">
-      <div className="border-border/80 bg-muted/95 sticky top-0 z-20 flex flex-wrap items-center gap-1 border-b px-2 py-2 shadow-sm backdrop-blur">
-        {TOOLS.map((tool) => {
+    <div className="border-border/80 bg-background min-h-[640px] rounded-lg border">
+      <div className="border-border/80 bg-muted/95 sticky top-0 z-30 flex flex-wrap items-center gap-1 rounded-t-lg border-b px-2 py-2 shadow-sm backdrop-blur">
+        {tools.map((tool) => {
           const Icon = tool.icon;
           return (
             <button
@@ -400,7 +366,8 @@ export function RichTextEditor({
               className="btn btn-ghost h-8 px-2"
               title={tool.label}
               aria-label={tool.label}
-              onClick={() => applyTool(tool)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={tool.apply}
             >
               <Icon className="h-4 w-4" />
             </button>
@@ -412,177 +379,60 @@ export function RichTextEditor({
           title="上传图片"
           aria-label="上传图片"
           disabled={uploading}
-          onClick={() => {
-            setUploadTarget({ type: 'image' });
-            inputRef.current?.click();
-          }}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => imageInputRef.current?.click()}
         >
-          {uploading ? (
-            <UploadCloud className="h-4 w-4 animate-pulse" />
-          ) : (
-            <Image className="h-4 w-4" />
-          )}
+          {uploading ? <UploadCloud className="h-4 w-4 animate-pulse" /> : <Image className="h-4 w-4" />}
         </button>
         <button
           type="button"
           className="btn btn-ghost h-8 px-2"
           title="横向图片组"
           aria-label="横向图片组"
-          onClick={() => insertBlockAtCursor({ type: 'imageScroll', images: [] })}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            const inserted = insertHtmlAtSelection(buildImageScrollHtml());
+            scrollTargetRef.current = inserted;
+          }}
         >
           <Images className="h-4 w-4" />
         </button>
         <input
-          ref={inputRef}
+          ref={imageInputRef}
           type="file"
           accept="image/*"
           className="hidden"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = '';
-            if (file) void upload(file);
+            if (file) void uploadSingleImage(file);
+          }}
+        />
+        <input
+          ref={scrollInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            const files = event.currentTarget.files;
+            event.currentTarget.value = '';
+            if (files?.length) void uploadScrollImages(files);
           }}
         />
       </div>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        {blocks.map((block, index) => {
-          if (block.type === 'text') {
-            return (
-              <textarea
-                key={`text-${index}`}
-                ref={(node) => {
-                  textRefs.current[index] = node;
-                  if (index === 0) textareaRef.current = node;
-                }}
-                className={`bg-background border-border/70 focus:border-primary w-full resize-y overflow-y-auto rounded-lg border px-3 py-3 text-sm leading-6 outline-none ${
-                  blocks.length === 1 ? 'min-h-[520px]' : 'min-h-44'
-                }`}
-                value={block.text}
-                placeholder="输入正文，可使用工具栏添加标题、列表、引用、链接。"
-                onFocus={() => rememberSelection(index)}
-                onSelect={() => rememberSelection(index)}
-                onKeyUp={() => rememberSelection(index)}
-                onMouseUp={() => rememberSelection(index)}
-                onChange={(event) => updateBlock(index, { ...block, text: event.target.value })}
-              />
-            );
-          }
-
-          if (block.type === 'image') {
-            return (
-              <figure
-                key={`image-${index}`}
-                ref={(node) => {
-                  blockRefs.current[index] = node;
-                }}
-                className="group relative overflow-hidden rounded-lg"
-              >
-                {block.url ? (
-                  <img
-                    src={block.url}
-                    alt={block.alt}
-                    className="border-border/70 max-h-[520px] w-full rounded-lg border object-contain"
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  className="bg-background/95 text-muted-foreground hover:text-red-600 absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm opacity-0 transition-opacity group-hover:opacity-100"
-                  title="移除图片"
-                  aria-label="移除图片"
-                  onClick={() => removeBlock(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </figure>
-            );
-          }
-
-          return (
-            <div
-              key={`scroll-${index}`}
-              ref={(node) => {
-                blockRefs.current[index] = node;
-              }}
-              className="border-border/70 bg-muted/15 rounded-lg border p-3"
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">横向图片组</div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-secondary h-8 px-2 text-xs"
-                    onClick={() => {
-                      setUploadTarget({ type: 'imageScroll', blockIndex: index });
-                      inputRef.current?.click();
-                    }}
-                  >
-                    上传图片
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost h-8 px-2 text-red-600"
-                    onClick={() => removeBlock(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {block.images.map((image, imageIndex) => (
-                  <div key={`${image.url}-${imageIndex}`} className="w-48 flex-none space-y-2">
-                    {image.url ? (
-                      <img
-                        src={image.url}
-                        alt={image.alt}
-                        className="aspect-[4/3] w-full rounded-lg border object-cover"
-                      />
-                    ) : (
-                      <div className="bg-muted flex aspect-[4/3] w-full items-center justify-center rounded-lg border text-xs">
-                        图片
-                      </div>
-                    )}
-                    <input
-                      className="form-input h-9 text-xs"
-                      value={image.url}
-                      placeholder="图片 URL"
-                      onChange={(event) => {
-                        const images = block.images.map((item, itemIndex) =>
-                          itemIndex === imageIndex ? { ...item, url: event.target.value } : item,
-                        );
-                        updateBlock(index, { ...block, images });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-ghost h-8 w-full text-xs text-red-600"
-                      onClick={() => {
-                        const images = block.images.filter(
-                          (_, itemIndex) => itemIndex !== imageIndex,
-                        );
-                        updateBlock(index, { ...block, images });
-                      }}
-                    >
-                      移除
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="border-border/70 bg-background text-muted-foreground flex aspect-[4/3] w-48 flex-none items-center justify-center rounded-lg border border-dashed text-sm"
-                  onClick={() =>
-                    updateBlock(index, {
-                      ...block,
-                      images: [...block.images, { alt: '', url: '' }],
-                    })
-                  }
-                >
-                  添加图片
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <div
+        ref={editorRef}
+        className="rich-text-editor-content min-h-[620px] p-6 text-base leading-8 outline-none"
+        contentEditable
+        suppressContentEditableWarning
+        onInput={emitCurrentValue}
+        onBlur={saveSelection}
+        onFocus={saveSelection}
+        onKeyUp={saveSelection}
+        onMouseUp={saveSelection}
+        onClick={handleEditorClick}
+      />
     </div>
   );
 }

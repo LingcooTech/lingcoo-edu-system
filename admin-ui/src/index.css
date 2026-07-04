@@ -193,6 +193,94 @@
     @apply bg-muted rounded px-1 py-0.5 text-xs;
   }
 
+  .rich-text-editor-content {
+    @apply text-foreground/90;
+  }
+
+  .rich-text-editor-content:empty::before {
+    content: '输入正文内容';
+    @apply text-muted-foreground;
+  }
+
+  .rich-text-editor-content p {
+    @apply my-5;
+  }
+
+  .rich-text-editor-content h1,
+  .rich-text-editor-content h2,
+  .rich-text-editor-content h3 {
+    @apply text-foreground mt-7 mb-4 leading-tight font-semibold;
+  }
+
+  .rich-text-editor-content h1 {
+    @apply text-2xl;
+  }
+
+  .rich-text-editor-content h2 {
+    @apply text-xl;
+  }
+
+  .rich-text-editor-content h3 {
+    @apply text-lg;
+  }
+
+  .rich-text-editor-content blockquote {
+    @apply border-primary/35 bg-muted/45 text-muted-foreground my-5 border-l-4 px-4 py-2;
+  }
+
+  .rich-text-editor-content ul,
+  .rich-text-editor-content ol {
+    @apply my-5 pl-6;
+  }
+
+  .rich-text-editor-content ul {
+    @apply list-disc;
+  }
+
+  .rich-text-editor-content ol {
+    @apply list-decimal;
+  }
+
+  .rich-text-editor-content a {
+    @apply text-primary font-medium underline underline-offset-4;
+  }
+
+  .rich-text-editor-content figure {
+    @apply relative my-6;
+  }
+
+  .rich-text-editor-content figure img {
+    @apply border-border/70 max-h-[520px] max-w-full rounded-lg border object-contain;
+  }
+
+  .rich-text-editor-content .article-image-scroll {
+    @apply border-border/70 bg-muted/20 my-6 flex snap-x gap-3 overflow-x-auto rounded-lg border p-3;
+  }
+
+  .rich-text-editor-content .article-image-scroll figure {
+    @apply my-0 w-56 flex-none snap-start;
+  }
+
+  .rich-text-editor-content .article-image-scroll img {
+    @apply aspect-[4/3] h-auto w-full object-cover;
+  }
+
+  .rich-text-editor-content .editor-scroll-actions {
+    @apply flex min-h-40 w-36 flex-none flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-background/80 p-3;
+  }
+
+  .rich-text-editor-content .editor-inline-button {
+    @apply bg-background/95 text-muted-foreground hover:text-primary inline-flex h-8 items-center justify-center rounded-md border px-3 text-xs font-medium shadow-sm;
+  }
+
+  .rich-text-editor-content figure > .editor-inline-button {
+    @apply absolute top-3 right-3 opacity-0 transition-opacity;
+  }
+
+  .rich-text-editor-content figure:hover > .editor-inline-button {
+    @apply opacity-100;
+  }
+
   .data-table-card {
     @apply shadow-[0_16px_42px_rgba(15,23,42,0.055),0_1px_2px_rgba(15,23,42,0.04)];
   }
