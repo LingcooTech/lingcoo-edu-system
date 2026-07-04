@@ -1,4 +1,5 @@
 import type { Block } from '@/components/blocks/blocks';
+import { toUserFacingMessage } from '@/lib/userFacingMessage';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8090');
@@ -259,19 +260,34 @@ export interface AuthAccount {
 
 export async function publicApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getParentToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
+      credentials: 'include',
+    });
+  } catch (error) {
+    throw new Error(
+      toUserFacingMessage(
+        error instanceof Error ? error.message : '',
+        '网络请求失败，请检查网络',
+      ),
+    );
+  }
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(payload?.message ?? `Request failed: ${response.status}`);
+    throw new Error(
+      toUserFacingMessage(
+        payload?.message ?? `Request failed: ${response.status}`,
+        '请求失败，请稍后再试',
+      ),
+    );
   }
 
   return (await response.json()) as T;

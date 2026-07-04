@@ -1,4 +1,5 @@
 import type { Block } from '../utils/blocks';
+import { toUserFacingMessage } from '../utils/user-facing-message';
 import { API_BASE_URL, TOKEN_KEY } from './config';
 
 export interface Course {
@@ -945,10 +946,17 @@ export function request<T>(
           return;
         }
         const payload = result.data as ApiErrorPayload;
-        reject(new Error(payload?.message || `请求失败：${result.statusCode}`));
+        reject(
+          new Error(
+            toUserFacingMessage(
+              payload?.message || `Request failed: ${result.statusCode}`,
+              '请求失败，请稍后再试',
+            ),
+          ),
+        );
       },
       fail(error) {
-        reject(new Error(error.errMsg || '网络请求失败'));
+        reject(new Error(toUserFacingMessage(error.errMsg, '网络请求失败')));
       },
     });
   });

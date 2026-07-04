@@ -15,6 +15,7 @@ import { ZodError } from 'zod';
 
 import { appModules } from './modules/index.js';
 import { parseCorsOrigin } from './lib/http.js';
+import { toUserFacingMessage } from './lib/user-facing-message.js';
 import { createDb } from './db/client.js';
 import type { AppEnv } from './lib/env.js';
 
@@ -127,7 +128,7 @@ export async function buildApp(env: AppEnv) {
     try {
       await request.jwtVerify();
     } catch {
-      return reply.unauthorized('Invalid or expired access token');
+      return reply.unauthorized('登录已过期，请重新登录');
     }
     attachAccount(request);
   });
@@ -137,7 +138,7 @@ export async function buildApp(env: AppEnv) {
       try {
         await request.jwtVerify();
       } catch {
-        return reply.unauthorized('Invalid or expired access token');
+        return reply.unauthorized('登录已过期，请重新登录');
       }
       const payload = attachAccount(request);
       if (!roles.includes(payload.role)) {
@@ -186,16 +187,17 @@ export async function buildApp(env: AppEnv) {
         : 500;
 
     const normalizedError = error instanceof Error ? error : new Error('Internal Server Error');
+    const fallbackMessage = statusCode >= 500 ? '服务器开小差了，请稍后再试' : '操作失败';
 
     return reply.status(statusCode).send({
       error: normalizedError.name || 'Error',
-      message: normalizedError.message || 'Internal Server Error',
+      message: toUserFacingMessage(normalizedError.message, fallbackMessage),
     });
   });
 
   app.setNotFoundHandler((request, reply) => {
     if (request.method !== 'GET') {
-      return reply.notFound();
+      return reply.status(404).send({ error: 'NotFound', message: '接口不存在' });
     }
 
     if (request.url.startsWith('/admin') && existsSync(adminDist)) {
@@ -204,14 +206,14 @@ export async function buildApp(env: AppEnv) {
 
     const apiPrefixes = ['/v1/', '/public/', '/auth/', '/api-docs', '/health', '/ready'];
     if (apiPrefixes.some((prefix) => request.url.startsWith(prefix))) {
-      return reply.notFound();
+      return reply.status(404).send({ error: 'NotFound', message: '接口不存在' });
     }
 
     if (existsSync(publicDist)) {
       return reply.sendFile('index.html', publicDist);
     }
 
-    return reply.notFound();
+    return reply.status(404).send({ error: 'NotFound', message: '页面不存在' });
   });
 
   return app;

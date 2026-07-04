@@ -16,6 +16,7 @@ import {
 } from '../../services/api';
 import { requestSubscribe } from '../../services/subscribe';
 import { formatDateTime, money } from '../../utils/format';
+import { toUserFacingMessage } from '../../utils/user-facing-message';
 
 type ReservationOrder = ParentOrder & { amountLabel: string; statusLabel: string };
 type PhoneWx = typeof wx & {
@@ -83,7 +84,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
       signType,
       paySign,
       success: () => resolve(),
-      fail: (error) => reject(new Error(error.errMsg || '支付失败')),
+      fail: (error) => reject(new Error(toUserFacingMessage(error.errMsg, '支付失败'))),
     });
   });
 }

@@ -24,6 +24,7 @@ import {
   type LessonAccountItem,
 } from '../../utils/parent-center';
 import { money } from '../../utils/format';
+import { toUserFacingMessage } from '../../utils/user-facing-message';
 
 type RenewalAction = {
   key: string;
@@ -109,7 +110,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
       signType,
       paySign,
       success: () => resolve(),
-      fail: (error) => reject(new Error(error.errMsg || '支付失败')),
+      fail: (error) => reject(new Error(toUserFacingMessage(error.errMsg, '支付失败'))),
     });
   });
 }
@@ -124,7 +125,7 @@ function loginWechatMiniCode(): Promise<string> {
         }
         reject(new Error('登录失败，请稍后重试'));
       },
-      fail: (error) => reject(new Error(error.errMsg || '登录失败，请稍后重试')),
+      fail: (error) => reject(new Error(toUserFacingMessage(error.errMsg, '登录失败，请稍后重试'))),
     });
   });
 }
@@ -357,7 +358,10 @@ Page({
     const phoneCode = event.detail.code;
     if (!key) return;
     if (!phoneCode) {
-      wx.showToast({ title: event.detail.errMsg || '请授权手机号后续费', icon: 'none' });
+      wx.showToast({
+        title: toUserFacingMessage(event.detail.errMsg, '请授权手机号后续费'),
+        icon: 'none',
+      });
       return;
     }
     if (this.data.payingKey) return;

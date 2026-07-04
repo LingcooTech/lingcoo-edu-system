@@ -140,6 +140,15 @@ function buildImageScrollHtml(images: Array<{ url: string; alt: string }> = []) 
   )}${editorButton('移除', 'remove-widget')}</div></div>`;
 }
 
+function imagesFromScrollTarget(target: HTMLElement) {
+  return [...target.querySelectorAll('figure img')]
+    .map((image) => ({
+      url: image.getAttribute('src') || '',
+      alt: image.getAttribute('alt') || '',
+    }))
+    .filter((image) => image.url);
+}
+
 function decorateEditorHtml(value: string) {
   const source = looksLikeHtml(value) ? value : markdownToHtml(value);
   const doc = new DOMParser().parseFromString(`<main>${source || '<p><br></p>'}</main>`, 'text/html');
@@ -339,19 +348,17 @@ export function RichTextEditor({
     }
     setUploading(true);
     try {
+      const nextImages = imagesFromScrollTarget(target);
       for (const file of files) {
         const result = await uploadQiniuImage(file, prefix);
         const alt = file.name.replace(/\.[^.]+$/, '') || '图片';
-        const figure = document.createElement('figure');
-        figure.innerHTML = `<img src="${htmlEscape(result.publicUrl)}" alt="${htmlEscape(alt)}" />`;
-        const actions: Element | null = target.querySelector('[data-editor-ui]');
-        if (actions?.parentElement === target) {
-          target.insertBefore(figure, actions);
-        } else {
-          target.appendChild(figure);
-        }
+        nextImages.push({ url: result.publicUrl, alt });
       }
-      target.removeAttribute('data-active-scroll-upload');
+      target.insertAdjacentHTML('afterend', buildImageScrollHtml(nextImages));
+      const replacement = target.nextElementSibling as HTMLElement | null;
+      target.remove();
+      setActiveScrollTarget(replacement);
+      replacement?.removeAttribute('data-active-scroll-upload');
       emitCurrentValue();
       toast.success('图片已添加到横向图片组');
     } catch (error) {

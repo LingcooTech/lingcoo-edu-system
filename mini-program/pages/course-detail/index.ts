@@ -20,6 +20,7 @@ import {
   type StudentWork,
 } from '../../services/api';
 import { money } from '../../utils/format';
+import { toUserFacingMessage } from '../../utils/user-facing-message';
 import { parseBlocks, type Block } from '../../utils/blocks';
 import { requestSubscribe } from '../../services/subscribe';
 
@@ -105,7 +106,7 @@ function requestWechatPayment(intent: PaymentIntent): Promise<void> {
       signType,
       paySign,
       success: () => resolve(),
-      fail: (error) => reject(new Error(error.errMsg || '支付失败')),
+      fail: (error) => reject(new Error(toUserFacingMessage(error.errMsg, '支付失败'))),
     });
   });
 }
@@ -120,7 +121,7 @@ function loginWechatMini(): Promise<string> {
         }
         reject(new Error('登录失败，请稍后重试'));
       },
-      fail: (error) => reject(new Error(error.errMsg || '登录失败，请稍后重试')),
+      fail: (error) => reject(new Error(toUserFacingMessage(error.errMsg, '登录失败，请稍后重试'))),
     });
   });
 }

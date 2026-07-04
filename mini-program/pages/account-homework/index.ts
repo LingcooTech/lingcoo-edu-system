@@ -16,6 +16,7 @@ import {
   type HomeworkItem,
   type HomeworkTarget,
 } from '../../utils/parent-center';
+import { toUserFacingMessage } from '../../utils/user-facing-message';
 
 const MAX_IMAGES = 9;
 type HomeworkTab = 'assignments' | 'checkin' | 'records';
@@ -168,7 +169,7 @@ Page({
                 reject(new Error('图片上传失败'));
               }
             },
-            fail: (error) => reject(new Error(error.errMsg || '图片上传失败')),
+            fail: (error) => reject(new Error(toUserFacingMessage(error.errMsg, '图片上传失败'))),
           });
         }),
     );

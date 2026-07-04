@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { toUserFacingMessage } from '@/lib/userFacingMessage';
 
 type ToastTone = 'success' | 'error' | 'info';
 
@@ -35,7 +36,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, tone: ToastTone = 'info') => {
       counter.current += 1;
       const id = counter.current;
-      setItems((current) => [...current, { id, tone, message }]);
+      const displayMessage = tone === 'error' ? toUserFacingMessage(message, '操作失败') : message;
+      setItems((current) => [...current, { id, tone, message: displayMessage }]);
       setTimeout(() => remove(id), 3200);
     },
     [remove],

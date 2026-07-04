@@ -33,7 +33,7 @@ export async function validateLeadPreferences(
 ) {
   const campuses = await organizationRepo.listCampuses(db);
   if (!campuses.some((campus) => campus.id === input.campusId)) {
-    throw unprocessable('Selected campus is not available');
+    throw unprocessable('所选校区暂不可用');
   }
 
   const course = input.courseId ? await catalogRepo.requireCourse(db, input.courseId) : null;
@@ -43,10 +43,10 @@ export async function validateLeadPreferences(
       const classrooms = await teachingRepo.findClassrooms(db, classroomIds);
       const campusIds = new Set(classrooms.map((classroom) => classroom.campusId));
       if (campusIds.size > 0 && !campusIds.has(input.campusId)) {
-        throw unprocessable('Selected campus is not available for this course');
+        throw unprocessable('所选校区暂不支持该课程');
       }
     } else if (course.campusId && course.campusId !== input.campusId) {
-      throw unprocessable('Selected campus is not available for this course');
+      throw unprocessable('所选校区暂不支持该课程');
     }
   }
 
@@ -54,13 +54,13 @@ export async function validateLeadPreferences(
 
   const teacher = await teachingRepo.findTeacher(db, input.preferredTeacherId);
   if (!teacher || teacher.status === 'archived') {
-    throw unprocessable('Selected teacher is not available');
+    throw unprocessable('所选老师暂不可用');
   }
 
   if (!course) return;
 
   const allowedTeacherIds = courseTeacherIds(course);
   if (allowedTeacherIds.length > 0 && !allowedTeacherIds.includes(input.preferredTeacherId)) {
-    throw unprocessable('Selected teacher is not available for this course');
+    throw unprocessable('所选老师暂不支持该课程');
   }
 }

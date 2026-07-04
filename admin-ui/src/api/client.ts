@@ -18,6 +18,7 @@ import type {
   SystemSettingOverview,
   WechatPaymentSettingsInput,
 } from './types';
+import { toUserFacingMessage } from '@/lib/userFacingMessage';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8090');
@@ -50,18 +51,33 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  } catch (error) {
+    throw new Error(
+      toUserFacingMessage(
+        error instanceof Error ? error.message : '',
+        '网络请求失败，请检查网络',
+      ),
+    );
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
       clearToken();
     }
     const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(payload?.message ?? `Request failed: ${response.status}`);
+    throw new Error(
+      toUserFacingMessage(
+        payload?.message ?? `Request failed: ${response.status}`,
+        '请求失败，请稍后再试',
+      ),
+    );
   }
 
   return (await response.json()) as T;
@@ -347,12 +363,22 @@ export async function uploadQiniuImage(file: File, prefix?: string) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}/v1/storage/qiniu/upload?${params}`, {
-    method: 'POST',
-    headers,
-    body: file,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/v1/storage/qiniu/upload?${params}`, {
+      method: 'POST',
+      headers,
+      body: file,
+      credentials: 'include',
+    });
+  } catch (error) {
+    throw new Error(
+      toUserFacingMessage(
+        error instanceof Error ? error.message : '',
+        '七牛云上传失败，请检查网络',
+      ),
+    );
+  }
 
   if (!response.ok) {
     const payload = (await response
@@ -360,7 +386,12 @@ export async function uploadQiniuImage(file: File, prefix?: string) {
       .json()
       .catch(() => null)) as { message?: string } | null;
     const detail = payload?.message ?? (await response.text().catch(() => '')).trim();
-    throw new Error(detail || `七牛云上传失败：${response.status}`);
+    throw new Error(
+      toUserFacingMessage(
+        detail || `Request failed: ${response.status}`,
+        '七牛云上传失败，请稍后再试',
+      ),
+    );
   }
 
   return (await response.json()) as QiniuUploadedImageResponse;

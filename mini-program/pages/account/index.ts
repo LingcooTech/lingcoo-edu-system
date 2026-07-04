@@ -27,6 +27,7 @@ import {
 } from '../../utils/parent-center';
 import { formatDateTime } from '../../utils/format';
 import { GUEST_ACCOUNT_ICONS } from '../../utils/icons';
+import { toUserFacingMessage } from '../../utils/user-facing-message';
 
 type HubStats = {
   childCount: number;
@@ -391,7 +392,7 @@ Page({
       },
       fail: (error) => {
         this.setData({ loading: false });
-        wx.showToast({ title: error.errMsg || '登录失败', icon: 'none' });
+        wx.showToast({ title: toUserFacingMessage(error.errMsg, '登录失败'), icon: 'none' });
       },
     });
   },
@@ -456,7 +457,7 @@ Page({
   onPhoneAuth(event: PhoneAuthEvent) {
     const code = event.detail.code;
     if (!code) {
-      wx.showToast({ title: event.detail.errMsg || '未授权手机号', icon: 'none' });
+      wx.showToast({ title: toUserFacingMessage(event.detail.errMsg, '未授权手机号'), icon: 'none' });
       return;
     }
     this.bindPhone({ phoneCode: code });
