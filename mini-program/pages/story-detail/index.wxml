@@ -31,6 +31,9 @@
               class="story-scroll-image"
               src="{{url}}"
               mode="aspectFill"
+              data-url="{{url}}"
+              data-urls="{{segment.urls}}"
+              bindtap="onPreviewImageGroup"
             />
           </scroll-view>
         </block>

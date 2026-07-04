@@ -1,8 +1,9 @@
 import { ArrowLeft, CalendarDays } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { fetchStory, type ContentItem } from '@/api/client';
+import { ImagePreview, type ImagePreviewState } from '@/components/ImagePreview';
 import { Layout } from '@/components/Layout';
 import { RichTextRenderer } from '@/components/RichTextRenderer';
 import { useSeo } from '@/lib/seo';
@@ -16,6 +17,7 @@ export function StoryDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const [story, setStory] = useState<ContentItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewer, setViewer] = useState<ImagePreviewState | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -40,6 +42,27 @@ export function StoryDetailPage() {
     title: story?.title || '成长故事',
     description: story?.excerpt || story?.content.slice(0, 140),
   });
+
+  function openHtmlImage(event: MouseEvent<HTMLDivElement>) {
+    const image = (event.target as HTMLElement).closest('img') as HTMLImageElement | null;
+    if (!image) return;
+
+    const currentUrl = image.currentSrc || image.src;
+    if (!currentUrl) return;
+    event.preventDefault();
+
+    const group = image.closest('.article-image-scroll, [data-role="image-scroll"]');
+    if (!group) {
+      setViewer({ urls: [currentUrl], index: 0 });
+      return;
+    }
+
+    const urls = [...group.querySelectorAll('img')]
+      .map((item) => item.currentSrc || item.src)
+      .filter(Boolean);
+    const index = Math.max(0, urls.indexOf(currentUrl));
+    setViewer({ urls: urls.length ? urls : [currentUrl], index });
+  }
 
   return (
     <Layout>
@@ -90,7 +113,10 @@ export function StoryDetailPage() {
               ) : null}
             </header>
 
-            <div className="story-content mx-auto mt-6 max-w-3xl sm:mt-8">
+            <div
+              className="story-content mx-auto mt-6 max-w-3xl sm:mt-8"
+              onClick={looksLikeHtml(story.content) ? openHtmlImage : undefined}
+            >
               {looksLikeHtml(story.content) ? (
                 <div dangerouslySetInnerHTML={{ __html: story.content }} />
               ) : (
@@ -102,6 +128,13 @@ export function StoryDetailPage() {
           <div className="pwcard text-muted mt-6 p-6 text-sm">内容不存在或暂未发布。</div>
         )}
       </section>
+      <ImagePreview
+        viewer={viewer}
+        onClose={() => setViewer(null)}
+        onChange={(nextIndex) =>
+          setViewer((current) => (current ? { ...current, index: nextIndex } : current))
+        }
+      />
     </Layout>
   );
 }

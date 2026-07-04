@@ -1,13 +1,15 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 
 import { Link } from 'react-router-dom';
+import { ImagePreview, type ImagePreviewState } from './ImagePreview';
 
 type Segment =
   | { type: 'heading'; level: 2 | 3; text: string }
   | { type: 'paragraph'; lines: string[] }
   | { type: 'list'; items: string[] }
   | { type: 'quote'; lines: string[] }
-  | { type: 'image'; alt: string; url: string };
+  | { type: 'image'; alt: string; url: string }
+  | { type: 'imageScroll'; images: Array<{ alt: string; url: string }> };
 
 function parseImage(line: string) {
   const match = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
@@ -43,6 +45,20 @@ function parseContent(value: string): Segment[] {
       flushParagraph(segments, paragraph);
       segments.push({ type: 'image', alt: image.alt, url: image.url });
       index += 1;
+      continue;
+    }
+
+    if (trimmed === ':::image-scroll') {
+      flushParagraph(segments, paragraph);
+      const images: Array<{ alt: string; url: string }> = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== ':::') {
+        const scrollImage = parseImage(lines[index].trim());
+        if (scrollImage) images.push(scrollImage);
+        index += 1;
+      }
+      if (index < lines.length && lines[index].trim() === ':::') index += 1;
+      if (images.length) segments.push({ type: 'imageScroll', images });
       continue;
     }
 
@@ -147,70 +163,118 @@ function renderInline(text: string): ReactNode[] {
 }
 
 export function RichTextRenderer({ content }: { content: string }) {
+  const [viewer, setViewer] = useState<ImagePreviewState | null>(null);
   const segments = parseContent(content);
   if (segments.length === 0) return null;
 
   return (
-    <div className="space-y-6">
-      {segments.map((segment, index) => {
-        switch (segment.type) {
-          case 'heading':
-            return segment.level === 3 ? (
-              <h3 key={index} className="text-ink text-lg font-semibold">
-                {renderInline(segment.text)}
-              </h3>
-            ) : (
-              <h2 key={index} className="section-title">
-                {renderInline(segment.text)}
-              </h2>
-            );
-          case 'paragraph':
-            return (
-              <p key={index} className="text-ink-soft text-sm leading-7">
-                {segment.lines.map((line, lineIndex) => (
-                  <Fragment key={lineIndex}>
-                    {lineIndex > 0 ? <br /> : null}
-                    {renderInline(line)}
-                  </Fragment>
-                ))}
-              </p>
-            );
-          case 'list':
-            return (
-              <ul key={index} className="text-ink-soft list-disc space-y-1 pl-5 text-sm leading-7">
-                {segment.items.map((item, itemIndex) => (
-                  <li key={itemIndex}>{renderInline(item)}</li>
-                ))}
-              </ul>
-            );
-          case 'quote':
-            return (
-              <blockquote
-                key={index}
-                className="border-brand/30 text-ink-soft border-l-4 pl-4 text-sm leading-7"
-              >
-                {segment.lines.map((line, lineIndex) => (
-                  <Fragment key={lineIndex}>
-                    {lineIndex > 0 ? <br /> : null}
-                    {renderInline(line)}
-                  </Fragment>
-                ))}
-              </blockquote>
-            );
-          case 'image':
-            return (
-              <figure key={index}>
-                <img
-                  src={segment.url}
-                  alt={segment.alt}
-                  loading="lazy"
-                  decoding="async"
-                  className="border-line w-full rounded-2xl border object-cover"
-                />
-              </figure>
-            );
+    <>
+      <div className="space-y-6">
+        {segments.map((segment, index) => {
+          switch (segment.type) {
+            case 'heading':
+              return segment.level === 3 ? (
+                <h3 key={index} className="text-ink text-lg font-semibold">
+                  {renderInline(segment.text)}
+                </h3>
+              ) : (
+                <h2 key={index} className="section-title">
+                  {renderInline(segment.text)}
+                </h2>
+              );
+            case 'paragraph':
+              return (
+                <p key={index} className="text-ink-soft text-sm leading-7">
+                  {segment.lines.map((line, lineIndex) => (
+                    <Fragment key={lineIndex}>
+                      {lineIndex > 0 ? <br /> : null}
+                      {renderInline(line)}
+                    </Fragment>
+                  ))}
+                </p>
+              );
+            case 'list':
+              return (
+                <ul
+                  key={index}
+                  className="text-ink-soft list-disc space-y-1 pl-5 text-sm leading-7"
+                >
+                  {segment.items.map((item, itemIndex) => (
+                    <li key={itemIndex}>{renderInline(item)}</li>
+                  ))}
+                </ul>
+              );
+            case 'quote':
+              return (
+                <blockquote
+                  key={index}
+                  className="border-brand/30 text-ink-soft border-l-4 pl-4 text-sm leading-7"
+                >
+                  {segment.lines.map((line, lineIndex) => (
+                    <Fragment key={lineIndex}>
+                      {lineIndex > 0 ? <br /> : null}
+                      {renderInline(line)}
+                    </Fragment>
+                  ))}
+                </blockquote>
+              );
+            case 'image':
+              return (
+                <figure key={index}>
+                  <button
+                    type="button"
+                    className="block w-full cursor-zoom-in text-left"
+                    onClick={() => setViewer({ urls: [segment.url], index: 0 })}
+                    aria-label="查看大图"
+                  >
+                    <img
+                      src={segment.url}
+                      alt={segment.alt}
+                      loading="lazy"
+                      decoding="async"
+                      className="border-line w-full rounded-2xl border object-cover"
+                    />
+                  </button>
+                </figure>
+              );
+            case 'imageScroll': {
+              const urls = segment.images.map((image) => image.url);
+              return (
+                <div
+                  key={index}
+                  className="article-image-scroll -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0"
+                >
+                  {segment.images.map((image, imageIndex) => (
+                    <figure key={`${image.url}-${imageIndex}`} className="my-0 w-[76vw] flex-none snap-start sm:w-80">
+                      <button
+                        type="button"
+                        className="block w-full cursor-zoom-in text-left"
+                        onClick={() => setViewer({ urls, index: imageIndex })}
+                        aria-label="查看大图"
+                      >
+                        <img
+                          src={image.url}
+                          alt={image.alt}
+                          loading="lazy"
+                          decoding="async"
+                          className="border-line aspect-[4/3] w-full rounded-2xl border object-cover"
+                        />
+                      </button>
+                    </figure>
+                  ))}
+                </div>
+              );
+            }
+          }
+        })}
+      </div>
+      <ImagePreview
+        viewer={viewer}
+        onClose={() => setViewer(null)}
+        onChange={(nextIndex) =>
+          setViewer((current) => (current ? { ...current, index: nextIndex } : current))
         }
-      })}
-    </div>
+      />
+    </>
   );
 }

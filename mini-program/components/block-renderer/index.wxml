@@ -16,12 +16,25 @@
     </view>
 
     <view wx:elif="{{item.type == 'image' && item.url}}" class="block">
-      <image class="image" src="{{item.url}}" mode="widthFix" />
+      <image
+        class="image"
+        src="{{item.url}}"
+        mode="widthFix"
+        data-url="{{item.url}}"
+        bindtap="onPreviewImage"
+      />
       <view wx:if="{{item.caption}}" class="caption">{{item.caption}}</view>
     </view>
 
     <view wx:elif="{{item.type == 'imageText' && (item.url || item.title || item.text)}}" class="block image-text {{item.mediaSide == 'right' ? 'reverse' : ''}}">
-      <image wx:if="{{item.url}}" class="image-text-media" src="{{item.url}}" mode="aspectFill" />
+      <image
+        wx:if="{{item.url}}"
+        class="image-text-media"
+        src="{{item.url}}"
+        mode="aspectFill"
+        data-url="{{item.url}}"
+        bindtap="onPreviewImage"
+      />
       <view class="image-text-body">
         <view wx:if="{{item.title}}" class="image-text-title">{{item.title}}</view>
         <view wx:if="{{item.text}}" class="paragraph">{{item.text}}</view>
@@ -45,7 +58,17 @@
     </view>
 
     <view wx:elif="{{item.type == 'gallery' && item.urls.length}}" class="block gallery">
-      <image wx:for="{{item.urls}}" wx:key="*this" wx:for-item="url" class="gallery-image" src="{{url}}" mode="aspectFill" />
+      <image
+        wx:for="{{item.urls}}"
+        wx:key="*this"
+        wx:for-item="url"
+        class="gallery-image"
+        src="{{url}}"
+        mode="aspectFill"
+        data-url="{{url}}"
+        data-urls="{{item.urls}}"
+        bindtap="onPreviewImage"
+      />
     </view>
 
     <view wx:elif="{{item.type == 'faq' && item.items.length}}" class="block faq">

@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 
+import { ImagePreview, type ImagePreviewState } from '@/components/ImagePreview';
 import type { Block } from './blocks';
 
 /**
@@ -8,13 +10,23 @@ import type { Block } from './blocks';
  * what parents see. All text is escaped React children — no dangerouslySetInnerHTML.
  */
 export function BlockRenderer({ blocks }: { blocks: Block[] }) {
+  const [viewer, setViewer] = useState<ImagePreviewState | null>(null);
   if (blocks.length === 0) return null;
   return (
-    <div className="space-y-6">
-      {blocks.map((block) => (
-        <BlockView key={block.id} block={block} />
-      ))}
-    </div>
+    <>
+      <div className="space-y-6">
+        {blocks.map((block) => (
+          <BlockView key={block.id} block={block} onOpenImage={setViewer} />
+        ))}
+      </div>
+      <ImagePreview
+        viewer={viewer}
+        onClose={() => setViewer(null)}
+        onChange={(nextIndex) =>
+          setViewer((current) => (current ? { ...current, index: nextIndex } : current))
+        }
+      />
+    </>
   );
 }
 
@@ -38,7 +50,13 @@ function CtaLink({ text, link }: { text: string; link: string }) {
   );
 }
 
-function BlockView({ block }: { block: Block }) {
+function BlockView({
+  block,
+  onOpenImage,
+}: {
+  block: Block;
+  onOpenImage: (viewer: ImagePreviewState) => void;
+}) {
   switch (block.type) {
     case 'heading': {
       if (!block.text.trim()) return null;
@@ -73,13 +91,20 @@ function BlockView({ block }: { block: Block }) {
       if (!block.url.trim()) return null;
       return (
         <figure>
-          <img
-            src={block.url}
-            alt={block.alt || block.caption || ''}
-            loading="lazy"
-            decoding="async"
-            className="border-line w-full rounded-2xl border object-cover"
-          />
+          <button
+            type="button"
+            className="block w-full cursor-zoom-in text-left"
+            onClick={() => onOpenImage({ urls: [block.url], index: 0 })}
+            aria-label="查看大图"
+          >
+            <img
+              src={block.url}
+              alt={block.alt || block.caption || ''}
+              loading="lazy"
+              decoding="async"
+              className="border-line w-full rounded-2xl border object-cover"
+            />
+          </button>
           {block.caption ? (
             <figcaption className="text-muted mt-2 text-center text-xs">{block.caption}</figcaption>
           ) : null}
@@ -94,13 +119,20 @@ function BlockView({ block }: { block: Block }) {
           }`}
         >
           {block.url.trim() ? (
-            <img
-              src={block.url}
-              alt={block.title || ''}
-              loading="lazy"
-              decoding="async"
-              className="border-line w-full rounded-2xl border object-cover sm:w-56"
-            />
+            <button
+              type="button"
+              className="block w-full cursor-zoom-in text-left sm:w-56"
+              onClick={() => onOpenImage({ urls: [block.url], index: 0 })}
+              aria-label="查看大图"
+            >
+              <img
+                src={block.url}
+                alt={block.title || ''}
+                loading="lazy"
+                decoding="async"
+                className="border-line w-full rounded-2xl border object-cover"
+              />
+            </button>
           ) : null}
           <div className="flex-1">
             {block.title?.trim() ? (
@@ -154,14 +186,21 @@ function BlockView({ block }: { block: Block }) {
       return (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {urls.map((url, index) => (
-            <img
+            <button
               key={index}
-              src={url}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="border-line aspect-square w-full rounded-2xl border object-cover"
-            />
+              type="button"
+              className="block cursor-zoom-in text-left"
+              onClick={() => onOpenImage({ urls, index })}
+              aria-label="查看大图"
+            >
+              <img
+                src={url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="border-line aspect-square w-full rounded-2xl border object-cover"
+              />
+            </button>
           ))}
         </div>
       );

@@ -291,7 +291,7 @@ body {
   }
 
   .story-content img {
-    @apply border-line my-6 max-w-full rounded-2xl border;
+    @apply border-line my-6 max-w-full cursor-zoom-in rounded-2xl border;
   }
 
   .story-content .article-image-scroll {

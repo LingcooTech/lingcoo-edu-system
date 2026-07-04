@@ -153,4 +153,12 @@ Page({
       },
     });
   },
+
+  onPreviewImageGroup(event: { currentTarget: { dataset: { url?: string; urls?: string[] } } }) {
+    const url = event.currentTarget.dataset.url;
+    const urls = event.currentTarget.dataset.urls || [];
+    if (url && urls.length) {
+      wx.previewImage({ urls, current: url });
+    }
+  },
 });
