@@ -294,6 +294,23 @@ body {
     @apply border-line my-6 max-w-full rounded-2xl border;
   }
 
+  .story-content .article-image-scroll {
+    @apply -mx-4 my-6 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0;
+    scrollbar-width: none;
+  }
+
+  .story-content .article-image-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .story-content .article-image-scroll figure {
+    @apply my-0 w-[76vw] flex-none snap-start sm:w-80;
+  }
+
+  .story-content .article-image-scroll img {
+    @apply my-0 aspect-[4/3] h-auto w-full object-cover;
+  }
+
   .story-content blockquote {
     @apply border-brand/40 bg-brand-soft/50 text-ink-soft my-6 border-l-4 px-5 py-3;
   }
@@ -488,6 +505,10 @@ body {
 
     .story-content img {
       @apply my-5 rounded-xl;
+    }
+
+    .story-content .article-image-scroll {
+      @apply my-5;
     }
   }
 

@@ -20,7 +20,21 @@
 
     <view class="story-body">
       <block-renderer wx:if="{{blocks.length}}" blocks="{{blocks}}" variant="reading" />
-      <rich-text wx:elif="{{html}}" class="story-rich" nodes="{{html}}" />
+      <block wx:elif="{{htmlSegments.length}}">
+        <block wx:for="{{htmlSegments}}" wx:key="index" wx:for-item="segment">
+          <rich-text wx:if="{{segment.type == 'html'}}" class="story-rich" nodes="{{segment.html}}" />
+          <scroll-view wx:else class="story-image-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+            <image
+              wx:for="{{segment.urls}}"
+              wx:key="*this"
+              wx:for-item="url"
+              class="story-scroll-image"
+              src="{{url}}"
+              mode="aspectFill"
+            />
+          </scroll-view>
+        </block>
+      </block>
       <view wx:else class="empty compact-empty">暂无正文</view>
     </view>
   </block>

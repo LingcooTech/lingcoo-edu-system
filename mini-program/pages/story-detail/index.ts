@@ -2,6 +2,8 @@ import { fetchStory, type ContentItem } from '../../services/api';
 import { parseBlocks, type Block } from '../../utils/blocks';
 import { enableShareMenu, shareCard, timelineCard } from '../../utils/share';
 
+type StoryHtmlSegment = { type: 'html'; html: string } | { type: 'imageScroll'; urls: string[] };
+
 function looksLikeHtml(value: string) {
   return /<\/?[a-z][\s\S]*>/i.test(value);
 }
@@ -58,6 +60,33 @@ function normalizeStoryHtml(value: string) {
   return html.trim();
 }
 
+function extractImageUrls(value: string) {
+  return [...value.matchAll(/<img\b[^>]*\ssrc=["']([^"']+)["'][^>]*>/gi)]
+    .map((match) => match[1])
+    .filter(Boolean);
+}
+
+function splitStoryHtml(value: string): StoryHtmlSegment[] {
+  const segments: StoryHtmlSegment[] = [];
+  const pattern =
+    /<div[^>]*(?:class=["'][^"']*article-image-scroll[^"']*["']|data-role=["']image-scroll["'])[^>]*>([\s\S]*?)<\/div>/gi;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(value)) !== null) {
+    const before = value.slice(cursor, match.index).trim();
+    if (before) segments.push({ type: 'html', html: before });
+
+    const urls = extractImageUrls(match[1]);
+    if (urls.length) segments.push({ type: 'imageScroll', urls });
+    cursor = match.index + match[0].length;
+  }
+
+  const after = value.slice(cursor).trim();
+  if (after) segments.push({ type: 'html', html: after });
+  return segments;
+}
+
 Page({
   data: {
     loading: true,
@@ -65,6 +94,7 @@ Page({
     story: null as ContentItem | null,
     blocks: [] as Block[],
     html: '',
+    htmlSegments: [] as StoryHtmlSegment[],
   },
 
   onLoad(options: { slug?: string }) {
@@ -100,12 +130,14 @@ Page({
       const story = await fetchStory(slug);
       const content = story.content || '';
       const contentIsHtml = looksLikeHtml(content);
+      const html = contentIsHtml ? normalizeStoryHtml(content) : '';
       wx.setNavigationBarTitle({ title: story.title });
       this.setData({
         loading: false,
         story,
         blocks: contentIsHtml ? [] : parseBlocks(content),
-        html: contentIsHtml ? normalizeStoryHtml(content) : '',
+        html,
+        htmlSegments: html ? splitStoryHtml(html) : [],
       });
     } catch {
       this.setData({ loading: false, notFound: true });

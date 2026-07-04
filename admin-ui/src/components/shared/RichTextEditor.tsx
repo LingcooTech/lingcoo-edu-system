@@ -1,5 +1,16 @@
-import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bold, Heading2, Image, Italic, Link, List, Quote, UploadCloud } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  Bold,
+  Heading2,
+  Image,
+  Images,
+  Italic,
+  Link,
+  List,
+  Quote,
+  Trash2,
+  UploadCloud,
+} from 'lucide-react';
 
 import { uploadQiniuImage } from '@/api/client';
 import { useToast } from '@/components/shared/Toast';
@@ -10,12 +21,12 @@ interface Tool {
   apply: (selection: string) => string;
 }
 
-type PreviewSegment =
-  | { type: 'heading'; level: 2 | 3; text: string }
-  | { type: 'paragraph'; lines: string[] }
-  | { type: 'list'; items: string[] }
-  | { type: 'quote'; lines: string[] }
-  | { type: 'image'; alt: string; url: string };
+type EditorBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; alt: string; url: string }
+  | { type: 'imageScroll'; images: Array<{ alt: string; url: string }> };
+
+type UploadTarget = { type: 'image' } | { type: 'imageScroll'; blockIndex: number };
 
 const TOOLS: Tool[] = [
   {
@@ -67,6 +78,12 @@ function parseImage(line: string) {
   return match ? { alt: match[1] || '', url: match[2] || '' } : null;
 }
 
+function parseImageFromHtml(value: string) {
+  const src = value.match(/\ssrc=["']([^"']+)["']/i)?.[1] ?? '';
+  const alt = value.match(/\salt=["']([^"']*)["']/i)?.[1] ?? '';
+  return src ? { alt: stripHtml(alt), url: decodeHtmlEntities(src) } : null;
+}
+
 function decodeHtmlEntities(value: string) {
   return value
     .replace(/&nbsp;/g, ' ')
@@ -89,12 +106,30 @@ function stripHtml(value: string) {
 function htmlToMarkdown(value: string) {
   let next = value.replace(/\r\n/g, '\n');
 
-  next = next.replace(/<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi, (_, url, alt) => {
-    return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
-  });
-  next = next.replace(/<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi, (_, alt, url) => {
-    return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
-  });
+  next = next.replace(
+    /<div[^>]*(?:class=["'][^"']*article-image-scroll[^"']*["']|data-role=["']image-scroll["'])[^>]*>([\s\S]*?)<\/div>/gi,
+    (_, inner) => {
+      const images = [...String(inner).matchAll(/<img\b[^>]*>/gi)]
+        .map((match) => parseImageFromHtml(match[0]))
+        .filter((image): image is { alt: string; url: string } => Boolean(image));
+      if (!images.length) return '\n\n';
+      return `\n\n:::image-scroll\n${images
+        .map((image) => `![${image.alt}](${image.url})`)
+        .join('\n')}\n:::\n\n`;
+    },
+  );
+  next = next.replace(
+    /<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi,
+    (_, url, alt) => {
+      return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
+    },
+  );
+  next = next.replace(
+    /<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi,
+    (_, alt, url) => {
+      return `\n\n![${stripHtml(alt)}](${decodeHtmlEntities(url)})\n\n`;
+    },
+  );
   next = next.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, (_, url) => {
     return `\n\n![](${decodeHtmlEntities(url)})\n\n`;
   });
@@ -128,15 +163,15 @@ function normalizeEditorValue(value: string) {
   return looksLikeHtml(value) ? htmlToMarkdown(value) : value;
 }
 
-function flushParagraph(segments: PreviewSegment[], paragraph: string[]) {
-  if (paragraph.length === 0) return;
-  segments.push({ type: 'paragraph', lines: [...paragraph] });
-  paragraph.length = 0;
+function flushTextBlock(blocks: EditorBlock[], text: string[]) {
+  const content = text.join('\n').trim();
+  if (content) blocks.push({ type: 'text', text: content });
+  text.length = 0;
 }
 
-function parsePreview(value: string): PreviewSegment[] {
-  const segments: PreviewSegment[] = [];
-  const paragraph: string[] = [];
+function parseEditorBlocks(value: string): EditorBlock[] {
+  const blocks: EditorBlock[] = [];
+  const text: string[] = [];
   const lines = value.replace(/\r\n/g, '\n').split('\n');
   let index = 0;
 
@@ -144,172 +179,56 @@ function parsePreview(value: string): PreviewSegment[] {
     const line = lines[index].trimEnd();
     const trimmed = line.trim();
 
-    if (!trimmed) {
-      flushParagraph(segments, paragraph);
+    if (trimmed === ':::image-scroll') {
+      flushTextBlock(blocks, text);
+      const images: Array<{ alt: string; url: string }> = [];
       index += 1;
+      while (index < lines.length && lines[index].trim() !== ':::') {
+        const image = parseImage(lines[index].trim());
+        if (image) images.push(image);
+        index += 1;
+      }
+      blocks.push({ type: 'imageScroll', images });
+      if (index < lines.length && lines[index].trim() === ':::') index += 1;
       continue;
     }
 
     const image = parseImage(trimmed);
     if (image) {
-      flushParagraph(segments, paragraph);
-      segments.push({ type: 'image', alt: image.alt, url: image.url });
+      flushTextBlock(blocks, text);
+      blocks.push({ type: 'image', alt: image.alt, url: image.url });
       index += 1;
       continue;
     }
 
-    if (trimmed.startsWith('### ')) {
-      flushParagraph(segments, paragraph);
-      segments.push({ type: 'heading', level: 3, text: trimmed.slice(4).trim() });
+    if (!trimmed && text.length === 0) {
       index += 1;
       continue;
     }
 
-    if (trimmed.startsWith('## ')) {
-      flushParagraph(segments, paragraph);
-      segments.push({ type: 'heading', level: 2, text: trimmed.slice(3).trim() });
-      index += 1;
-      continue;
-    }
-
-    if (trimmed.startsWith('- ')) {
-      flushParagraph(segments, paragraph);
-      const items: string[] = [];
-      while (index < lines.length && lines[index].trim().startsWith('- ')) {
-        items.push(lines[index].trim().slice(2).trim());
-        index += 1;
-      }
-      segments.push({ type: 'list', items });
-      continue;
-    }
-
-    if (trimmed.startsWith('> ')) {
-      flushParagraph(segments, paragraph);
-      const quoteLines: string[] = [];
-      while (index < lines.length && lines[index].trim().startsWith('> ')) {
-        quoteLines.push(lines[index].trim().slice(2).trim());
-        index += 1;
-      }
-      segments.push({ type: 'quote', lines: quoteLines });
-      continue;
-    }
-
-    paragraph.push(line);
+    text.push(line);
     index += 1;
   }
 
-  flushParagraph(segments, paragraph);
-  return segments;
+  flushTextBlock(blocks, text);
+  return blocks.length ? blocks : [{ type: 'text', text: '' }];
 }
 
-function isSafeLink(href: string) {
-  return href.startsWith('/') || /^https?:\/\//i.test(href);
+function serializeImage(image: { alt: string; url: string }) {
+  return `![${image.alt}](${image.url})`;
 }
 
-function renderInline(text: string): ReactNode[] {
-  const parts: ReactNode[] = [];
-  const pattern = /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(\[([^\]]+)\]\(([^)]+)\))/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(text))) {
-    if (match.index > cursor) {
-      parts.push(text.slice(cursor, match.index));
-    }
-    if (match[2]) {
-      parts.push(<strong key={parts.length}>{match[2]}</strong>);
-    } else if (match[4]) {
-      parts.push(<em key={parts.length}>{match[4]}</em>);
-    } else if (match[6] && match[7] && isSafeLink(match[7])) {
-      parts.push(
-        <a
-          key={parts.length}
-          href={match[7]}
-          target="_blank"
-          rel="noreferrer"
-          className="text-brand font-medium underline underline-offset-4"
-        >
-          {match[6]}
-        </a>,
-      );
-    } else {
-      parts.push(match[0]);
-    }
-    cursor = match.index + match[0].length;
-  }
-
-  if (cursor < text.length) {
-    parts.push(text.slice(cursor));
-  }
-  return parts;
-}
-
-function MarkdownPreview({ segments }: { segments: PreviewSegment[] }) {
-  if (segments.length === 0) return null;
-  return (
-    <div className="border-border/80 bg-muted/20 border-t p-4">
-      <div className="text-muted-foreground mb-3 text-xs font-medium">预览</div>
-      <div className="space-y-4">
-        {segments.map((segment, index) => {
-          switch (segment.type) {
-            case 'heading':
-              return segment.level === 3 ? (
-                <h4 key={index} className="text-base font-semibold">
-                  {renderInline(segment.text)}
-                </h4>
-              ) : (
-                <h3 key={index} className="text-xl font-semibold tracking-tight">
-                  {renderInline(segment.text)}
-                </h3>
-              );
-            case 'paragraph':
-              return (
-                <p key={index} className="text-muted-foreground text-sm leading-7">
-                  {segment.lines.map((line, lineIndex) => (
-                    <Fragment key={lineIndex}>
-                      {lineIndex > 0 ? <br /> : null}
-                      {renderInline(line)}
-                    </Fragment>
-                  ))}
-                </p>
-              );
-            case 'list':
-              return (
-                <ul key={index} className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-                  {segment.items.map((item, itemIndex) => (
-                    <li key={itemIndex}>{renderInline(item)}</li>
-                  ))}
-                </ul>
-              );
-            case 'quote':
-              return (
-                <blockquote
-                  key={index}
-                  className="border-brand/40 text-muted-foreground border-l-4 pl-4 text-sm leading-7"
-                >
-                  {segment.lines.map((line, lineIndex) => (
-                    <Fragment key={lineIndex}>
-                      {lineIndex > 0 ? <br /> : null}
-                      {renderInline(line)}
-                    </Fragment>
-                  ))}
-                </blockquote>
-              );
-            case 'image':
-              return (
-                <figure key={index}>
-                  <img
-                    src={segment.url}
-                    alt={segment.alt}
-                    className="w-full rounded-lg border object-cover"
-                  />
-                </figure>
-              );
-          }
-        })}
-      </div>
-    </div>
-  );
+function serializeBlocks(blocks: EditorBlock[]) {
+  return blocks
+    .map((block) => {
+      if (block.type === 'text') return block.text.trim();
+      if (block.type === 'image') return block.url.trim() ? serializeImage(block) : '';
+      const images = block.images.filter((image) => image.url.trim());
+      if (!images.length) return '';
+      return `:::image-scroll\n${images.map(serializeImage).join('\n')}\n:::`;
+    })
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export function RichTextEditor({
@@ -324,23 +243,55 @@ export function RichTextEditor({
   const toast = useToast();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const textRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const [uploading, setUploading] = useState(false);
+  const [focusedTextIndex, setFocusedTextIndex] = useState<number | null>(null);
+  const [uploadTarget, setUploadTarget] = useState<UploadTarget>({ type: 'image' });
   const editorValue = useMemo(() => normalizeEditorValue(value), [value]);
-  const previewSegments = useMemo(() => parsePreview(editorValue), [editorValue]);
+  const blocks = useMemo(() => parseEditorBlocks(editorValue), [editorValue]);
 
-  function replaceSelection(replacement: string) {
-    const textarea = textareaRef.current;
+  function emit(nextBlocks: EditorBlock[]) {
+    onChange(serializeBlocks(nextBlocks));
+  }
+
+  function updateBlock(index: number, nextBlock: EditorBlock) {
+    emit(blocks.map((block, blockIndex) => (blockIndex === index ? nextBlock : block)));
+  }
+
+  function removeBlock(index: number) {
+    const next = blocks.filter((_, blockIndex) => blockIndex !== index);
+    emit(next.length ? next : [{ type: 'text', text: '' }]);
+  }
+
+  function insertBlock(block: EditorBlock, afterIndex = focusedTextIndex) {
+    const next = [...blocks];
+    const index = afterIndex === null ? next.length : afterIndex + 1;
+    next.splice(index, 0, block);
+    emit(next);
+  }
+
+  function replaceSelection(replacement: string, blockIndex = focusedTextIndex) {
+    if (blockIndex === null || blocks[blockIndex]?.type !== 'text') {
+      insertBlock({ type: 'text', text: replacement });
+      return;
+    }
+
+    const textarea = textRefs.current[blockIndex] ?? textareaRef.current;
+    const block = blocks[blockIndex] as Extract<EditorBlock, { type: 'text' }>;
     if (!textarea) {
-      onChange(`${editorValue}${editorValue ? '\n\n' : ''}${replacement}`);
+      updateBlock(blockIndex, {
+        ...block,
+        text: `${block.text}${block.text ? '\n' : ''}${replacement}`,
+      });
       return;
     }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const before = editorValue.slice(0, start);
-    const after = editorValue.slice(end);
+    const before = block.text.slice(0, start);
+    const after = block.text.slice(end);
     const next = `${before}${replacement}${after}`;
-    onChange(next);
+    updateBlock(blockIndex, { ...block, text: next });
 
     window.requestAnimationFrame(() => {
       textarea.focus();
@@ -349,9 +300,14 @@ export function RichTextEditor({
   }
 
   function applyTool(tool: Tool) {
-    const textarea = textareaRef.current;
+    const textarea =
+      focusedTextIndex === null ? textareaRef.current : textRefs.current[focusedTextIndex];
+    const block =
+      focusedTextIndex === null || blocks[focusedTextIndex]?.type !== 'text'
+        ? null
+        : (blocks[focusedTextIndex] as Extract<EditorBlock, { type: 'text' }>);
     const selection = textarea
-      ? editorValue.slice(textarea.selectionStart, textarea.selectionEnd)
+      ? (block?.text ?? '').slice(textarea.selectionStart, textarea.selectionEnd)
       : '';
     replaceSelection(tool.apply(selection));
   }
@@ -360,7 +316,19 @@ export function RichTextEditor({
     setUploading(true);
     try {
       const result = await uploadQiniuImage(file, prefix);
-      replaceSelection(`![${file.name.replace(/\.[^.]+$/, '') || '图片'}](${result.publicUrl})`);
+      const image = { alt: file.name.replace(/\.[^.]+$/, '') || '图片', url: result.publicUrl };
+      if (
+        uploadTarget.type === 'imageScroll' &&
+        blocks[uploadTarget.blockIndex]?.type === 'imageScroll'
+      ) {
+        const block = blocks[uploadTarget.blockIndex] as Extract<
+          EditorBlock,
+          { type: 'imageScroll' }
+        >;
+        updateBlock(uploadTarget.blockIndex, { ...block, images: [...block.images, image] });
+      } else {
+        insertBlock({ type: 'image', ...image });
+      }
       toast.success('图片已上传并插入正文');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '上传失败');
@@ -393,13 +361,25 @@ export function RichTextEditor({
           title="上传图片"
           aria-label="上传图片"
           disabled={uploading}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => {
+            setUploadTarget({ type: 'image' });
+            inputRef.current?.click();
+          }}
         >
           {uploading ? (
             <UploadCloud className="h-4 w-4 animate-pulse" />
           ) : (
             <Image className="h-4 w-4" />
           )}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost h-8 px-2"
+          title="横向图片组"
+          aria-label="横向图片组"
+          onClick={() => insertBlock({ type: 'imageScroll', images: [] })}
+        >
+          <Images className="h-4 w-4" />
         </button>
         <input
           ref={inputRef}
@@ -413,13 +393,146 @@ export function RichTextEditor({
           }}
         />
       </div>
-      <textarea
-        ref={textareaRef}
-        className="bg-background min-h-80 w-full resize-y px-3 py-3 text-sm leading-6 outline-none"
-        value={editorValue}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      <MarkdownPreview segments={previewSegments} />
+      <div className="space-y-3 p-3">
+        {blocks.map((block, index) => {
+          if (block.type === 'text') {
+            return (
+              <textarea
+                key={`text-${index}`}
+                ref={(node) => {
+                  textRefs.current[index] = node;
+                  if (index === 0) textareaRef.current = node;
+                }}
+                className="bg-background border-border/70 focus:border-primary min-h-36 w-full resize-y rounded-lg border px-3 py-3 text-sm leading-6 outline-none"
+                value={block.text}
+                placeholder="输入正文，可使用工具栏添加标题、列表、引用、链接。"
+                onFocus={() => setFocusedTextIndex(index)}
+                onChange={(event) => updateBlock(index, { ...block, text: event.target.value })}
+              />
+            );
+          }
+
+          if (block.type === 'image') {
+            return (
+              <div
+                key={`image-${index}`}
+                className="border-border/70 bg-muted/15 rounded-lg border p-3"
+              >
+                {block.url ? (
+                  <img
+                    src={block.url}
+                    alt={block.alt}
+                    className="max-h-80 w-full rounded-lg border object-contain"
+                  />
+                ) : null}
+                <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+                  <input
+                    className="form-input"
+                    value={block.url}
+                    placeholder="图片 URL"
+                    onChange={(event) => updateBlock(index, { ...block, url: event.target.value })}
+                  />
+                  <input
+                    className="form-input"
+                    value={block.alt}
+                    placeholder="图片描述"
+                    onChange={(event) => updateBlock(index, { ...block, alt: event.target.value })}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost text-red-600"
+                    onClick={() => removeBlock(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={`scroll-${index}`}
+              className="border-border/70 bg-muted/15 rounded-lg border p-3"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold">横向图片组</div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary h-8 px-2 text-xs"
+                    onClick={() => {
+                      setUploadTarget({ type: 'imageScroll', blockIndex: index });
+                      inputRef.current?.click();
+                    }}
+                  >
+                    上传图片
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost h-8 px-2 text-red-600"
+                    onClick={() => removeBlock(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {block.images.map((image, imageIndex) => (
+                  <div key={`${image.url}-${imageIndex}`} className="w-48 flex-none space-y-2">
+                    {image.url ? (
+                      <img
+                        src={image.url}
+                        alt={image.alt}
+                        className="aspect-[4/3] w-full rounded-lg border object-cover"
+                      />
+                    ) : (
+                      <div className="bg-muted flex aspect-[4/3] w-full items-center justify-center rounded-lg border text-xs">
+                        图片
+                      </div>
+                    )}
+                    <input
+                      className="form-input h-9 text-xs"
+                      value={image.url}
+                      placeholder="图片 URL"
+                      onChange={(event) => {
+                        const images = block.images.map((item, itemIndex) =>
+                          itemIndex === imageIndex ? { ...item, url: event.target.value } : item,
+                        );
+                        updateBlock(index, { ...block, images });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost h-8 w-full text-xs text-red-600"
+                      onClick={() => {
+                        const images = block.images.filter(
+                          (_, itemIndex) => itemIndex !== imageIndex,
+                        );
+                        updateBlock(index, { ...block, images });
+                      }}
+                    >
+                      移除
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="border-border/70 bg-background text-muted-foreground flex aspect-[4/3] w-48 flex-none items-center justify-center rounded-lg border border-dashed text-sm"
+                  onClick={() =>
+                    updateBlock(index, {
+                      ...block,
+                      images: [...block.images, { alt: '', url: '' }],
+                    })
+                  }
+                >
+                  添加图片
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -136,6 +136,22 @@ function markdownInlineToHtml(value: string) {
     );
 }
 
+function parseMarkdownImage(value: string) {
+  const match = value.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+  return match ? { alt: match[1] || '', url: match[2] || '' } : null;
+}
+
+function renderArticleImage(image: { alt: string; url: string }) {
+  return `<figure><img src="${htmlEscape(image.url)}" alt="${htmlEscape(image.alt)}" /></figure>`;
+}
+
+function renderImageScroll(images: Array<{ alt: string; url: string }>) {
+  if (!images.length) return '';
+  return `<div class="article-image-scroll" data-role="image-scroll">${images
+    .map((image) => renderArticleImage(image))
+    .join('')}</div>`;
+}
+
 function plainTextToArticleHtml(value: string) {
   const html: string[] = [];
   const lines = value.replace(/\r\n/g, '\n').split('\n');
@@ -168,23 +184,42 @@ function plainTextToArticleHtml(value: string) {
     }
   }
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index].trim();
     if (!line) {
       flushParagraph();
       flushList();
       flushQuote();
+      index += 1;
       continue;
     }
 
-    const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (line === ':::image-scroll') {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      const images: Array<{ alt: string; url: string }> = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== ':::') {
+        const image = parseMarkdownImage(lines[index].trim());
+        if (image) images.push(image);
+        index += 1;
+      }
+      if (index < lines.length && lines[index].trim() === ':::') index += 1;
+      const galleryHtml = renderImageScroll(images);
+      if (galleryHtml) html.push(galleryHtml);
+      continue;
+    }
+
+    const image = parseMarkdownImage(line);
     if (image) {
       flushParagraph();
       flushList();
       flushQuote();
-      html.push(
-        `<figure><img src="${htmlEscape(image[2])}" alt="${htmlEscape(image[1])}" /></figure>`,
-      );
+      html.push(renderArticleImage(image));
+      index += 1;
       continue;
     }
 
@@ -195,6 +230,7 @@ function plainTextToArticleHtml(value: string) {
       flushQuote();
       const level = heading[1].length;
       html.push(`<h${level}>${markdownInlineToHtml(heading[2])}</h${level}>`);
+      index += 1;
       continue;
     }
 
@@ -203,6 +239,7 @@ function plainTextToArticleHtml(value: string) {
       flushParagraph();
       flushQuote();
       listItems.push(bullet[1]);
+      index += 1;
       continue;
     }
 
@@ -211,12 +248,14 @@ function plainTextToArticleHtml(value: string) {
       flushParagraph();
       flushList();
       quoteLines.push(quote[1]);
+      index += 1;
       continue;
     }
 
     flushList();
     flushQuote();
     paragraph.push(line);
+    index += 1;
   }
 
   flushParagraph();
@@ -814,15 +853,6 @@ export function ContentMarketingPage() {
       />
     </PageFrame>
   );
-}
-
-function ArticlePreview({ content }: { content: string }) {
-  const html = articleContentToHtml(content);
-  if (!html.trim()) {
-    return <div className="text-muted-foreground text-sm">暂无正文</div>;
-  }
-
-  return <div className="admin-article-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function ImportCard({
