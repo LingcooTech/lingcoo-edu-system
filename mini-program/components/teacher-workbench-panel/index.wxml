@@ -4,9 +4,20 @@
   <block wx:else>
     <view class="card summary-card">
       <view class="summary-head">
-        <view>
-          <view class="summary-eyebrow">老师工作台</view>
-          <view class="summary-title">{{summaryTitle}}</view>
+        <view class="summary-titlebar">
+          <view>
+            <view class="summary-eyebrow">老师工作台</view>
+            <view class="summary-title">{{summaryTitle}}</view>
+          </view>
+          <button
+            wx:if="{{canSwitchRole}}"
+            class="role-switch-button"
+            loading="{{switchingRole}}"
+            disabled="{{switchingRole}}"
+            bindtap="requestRoleSwitch"
+          >
+            切到管理
+          </button>
         </view>
         <view class="scope-tabs">
           <view

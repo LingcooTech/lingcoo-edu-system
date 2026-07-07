@@ -5,6 +5,8 @@ import * as schema from '../schema.js';
 
 export type Account = typeof schema.accounts.$inferSelect;
 export type AccountRole = (typeof schema.accountRoleEnum.enumValues)[number];
+export type AccountRoleAssignment = typeof schema.accountRoleAssignments.$inferSelect;
+export type AccountStatus = (typeof schema.accountStatusEnum.enumValues)[number];
 type SecurityPurpose = (typeof schema.accountSecurityPurposeEnum.enumValues)[number];
 
 export async function findById(db: Database, id: string) {
@@ -35,6 +37,21 @@ export async function findByPhone(db: Database, phone: string) {
 }
 
 export async function findByTeacherId(db: Database, teacherId: string) {
+  const [assignmentRow] = await db
+    .select({ account: schema.accounts })
+    .from(schema.accountRoleAssignments)
+    .innerJoin(schema.accounts, eq(schema.accountRoleAssignments.accountId, schema.accounts.id))
+    .where(
+      and(
+        eq(schema.accountRoleAssignments.role, 'teacher'),
+        eq(schema.accountRoleAssignments.teacherId, teacherId),
+      ),
+    )
+    .limit(1);
+  if (assignmentRow?.account) {
+    return assignmentRow.account;
+  }
+
   const [account] = await db
     .select()
     .from(schema.accounts)
@@ -60,6 +77,13 @@ export async function findByIdentifier(db: Database, identifier: string) {
 
 export async function createAccount(db: Database, values: typeof schema.accounts.$inferInsert) {
   const [account] = await db.insert(schema.accounts).values(values).returning();
+  await upsertRoleAssignment(db, {
+    accountId: account.id,
+    role: account.role,
+    guardianId: account.role === 'parent' ? (account.guardianId ?? null) : null,
+    teacherId: account.role === 'teacher' ? (account.teacherId ?? null) : null,
+    status: account.status,
+  });
   return account;
 }
 
@@ -73,15 +97,26 @@ export async function updateAccount(
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(schema.accounts.id, id))
     .returning();
+  if (account) {
+    await upsertRoleAssignment(db, {
+      accountId: account.id,
+      role: account.role,
+      guardianId: account.role === 'parent' ? (account.guardianId ?? null) : null,
+      teacherId: account.role === 'teacher' ? (account.teacherId ?? null) : null,
+      status: account.status,
+    });
+  }
   return account ?? null;
 }
 
 export async function listByRole(db: Database, role: AccountRole) {
-  return db
-    .select()
-    .from(schema.accounts)
-    .where(eq(schema.accounts.role, role))
+  const rows = await db
+    .select({ account: schema.accounts })
+    .from(schema.accountRoleAssignments)
+    .innerJoin(schema.accounts, eq(schema.accountRoleAssignments.accountId, schema.accounts.id))
+    .where(eq(schema.accountRoleAssignments.role, role))
     .orderBy(desc(schema.accounts.createdAt));
+  return rows.map((row) => row.account);
 }
 
 export async function listAccounts(db: Database) {
@@ -94,6 +129,108 @@ export async function deleteAccount(db: Database, accountId: string) {
     .where(eq(schema.accounts.id, accountId))
     .returning();
   return account ?? null;
+}
+
+// --- Account role assignments ---
+
+export async function listRoleAssignments(db: Database) {
+  return db.select().from(schema.accountRoleAssignments);
+}
+
+export async function listRoleAssignmentsForAccount(db: Database, accountId: string) {
+  return db
+    .select()
+    .from(schema.accountRoleAssignments)
+    .where(eq(schema.accountRoleAssignments.accountId, accountId));
+}
+
+export async function findRoleAssignment(
+  db: Database,
+  input: { accountId: string; role: AccountRole },
+) {
+  const [assignment] = await db
+    .select()
+    .from(schema.accountRoleAssignments)
+    .where(
+      and(
+        eq(schema.accountRoleAssignments.accountId, input.accountId),
+        eq(schema.accountRoleAssignments.role, input.role),
+      ),
+    )
+    .limit(1);
+  return assignment ?? null;
+}
+
+export async function upsertRoleAssignment(
+  db: Database,
+  values: typeof schema.accountRoleAssignments.$inferInsert,
+) {
+  const [assignment] = await db
+    .insert(schema.accountRoleAssignments)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [schema.accountRoleAssignments.accountId, schema.accountRoleAssignments.role],
+      set: {
+        guardianId: values.guardianId ?? null,
+        teacherId: values.teacherId ?? null,
+        status: values.status ?? 'active',
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return assignment;
+}
+
+export async function replaceRoleAssignmentsForAccount(
+  db: Database,
+  accountId: string,
+  assignments: Array<{
+    role: AccountRole;
+    guardianId?: string | null;
+    teacherId?: string | null;
+    status?: AccountStatus;
+  }>,
+) {
+  await db
+    .delete(schema.accountRoleAssignments)
+    .where(eq(schema.accountRoleAssignments.accountId, accountId));
+
+  if (!assignments.length) {
+    return [];
+  }
+
+  return db
+    .insert(schema.accountRoleAssignments)
+    .values(
+      assignments.map((assignment) => ({
+        accountId,
+        role: assignment.role,
+        guardianId: assignment.role === 'parent' ? (assignment.guardianId ?? null) : null,
+        teacherId: assignment.role === 'teacher' ? (assignment.teacherId ?? null) : null,
+        status: assignment.status ?? 'active',
+      })),
+    )
+    .returning();
+}
+
+export async function accountHasActiveRole(db: Database, accountId: string, role: string) {
+  if (!schema.accountRoleEnum.enumValues.includes(role as AccountRole)) {
+    return false;
+  }
+  const account = await findById(db, accountId);
+  if (!account || account.status !== 'active') {
+    return false;
+  }
+
+  const assignment = await findRoleAssignment(db, {
+    accountId,
+    role: role as AccountRole,
+  });
+  if (assignment) {
+    return assignment.status === 'active';
+  }
+
+  return account.role === role;
 }
 
 // --- WeChat Mini Program identities ---

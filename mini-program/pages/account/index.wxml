@@ -2,7 +2,12 @@
 <view class="page account-page">
   <skeleton wx:if="{{booting}}" variant="hub" />
   <block wx:elif="{{account && account.role == 'admin'}}">
-    <admin-dashboard-panel id="adminDashboard" />
+    <admin-dashboard-panel
+      id="adminDashboard"
+      can-switch-role="{{canSwitchWorkRole}}"
+      switching-role="{{switchingRole}}"
+      bind:switchrole="onSwitchWorkRole"
+    />
 
     <view class="logout-wrap">
       <button class="mini-button logout-button" bindtap="onLogout">退出登录</button>
@@ -10,7 +15,12 @@
   </block>
 
   <block wx:elif="{{account && account.role == 'teacher'}}">
-    <teacher-workbench-panel id="teacherWorkbench" />
+    <teacher-workbench-panel
+      id="teacherWorkbench"
+      can-switch-role="{{canSwitchWorkRole}}"
+      switching-role="{{switchingRole}}"
+      bind:switchrole="onSwitchWorkRole"
+    />
 
     <view class="logout-wrap">
       <button class="mini-button logout-button" bindtap="onLogout">退出登录</button>

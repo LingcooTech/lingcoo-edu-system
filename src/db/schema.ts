@@ -165,6 +165,32 @@ export const accounts = pgTable(
   }),
 );
 
+export const accountRoleAssignments = pgTable(
+  'account_role_assignments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    role: accountRoleEnum('role').notNull(),
+    guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    status: accountStatusEnum('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    accountRoleUnique: uniqueIndex('account_role_assignments_account_role_idx').on(
+      table.accountId,
+      table.role,
+    ),
+    accountIdx: index('account_role_assignments_account_idx').on(table.accountId),
+    roleIdx: index('account_role_assignments_role_idx').on(table.role),
+    guardianIdx: index('account_role_assignments_guardian_idx').on(table.guardianId),
+    teacherIdx: index('account_role_assignments_teacher_idx').on(table.teacherId),
+  }),
+);
+
 // Single-institution deployment: this table holds exactly one row describing the
 // organization that owns the deployment (its identity + brand/profile settings).
 // There is no multi-tenancy — read it with LIMIT 1.

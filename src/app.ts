@@ -17,6 +17,7 @@ import { appModules } from './modules/index.js';
 import { parseCorsOrigin } from './lib/http.js';
 import { toUserFacingMessage } from './lib/user-facing-message.js';
 import { createDb } from './db/client.js';
+import * as accountsRepo from './db/repositories/accounts.js';
 import type { AppEnv } from './lib/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,12 +116,15 @@ export async function buildApp(env: AppEnv) {
     },
   );
 
-  // Unified auth: the JWT (cookie `fd_edu_token` or Bearer) carries { sub, role }.
-  // `authenticate` verifies the token and exposes request.account; `requireRole`
-  // additionally gates on role. One token, one cookie, for every role.
+  // Unified auth: the JWT (cookie `fd_edu_token` or Bearer) carries the active
+  // role. `requireRole` validates that role against the account's current grants.
   function attachAccount(request: FastifyRequest) {
-    const payload = request.user as { sub: string; role: string };
-    request.account = { id: payload.sub, role: payload.role };
+    const payload = request.user as { sub: string; role: string; roleAssignmentId?: string };
+    request.account = {
+      id: payload.sub,
+      role: payload.role,
+      roleAssignmentId: payload.roleAssignmentId,
+    };
     return payload;
   }
 
@@ -141,7 +145,10 @@ export async function buildApp(env: AppEnv) {
         return reply.unauthorized('登录已过期，请重新登录');
       }
       const payload = attachAccount(request);
-      if (!roles.includes(payload.role)) {
+      if (
+        !roles.includes(payload.role) ||
+        !(await accountsRepo.accountHasActiveRole(app.db, payload.sub, payload.role))
+      ) {
         return reply.forbidden('权限不足');
       }
     };

@@ -94,6 +94,17 @@ function toSearchView(result: AdminSearchResult | null) {
 }
 
 Component({
+  properties: {
+    canSwitchRole: {
+      type: Boolean,
+      value: false,
+    },
+    switchingRole: {
+      type: Boolean,
+      value: false,
+    },
+  },
+
   data: {
     loading: true,
     searching: false,
@@ -114,6 +125,10 @@ Component({
   },
 
   methods: {
+    requestRoleSwitch() {
+      this.triggerEvent('switchrole');
+    },
+
     async refresh() {
       this.setData({ loading: true });
       try {

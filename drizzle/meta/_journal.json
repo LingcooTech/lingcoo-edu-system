@@ -295,6 +295,13 @@
       "when": 1783123200000,
       "tag": "0041_cover_thumb_urls",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1783209600000,
+      "tag": "0042_account_role_assignments",
+      "breakpoints": true
     }
   ]
 }

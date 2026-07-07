@@ -11,6 +11,6 @@ declare module 'fastify' {
   }
 
   interface FastifyRequest {
-    account?: { id: string; role: string };
+    account?: { id: string; role: string; roleAssignmentId?: string };
   }
 }

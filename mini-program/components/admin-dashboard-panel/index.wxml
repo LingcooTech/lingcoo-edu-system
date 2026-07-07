@@ -5,7 +5,18 @@
       <view class="admin-title">管理看板</view>
       <view class="admin-desc">数据展示、快速搜索和业务概览。</view>
     </view>
-    <view class="admin-badge">只读</view>
+    <view class="admin-hero-actions">
+      <button
+        wx:if="{{canSwitchRole}}"
+        class="role-switch-button"
+        loading="{{switchingRole}}"
+        disabled="{{switchingRole}}"
+        bindtap="requestRoleSwitch"
+      >
+        切到老师
+      </button>
+      <view class="admin-badge">只读</view>
+    </view>
   </view>
 
   <view class="admin-tabs">

@@ -25,6 +25,7 @@ type AccountRoleFilter = 'all' | AccountRole;
 
 interface AccountForm {
   role: AccountRole;
+  roles: AccountRole[];
   displayName: string;
   email: string;
   phone: string;
@@ -36,6 +37,7 @@ interface AccountForm {
 
 const emptyForm: AccountForm = {
   role: 'parent',
+  roles: ['parent'],
   displayName: '',
   email: '',
   phone: '',
@@ -45,9 +47,24 @@ const emptyForm: AccountForm = {
   password: '',
 };
 
+function accountRoles(account: Account): AccountRole[] {
+  const assignments = account.roleAssignments ?? account.roles ?? [];
+  const roles = assignments.map((assignment) => assignment.role);
+  return roles.length ? roles : [account.role];
+}
+
+function accountHasRole(account: Account, role: AccountRole) {
+  return accountRoles(account).includes(role);
+}
+
+function roleListLabel(account: Account) {
+  return accountRoles(account).map((role) => ROLE_LABEL[role]).join(' / ');
+}
+
 function accountToForm(account: Account): AccountForm {
   return {
     role: account.role,
+    roles: accountRoles(account),
     displayName: account.displayName,
     email: account.email ?? '',
     phone: account.phone ?? '',
@@ -59,14 +76,16 @@ function accountToForm(account: Account): AccountForm {
 }
 
 function buildPayload(form: AccountForm, includePassword: boolean) {
+  const primaryRole = form.roles.includes(form.role) ? form.role : (form.roles[0] ?? 'parent');
   return {
-    role: form.role,
+    role: primaryRole,
+    roles: form.roles,
     displayName: form.displayName.trim(),
     email: form.email.trim() || undefined,
     phone: form.phone.trim() || undefined,
     status: form.status,
-    teacherId: form.role === 'teacher' ? form.teacherId || undefined : null,
-    guardianId: form.role === 'parent' ? form.guardianId || undefined : null,
+    teacherId: form.roles.includes('teacher') ? form.teacherId || undefined : null,
+    guardianId: form.roles.includes('parent') ? form.guardianId || undefined : null,
     ...(includePassword && form.password.trim() ? { password: form.password.trim() } : {}),
   };
 }
@@ -94,9 +113,9 @@ export function AccountsPage() {
   const roleCounts = useMemo(
     () => ({
       all: accounts.length,
-      admin: accounts.filter((account) => account.role === 'admin').length,
-      teacher: accounts.filter((account) => account.role === 'teacher').length,
-      parent: accounts.filter((account) => account.role === 'parent').length,
+      admin: accounts.filter((account) => accountHasRole(account, 'admin')).length,
+      teacher: accounts.filter((account) => accountHasRole(account, 'teacher')).length,
+      parent: accounts.filter((account) => accountHasRole(account, 'parent')).length,
     }),
     [accounts],
   );
@@ -115,13 +134,14 @@ export function AccountsPage() {
     () =>
       activeRole === 'all'
         ? accounts
-        : accounts.filter((account) => account.role === activeRole),
+        : accounts.filter((account) => accountHasRole(account, activeRole)),
     [accounts, activeRole],
   );
 
   function openCreate() {
     setEditing(null);
-    setForm({ ...emptyForm, role: activeRole === 'all' ? 'parent' : activeRole });
+    const role = activeRole === 'all' ? 'parent' : activeRole;
+    setForm({ ...emptyForm, role, roles: [role] });
     setDefaultPassword('');
     setOpen(true);
   }
@@ -133,6 +153,37 @@ export function AccountsPage() {
     setOpen(true);
   }
 
+  function choosePrimaryRole(role: AccountRole) {
+    setForm((current) => {
+      if (role === 'parent') {
+        return { ...current, role, roles: ['parent'], teacherId: '' };
+      }
+      const roles = current.roles.includes(role)
+        ? current.roles.filter((item) => item !== 'parent')
+        : [...current.roles.filter((item) => item !== 'parent'), role];
+      return { ...current, role, roles: roles.length ? roles : [role], guardianId: '' };
+    });
+  }
+
+  function toggleRole(role: AccountRole) {
+    setForm((current) => {
+      if (role === 'parent') {
+        return { ...current, role: 'parent', roles: ['parent'], teacherId: '' };
+      }
+
+      const staffRoles = current.roles.filter((item) => item === 'admin' || item === 'teacher');
+      const roles = staffRoles.includes(role)
+        ? staffRoles.filter((item) => item !== role)
+        : [...staffRoles, role];
+      const nextRoles = roles.length ? roles : [role];
+      const currentStaffRole =
+        current.role === 'admin' || current.role === 'teacher' ? current.role : null;
+      const nextPrimary =
+        currentStaffRole && nextRoles.includes(currentStaffRole) ? currentStaffRole : nextRoles[0];
+      return { ...current, role: nextPrimary, roles: nextRoles, guardianId: '' };
+    });
+  }
+
   async function submit() {
     if (!form.displayName.trim()) {
       toast.error('账号名称必填');
@@ -142,7 +193,11 @@ export function AccountsPage() {
       toast.error('邮箱和手机号至少填写一个');
       return;
     }
-    if (form.role === 'teacher' && !form.teacherId) {
+    if (form.roles.includes('parent') && form.roles.length > 1) {
+      toast.error('家长身份暂不支持叠加管理员或老师身份');
+      return;
+    }
+    if (form.roles.includes('teacher') && !form.teacherId) {
       toast.error('老师账号必须关联老师档案');
       return;
     }
@@ -258,14 +313,14 @@ export function AccountsPage() {
               </div>
             ),
           },
-          { key: 'role', header: '角色', cell: (row) => ROLE_LABEL[row.role] },
+          { key: 'role', header: '身份', cell: (row) => roleListLabel(row) },
           {
             key: 'link',
             header: '关联档案',
             cell: (row) =>
-              row.role === 'teacher'
+              accountHasRole(row, 'teacher')
                 ? (row.teacher?.name ?? '-')
-                : row.role === 'parent'
+                : accountHasRole(row, 'parent')
                   ? row.guardian
                     ? `${row.guardian.name} · ${row.guardian.phone}`
                     : '-'
@@ -365,11 +420,11 @@ export function AccountsPage() {
           </div>
         )}
         <FieldRow>
-          <Field label="角色" required>
+          <Field label="默认身份" required>
             <select
               className="form-input"
               value={form.role}
-              onChange={(event) => setForm({ ...form, role: event.target.value as AccountRole })}
+              onChange={(event) => choosePrimaryRole(event.target.value as AccountRole)}
             >
               <option value="admin">管理员</option>
               <option value="teacher">老师</option>
@@ -389,6 +444,27 @@ export function AccountsPage() {
             </select>
           </Field>
         </FieldRow>
+        <Field
+          label="账号身份"
+          hint="管理员和老师可以同时开通；家长身份保持独立，不参与工作台切换"
+          required
+        >
+          <div className="grid grid-cols-3 gap-2">
+            {(['admin', 'teacher', 'parent'] as AccountRole[]).map((role) => (
+              <label
+                key={role}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={form.roles.includes(role)}
+                  onChange={() => toggleRole(role)}
+                />
+                {ROLE_LABEL[role]}
+              </label>
+            ))}
+          </div>
+        </Field>
         <Field label="显示名称" required>
           <input
             className="form-input"
@@ -422,7 +498,7 @@ export function AccountsPage() {
             />
           </Field>
         )}
-        {form.role === 'teacher' && (
+        {form.roles.includes('teacher') && (
           <Field label="关联老师档案" required>
             <select
               className="form-input"
@@ -438,7 +514,7 @@ export function AccountsPage() {
             </select>
           </Field>
         )}
-        {form.role === 'parent' && (
+        {form.roles.includes('parent') && (
           <Field label="关联家长档案" hint="免登录成交会自动创建；这里可手动补关联">
             <select
               className="form-input"

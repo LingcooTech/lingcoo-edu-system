@@ -24,6 +24,18 @@
   min-width: 0;
 }
 
+.summary-titlebar {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.summary-titlebar > view:first-child {
+  min-width: 0;
+}
+
 .summary-eyebrow {
   color: #6b6258;
   font-size: 25rpx;
@@ -37,6 +49,26 @@
   font-size: 44rpx;
   font-weight: 900;
   line-height: 1.18;
+}
+
+.role-switch-button {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: 132rpx;
+  height: 54rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: #211f1c;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 850;
+  line-height: 54rpx;
+  margin: 0;
+  padding: 0 20rpx;
+}
+
+.role-switch-button::after {
+  border: 0;
 }
 
 .scope-tabs {

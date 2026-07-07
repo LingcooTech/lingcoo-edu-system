@@ -174,9 +174,20 @@ export interface Guardian {
 
 export type AccountRole = 'admin' | 'teacher' | 'parent';
 
+export interface AccountRoleAssignment {
+  id: string;
+  role: AccountRole;
+  status: 'active' | 'suspended';
+  guardianId?: string | null;
+  teacherId?: string | null;
+}
+
 export interface Account {
   id: string;
   role: AccountRole;
+  activeRole?: AccountRole;
+  roles?: AccountRoleAssignment[];
+  roleAssignments?: AccountRoleAssignment[];
   email?: string | null;
   phone?: string | null;
   displayName: string;

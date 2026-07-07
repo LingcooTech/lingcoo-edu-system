@@ -54,8 +54,12 @@ const wechatMiniBindPhoneSchema = z
     message: 'phoneCode 或 phone 至少提供一个',
   });
 
+const accountRoleSchema = z.enum(['admin', 'teacher', 'parent']);
+const workRoleSchema = z.enum(['admin', 'teacher']);
+
 const adminAccountCreateSchema = z.object({
-  role: z.enum(['admin', 'teacher', 'parent']),
+  role: accountRoleSchema,
+  roles: z.array(accountRoleSchema).optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   displayName: z.string().min(1),
@@ -66,6 +70,7 @@ const adminAccountCreateSchema = z.object({
 });
 
 const adminAccountUpdateSchema = adminAccountCreateSchema.omit({ password: true }).partial();
+const switchWorkRoleSchema = z.object({ role: workRoleSchema });
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -99,15 +104,75 @@ function generateDefaultPassword(phone: string | null | undefined) {
   return defaultPasswordFromPhone(phone) ?? String(randomInt(10_000_000, 100_000_000));
 }
 
-function publicAccount(account: accountsRepo.Account) {
+type PublicRoleAssignment = {
+  id: string;
+  role: accountsRepo.AccountRole;
+  status: accountsRepo.AccountStatus;
+  guardianId: string | null;
+  teacherId: string | null;
+};
+
+function legacyRoleAssignment(account: accountsRepo.Account): PublicRoleAssignment {
+  return {
+    id: `${account.id}:${account.role}`,
+    role: account.role,
+    status: account.status,
+    guardianId: account.role === 'parent' ? (account.guardianId ?? null) : null,
+    teacherId: account.role === 'teacher' ? (account.teacherId ?? null) : null,
+  };
+}
+
+function toPublicRoleAssignments(
+  account: accountsRepo.Account,
+  assignments: accountsRepo.AccountRoleAssignment[],
+): PublicRoleAssignment[] {
+  const source = assignments.length ? assignments : [legacyRoleAssignment(account)];
+  return source.map((assignment) => ({
+    id: assignment.id,
+    role: assignment.role,
+    status: assignment.status,
+    guardianId: assignment.role === 'parent' ? (assignment.guardianId ?? null) : null,
+    teacherId: assignment.role === 'teacher' ? (assignment.teacherId ?? null) : null,
+  }));
+}
+
+function selectActiveRole(
+  account: accountsRepo.Account,
+  roles: PublicRoleAssignment[],
+  preferredRole?: accountsRepo.AccountRole,
+) {
+  const activeRoles = roles.filter((role) => role.status === 'active');
+  return (
+    (preferredRole ? activeRoles.find((role) => role.role === preferredRole) : null) ??
+    activeRoles.find((role) => role.role === account.role) ??
+    activeRoles[0] ??
+    null
+  );
+}
+
+function publicAccount(
+  account: accountsRepo.Account,
+  input: {
+    roles?: PublicRoleAssignment[];
+    activeRole?: accountsRepo.AccountRole;
+  } = {},
+) {
+  const roles = input.roles ?? [legacyRoleAssignment(account)];
+  const activeRole = input.activeRole ?? account.role;
+  const activeAssignment =
+    roles.find((assignment) => assignment.role === activeRole) ?? legacyRoleAssignment(account);
   return {
     id: account.id,
-    role: account.role,
+    role: activeRole,
+    activeRole,
+    roles,
     email: account.email,
     phone: account.phone,
     displayName: account.displayName,
     emailVerified: Boolean(account.emailVerifiedAt),
     mustChangePassword: account.mustChangePassword,
+    guardianId: activeAssignment.guardianId,
+    teacherId: activeAssignment.teacherId,
   };
 }
 
@@ -128,12 +193,17 @@ function isWechatMiniBindToken(value: unknown): value is WechatMiniBindToken {
   );
 }
 
-function adminAccount(account: accountsRepo.Account) {
+function adminAccount(
+  account: accountsRepo.Account,
+  assignments: accountsRepo.AccountRoleAssignment[] = [],
+) {
+  const roles = toPublicRoleAssignments(account, assignments);
   return {
-    ...publicAccount(account),
+    ...publicAccount(account, { roles, activeRole: account.role }),
     status: account.status,
     guardianId: account.guardianId,
     teacherId: account.teacherId,
+    roleAssignments: roles,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };
@@ -151,13 +221,49 @@ export const authModule: AppModule = {
       };
     }
 
-    async function signIn(reply: FastifyReply, account: accountsRepo.Account) {
+    async function loadPublicAccountForRole(
+      account: accountsRepo.Account,
+      preferredRole?: accountsRepo.AccountRole,
+      strict = false,
+    ) {
+      if (account.status !== 'active') {
+        throw httpError(403, '账号已停用');
+      }
+      const assignments = await accountsRepo.listRoleAssignmentsForAccount(app.db, account.id);
+      const roles = toPublicRoleAssignments(account, assignments);
+      const activeRoleAssignment = selectActiveRole(account, roles, preferredRole);
+      if (
+        !activeRoleAssignment ||
+        (strict && preferredRole && activeRoleAssignment.role !== preferredRole)
+      ) {
+        throw httpError(403, '当前账号没有可用的该身份');
+      }
+      return {
+        activeRoleAssignment,
+        account: publicAccount(account, {
+          roles,
+          activeRole: activeRoleAssignment.role,
+        }),
+      };
+    }
+
+    async function signIn(
+      reply: FastifyReply,
+      account: accountsRepo.Account,
+      preferredRole?: accountsRepo.AccountRole,
+      strict = false,
+    ) {
+      const resolved = await loadPublicAccountForRole(account, preferredRole, strict);
       const token = await reply.jwtSign(
-        { sub: account.id, role: account.role },
+        {
+          sub: account.id,
+          role: resolved.activeRoleAssignment.role,
+          roleAssignmentId: resolved.activeRoleAssignment.id,
+        },
         { expiresIn: TOKEN_TTL },
       );
       reply.setCookie(AUTH_COOKIE, token, cookieOptions());
-      return token;
+      return { token, account: resolved.account };
     }
 
     // Issues an email verification / password reset code, throttled to one per
@@ -213,8 +319,7 @@ export const authModule: AppModule = {
         return reply.unauthorized('账号或密码不正确');
       }
 
-      const token = await signIn(reply, account);
-      return { token, account: publicAccount(account) };
+      return signIn(reply, account);
     });
 
     app.post('/auth/wechat-mini/login', async (request, reply) => {
@@ -230,8 +335,8 @@ export const authModule: AppModule = {
         if (account.status !== 'active') {
           throw httpError(403, '账号已停用');
         }
-        const token = await signIn(reply, account);
-        return { bound: true, token, account: publicAccount(account) };
+        const result = await signIn(reply, account);
+        return { bound: true, ...result };
       }
 
       const bindToken = await reply.jwtSign(
@@ -317,10 +422,9 @@ export const authModule: AppModule = {
         });
       }
 
-      const authToken = await signIn(reply, account);
+      const result = await signIn(reply, account);
       return {
-        token: authToken,
-        account: publicAccount(account),
+        ...result,
         accountCreated,
         defaultPassword,
       };
@@ -333,7 +437,23 @@ export const authModule: AppModule = {
 
     app.get('/auth/me', { preHandler: app.authenticate }, async (request) => {
       const account = await accountsRepo.findById(app.db, request.account!.id);
-      return { account: account ? publicAccount(account) : null };
+      if (!account) {
+        return { account: null };
+      }
+      const resolved = await loadPublicAccountForRole(
+        account,
+        request.account!.role as accountsRepo.AccountRole,
+      );
+      return { account: resolved.account };
+    });
+
+    app.post('/auth/switch-work-role', { preHandler: app.authenticate }, async (request, reply) => {
+      const body = switchWorkRoleSchema.parse(request.body);
+      const account = await accountsRepo.findById(app.db, request.account!.id);
+      if (!account) {
+        throw httpError(404, '账号不存在');
+      }
+      return signIn(reply, account, body.role, true);
     });
 
     // --- Admin account management ---
@@ -357,12 +477,31 @@ export const authModule: AppModule = {
       }
     }
 
+    function resolveSubmittedRoles(input: {
+      role: accountsRepo.AccountRole;
+      roles?: accountsRepo.AccountRole[];
+    }) {
+      const roles = Array.from(new Set([input.role, ...(input.roles ?? [])]));
+      if (roles.includes('parent') && roles.length > 1) {
+        throw httpError(422, '家长身份暂不支持叠加管理员或老师身份');
+      }
+      return roles;
+    }
+
+    function rolesFromAssignments(
+      account: accountsRepo.Account,
+      assignments: accountsRepo.AccountRoleAssignment[],
+    ) {
+      const roles = assignments.length ? assignments.map((assignment) => assignment.role) : [];
+      return roles.length ? roles : [account.role];
+    }
+
     async function validateProfileLinks(input: {
-      role?: accountsRepo.AccountRole;
+      roles: accountsRepo.AccountRole[];
       guardianId?: string | null;
       teacherId?: string | null;
     }) {
-      if (input.role === 'teacher') {
+      if (input.roles.includes('teacher')) {
         if (!input.teacherId) {
           throw httpError(422, '老师账号必须关联老师档案');
         }
@@ -371,7 +510,7 @@ export const authModule: AppModule = {
           throw httpError(404, '老师档案不存在');
         }
       }
-      if (input.role === 'parent' && input.guardianId) {
+      if (input.roles.includes('parent') && input.guardianId) {
         const guardian = await peopleRepo.findGuardian(app.db, input.guardianId);
         if (!guardian) {
           throw httpError(404, '家长档案不存在');
@@ -386,19 +525,27 @@ export const authModule: AppModule = {
         teachingRepo.listTeachers(app.db),
         accountsRepo.listWechatIdentities(app.db),
       ]);
+      const roleAssignments = await accountsRepo.listRoleAssignments(app.db);
       const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
       const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
       const wechatIdentitiesByAccountId = new Map<string, typeof wechatIdentities>();
+      const roleAssignmentsByAccountId = new Map<string, accountsRepo.AccountRoleAssignment[]>();
       for (const identity of wechatIdentities) {
         wechatIdentitiesByAccountId.set(identity.accountId, [
           ...(wechatIdentitiesByAccountId.get(identity.accountId) ?? []),
           identity,
         ]);
       }
+      for (const assignment of roleAssignments) {
+        roleAssignmentsByAccountId.set(assignment.accountId, [
+          ...(roleAssignmentsByAccountId.get(assignment.accountId) ?? []),
+          assignment,
+        ]);
+      }
 
       return {
         accounts: accounts.map((account) => ({
-          ...adminAccount(account),
+          ...adminAccount(account, roleAssignmentsByAccountId.get(account.id) ?? []),
           guardian: account.guardianId ? guardianById.get(account.guardianId) : undefined,
           teacher: account.teacherId ? teacherById.get(account.teacherId) : undefined,
           wechatIdentities: wechatIdentitiesByAccountId.get(account.id) ?? [],
@@ -415,10 +562,13 @@ export const authModule: AppModule = {
       }
 
       await ensureUniqueIdentifiers({ email, phone });
+      const roles = resolveSubmittedRoles({ role: body.role, roles: body.roles });
+      const guardianId = roles.includes('parent') ? (body.guardianId ?? null) : null;
+      const teacherId = roles.includes('teacher') ? (body.teacherId ?? null) : null;
       await validateProfileLinks({
-        role: body.role,
-        guardianId: body.guardianId ?? null,
-        teacherId: body.teacherId ?? null,
+        roles,
+        guardianId,
+        teacherId,
       });
 
       const defaultPassword = body.password ?? generateDefaultPassword(phone);
@@ -428,13 +578,23 @@ export const authModule: AppModule = {
         phone,
         displayName: body.displayName.trim(),
         status: body.status,
-        guardianId: body.role === 'parent' ? (body.guardianId ?? null) : null,
-        teacherId: body.role === 'teacher' ? (body.teacherId ?? null) : null,
+        guardianId,
+        teacherId,
         passwordHash: hashPassword(defaultPassword),
         mustChangePassword: true,
       });
+      const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
+        app.db,
+        account.id,
+        roles.map((role) => ({
+          role,
+          guardianId,
+          teacherId,
+          status: body.status,
+        })),
+      );
 
-      return { account: adminAccount(account), defaultPassword };
+      return { account: adminAccount(account, assignments), defaultPassword };
     });
 
     app.patch('/v1/accounts/:accountId', { preHandler: app.requireAdmin }, async (request) => {
@@ -443,29 +603,35 @@ export const authModule: AppModule = {
       if (!current) {
         throw httpError(404, '账号不存在');
       }
+      const currentAssignments = await accountsRepo.listRoleAssignmentsForAccount(
+        app.db,
+        current.id,
+      );
       const body = adminAccountUpdateSchema.parse(request.body);
       const nextRole = body.role ?? current.role;
+      const nextRoles =
+        body.roles === undefined && body.role === undefined
+          ? rolesFromAssignments(current, currentAssignments)
+          : resolveSubmittedRoles({ role: nextRole, roles: body.roles });
       const email = body.email === undefined ? current.email : normalizeOptionalEmail(body.email);
       const phone = body.phone === undefined ? current.phone : normalizeOptionalPhone(body.phone);
       if (!email && !phone) {
         throw httpError(422, '邮箱和手机号至少填写一个');
       }
 
-      const guardianId =
-        nextRole === 'parent'
-          ? body.guardianId === undefined
-            ? current.guardianId
-            : body.guardianId
-          : null;
-      const teacherId =
-        nextRole === 'teacher'
-          ? body.teacherId === undefined
-            ? current.teacherId
-            : body.teacherId
-          : null;
+      const guardianId = nextRoles.includes('parent')
+        ? body.guardianId === undefined
+          ? current.guardianId
+          : body.guardianId
+        : null;
+      const teacherId = nextRoles.includes('teacher')
+        ? body.teacherId === undefined
+          ? current.teacherId
+          : body.teacherId
+        : null;
 
       await ensureUniqueIdentifiers({ email, phone, ignoreAccountId: accountId });
-      await validateProfileLinks({ role: nextRole, guardianId, teacherId });
+      await validateProfileLinks({ roles: nextRoles, guardianId, teacherId });
 
       const updated = await accountsRepo.updateAccount(app.db, accountId, {
         role: nextRole,
@@ -476,8 +642,18 @@ export const authModule: AppModule = {
         guardianId,
         teacherId,
       });
+      const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
+        app.db,
+        accountId,
+        nextRoles.map((role) => ({
+          role,
+          guardianId,
+          teacherId,
+          status: body.status ?? current.status,
+        })),
+      );
 
-      return { account: adminAccount(updated!) };
+      return { account: adminAccount(updated!, assignments) };
     });
 
     app.post(
@@ -494,7 +670,8 @@ export const authModule: AppModule = {
           passwordHash: hashPassword(defaultPassword),
           mustChangePassword: true,
         });
-        return { account: adminAccount(updated!), defaultPassword };
+        const assignments = await accountsRepo.listRoleAssignmentsForAccount(app.db, accountId);
+        return { account: adminAccount(updated!, assignments), defaultPassword };
       },
     );
 
@@ -559,8 +736,8 @@ export const authModule: AppModule = {
       });
 
       const codeResult = await sendCode(account, 'email_verify');
-      const token = await signIn(reply, account);
-      return { token, account: publicAccount(account), verificationSent: codeResult.sent };
+      const result = await signIn(reply, account);
+      return { ...result, verificationSent: codeResult.sent };
     });
 
     // --- Change password (clears the must-change flag set on provisioning) ---
@@ -617,7 +794,11 @@ export const authModule: AppModule = {
       const updated = await accountsRepo.updateAccount(app.db, account.id, {
         emailVerifiedAt: new Date(),
       });
-      return { account: publicAccount(updated!) };
+      const resolved = await loadPublicAccountForRole(
+        updated!,
+        request.account!.role as accountsRepo.AccountRole,
+      );
+      return { account: resolved.account };
     });
 
     // --- Forgot / reset password (email channel) ---

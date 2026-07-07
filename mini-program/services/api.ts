@@ -413,11 +413,21 @@ export interface PublicTeacherDetail {
 export interface AuthAccount {
   id: string;
   role: string;
+  activeRole?: string;
+  roles?: Array<{
+    id: string;
+    role: string;
+    status: string;
+    guardianId?: string | null;
+    teacherId?: string | null;
+  }>;
   email: string | null;
   phone: string | null;
   displayName: string;
   emailVerified: boolean;
   mustChangePassword: boolean;
+  guardianId?: string | null;
+  teacherId?: string | null;
 }
 
 export interface AdminMetricSummary {
@@ -1194,6 +1204,16 @@ export function bindWechatMiniPhone(input: {
 
 export function fetchMe(): Promise<{ account: AuthAccount | null }> {
   return request('/auth/me');
+}
+
+export function switchWorkRole(role: 'admin' | 'teacher'): Promise<{
+  token: string;
+  account: AuthAccount;
+}> {
+  return request('/auth/switch-work-role', {
+    method: 'POST',
+    data: { role },
+  });
 }
 
 export function logout(): Promise<{ ok: boolean }> {

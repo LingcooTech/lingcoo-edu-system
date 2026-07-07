@@ -36,6 +36,33 @@
   line-height: 1.45;
 }
 
+.admin-hero-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12rpx;
+}
+
+.role-switch-button {
+  box-sizing: border-box;
+  min-width: 132rpx;
+  height: 54rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: #211f1c;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 850;
+  line-height: 54rpx;
+  margin: 0;
+  padding: 0 20rpx;
+}
+
+.role-switch-button::after {
+  border: 0;
+}
+
 .admin-badge,
 .status-pill {
   flex-shrink: 0;

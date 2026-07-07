@@ -15,6 +15,7 @@ import {
   logout,
   setToken,
   submitParentCheckIn,
+  switchWorkRole,
   wechatMiniLogin,
   type AuthAccount,
   type ParentSeatReservation,
@@ -78,6 +79,14 @@ function isCurrentMonth(value?: string | null) {
 }
 
 const ACCOUNT_TAB_INDEX = 4;
+
+function canSwitchWorkRole(account: AuthAccount | null) {
+  if (!account) return false;
+  const activeRoles = (account.roles ?? [])
+    .filter((role) => role.status === 'active')
+    .map((role) => role.role);
+  return activeRoles.includes('admin') && activeRoles.includes('teacher');
+}
 
 function timeLabel(value?: string) {
   if (!value) return '';
@@ -149,6 +158,8 @@ Page({
     bindToken: '',
     loginSheetVisible: false,
     account: null as AuthAccount | null,
+    canSwitchWorkRole: false,
+    switchingRole: false,
     defaultPassword: '',
     avatarText: '我',
     guestIcons: GUEST_ACCOUNT_ICONS,
@@ -229,6 +240,7 @@ Page({
     const source = account.displayName || account.phone || '我';
     this.setData({
       account,
+      canSwitchWorkRole: canSwitchWorkRole(account),
       bindToken: '',
       avatarText: source.slice(0, 1).toUpperCase(),
     });
@@ -301,6 +313,8 @@ Page({
   resetAccountState() {
     this.setData({
       account: null,
+      canSwitchWorkRole: false,
+      switchingRole: false,
       bindToken: '',
       loginSheetVisible: false,
       defaultPassword: '',
@@ -311,6 +325,29 @@ Page({
       checkingInKey: '',
     });
     this.updateTabBadge(0);
+  },
+
+  async onSwitchWorkRole() {
+    if (!this.data.account || !this.data.canSwitchWorkRole || this.data.switchingRole) return;
+    const targetRole = this.data.account.role === 'admin' ? 'teacher' : 'admin';
+    this.setData({ switchingRole: true });
+    try {
+      const payload = await switchWorkRole(targetRole);
+      setToken(payload.token);
+      this.applyAccount(payload.account);
+      this.updateTabBadge(0);
+      wx.showToast({
+        title: targetRole === 'admin' ? '已切到管理看板' : '已切到老师工作台',
+        icon: 'success',
+      });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '切换身份失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ switchingRole: false });
+    }
   },
 
   async onParentCheckIn(event: {

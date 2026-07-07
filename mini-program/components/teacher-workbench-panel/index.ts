@@ -327,6 +327,17 @@ Component({
     styleIsolation: 'apply-shared',
   },
 
+  properties: {
+    canSwitchRole: {
+      type: Boolean,
+      value: false,
+    },
+    switchingRole: {
+      type: Boolean,
+      value: false,
+    },
+  },
+
   data: {
     loading: true,
     activeView: 'schedule' as ActiveView,
@@ -427,11 +438,15 @@ Component({
   },
 
   methods: {
-  refresh() {
-    return this.reload();
-  },
+    requestRoleSwitch() {
+      this.triggerEvent('switchrole');
+    },
 
-  async reload() {
+    refresh() {
+      return this.reload();
+    },
+
+    async reload() {
     this.setData({ loading: true });
     try {
       const [
