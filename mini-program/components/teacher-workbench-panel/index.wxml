@@ -5,7 +5,7 @@
     <view class="card summary-card">
       <view class="summary-head">
         <view>
-          <view class="summary-eyebrow">机构工作台</view>
+          <view class="summary-eyebrow">老师工作台</view>
           <view class="summary-title">{{summaryTitle}}</view>
         </view>
         <view class="scope-tabs">

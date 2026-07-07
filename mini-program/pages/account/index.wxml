@@ -287,7 +287,7 @@
         <view class="guest-title-icon teacher">
           <image class="guest-title-image" src="{{guestIcons.teacher}}" mode="aspectFit" />
         </view>
-        <view>机构工作台</view>
+        <view>老师工作台</view>
       </view>
       <view class="guest-grid">
         <view class="guest-tool">
@@ -334,7 +334,7 @@
     <view class="login-sheet" catchtap="noop">
       <view class="sheet-handle"></view>
       <view class="sheet-title">授权手机号</view>
-      <view class="sheet-desc">当前账号还未绑定手机号，授权后将自动进入成长中心、机构工作台或管理看板。</view>
+      <view class="sheet-desc">当前账号还未绑定手机号，授权后将自动进入成长中心、老师工作台或管理看板。</view>
       <button
         class="btn btn-primary bind-button"
         open-type="getPhoneNumber"

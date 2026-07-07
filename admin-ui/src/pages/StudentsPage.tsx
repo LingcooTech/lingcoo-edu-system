@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Archive, Eye, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Student } from '@/api/types';
+import type { Account, Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -20,6 +20,7 @@ const ARCHIVED_STUDENTS = '/v1/students?scope=archived';
 const STUDENT_TABS = [
   { key: 'profiles', label: '学员档案' },
   { key: 'history', label: '历史档案' },
+  { key: 'parentAccounts', label: '家长账号' },
   { key: 'lessonAccounts', label: '课时账户' },
   { key: 'courseContracts', label: '正式课程档案' },
 ] as const;
@@ -360,6 +361,8 @@ export function StudentsPage() {
             emptyMessage="暂无历史档案"
             getRowKey={(row) => row.id}
           />
+        ) : activeTab === 'parentAccounts' ? (
+          <ParentAccountsPanel students={[...data, ...archivedData]} />
         ) : activeTab === 'lessonAccounts' ? (
           <LessonAccountsPanel />
         ) : (
@@ -532,5 +535,139 @@ export function StudentsPage() {
         onConfirm={hardDeleteStudent}
       />
     </PageFrame>
+  );
+}
+
+function ParentAccountsPanel({ students }: { students: Student[] }) {
+  const toast = useToast();
+  const { data: accounts, setData: setAccounts } = useApiResource<Account>(
+    '/v1/accounts',
+    'accounts',
+  );
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const parentAccounts = accounts.filter((account) => account.role === 'parent');
+
+  function linkedStudents(account: Account) {
+    if (!account.guardianId) return [];
+    return students.filter((student) => student.guardianId === account.guardianId);
+  }
+
+  async function deleteParentAccount() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { account } = await apiDelete<{ account: Account }>(
+        `/v1/accounts/${deleteTarget.id}`,
+      );
+      setAccounts((current) => current.filter((item) => item.id !== account.id));
+      setDeleteTarget(null);
+      toast.success('家长账号已删除，手机号已释放');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <>
+      <DataTable
+        columns={[
+          {
+            key: 'account',
+            header: '家长账号',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">{row.displayName}</span>
+                <span className="cell-subtitle">{row.phone ?? row.email ?? '-'}</span>
+              </div>
+            ),
+            sortValue: (row) => row.displayName,
+            filterValue: (row) => `${row.displayName} ${row.phone ?? ''} ${row.email ?? ''}`,
+          },
+          {
+            key: 'guardian',
+            header: '绑定家长档案',
+            cell: (row) =>
+              row.guardian ? `${row.guardian.name} · ${row.guardian.phone}` : '未绑定',
+            filterValue: (row) => `${row.guardian?.name ?? ''} ${row.guardian?.phone ?? ''}`,
+          },
+          {
+            key: 'students',
+            header: '关联学员',
+            cell: (row) => {
+              const linked = linkedStudents(row);
+              return linked.length ? (
+                <div className="cell-stack">
+                  <span className="cell-title">
+                    {linked.map((student) => student.name).join('、')}
+                  </span>
+                  <span className="cell-subtitle">共 {linked.length} 位学员</span>
+                </div>
+              ) : (
+                '无关联学员'
+              );
+            },
+            filterValue: (row) => linkedStudents(row).map((student) => student.name).join(' '),
+          },
+          {
+            key: 'status',
+            header: '状态',
+            cell: (row) => <StatusPill tone={statusToTone(row.status)} label={row.status} />,
+          },
+          {
+            key: 'wechat',
+            header: '微信绑定',
+            cell: (row) => {
+              const identity = row.wechatIdentities?.[0];
+              return identity ? (
+                <div className="cell-stack">
+                  <span className="cell-title">已绑定</span>
+                  <span className="cell-subtitle">openid: {identity.openid.slice(-8)}</span>
+                </div>
+              ) : (
+                '未绑定'
+              );
+            },
+          },
+          {
+            key: 'createdAt',
+            header: '创建时间',
+            cell: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
+            sortValue: (row) => new Date(row.createdAt),
+          },
+          {
+            key: 'actions',
+            header: '操作',
+            cell: (row) => (
+              <button
+                type="button"
+                className="btn btn-ghost px-2 py-1 text-red-600"
+                onClick={() => setDeleteTarget(row)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                删除账号
+              </button>
+            ),
+            sortable: false,
+          },
+        ]}
+        data={parentAccounts}
+        emptyMessage="暂无家长账号"
+        getRowKey={(row) => row.id}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除家长账号？"
+        message={`确认删除「${deleteTarget?.displayName ?? ''}」？删除后该账号不能登录，微信绑定会同步解除，手机号可重新用于创建新家长账号；学员档案和家长档案不会被删除。`}
+        confirmLabel="删除账号"
+        danger
+        busy={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={deleteParentAccount}
+      />
+    </>
   );
 }
