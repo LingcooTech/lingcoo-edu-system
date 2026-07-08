@@ -2,18 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
 import { api, apiPost } from '@/api/client';
-import type { AttendanceRecord, AttendanceStatus, ClassSession, Student } from '@/api/types';
+import type {
+  AttendanceRecord,
+  AttendanceStatus,
+  ClassSession,
+  SessionRosterEntry,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
-
-interface Enrollment {
-  id: string;
-  studentId: string;
-  student?: Student;
-}
 
 interface AttendanceDraft {
   status: AttendanceStatus;
@@ -49,7 +48,7 @@ export function AttendancePage() {
     'classSessions',
   );
   const [sessionId, setSessionId] = useState('');
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [roster, setRoster] = useState<SessionRosterEntry[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [drafts, setDrafts] = useState<Record<string, AttendanceDraft>>({});
   const [loading, setLoading] = useState(false);
@@ -66,7 +65,7 @@ export function AttendancePage() {
   );
 
   const attendanceSummary = useMemo(() => {
-    const total = enrollments.length;
+    const total = roster.length;
     const signed = records.length;
     const statuses: Record<AttendanceStatus, number> = {
       present: 0,
@@ -81,7 +80,7 @@ export function AttendancePage() {
     });
     const lessonDeducted = statuses.present + statuses.late + statuses.absent + statuses.makeup;
     return { total, signed, statuses, lessonDeducted };
-  }, [enrollments, records]);
+  }, [roster, records]);
 
   useEffect(() => {
     if (!sessionId && sessions.length > 0) {
@@ -93,34 +92,34 @@ export function AttendancePage() {
 
   useEffect(() => {
     if (!selectedSession) {
-      setEnrollments([]);
+      setRoster([]);
       setRecords([]);
       setDrafts({});
       return;
     }
     setLoading(true);
     Promise.all([
-      api<{ enrollments: Enrollment[] }>(`/v1/classes/${selectedSession.classId}/enrollments`),
+      api<{ roster: SessionRosterEntry[] }>(`/v1/class-sessions/${selectedSession.id}/roster`),
       api<{ attendanceRecords: AttendanceRecord[] }>(
         `/v1/class-sessions/${selectedSession.id}/attendance`,
       ),
     ])
-      .then(([enrollmentPayload, attendancePayload]) => {
-        setEnrollments(enrollmentPayload.enrollments);
+      .then(([rosterPayload, attendancePayload]) => {
+        setRoster(rosterPayload.roster);
         setRecords(attendancePayload.attendanceRecords);
         const nextDrafts: Record<string, AttendanceDraft> = {};
-        enrollmentPayload.enrollments.forEach((enrollment) => {
+        rosterPayload.roster.forEach((entry) => {
           const existing = attendancePayload.attendanceRecords.find(
-            (record) => record.studentId === enrollment.studentId,
+            (record) => record.studentId === entry.studentId,
           );
-          nextDrafts[enrollment.studentId] = existing
+          nextDrafts[entry.studentId] = existing
             ? { status: existing.status, note: existing.note ?? '' }
             : defaultDraft();
         });
         setDrafts(nextDrafts);
       })
       .catch((err) => {
-        setEnrollments([]);
+        setRoster([]);
         setRecords([]);
         setDrafts({});
         toast.error(err instanceof Error ? err.message : '加载签到数据失败');
@@ -135,17 +134,17 @@ export function AttendancePage() {
     }));
   }
 
-  async function submitEnrollment(enrollment: Enrollment) {
-    if (!selectedSession || recordByStudentId.has(enrollment.studentId)) return;
-    const draft = drafts[enrollment.studentId] ?? defaultDraft();
-    setSavingStudentId(enrollment.studentId);
+  async function submitRosterEntry(entry: SessionRosterEntry) {
+    if (!selectedSession || recordByStudentId.has(entry.studentId)) return;
+    const draft = drafts[entry.studentId] ?? defaultDraft();
+    setSavingStudentId(entry.studentId);
     try {
       const { attendanceRecords } = await apiPost<{ attendanceRecords: AttendanceRecord[] }>(
         `/v1/class-sessions/${selectedSession.id}/attendance`,
         {
           records: [
             {
-              studentId: enrollment.studentId,
+              studentId: entry.studentId,
               status: draft.status,
               note: draft.note.trim() || undefined,
             },
@@ -157,10 +156,7 @@ export function AttendancePage() {
         attendanceRecords.forEach((record) => byStudentId.set(record.studentId, record));
         const nextRecords = Array.from(byStudentId.values());
         const checkedInStudentIds = new Set(nextRecords.map((record) => record.studentId));
-        if (
-          enrollments.length > 0 &&
-          enrollments.every((item) => checkedInStudentIds.has(item.studentId))
-        ) {
+        if (roster.length > 0 && roster.every((item) => checkedInStudentIds.has(item.studentId))) {
           setSessions(
             sessions.map((session) =>
               session.id === selectedSession.id ? { ...session, status: 'completed' } : session,
@@ -255,31 +251,43 @@ export function AttendancePage() {
             <Loader2 className="h-4 w-4 animate-spin" />
             加载中...
           </div>
-        ) : enrollments.length === 0 ? (
+        ) : roster.length === 0 ? (
           <div className="text-muted-foreground py-12 text-center text-sm">
-            {selectedSession ? '该班级暂无学员' : '请先选择课次'}
+            {selectedSession ? '该课次暂无学员' : '请先选择课次'}
           </div>
         ) : (
           <div className="divide-y">
-            {enrollments.map((enrollment) => {
-              const student = enrollment.student;
-              const record = recordByStudentId.get(enrollment.studentId);
-              const draft = drafts[enrollment.studentId] ?? defaultDraft();
+            {roster.map((entry) => {
+              const student = entry.student;
+              const record = recordByStudentId.get(entry.studentId);
+              const draft = drafts[entry.studentId] ?? defaultDraft();
               return (
                 <div
-                  key={enrollment.id}
+                  key={`${entry.source}-${entry.id}`}
                   className="grid gap-3 px-4 py-3 lg:grid-cols-[1.1fr_1fr_1.2fr_auto]"
                 >
                   <div className="cell-stack">
-                    <span className="cell-title">{student?.name ?? '学员'}</span>
-                    <span className="cell-subtitle">{student?.grade ?? '-'}</span>
+                    <span className="cell-title flex items-center gap-2">
+                      {student?.name ?? '学员'}
+                      {entry.source === 'temporary' && (
+                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+                          临时
+                        </span>
+                      )}
+                    </span>
+                    <span className="cell-subtitle">
+                      {student?.grade ?? '-'}
+                      {entry.source === 'temporary' && entry.billingCourse
+                        ? ` · 扣 ${entry.billingCourse.name}`
+                        : ''}
+                    </span>
                   </div>
                   <select
                     className="form-input"
                     value={draft.status}
                     disabled={Boolean(record)}
                     onChange={(event) =>
-                      updateDraft(enrollment.studentId, {
+                      updateDraft(entry.studentId, {
                         status: event.target.value as AttendanceStatus,
                       })
                     }
@@ -295,9 +303,7 @@ export function AttendancePage() {
                     placeholder="备注"
                     value={draft.note}
                     disabled={Boolean(record)}
-                    onChange={(event) =>
-                      updateDraft(enrollment.studentId, { note: event.target.value })
-                    }
+                    onChange={(event) => updateDraft(entry.studentId, { note: event.target.value })}
                   />
                   <div className="flex items-center justify-start lg:justify-end">
                     {record ? (
@@ -309,9 +315,9 @@ export function AttendancePage() {
                         type="button"
                         className="btn btn-primary px-3 py-1.5"
                         disabled={!selectedSession || loading || savingStudentId !== ''}
-                        onClick={() => submitEnrollment(enrollment)}
+                        onClick={() => submitRosterEntry(entry)}
                       >
-                        {savingStudentId === enrollment.studentId ? (
+                        {savingStudentId === entry.studentId ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <CheckCircle2 className="h-3.5 w-3.5" />

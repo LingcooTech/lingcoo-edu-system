@@ -341,7 +341,7 @@ export interface Student {
   school?: string | null;
   status: string;
   guardian?: { name: string; phone: string };
-  lessonAccounts?: Array<{ balance: number; courseId: string }>;
+  lessonAccounts?: Array<{ id?: string; balance: number; courseId: string; studentId?: string }>;
 }
 
 export interface ClassGroup {
@@ -371,6 +371,30 @@ export interface ClassSession {
   class?: { name: string };
   teacher?: { name: string };
   classroom?: { name: string };
+}
+
+export interface SessionRosterEntry {
+  id: string;
+  source: 'enrollment' | 'temporary';
+  studentId: string;
+  billingCourseId: string;
+  classEnrollmentId?: string;
+  temporaryStudentId?: string;
+  note?: string | null;
+  student?: Student | null;
+  billingCourse?: Course | null;
+  lessonAccount?: { balance: number; courseId: string } | null;
+}
+
+export interface TemporarySessionStudent {
+  id: string;
+  classSessionId: string;
+  studentId: string;
+  billingCourseId: string;
+  note?: string | null;
+  student?: Student | null;
+  billingCourse?: Course | null;
+  lessonAccount?: { balance: number; courseId: string } | null;
 }
 
 export interface CalendarEvent {

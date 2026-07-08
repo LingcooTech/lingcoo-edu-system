@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import QRCode from 'qrcode';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
@@ -7,6 +8,7 @@ import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as trialRepo from '../../db/repositories/trial.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
+import * as schema from '../../db/schema.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import type { AppModule } from '../types.js';
 
@@ -64,6 +66,12 @@ const publicCalendarQuerySchema = z.object({
 
 const enrollmentSchema = z.object({
   studentId: z.string(),
+});
+
+const temporaryStudentSchema = z.object({
+  studentId: z.string().uuid(),
+  billingCourseId: z.string().uuid(),
+  note: z.string().trim().max(300).optional(),
 });
 
 function notFound(message: string): Error {
@@ -144,6 +152,81 @@ function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, t
 export const schedulingModule: AppModule = {
   name: 'scheduling',
   async register(app) {
+    async function enrichSessionRoster(sessionId: string) {
+      const roster = await schedulingRepo.listSessionRoster(app.db, sessionId);
+      if (roster.length === 0) {
+        return [];
+      }
+
+      const studentIds = Array.from(new Set(roster.map((entry) => entry.studentId)));
+      const billingCourseIds = Array.from(new Set(roster.map((entry) => entry.billingCourseId)));
+      const [students, courses, lessonAccounts] = await Promise.all([
+        peopleRepo.listStudents(app.db, { scope: 'all' }),
+        catalogRepo.listCourses(app.db),
+        app.db
+          .select()
+          .from(schema.lessonAccounts)
+          .where(inArray(schema.lessonAccounts.studentId, studentIds)),
+      ]);
+      const studentById = new Map(students.map((student) => [student.id, student]));
+      const courseById = new Map(
+        courses
+          .filter((course) => billingCourseIds.includes(course.id))
+          .map((course) => [course.id, course]),
+      );
+      const lessonAccountByStudentCourse = new Map(
+        lessonAccounts.map((account) => [`${account.studentId}:${account.courseId}`, account]),
+      );
+
+      return roster.map((entry) => ({
+        ...entry,
+        student: studentById.get(entry.studentId) ?? null,
+        billingCourse: courseById.get(entry.billingCourseId) ?? null,
+        lessonAccount:
+          lessonAccountByStudentCourse.get(`${entry.studentId}:${entry.billingCourseId}`) ?? null,
+      }));
+    }
+
+    async function enrichTemporaryStudents(sessionId: string) {
+      const roster = await enrichSessionRoster(sessionId);
+      return roster
+        .filter((entry) => entry.source === 'temporary')
+        .map((entry) => ({
+          id: entry.temporaryStudentId ?? entry.id,
+          classSessionId: sessionId,
+          studentId: entry.studentId,
+          billingCourseId: entry.billingCourseId,
+          note: entry.note ?? null,
+          student: entry.student,
+          billingCourse: entry.billingCourse,
+          lessonAccount: entry.lessonAccount,
+        }));
+    }
+
+    async function requireLessonAccountForTemporaryStudent(input: {
+      studentId: string;
+      billingCourseId: string;
+    }) {
+      const [lessonAccount] = await app.db
+        .select()
+        .from(schema.lessonAccounts)
+        .where(
+          and(
+            eq(schema.lessonAccounts.studentId, input.studentId),
+            eq(schema.lessonAccounts.courseId, input.billingCourseId),
+          ),
+        )
+        .limit(1);
+
+      if (!lessonAccount) {
+        throw unprocessable('该学员暂无所选课程课时账户');
+      }
+      if (lessonAccount.balance <= 0) {
+        throw unprocessable('所选课时账户余额不足');
+      }
+      return lessonAccount;
+    }
+
     app.get('/v1/classes', { preHandler: app.requireAdmin }, async () => {
       const [classes, courses, teachers, classrooms] = await Promise.all([
         schedulingRepo.listClasses(app.db),
@@ -390,11 +473,7 @@ export const schedulingModule: AppModule = {
       const skipped: Array<{ date: string; reason: string }> = [];
 
       for (const dateKey of dates) {
-        const startsAt = localDateTimeToDate(
-          dateKey,
-          body.startTime,
-          body.timezoneOffsetMinutes,
-        );
+        const startsAt = localDateTimeToDate(dateKey, body.startTime, body.timezoneOffsetMinutes);
         const endsAt = localDateTimeToDate(dateKey, body.endTime, body.timezoneOffsetMinutes);
         if (endsAt <= startsAt) {
           throw unprocessable('下课时间必须晚于上课时间');
@@ -478,6 +557,114 @@ export const schedulingModule: AppModule = {
         const landingUrl = `${resolvePublicWebBaseUrl(app.appEnv, request)}/check-in/${sessionId}`;
         const qrCodeDataUrl = await QRCode.toDataURL(landingUrl, { margin: 1, width: 320 });
         return { landingUrl, qrCodeDataUrl };
+      },
+    );
+
+    app.get(
+      '/v1/class-sessions/:sessionId/roster',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) throw notFound('Class session not found');
+        return { roster: await enrichSessionRoster(sessionId) };
+      },
+    );
+
+    app.get(
+      '/v1/class-sessions/:sessionId/temporary-students',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) throw notFound('Class session not found');
+        return { temporaryStudents: await enrichTemporaryStudents(sessionId) };
+      },
+    );
+
+    app.post(
+      '/v1/class-sessions/:sessionId/temporary-students',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const body = temporaryStudentSchema.parse(request.body);
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) throw notFound('Class session not found');
+        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        if (!classGroup) throw notFound('Class not found');
+
+        const [student, billingCourse, enrollments, existingTemporaryStudent] = await Promise.all([
+          peopleRepo.requireStudent(app.db, body.studentId),
+          catalogRepo.requireCourse(app.db, body.billingCourseId),
+          schedulingRepo.listEnrollments(app.db, classGroup.id),
+          schedulingRepo.findTemporaryStudent(app.db, {
+            sessionId,
+            studentId: body.studentId,
+          }),
+        ]);
+
+        if (student.status === 'archived') {
+          throw unprocessable('不能添加已归档学员');
+        }
+        if (enrollments.some((enrollment) => enrollment.studentId === body.studentId)) {
+          throw conflict('该学员已是本课次正式学员，无需临时添加');
+        }
+        if (existingTemporaryStudent) {
+          throw conflict('该学员已是本课次临时学员');
+        }
+        await requireLessonAccountForTemporaryStudent({
+          studentId: student.id,
+          billingCourseId: billingCourse.id,
+        });
+
+        const temporaryStudent = await schedulingRepo.createTemporaryStudent(app.db, {
+          classSessionId: sessionId,
+          studentId: student.id,
+          billingCourseId: billingCourse.id,
+          note: body.note?.trim() || null,
+        });
+        const [enriched] = (await enrichTemporaryStudents(sessionId)).filter(
+          (item) => item.id === temporaryStudent.id,
+        );
+        return { temporaryStudent: enriched ?? temporaryStudent };
+      },
+    );
+
+    app.delete(
+      '/v1/class-sessions/:sessionId/temporary-students/:temporaryStudentId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId, temporaryStudentId } = request.params as {
+          sessionId: string;
+          temporaryStudentId: string;
+        };
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) throw notFound('Class session not found');
+        const temporaryStudent = (
+          await schedulingRepo.listTemporaryStudents(app.db, sessionId)
+        ).find((item) => item.id === temporaryStudentId);
+        if (!temporaryStudent) throw notFound('Temporary student not found');
+
+        const [attendanceRecord] = await app.db
+          .select({ id: schema.attendanceRecords.id })
+          .from(schema.attendanceRecords)
+          .where(
+            and(
+              eq(schema.attendanceRecords.classSessionId, sessionId),
+              eq(schema.attendanceRecords.studentId, temporaryStudent.studentId),
+            ),
+          )
+          .limit(1);
+        if (attendanceRecord) {
+          throw unprocessable('该临时学员已点名，不能移除');
+        }
+
+        const removed = await schedulingRepo.removeTemporaryStudent(app.db, {
+          sessionId,
+          temporaryStudentId,
+        });
+        if (!removed) throw notFound('Temporary student not found');
+        return { temporaryStudent: removed };
       },
     );
 

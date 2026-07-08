@@ -1,8 +1,26 @@
 import { useMemo, useState } from 'react';
-import { Ban, CalendarDays, List, Pencil, Plus, QrCode, Repeat, Trash2 } from 'lucide-react';
+import {
+  Ban,
+  CalendarDays,
+  List,
+  Loader2,
+  Pencil,
+  Plus,
+  QrCode,
+  Repeat,
+  Trash2,
+} from 'lucide-react';
 
 import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { ClassGroup, ClassSession, Classroom, Teacher } from '@/api/types';
+import type {
+  ClassGroup,
+  ClassSession,
+  Classroom,
+  Course,
+  Student,
+  Teacher,
+  TemporarySessionStudent,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -35,6 +53,12 @@ interface BatchForm {
   endTime: string;
   topic: string;
   skipConflicts: boolean;
+}
+
+interface TemporaryStudentForm {
+  studentId: string;
+  billingCourseId: string;
+  note: string;
 }
 
 const WEEKDAYS = [
@@ -120,6 +144,8 @@ export function SchedulePage() {
   const { data: classes } = useApiResource<ClassGroup>('/v1/classes', 'classes');
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
   const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
+  const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
+  const { data: students } = useApiResource<Student>('/v1/students?scope=current', 'students');
 
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [weekStartKey, setWeekStartKey] = useState(toDateKey(startOfWeek(new Date())));
@@ -142,6 +168,14 @@ export function SchedulePage() {
   const [qrSession, setQrSession] = useState<ClassSession | null>(null);
   const [qr, setQr] = useState<{ landingUrl: string; qrCodeDataUrl: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [temporaryStudents, setTemporaryStudents] = useState<TemporarySessionStudent[]>([]);
+  const [temporaryStudentForm, setTemporaryStudentForm] = useState<TemporaryStudentForm>({
+    studentId: '',
+    billingCourseId: '',
+    note: '',
+  });
+  const [temporaryStudentsLoading, setTemporaryStudentsLoading] = useState(false);
+  const [temporaryStudentSaving, setTemporaryStudentSaving] = useState(false);
 
   const classNameById = useMemo(
     () => new Map(classes.map((item) => [item.id, item.name])),
@@ -155,6 +189,7 @@ export function SchedulePage() {
     () => new Map(classrooms.map((item) => [item.id, item.name])),
     [classrooms],
   );
+  const courseById = useMemo(() => new Map(courses.map((item) => [item.id, item])), [courses]);
   const filteredSessions = useMemo(
     () =>
       data
@@ -185,9 +220,70 @@ export function SchedulePage() {
     [filteredSessions, weekDays],
   );
 
+  function billingAccountOptions(studentId: string) {
+    const student = students.find((item) => item.id === studentId);
+    const classGroup = classes.find((item) => item.id === form.classId);
+    const targetCourse = classGroup ? courseById.get(classGroup.courseId) : null;
+    return [...(student?.lessonAccounts ?? [])]
+      .map((account) => {
+        const course = courseById.get(account.courseId) ?? null;
+        const sameCourse = Boolean(targetCourse && course?.id === targetCourse.id);
+        const sameSeries = Boolean(
+          targetCourse?.courseSeriesId &&
+          course?.courseSeriesId &&
+          course.courseSeriesId === targetCourse.courseSeriesId,
+        );
+        const sameCategory = Boolean(
+          targetCourse?.category && course?.category === targetCourse.category,
+        );
+        return {
+          ...account,
+          course,
+          recommended: sameCourse || sameSeries || sameCategory,
+          sortScore:
+            (account.balance > 0 ? 10 : 0) +
+            (sameCourse ? 4 : 0) +
+            (sameSeries ? 3 : 0) +
+            (sameCategory ? 1 : 0),
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.sortScore - a.sortScore || (a.course?.name ?? '').localeCompare(b.course?.name ?? ''),
+      );
+  }
+
+  function selectTemporaryStudent(studentId: string) {
+    const firstAvailableAccount = billingAccountOptions(studentId).find(
+      (account) => account.balance > 0,
+    );
+    setTemporaryStudentForm({
+      studentId,
+      billingCourseId: firstAvailableAccount?.courseId ?? '',
+      note: '',
+    });
+  }
+
+  async function loadTemporaryStudents(sessionId: string) {
+    setTemporaryStudentsLoading(true);
+    try {
+      const payload = await api<{ temporaryStudents: TemporarySessionStudent[] }>(
+        `${SESSIONS()}/${sessionId}/temporary-students`,
+      );
+      setTemporaryStudents(payload.temporaryStudents);
+    } catch (err) {
+      setTemporaryStudents([]);
+      toast.error(err instanceof Error ? err.message : '加载临时学员失败');
+    } finally {
+      setTemporaryStudentsLoading(false);
+    }
+  }
+
   function openCreate() {
     setEditing(null);
     setForm(defaultForm(classes, teachers, classrooms));
+    setTemporaryStudents([]);
+    setTemporaryStudentForm({ studentId: '', billingCourseId: '', note: '' });
     setOpen(true);
   }
 
@@ -216,6 +312,8 @@ export function SchedulePage() {
       topic: session.topic,
       status: session.status as SessionForm['status'],
     });
+    setTemporaryStudentForm({ studentId: '', billingCourseId: '', note: '' });
+    void loadTemporaryStudents(session.id);
     setOpen(true);
   }
 
@@ -291,10 +389,7 @@ export function SchedulePage() {
         topic: batchForm.topic.trim(),
         timezoneOffsetMinutes: new Date().getTimezoneOffset(),
       });
-      setData([
-        ...classSessions.map((session) => hydrateSession(session)),
-        ...data,
-      ]);
+      setData([...classSessions.map((session) => hydrateSession(session)), ...data]);
       setBatchOpen(false);
       toast.success(
         `已生成 ${classSessions.length} 节课次${skipped.length ? `，跳过 ${skipped.length} 个冲突` : ''}`,
@@ -339,6 +434,42 @@ export function SchedulePage() {
     }
   }
 
+  async function addTemporaryStudent() {
+    if (!editing) return;
+    if (!temporaryStudentForm.studentId || !temporaryStudentForm.billingCourseId) {
+      toast.error('请选择临时学员和扣课账户');
+      return;
+    }
+    setTemporaryStudentSaving(true);
+    try {
+      const { temporaryStudent } = await apiPost<{
+        temporaryStudent: TemporarySessionStudent;
+      }>(`${SESSIONS()}/${editing.id}/temporary-students`, {
+        studentId: temporaryStudentForm.studentId,
+        billingCourseId: temporaryStudentForm.billingCourseId,
+        note: temporaryStudentForm.note.trim() || undefined,
+      });
+      setTemporaryStudents([...temporaryStudents, temporaryStudent]);
+      setTemporaryStudentForm({ studentId: '', billingCourseId: '', note: '' });
+      toast.success('临时学员已添加');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '添加临时学员失败');
+    } finally {
+      setTemporaryStudentSaving(false);
+    }
+  }
+
+  async function removeTemporaryStudent(temporaryStudent: TemporarySessionStudent) {
+    if (!editing) return;
+    try {
+      await apiDelete(`${SESSIONS()}/${editing.id}/temporary-students/${temporaryStudent.id}`);
+      setTemporaryStudents(temporaryStudents.filter((item) => item.id !== temporaryStudent.id));
+      toast.success('临时学员已移除');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '移除临时学员失败');
+    }
+  }
+
   async function openQr(session: ClassSession) {
     setQrSession(session);
     setQr(null);
@@ -365,6 +496,8 @@ export function SchedulePage() {
       toast.error('复制失败，请手动选择');
     }
   }
+
+  const temporaryBillingOptions = billingAccountOptions(temporaryStudentForm.studentId);
 
   return (
     <PageFrame
@@ -501,7 +634,7 @@ export function SchedulePage() {
                       <button
                         key={session.id}
                         type="button"
-                        className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-left transition hover:border-primary/40 hover:bg-white"
+                        className="hover:border-primary/40 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-left transition hover:bg-white"
                         onClick={() => openEdit(session)}
                       >
                         <div className="text-xs font-semibold">
@@ -511,7 +644,9 @@ export function SchedulePage() {
                         <div className="mt-1 line-clamp-2 text-sm font-medium">{session.topic}</div>
                         <div className="text-muted-foreground mt-1 text-xs">
                           {classNameById.get(session.classId) ?? session.class?.name ?? '班级'} ·{' '}
-                          {teacherNameById.get(session.teacherId) ?? session.teacher?.name ?? '老师'}
+                          {teacherNameById.get(session.teacherId) ??
+                            session.teacher?.name ??
+                            '老师'}
                         </div>
                         <div className="text-muted-foreground mt-1 text-xs">
                           {classroomNameById.get(session.classroomId) ??
@@ -701,6 +836,119 @@ export function SchedulePage() {
               ))}
             </select>
           </Field>
+        )}
+        {editing && (
+          <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+            <div>
+              <div className="text-sm font-semibold">临时学员</div>
+              <div className="text-muted-foreground mt-1 text-xs">
+                仅加入当前课次；点名时按所选课时账户扣减，不改变班级正式学员。
+              </div>
+            </div>
+
+            {temporaryStudentsLoading ? (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                加载中...
+              </div>
+            ) : temporaryStudents.length > 0 ? (
+              <div className="space-y-2">
+                {temporaryStudents.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">
+                        {item.student?.name ?? '学员'}
+                      </div>
+                      <div className="text-muted-foreground truncate text-xs">
+                        扣 {item.billingCourse?.name ?? item.billingCourseId}
+                        {typeof item.lessonAccount?.balance === 'number'
+                          ? ` · 剩余 ${item.lessonAccount.balance} 课时`
+                          : ''}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-2 py-1 text-red-600"
+                      onClick={() => removeTemporaryStudent(item)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      移除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-muted-foreground rounded-md border border-dashed py-4 text-center text-xs">
+                暂无临时学员
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <select
+                className="form-input"
+                value={temporaryStudentForm.studentId}
+                onChange={(event) => selectTemporaryStudent(event.target.value)}
+              >
+                <option value="">选择学员</option>
+                {students
+                  .filter(
+                    (student) => !temporaryStudents.some((item) => item.studentId === student.id),
+                  )
+                  .map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name} · {student.grade}
+                    </option>
+                  ))}
+              </select>
+              <select
+                className="form-input"
+                value={temporaryStudentForm.billingCourseId}
+                disabled={!temporaryStudentForm.studentId}
+                onChange={(event) =>
+                  setTemporaryStudentForm({
+                    ...temporaryStudentForm,
+                    billingCourseId: event.target.value,
+                  })
+                }
+              >
+                <option value="">选择扣课账户</option>
+                {temporaryBillingOptions.map((account) => (
+                  <option
+                    key={account.courseId}
+                    value={account.courseId}
+                    disabled={account.balance <= 0}
+                  >
+                    {account.course?.name ?? account.courseId} · 剩余 {account.balance} 课时
+                    {account.recommended ? ' · 推荐' : ''}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="form-input"
+                placeholder="备注，可不填"
+                value={temporaryStudentForm.note}
+                onChange={(event) =>
+                  setTemporaryStudentForm({ ...temporaryStudentForm, note: event.target.value })
+                }
+              />
+              <button
+                type="button"
+                className="btn btn-secondary justify-center"
+                disabled={temporaryStudentSaving || !temporaryStudentForm.billingCourseId}
+                onClick={addTemporaryStudent}
+              >
+                {temporaryStudentSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                添加临时学员
+              </button>
+            </div>
+          </div>
         )}
       </Drawer>
 

@@ -68,7 +68,12 @@ export async function recordAttendance(
   input: {
     sessionId: string;
     courseId: string;
-    records: Array<{ studentId: string; status: AttendanceStatus; note?: string }>;
+    records: Array<{
+      studentId: string;
+      status: AttendanceStatus;
+      note?: string;
+      courseId?: string;
+    }>;
     completeSession?: boolean;
   },
 ) {
@@ -107,7 +112,7 @@ export async function recordAttendance(
       if (lessonDelta !== 0) {
         await applyLessonDelta(tx, {
           studentId: record.studentId,
-          courseId: input.courseId,
+          courseId: record.courseId ?? input.courseId,
           type: 'consume',
           amount: lessonDelta,
           relatedEntityType: 'class_session',

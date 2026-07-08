@@ -189,9 +189,10 @@ export const parentCenterModule: AppModule = {
         const classGroup = session ? (classById.get(session.classId) ?? null) : null;
         return {
           ...item,
-          student: item.studentId && studentById.get(item.studentId)
-            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
-            : null,
+          student:
+            item.studentId && studentById.get(item.studentId)
+              ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+              : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
@@ -243,9 +244,10 @@ export const parentCenterModule: AppModule = {
         const homeworkAssignment = personalAssignment ?? classAssignment;
         return {
           ...item,
-          student: item.studentId && studentById.get(item.studentId)
-            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
-            : null,
+          student:
+            item.studentId && studentById.get(item.studentId)
+              ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+              : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
@@ -291,9 +293,10 @@ export const parentCenterModule: AppModule = {
           (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);
         return {
           ...item,
-          student: item.studentId && studentById.get(item.studentId)
-            ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
-            : null,
+          student:
+            item.studentId && studentById.get(item.studentId)
+              ? { id: item.studentId, name: studentById.get(item.studentId)!.name }
+              : null,
           course: item.courseId ? (courseById.get(item.courseId) ?? null) : null,
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
@@ -584,28 +587,30 @@ export const parentCenterModule: AppModule = {
         return { checkInSessions: [] };
       }
 
-      const enrollments = await app.db
-        .select()
-        .from(schema.classEnrollments)
-        .where(
-          and(
-            inArray(schema.classEnrollments.studentId, studentIds),
-            eq(schema.classEnrollments.active, true),
+      const [enrollments, temporaryEntries] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.classEnrollments)
+          .where(
+            and(
+              inArray(schema.classEnrollments.studentId, studentIds),
+              eq(schema.classEnrollments.active, true),
+            ),
           ),
-        );
-      if (enrollments.length === 0) {
+        schedulingRepo.listTemporaryStudentsForStudents(app.db, studentIds),
+      ]);
+      if (enrollments.length === 0 && temporaryEntries.length === 0) {
         return { checkInSessions: [] };
       }
 
       const classIds = Array.from(new Set(enrollments.map((enrollment) => enrollment.classId)));
+      const classIdSet = new Set(classIds);
+      const temporarySessionIds = new Set(temporaryEntries.map((entry) => entry.classSessionId));
       const now = new Date();
       const windowStartsAt = new Date(now.getTime() - 6 * 60 * 60 * 1000);
       const windowEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
       const [sessions, classes, courses, classrooms] = await Promise.all([
-        app.db
-          .select()
-          .from(schema.classSessions)
-          .where(inArray(schema.classSessions.classId, classIds)),
+        schedulingRepo.listClassSessions(app.db),
         schedulingRepo.listClasses(app.db),
         catalogRepo.listCourses(app.db),
         teachingRepo.listClassrooms(app.db),
@@ -613,6 +618,7 @@ export const parentCenterModule: AppModule = {
       const visibleSessions = sessions
         .filter(
           (session) =>
+            (classIdSet.has(session.classId) || temporarySessionIds.has(session.id)) &&
             session.status === 'scheduled' &&
             session.endsAt >= windowStartsAt &&
             session.startsAt <= windowEndsAt,
@@ -644,6 +650,13 @@ export const parentCenterModule: AppModule = {
           enrollment,
         ]);
       }
+      const temporaryEntriesBySessionId = new Map<string, typeof temporaryEntries>();
+      for (const entry of temporaryEntries) {
+        temporaryEntriesBySessionId.set(entry.classSessionId, [
+          ...(temporaryEntriesBySessionId.get(entry.classSessionId) ?? []),
+          entry,
+        ]);
+      }
       const attendanceBySessionStudent = new Map(
         attendanceRecords.map((record) => [`${record.classSessionId}:${record.studentId}`, record]),
       );
@@ -656,8 +669,15 @@ export const parentCenterModule: AppModule = {
           }
           const course = courseById.get(classGroup.courseId) ?? null;
           const classroom = classroomById.get(session.classroomId) ?? null;
-          return (enrollmentsByClassId.get(session.classId) ?? []).flatMap((enrollment) => {
-            const student = studentById.get(enrollment.studentId);
+          const participantIds = new Set<string>();
+          for (const enrollment of enrollmentsByClassId.get(session.classId) ?? []) {
+            participantIds.add(enrollment.studentId);
+          }
+          for (const entry of temporaryEntriesBySessionId.get(session.id) ?? []) {
+            participantIds.add(entry.studentId);
+          }
+          return Array.from(participantIds).flatMap((studentId) => {
+            const student = studentById.get(studentId);
             if (!student) {
               return [];
             }
@@ -698,25 +718,27 @@ export const parentCenterModule: AppModule = {
         return { events: [] };
       }
 
-      const enrollments = await app.db
-        .select()
-        .from(schema.classEnrollments)
-        .where(
-          and(
-            inArray(schema.classEnrollments.studentId, studentIds),
-            eq(schema.classEnrollments.active, true),
+      const [enrollments, temporaryEntries] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.classEnrollments)
+          .where(
+            and(
+              inArray(schema.classEnrollments.studentId, studentIds),
+              eq(schema.classEnrollments.active, true),
+            ),
           ),
-        );
-      if (enrollments.length === 0) {
+        schedulingRepo.listTemporaryStudentsForStudents(app.db, studentIds),
+      ]);
+      if (enrollments.length === 0 && temporaryEntries.length === 0) {
         return { events: [] };
       }
 
       const classIds = Array.from(new Set(enrollments.map((enrollment) => enrollment.classId)));
+      const classIdSet = new Set(classIds);
+      const temporarySessionIds = new Set(temporaryEntries.map((entry) => entry.classSessionId));
       const [sessions, classes, courses, classrooms, attendanceRecords] = await Promise.all([
-        app.db
-          .select()
-          .from(schema.classSessions)
-          .where(inArray(schema.classSessions.classId, classIds)),
+        schedulingRepo.listClassSessions(app.db),
         schedulingRepo.listClasses(app.db),
         catalogRepo.listCourses(app.db),
         teachingRepo.listClassrooms(app.db),
@@ -737,20 +759,38 @@ export const parentCenterModule: AppModule = {
           enrollment,
         ]);
       }
+      const temporaryEntriesBySessionId = new Map<string, typeof temporaryEntries>();
+      for (const entry of temporaryEntries) {
+        temporaryEntriesBySessionId.set(entry.classSessionId, [
+          ...(temporaryEntriesBySessionId.get(entry.classSessionId) ?? []),
+          entry,
+        ]);
+      }
       const attendanceBySessionStudent = new Map(
         attendanceRecords.map((record) => [`${record.classSessionId}:${record.studentId}`, record]),
       );
 
       return {
         events: sessions
-          .filter((session) => overlapsRange(session, from, to))
+          .filter(
+            (session) =>
+              (classIdSet.has(session.classId) || temporarySessionIds.has(session.id)) &&
+              overlapsRange(session, from, to),
+          )
           .flatMap((session) => {
             const classGroup = classById.get(session.classId);
             if (!classGroup) return [];
             const course = courseById.get(classGroup.courseId) ?? null;
             const classroom = classroomById.get(session.classroomId) ?? null;
-            return (enrollmentsByClassId.get(session.classId) ?? []).flatMap((enrollment) => {
-              const student = studentById.get(enrollment.studentId);
+            const participantIds = new Set<string>();
+            for (const enrollment of enrollmentsByClassId.get(session.classId) ?? []) {
+              participantIds.add(enrollment.studentId);
+            }
+            for (const entry of temporaryEntriesBySessionId.get(session.id) ?? []) {
+              participantIds.add(entry.studentId);
+            }
+            return Array.from(participantIds).flatMap((studentId) => {
+              const student = studentById.get(studentId);
               if (!student) return [];
               const attendanceRecord = attendanceBySessionStudent.get(
                 `${session.id}:${student.id}`,
@@ -798,10 +838,10 @@ export const parentCenterModule: AppModule = {
         if (!classGroup) {
           throw httpError(404, 'Class not found');
         }
-        const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
-        const enrolled = enrollments.some((enrollment) => enrollment.studentId === body.studentId);
-        if (!enrolled) {
-          throw httpError(422, '该学员未报名本班级');
+        const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
+        const rosterEntry = rosterEntries.find((entry) => entry.studentId === body.studentId);
+        if (!rosterEntry) {
+          throw httpError(422, '该学员未加入本课次');
         }
 
         const existingRecords = await attendanceRepo.listAttendanceForSession(app.db, sessionId);
@@ -816,12 +856,22 @@ export const parentCenterModule: AppModule = {
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
           courseId: classGroup.courseId,
-          records: [{ studentId: body.studentId, status: 'present', note: '家长中心签到' }],
+          records: [
+            {
+              studentId: body.studentId,
+              status: 'present',
+              note: '家长中心签到',
+              courseId: rosterEntry.billingCourseId,
+            },
+          ],
           completeSession: false,
         });
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
+          billingCourseIdByStudentId: new Map(
+            rosterEntries.map((entry) => [entry.studentId, entry.billingCourseId]),
+          ),
         });
 
         const latestAttendanceRecords = alreadyCheckedIn
@@ -831,8 +881,8 @@ export const parentCenterModule: AppModule = {
           latestAttendanceRecords.map((record) => record.studentId),
         );
         if (
-          enrollments.length > 0 &&
-          enrollments.every((enrollment) => checkedInStudentIds.has(enrollment.studentId))
+          rosterEntries.length > 0 &&
+          rosterEntries.every((entry) => checkedInStudentIds.has(entry.studentId))
         ) {
           await schedulingRepo.markSessionCompleted(app.db, sessionId);
         }
@@ -888,10 +938,14 @@ export const parentCenterModule: AppModule = {
       return { lessonFeedbacks: await enrichLessonFeedbacks(students, items) };
     });
 
-    app.get('/public/me/homework-assignments', { preHandler: app.requireParent }, async (request) => {
-      const { students } = await resolveChildren(request.account!.id);
-      return { homeworkAssignments: await listHomeworkAssignmentsForStudents(students) };
-    });
+    app.get(
+      '/public/me/homework-assignments',
+      { preHandler: app.requireParent },
+      async (request) => {
+        const { students } = await resolveChildren(request.account!.id);
+        return { homeworkAssignments: await listHomeworkAssignmentsForStudents(students) };
+      },
+    );
 
     app.post(
       '/public/me/homework-check-ins',
@@ -911,14 +965,12 @@ export const parentCenterModule: AppModule = {
           if (!classGroup) {
             throw httpError(404, 'Class not found');
           }
-          const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
-          const enrolled = enrollments.some(
-            (enrollment) => enrollment.studentId === body.studentId,
-          );
-          if (!enrolled) {
-            throw httpError(422, '该学员未报名本班级');
+          const rosterEntries = await schedulingRepo.listSessionRoster(app.db, body.classSessionId);
+          const rosterEntry = rosterEntries.find((entry) => entry.studentId === body.studentId);
+          if (!rosterEntry) {
+            throw httpError(422, '该学员未加入本课次');
           }
-          courseId = classGroup.courseId;
+          courseId = rosterEntry.billingCourseId;
         } else if (courseId) {
           await assertCourseBelongsToStudent(body.studentId, courseId);
         }

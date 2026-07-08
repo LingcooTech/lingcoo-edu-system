@@ -211,6 +211,12 @@ export const teachingModule: AppModule = {
       log: app.log,
     });
 
+    function billingCourseByStudentId(
+      roster: Array<Pick<schedulingRepo.SessionRosterEntry, 'studentId' | 'billingCourseId'>>,
+    ) {
+      return new Map(roster.map((entry) => [entry.studentId, entry.billingCourseId]));
+    }
+
     app.get(
       '/public/teacher/dashboard',
       { preHandler: app.requireRole('teacher') },
@@ -274,6 +280,20 @@ export const teachingModule: AppModule = {
             };
           }),
         );
+        const mySessionIds = sessions
+          .filter((session) => session.teacherId === account.teacherId)
+          .map((session) => session.id);
+        const temporaryStudents = await schedulingRepo.listTemporaryStudentsForSessions(
+          app.db,
+          mySessionIds,
+        );
+        const temporaryCountBySessionId = new Map<string, number>();
+        for (const temporaryStudent of temporaryStudents) {
+          temporaryCountBySessionId.set(
+            temporaryStudent.classSessionId,
+            (temporaryCountBySessionId.get(temporaryStudent.classSessionId) ?? 0) + 1,
+          );
+        }
 
         return {
           sessions: sessions
@@ -289,7 +309,8 @@ export const teachingModule: AppModule = {
                 course: classGroup ? courseById.get(classGroup.courseId) : undefined,
                 classroom: classroomById.get(session.classroomId),
                 rosterCount: classGroup
-                  ? (enrollmentsByClassId.get(classGroup.id)?.length ?? 0)
+                  ? (enrollmentsByClassId.get(classGroup.id)?.length ?? 0) +
+                    (temporaryCountBySessionId.get(session.id) ?? 0)
                   : 0,
                 attendanceCount: sessionAttendance.length,
                 attendanceSummary: summarizeAttendance(sessionAttendance),
@@ -417,7 +438,10 @@ export const teachingModule: AppModule = {
         });
 
         if (body.notificationId) {
-          await new NotificationsService(app.db).markAsRead(body.notificationId, request.account!.id);
+          await new NotificationsService(app.db).markAsRead(
+            body.notificationId,
+            request.account!.id,
+          );
         }
 
         return { enrollment };
@@ -459,6 +483,20 @@ export const teachingModule: AppModule = {
             (rosterCountByClassId.get(enrollment.classId) ?? 0) + 1,
           );
         }
+        const mySessionIds = sessions
+          .filter((session) => session.teacherId === account.teacherId)
+          .map((session) => session.id);
+        const temporaryStudents = await schedulingRepo.listTemporaryStudentsForSessions(
+          app.db,
+          mySessionIds,
+        );
+        const temporaryCountBySessionId = new Map<string, number>();
+        for (const temporaryStudent of temporaryStudents) {
+          temporaryCountBySessionId.set(
+            temporaryStudent.classSessionId,
+            (temporaryCountBySessionId.get(temporaryStudent.classSessionId) ?? 0) + 1,
+          );
+        }
 
         return {
           events: sessions
@@ -483,7 +521,10 @@ export const teachingModule: AppModule = {
                 class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
                 course: course ? { id: course.id, name: course.name } : null,
                 classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
-                rosterCount: classGroup ? (rosterCountByClassId.get(classGroup.id) ?? 0) : 0,
+                rosterCount: classGroup
+                  ? (rosterCountByClassId.get(classGroup.id) ?? 0) +
+                    (temporaryCountBySessionId.get(session.id) ?? 0)
+                  : 0,
                 attendanceCount: sessionAttendance.length,
                 attendanceSummary: summarizeAttendance(sessionAttendance),
               };
@@ -580,11 +621,7 @@ export const teachingModule: AppModule = {
             remainingSeats: Math.max(classGroup.capacity - enrolledCount, 0),
             alreadyEnrolled,
             canEnroll: !alreadyEnrolled && !capacityReached,
-            disabledReason: alreadyEnrolled
-              ? '已在班'
-              : capacityReached
-                ? '已满'
-                : '',
+            disabledReason: alreadyEnrolled ? '已在班' : capacityReached ? '已满' : '',
           };
         }),
       };
@@ -604,12 +641,23 @@ export const teachingModule: AppModule = {
         teachingRepo.listTeachers(app.db),
       ]);
       const myClasses = classes.filter((classGroup) => classGroup.teacherId === account.teacherId);
+      const myClassIds = new Set(myClasses.map((classGroup) => classGroup.id));
+      const mySessionIds = sessions
+        .filter((session) => myClassIds.has(session.classId))
+        .map((session) => session.id);
+      const temporaryStudents = await schedulingRepo.listTemporaryStudentsForSessions(
+        app.db,
+        mySessionIds,
+      );
       const enrollments = (
         await Promise.all(
           myClasses.map((classGroup) => schedulingRepo.listEnrollments(app.db, classGroup.id)),
         )
       ).flat();
       const studentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
+      for (const temporaryStudent of temporaryStudents) {
+        studentIds.add(temporaryStudent.studentId);
+      }
       const courseIds = new Set(myClasses.map((classGroup) => classGroup.courseId));
       const classIds = new Set(myClasses.map((classGroup) => classGroup.id));
       const classByStudentCourse = new Map<string, typeof schema.classes.$inferSelect>();
@@ -622,6 +670,18 @@ export const teachingModule: AppModule = {
           classByStudentCourse.set(`${enrollment.studentId}:${classGroup.courseId}`, classGroup);
         }
       }
+      const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
+      const sessionById = new Map(sessions.map((session) => [session.id, session]));
+      for (const temporaryStudent of temporaryStudents) {
+        const session = sessionById.get(temporaryStudent.classSessionId);
+        const classGroup = session ? classById.get(session.classId) : null;
+        if (classGroup) {
+          classByStudentCourse.set(
+            `${temporaryStudent.studentId}:${classGroup.courseId}`,
+            classGroup,
+          );
+        }
+      }
 
       return {
         account,
@@ -630,10 +690,10 @@ export const teachingModule: AppModule = {
         courseIds,
         classIds,
         classByStudentCourse,
-        classById: new Map(classes.map((classGroup) => [classGroup.id, classGroup])),
+        classById,
         courseById: new Map(courses.map((course) => [course.id, course])),
         studentById: new Map(students.map((student) => [student.id, student])),
-        sessionById: new Map(sessions.map((session) => [session.id, session])),
+        sessionById,
         teacherById: new Map(teachers.map((teacher) => [teacher.id, teacher])),
       };
     }
@@ -818,13 +878,14 @@ export const teachingModule: AppModule = {
           (classGroup?.teacherId ? (scope.teacherById.get(classGroup.teacherId) ?? null) : null);
         return {
           ...item,
-          student: item.studentId && scope.studentById.get(item.studentId)
-            ? {
-                id: item.studentId,
-                name: scope.studentById.get(item.studentId)!.name,
-                grade: scope.studentById.get(item.studentId)!.grade,
-              }
-            : null,
+          student:
+            item.studentId && scope.studentById.get(item.studentId)
+              ? {
+                  id: item.studentId,
+                  name: scope.studentById.get(item.studentId)!.name,
+                  grade: scope.studentById.get(item.studentId)!.grade,
+                }
+              : null,
           course: item.courseId ? (scope.courseById.get(item.courseId) ?? null) : null,
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
@@ -839,17 +900,21 @@ export const teachingModule: AppModule = {
       async (request) => {
         const { sessionId } = request.params as { sessionId: string };
         const { session } = await requireOwnedSession(request.account!.id, sessionId);
-        const [classGroup, attendanceRecords, allStudents, enrollments] = await Promise.all([
+        const [classGroup, attendanceRecords, allStudents, rosterEntries] = await Promise.all([
           schedulingRepo.findClass(app.db, session.classId),
           attendanceRepo.listAttendanceForSession(app.db, sessionId),
           peopleRepo.listStudents(app.db),
-          schedulingRepo.listEnrollments(app.db, session.classId),
+          schedulingRepo.listSessionRoster(app.db, sessionId),
         ]);
         const studentById = new Map(allStudents.map((s) => [s.id, s]));
-        const roster = enrollments
-          .map((enrollment) => studentById.get(enrollment.studentId))
+        const roster = rosterEntries
+          .map((entry) => studentById.get(entry.studentId))
           .filter(Boolean)
-          .map((student) => ({ id: student!.id, name: student!.name, grade: student!.grade }));
+          .map((student) => ({
+            id: student!.id,
+            name: student!.name,
+            grade: student!.grade,
+          }));
         return {
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
@@ -870,8 +935,9 @@ export const teachingModule: AppModule = {
           throw notFound('Class not found');
         }
         const body = teacherAttendanceSchema.parse(request.body);
-        const enrollments = await schedulingRepo.listEnrollments(app.db, session.classId);
-        const rosterStudentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
+        const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
+        const billingCourseMap = billingCourseByStudentId(rosterEntries);
+        const rosterStudentIds = new Set(rosterEntries.map((entry) => entry.studentId));
         const invalidRecord = body.records.find(
           (record) => !rosterStudentIds.has(record.studentId),
         );
@@ -883,11 +949,15 @@ export const teachingModule: AppModule = {
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
           courseId: classGroup.courseId,
-          records: body.records,
+          records: body.records.map((record) => ({
+            ...record,
+            courseId: billingCourseMap.get(record.studentId),
+          })),
         });
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
+          billingCourseIdByStudentId: billingCourseMap,
         });
         return { attendanceRecords };
       },
@@ -930,8 +1000,8 @@ export const teachingModule: AppModule = {
         }
 
         const body = teacherLessonFeedbackSchema.parse(request.body);
-        const enrollments = await schedulingRepo.listEnrollments(app.db, session.classId);
-        const rosterStudentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
+        const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
+        const rosterStudentIds = new Set(rosterEntries.map((entry) => entry.studentId));
         const invalidItem = [...body.items, ...body.studentAssignments].find(
           (item) => !rosterStudentIds.has(item.studentId),
         );
@@ -1075,10 +1145,10 @@ export const teachingModule: AppModule = {
             });
           }),
           ...(body.classAssignmentContent
-            ? enrollments.map((enrollment) =>
+            ? rosterEntries.map((entry) =>
                 notifyLearningSafely({
-                  studentId: enrollment.studentId,
-                  studentName: studentName(scope, enrollment.studentId),
+                  studentId: entry.studentId,
+                  studentName: studentName(scope, entry.studentId),
                   title: '活动任务已布置',
                   body: compactText(body.classAssignmentContent, '有新的活动任务'),
                   updateType: '任务布置',
@@ -1086,10 +1156,10 @@ export const teachingModule: AppModule = {
                   sourceEventName: 'homework.assignment',
                   dedupeKey:
                     `homework.assignment:${sessionId}:class:` +
-                    `${enrollment.studentId}:${notificationStamp}`,
+                    `${entry.studentId}:${notificationStamp}`,
                   meta: {
                     sessionId,
-                    studentId: enrollment.studentId,
+                    studentId: entry.studentId,
                     courseId: classGroup.courseId,
                     classId: classGroup.id,
                     scope: 'class',

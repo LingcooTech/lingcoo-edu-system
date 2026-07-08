@@ -649,6 +649,35 @@ export const classSessions = pgTable(
   }),
 );
 
+export const classSessionTemporaryStudents = pgTable(
+  'class_session_temporary_students',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    classSessionId: uuid('class_session_id')
+      .notNull()
+      .references(() => classSessions.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    billingCourseId: uuid('billing_course_id')
+      .notNull()
+      .references(() => courses.id, { onDelete: 'restrict' }),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionStudentUnique: uniqueIndex('class_session_temporary_students_session_student_idx').on(
+      table.classSessionId,
+      table.studentId,
+    ),
+    sessionIdx: index('class_session_temporary_students_session_idx').on(table.classSessionId),
+    studentIdx: index('class_session_temporary_students_student_idx').on(table.studentId),
+    billingCourseIdx: index('class_session_temporary_students_billing_course_idx').on(
+      table.billingCourseId,
+    ),
+  }),
+);
+
 export const attendanceRecords = pgTable(
   'attendance_records',
   {

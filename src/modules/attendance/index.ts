@@ -9,7 +9,7 @@ import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as schema from '../../db/schema.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
-import { eq, lte, and } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 const attendanceSchema = z.object({
   records: z.array(
@@ -42,6 +42,12 @@ export const attendanceModule: AppModule = {
       log: app.log,
     });
 
+    function billingCourseByStudentId(
+      roster: Array<Pick<schedulingRepo.SessionRosterEntry, 'studentId' | 'billingCourseId'>>,
+    ) {
+      return new Map(roster.map((entry) => [entry.studentId, entry.billingCourseId]));
+    }
+
     async function loadPublicCheckInContext(sessionId: string) {
       const session = await schedulingRepo.findSession(app.db, sessionId);
       if (!session) {
@@ -53,10 +59,10 @@ export const attendanceModule: AppModule = {
         throw notFound('Class not found');
       }
 
-      const [course, classrooms, enrollments, students, attendanceRecords] = await Promise.all([
+      const [course, classrooms, rosterEntries, students, attendanceRecords] = await Promise.all([
         catalogRepo.requireCourse(app.db, classGroup.courseId),
         teachingRepo.listClassrooms(app.db),
-        schedulingRepo.listEnrollments(app.db, classGroup.id),
+        schedulingRepo.listSessionRoster(app.db, sessionId),
         peopleRepo.listStudents(app.db),
         attendanceRepo.listAttendanceForSession(app.db, sessionId),
       ]);
@@ -66,15 +72,16 @@ export const attendanceModule: AppModule = {
       const attendanceByStudentId = new Map(
         attendanceRecords.map((record) => [record.studentId, record]),
       );
-      const roster = enrollments
-        .map((enrollment) => {
-          const student = studentById.get(enrollment.studentId);
+      const roster = rosterEntries
+        .map((entry) => {
+          const student = studentById.get(entry.studentId);
           if (!student) return null;
           const attendanceRecord = attendanceByStudentId.get(student.id);
           return {
             id: student.id,
             name: student.name,
             grade: student.grade,
+            source: entry.source,
             checkedIn: Boolean(attendanceRecord),
             attendanceStatus: attendanceRecord?.status ?? null,
           };
@@ -86,7 +93,7 @@ export const attendanceModule: AppModule = {
         classGroup,
         course,
         classroom,
-        enrollments,
+        rosterEntries,
         attendanceRecords,
         roster,
       };
@@ -128,10 +135,8 @@ export const attendanceModule: AppModule = {
         throw unprocessable('Class session is cancelled');
       }
 
-      const enrolled = context.enrollments.some(
-        (enrollment) => enrollment.studentId === body.studentId,
-      );
-      if (!enrolled) {
+      const rosterEntry = context.rosterEntries.find((entry) => entry.studentId === body.studentId);
+      if (!rosterEntry) {
         throw unprocessable('Student is not enrolled in this class session');
       }
 
@@ -144,7 +149,14 @@ export const attendanceModule: AppModule = {
       const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
         sessionId,
         courseId: context.classGroup.courseId,
-        records: [{ studentId: body.studentId, status: 'present', note: '家长扫码签到' }],
+        records: [
+          {
+            studentId: body.studentId,
+            status: 'present',
+            note: '家长扫码签到',
+            courseId: rosterEntry.billingCourseId,
+          },
+        ],
         completeSession: false,
       });
 
@@ -174,6 +186,7 @@ export const attendanceModule: AppModule = {
       await lessonNotifications.notifyLessonConsumedForAttendance({
         sessionId,
         records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
+        billingCourseIdByStudentId: billingCourseByStudentId(context.rosterEntries),
       });
 
       const latestAttendanceRecords = alreadyCheckedIn
@@ -183,25 +196,10 @@ export const attendanceModule: AppModule = {
         latestAttendanceRecords.map((record) => record.studentId),
       );
 
-      // Only mark as completed if all students with active course contracts
-      // with startDate on or before this session have checked in
-      const contractRows = await app.db
-        .select({ studentId: schema.courseContracts.studentId })
-        .from(schema.courseContracts)
-        .where(
-          and(
-            eq(schema.courseContracts.courseId, context.classGroup.courseId),
-            eq(schema.courseContracts.status, 'active'),
-            lte(schema.courseContracts.startsAt, context.session.startsAt),
-          ),
-        );
-
-      const contractStudentIds = new Set(contractRows.map((row) => row.studentId));
-
-      // Mark complete if all students with valid contracts have checked in
+      const rosterStudentIds = new Set(context.rosterEntries.map((entry) => entry.studentId));
       if (
-        contractStudentIds.size > 0 &&
-        Array.from(contractStudentIds).every((studentId) => checkedInStudentIds.has(studentId))
+        rosterStudentIds.size > 0 &&
+        Array.from(rosterStudentIds).every((studentId) => checkedInStudentIds.has(studentId))
       ) {
         await schedulingRepo.markSessionCompleted(app.db, sessionId);
       }
@@ -347,12 +345,23 @@ export const attendanceModule: AppModule = {
         }
 
         const body = attendanceSchema.parse(request.body);
+        const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
+        const billingCourseMap = billingCourseByStudentId(rosterEntries);
+        const invalidRecord = body.records.find(
+          (record) => !billingCourseMap.has(record.studentId),
+        );
+        if (invalidRecord) {
+          throw Object.assign(new Error('只能为本课次学员点名'), { statusCode: 400 });
+        }
         const existingRecords = await attendanceRepo.listAttendanceForSession(app.db, sessionId);
         const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
           courseId: classGroup.courseId,
-          records: body.records,
+          records: body.records.map((record) => ({
+            ...record,
+            courseId: billingCourseMap.get(record.studentId),
+          })),
           completeSession: false,
         });
 
@@ -382,31 +391,22 @@ export const attendanceModule: AppModule = {
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
+          billingCourseIdByStudentId: billingCourseMap,
         });
 
-        const [latestAttendanceRecords, contractRows] = await Promise.all([
-          attendanceRepo.listAttendanceForSession(app.db, sessionId),
-          app.db
-            .select({ studentId: schema.courseContracts.studentId })
-            .from(schema.courseContracts)
-            .where(
-              and(
-                eq(schema.courseContracts.courseId, classGroup.courseId),
-                eq(schema.courseContracts.status, 'active'),
-                lte(schema.courseContracts.startsAt, session.startsAt),
-              ),
-            ),
-        ]);
+        const latestAttendanceRecords = await attendanceRepo.listAttendanceForSession(
+          app.db,
+          sessionId,
+        );
 
         const checkedInStudentIds = new Set(
           latestAttendanceRecords.map((record) => record.studentId),
         );
-        const contractStudentIds = new Set(contractRows.map((row) => row.studentId));
+        const rosterStudentIds = new Set(rosterEntries.map((entry) => entry.studentId));
 
-        // Mark complete if all students with valid contracts have checked in
         if (
-          contractStudentIds.size > 0 &&
-          Array.from(contractStudentIds).every((studentId) => checkedInStudentIds.has(studentId))
+          rosterStudentIds.size > 0 &&
+          Array.from(rosterStudentIds).every((studentId) => checkedInStudentIds.has(studentId))
         ) {
           await schedulingRepo.markSessionCompleted(app.db, sessionId);
         }

@@ -124,6 +124,7 @@ export class LessonNotificationService {
   async notifyLessonConsumedForAttendance(input: {
     sessionId: string;
     records: AttendanceRecord[];
+    billingCourseIdByStudentId?: Map<string, string> | Record<string, string>;
   }) {
     const consumedRecords = input.records.filter((record) => record.lessonDelta < 0);
     const result = emptyRunResult(consumedRecords.length);
@@ -143,8 +144,18 @@ export class LessonNotificationService {
       if (!target) {
         continue;
       }
-      const balance = await this.findLessonBalance(target.studentId, target.courseId);
-      mergeRunResult(result, await this.notifyLessonConsumedTarget(target, balance));
+      const billingCourseId =
+        input.billingCourseIdByStudentId instanceof Map
+          ? input.billingCourseIdByStudentId.get(record.studentId)
+          : input.billingCourseIdByStudentId?.[record.studentId];
+      const balance = await this.findLessonBalance(
+        target.studentId,
+        billingCourseId ?? target.courseId,
+      );
+      mergeRunResult(
+        result,
+        await this.notifyLessonConsumedTarget(target, balance, billingCourseId),
+      );
     }
 
     return result;
@@ -182,6 +193,7 @@ export class LessonNotificationService {
   private async notifyLessonConsumedTarget(
     target: LessonNotificationTarget,
     balance: number | null,
+    billingCourseId?: string,
   ) {
     const lessonName = `${target.courseName}（${target.className}）`;
     const balanceText = balance === null ? '已扣减 1 课时' : `扣减 1 课时，剩余 ${balance} 课时`;
@@ -206,6 +218,7 @@ export class LessonNotificationService {
         sessionId: target.sessionId,
         studentId: target.studentId,
         courseId: target.courseId,
+        billingCourseId: billingCourseId ?? target.courseId,
         classId: target.classId,
         startsAt: target.startsAt.toISOString(),
         balance,

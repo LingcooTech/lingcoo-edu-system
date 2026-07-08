@@ -226,6 +226,132 @@ export async function listEnrollments(db: Database, classId: string) {
     .orderBy(asc(schema.classEnrollments.createdAt));
 }
 
+export async function listTemporaryStudents(db: Database, sessionId: string) {
+  return db
+    .select()
+    .from(schema.classSessionTemporaryStudents)
+    .where(eq(schema.classSessionTemporaryStudents.classSessionId, sessionId))
+    .orderBy(asc(schema.classSessionTemporaryStudents.createdAt));
+}
+
+export async function listTemporaryStudentsForSessions(db: Database, sessionIds: string[]) {
+  if (sessionIds.length === 0) {
+    return [];
+  }
+  return db
+    .select()
+    .from(schema.classSessionTemporaryStudents)
+    .where(inArray(schema.classSessionTemporaryStudents.classSessionId, sessionIds))
+    .orderBy(asc(schema.classSessionTemporaryStudents.createdAt));
+}
+
+export async function listTemporaryStudentsForStudents(db: Database, studentIds: string[]) {
+  if (studentIds.length === 0) {
+    return [];
+  }
+  return db
+    .select()
+    .from(schema.classSessionTemporaryStudents)
+    .where(inArray(schema.classSessionTemporaryStudents.studentId, studentIds))
+    .orderBy(asc(schema.classSessionTemporaryStudents.createdAt));
+}
+
+export async function findTemporaryStudent(
+  db: Database,
+  input: { sessionId: string; studentId: string },
+) {
+  const [temporaryStudent] = await db
+    .select()
+    .from(schema.classSessionTemporaryStudents)
+    .where(
+      and(
+        eq(schema.classSessionTemporaryStudents.classSessionId, input.sessionId),
+        eq(schema.classSessionTemporaryStudents.studentId, input.studentId),
+      ),
+    )
+    .limit(1);
+  return temporaryStudent ?? null;
+}
+
+export async function createTemporaryStudent(
+  db: Database,
+  values: typeof schema.classSessionTemporaryStudents.$inferInsert,
+) {
+  const [temporaryStudent] = await db
+    .insert(schema.classSessionTemporaryStudents)
+    .values(values)
+    .returning();
+  return temporaryStudent;
+}
+
+export async function removeTemporaryStudent(
+  db: Database,
+  input: { sessionId: string; temporaryStudentId: string },
+) {
+  const [temporaryStudent] = await db
+    .delete(schema.classSessionTemporaryStudents)
+    .where(
+      and(
+        eq(schema.classSessionTemporaryStudents.classSessionId, input.sessionId),
+        eq(schema.classSessionTemporaryStudents.id, input.temporaryStudentId),
+      ),
+    )
+    .returning();
+  return temporaryStudent ?? null;
+}
+
+export type SessionRosterEntry = {
+  id: string;
+  source: 'enrollment' | 'temporary';
+  studentId: string;
+  billingCourseId: string;
+  classEnrollmentId?: string;
+  temporaryStudentId?: string;
+  note?: string | null;
+};
+
+export async function listSessionRoster(db: Database, sessionId: string) {
+  const session = await findSession(db, sessionId);
+  if (!session) {
+    return [];
+  }
+  const [classGroup, enrollments, temporaryStudents] = await Promise.all([
+    findClass(db, session.classId),
+    listEnrollments(db, session.classId),
+    listTemporaryStudents(db, sessionId),
+  ]);
+  if (!classGroup) {
+    return [];
+  }
+
+  const roster = new Map<string, SessionRosterEntry>();
+  for (const enrollment of enrollments) {
+    roster.set(enrollment.studentId, {
+      id: enrollment.id,
+      source: 'enrollment',
+      studentId: enrollment.studentId,
+      billingCourseId: classGroup.courseId,
+      classEnrollmentId: enrollment.id,
+    });
+  }
+
+  for (const temporaryStudent of temporaryStudents) {
+    if (roster.has(temporaryStudent.studentId)) {
+      continue;
+    }
+    roster.set(temporaryStudent.studentId, {
+      id: temporaryStudent.id,
+      source: 'temporary',
+      studentId: temporaryStudent.studentId,
+      billingCourseId: temporaryStudent.billingCourseId,
+      temporaryStudentId: temporaryStudent.id,
+      note: temporaryStudent.note,
+    });
+  }
+
+  return Array.from(roster.values());
+}
+
 export async function createEnrollment(
   db: Database,
   values: typeof schema.classEnrollments.$inferInsert,
