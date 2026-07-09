@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
-import { api, apiPost } from '@/api/client';
+import { api, apiPatch, apiPost } from '@/api/client';
 import type {
   AttendanceRecord,
   AttendanceStatus,
@@ -135,10 +135,25 @@ export function AttendancePage() {
   }
 
   async function submitRosterEntry(entry: SessionRosterEntry) {
-    if (!selectedSession || recordByStudentId.has(entry.studentId)) return;
+    if (!selectedSession) return;
     const draft = drafts[entry.studentId] ?? defaultDraft();
+    const existing = recordByStudentId.get(entry.studentId);
     setSavingStudentId(entry.studentId);
     try {
+      if (existing) {
+        const { attendanceRecord } = await apiPatch<{
+          attendanceRecord: AttendanceRecord;
+        }>(`/v1/class-sessions/${selectedSession.id}/attendance/${entry.studentId}`, {
+          status: draft.status,
+          note: draft.note.trim() || undefined,
+        });
+        setRecords((current) =>
+          current.map((record) => (record.id === attendanceRecord.id ? attendanceRecord : record)),
+        );
+        toast.success('点名结果已修改，课时流水已校正');
+        return;
+      }
+
       const { attendanceRecords } = await apiPost<{ attendanceRecords: AttendanceRecord[] }>(
         `/v1/class-sessions/${selectedSession.id}/attendance`,
         {
@@ -285,7 +300,6 @@ export function AttendancePage() {
                   <select
                     className="form-input"
                     value={draft.status}
-                    disabled={Boolean(record)}
                     onChange={(event) =>
                       updateDraft(entry.studentId, {
                         status: event.target.value as AttendanceStatus,
@@ -302,29 +316,27 @@ export function AttendancePage() {
                     className="form-input"
                     placeholder="备注"
                     value={draft.note}
-                    disabled={Boolean(record)}
                     onChange={(event) => updateDraft(entry.studentId, { note: event.target.value })}
                   />
-                  <div className="flex items-center justify-start lg:justify-end">
+                  <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
                     {record ? (
                       <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
                         已签到 · {STATUS_LABEL[record.status]}
                       </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary px-3 py-1.5"
-                        disabled={!selectedSession || loading || savingStudentId !== ''}
-                        onClick={() => submitRosterEntry(entry)}
-                      >
-                        {savingStudentId === entry.studentId ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        )}
-                        补签/核销
-                      </button>
-                    )}
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn btn-primary px-3 py-1.5"
+                      disabled={!selectedSession || loading || savingStudentId !== ''}
+                      onClick={() => submitRosterEntry(entry)}
+                    >
+                      {savingStudentId === entry.studentId ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      )}
+                      {record ? '保存修改' : '补签/核销'}
+                    </button>
                   </div>
                 </div>
               );

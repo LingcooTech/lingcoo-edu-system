@@ -21,6 +21,11 @@ const attendanceSchema = z.object({
   ),
 });
 
+const attendanceCorrectionSchema = z.object({
+  status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
+  note: z.string().optional(),
+});
+
 const publicCheckInSchema = z.object({
   studentId: z.string().uuid(),
 });
@@ -412,6 +417,76 @@ export const attendanceModule: AppModule = {
         }
 
         return { attendanceRecords };
+      },
+    );
+
+    app.patch(
+      '/v1/class-sessions/:sessionId/attendance/:studentId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId, studentId } = request.params as {
+          sessionId: string;
+          studentId: string;
+        };
+
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) {
+          throw Object.assign(new Error('Class session not found'), { statusCode: 404 });
+        }
+
+        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        if (!classGroup) {
+          throw Object.assign(new Error('Class not found'), { statusCode: 404 });
+        }
+
+        const body = attendanceCorrectionSchema.parse(request.body);
+        const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
+        const billingCourseMap = billingCourseByStudentId(rosterEntries);
+        const billingCourseId = billingCourseMap.get(studentId);
+        if (!billingCourseId) {
+          throw Object.assign(new Error('只能修改本课次学员的点名结果'), { statusCode: 400 });
+        }
+
+        const result = await attendanceRepo.updateAttendanceRecord(app.db, {
+          sessionId,
+          studentId,
+          status: body.status,
+          note: body.note?.trim() || null,
+          courseId: billingCourseId,
+        });
+        if (!result) {
+          throw Object.assign(new Error('Attendance record not found'), { statusCode: 404 });
+        }
+
+        if (result.lessonDeltaAdjustment < 0) {
+          const [contract] = await app.db
+            .select()
+            .from(schema.courseContracts)
+            .where(
+              and(
+                eq(schema.courseContracts.studentId, result.attendanceRecord.studentId),
+                eq(schema.courseContracts.courseId, billingCourseId),
+                eq(schema.courseContracts.status, 'active'),
+              ),
+            )
+            .limit(1);
+
+          if (contract) {
+            await lessonRepo.checkAndCompleteCourseContract(app.db, {
+              studentId: result.attendanceRecord.studentId,
+              courseId: billingCourseId,
+              contractId: contract.id,
+            });
+          }
+
+          await lessonNotifications.notifyLessonConsumedForAttendance({
+            sessionId,
+            records: [result.attendanceRecord],
+            billingCourseIdByStudentId: billingCourseMap,
+          });
+        }
+
+        return { attendanceRecord: result.attendanceRecord };
       },
     );
   },

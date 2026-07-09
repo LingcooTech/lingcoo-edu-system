@@ -131,3 +131,56 @@ export async function recordAttendance(
     return created;
   });
 }
+
+export async function updateAttendanceRecord(
+  db: Database,
+  input: {
+    sessionId: string;
+    studentId: string;
+    status: AttendanceStatus;
+    note?: string | null;
+    courseId: string;
+  },
+) {
+  return db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(schema.attendanceRecords)
+      .where(
+        and(
+          eq(schema.attendanceRecords.classSessionId, input.sessionId),
+          eq(schema.attendanceRecords.studentId, input.studentId),
+        ),
+      )
+      .limit(1)
+      .for('update');
+    if (!existing) {
+      return null;
+    }
+
+    const nextLessonDelta = lessonDeltaForStatus(input.status);
+    const lessonDeltaAdjustment = nextLessonDelta - existing.lessonDelta;
+    const [updated] = await tx
+      .update(schema.attendanceRecords)
+      .set({
+        status: input.status,
+        lessonDelta: nextLessonDelta,
+        note: input.note ?? null,
+      })
+      .where(eq(schema.attendanceRecords.id, existing.id))
+      .returning();
+
+    if (lessonDeltaAdjustment !== 0) {
+      await applyLessonDelta(tx, {
+        studentId: input.studentId,
+        courseId: input.courseId,
+        type: 'consume',
+        amount: lessonDeltaAdjustment,
+        relatedEntityType: 'class_session',
+        relatedEntityId: input.sessionId,
+      });
+    }
+
+    return { attendanceRecord: updated, lessonDeltaAdjustment };
+  });
+}
