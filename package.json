@@ -22,6 +22,7 @@
     "lint:fix": "eslint . --fix && cd admin-ui && npm run lint -- --fix && cd ../public-web && npm run lint -- --fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/run-migrations.mjs",
+    "db:bootstrap": "node dist/db/bootstrap.js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",

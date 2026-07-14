@@ -15,6 +15,7 @@ import { ZodError } from 'zod';
 
 import { appModules } from './modules/index.js';
 import { parseCorsOrigin } from './lib/http.js';
+import { isRequestHostAllowed } from './lib/domain-binding.js';
 import { toUserFacingMessage } from './lib/user-facing-message.js';
 import { createDb } from './db/client.js';
 import * as accountsRepo from './db/repositories/accounts.js';
@@ -72,6 +73,21 @@ export async function buildApp(env: AppEnv) {
   await app.register(rateLimit, {
     max: 300,
     timeWindow: '1 minute',
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    if (
+      !isRequestHostAllowed({
+        bindingSource: env.FD_DOMAIN_BINDING_SOURCE,
+        boundHost: env.FD_BOUND_HOST,
+        requestHost: request.headers.host,
+      })
+    ) {
+      return reply.code(421).send({
+        error: 'MisdirectedRequest',
+        message: '当前域名未绑定到此部署',
+      });
+    }
   });
   await app.register(swagger, {
     openapi: {

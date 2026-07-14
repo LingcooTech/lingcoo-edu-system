@@ -1,5 +1,8 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import pg from 'pg';
 
 function hasSqlMigration(dir) {
   if (!existsSync(dir)) {
@@ -16,9 +19,14 @@ if (!hasSqlMigration('./drizzle')) {
   process.exit(0);
 }
 
-const result = spawnSync('npx', ['drizzle-kit', 'migrate'], {
-  stdio: 'inherit',
-  env: process.env,
-});
+const connectionString =
+  process.env.DATABASE_URL ?? 'postgres://fd_edu:fd_edu@localhost:5434/fd_edu';
+const pool = new pg.Pool({ connectionString });
 
-process.exit(result.status ?? 1);
+try {
+  const db = drizzle(pool);
+  await migrate(db, { migrationsFolder: './drizzle' });
+  console.log('Drizzle migrations applied successfully.');
+} finally {
+  await pool.end();
+}

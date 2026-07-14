@@ -11,6 +11,11 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6381'),
   LOG_LEVEL: z.string().default('info'),
 
+  // FD Stack deployment binding. The delivery installer injects these values
+  // after the entitlement's primary domain is locked.
+  FD_DOMAIN_BINDING_SOURCE: z.string().default('none'),
+  FD_BOUND_HOST: z.string().optional(),
+
   // Public base URL for notification CTA links and QR landing URLs.
   PUBLIC_WEB_BASE_URL: z.string().default('http://localhost:5174'),
   // Backwards-compatible alias used by older deployments.
@@ -94,6 +99,24 @@ const envSchema = z.object({
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+export function validateProductionEnv(env: AppEnv): AppEnv {
+  if (env.NODE_ENV !== 'production') {
+    return env;
+  }
+
+  if (env.JWT_SECRET === 'change-me-in-production' || env.JWT_SECRET.length < 32) {
+    throw new Error(
+      'JWT_SECRET must be an explicit secret of at least 32 characters in production',
+    );
+  }
+
+  if (env.FD_DOMAIN_BINDING_SOURCE !== 'none' && !env.FD_BOUND_HOST?.trim()) {
+    throw new Error('FD_BOUND_HOST is required when FD domain binding is enabled');
+  }
+
+  return env;
+}
+
 export function loadEnv(): AppEnv {
-  return envSchema.parse(process.env);
+  return validateProductionEnv(envSchema.parse(process.env));
 }
