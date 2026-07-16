@@ -653,6 +653,29 @@ export const classSessions = pgTable(
   }),
 );
 
+export const classSessionTeachers = pgTable(
+  'class_session_teachers',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    classSessionId: uuid('class_session_id')
+      .notNull()
+      .references(() => classSessions.id, { onDelete: 'cascade' }),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => teachers.id, { onDelete: 'restrict' }),
+    role: varchar('role', { length: 40 }).notNull().default('assistant'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionTeacherUnique: uniqueIndex('class_session_teachers_session_teacher_idx').on(
+      table.classSessionId,
+      table.teacherId,
+    ),
+    sessionIdx: index('class_session_teachers_session_idx').on(table.classSessionId),
+    teacherIdx: index('class_session_teachers_teacher_idx').on(table.teacherId),
+  }),
+);
+
 export const classSessionTemporaryStudents = pgTable(
   'class_session_temporary_students',
   {

@@ -316,6 +316,13 @@
       "when": 1783382400000,
       "tag": "0044_class_enrollment_billing_course",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1783468800000,
+      "tag": "0045_class_session_teachers",
+      "breakpoints": true
     }
   ]
 }

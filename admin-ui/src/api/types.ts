@@ -369,13 +369,15 @@ export interface ClassSession {
   id: string;
   classId: string;
   teacherId: string;
+  teacherIds?: string[];
   classroomId: string;
   startsAt: string;
   endsAt: string;
   topic: string;
   status: string;
   class?: { name: string };
-  teacher?: { name: string };
+  teacher?: { id?: string; name: string };
+  teachers?: Array<{ id: string; name: string; role?: string }>;
   classroom?: { name: string };
 }
 

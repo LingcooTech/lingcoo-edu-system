@@ -27,6 +27,7 @@ const classUpdateSchema = classSchema.partial();
 const sessionSchema = z.object({
   classId: z.string(),
   teacherId: z.string(),
+  teacherIds: z.array(z.string()).max(12).optional(),
   classroomId: z.string(),
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
@@ -46,6 +47,7 @@ const batchSessionSchema = z.object({
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
   topic: z.string().min(1),
   teacherId: z.string().optional(),
+  teacherIds: z.array(z.string()).max(12).optional(),
   classroomId: z.string().optional(),
   skipConflicts: z.boolean().default(true),
   timezoneOffsetMinutes: z.number().int().default(-480),
@@ -154,9 +156,62 @@ function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, t
   return true;
 }
 
+function normalizeSessionTeacherIds(primaryTeacherId: string, teacherIds?: string[]) {
+  return Array.from(new Set([primaryTeacherId, ...(teacherIds ?? [])].filter(Boolean)));
+}
+
 export const schedulingModule: AppModule = {
   name: 'scheduling',
   async register(app) {
+    async function enrichClassSessions(
+      sessions: Awaited<ReturnType<typeof schedulingRepo.listClassSessions>>,
+    ) {
+      if (sessions.length === 0) {
+        return [];
+      }
+      const [classes, teachers, classrooms, assignments] = await Promise.all([
+        schedulingRepo.listClasses(app.db),
+        teachingRepo.listTeachers(app.db),
+        teachingRepo.listClassrooms(app.db),
+        schedulingRepo.listClassSessionTeachers(
+          app.db,
+          sessions.map((session) => session.id),
+        ),
+      ]);
+      const classById = new Map(classes.map((item) => [item.id, item]));
+      const teacherById = new Map(teachers.map((item) => [item.id, item]));
+      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+      const assignmentsBySessionId = new Map<string, typeof assignments>();
+      for (const assignment of assignments) {
+        const sessionAssignments = assignmentsBySessionId.get(assignment.classSessionId) ?? [];
+        sessionAssignments.push(assignment);
+        assignmentsBySessionId.set(assignment.classSessionId, sessionAssignments);
+      }
+
+      return sessions.map((session) => {
+        const sessionAssignments = assignmentsBySessionId.get(session.id) ?? [];
+        const teachersForSession =
+          sessionAssignments.length > 0
+            ? sessionAssignments
+                .map((assignment) => {
+                  const teacher = teacherById.get(assignment.teacherId);
+                  return teacher ? { ...teacher, role: assignment.role } : null;
+                })
+                .filter((teacher): teacher is NonNullable<typeof teacher> => teacher !== null)
+            : teacherById.has(session.teacherId)
+              ? [{ ...teacherById.get(session.teacherId)!, role: 'primary' }]
+              : [];
+        return {
+          ...session,
+          teacherIds: teachersForSession.map((teacher) => teacher.id),
+          teachers: teachersForSession,
+          class: classById.get(session.classId),
+          teacher: teacherById.get(session.teacherId),
+          classroom: classroomById.get(session.classroomId),
+        };
+      });
+    }
+
     async function enrichSessionRoster(sessionId: string) {
       const roster = await schedulingRepo.listSessionRoster(app.db, sessionId);
       if (roster.length === 0) {
@@ -296,60 +351,37 @@ export const schedulingModule: AppModule = {
     });
 
     app.get('/v1/class-sessions', { preHandler: app.requireAdmin }, async () => {
-      const [sessions, classes, teachers, classrooms] = await Promise.all([
-        schedulingRepo.listClassSessions(app.db),
-        schedulingRepo.listClasses(app.db),
-        teachingRepo.listTeachers(app.db),
-        teachingRepo.listClassrooms(app.db),
-      ]);
-      const classById = new Map(classes.map((item) => [item.id, item]));
-      const teacherById = new Map(teachers.map((item) => [item.id, item]));
-      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
-
-      return {
-        classSessions: sessions.map((session) => ({
-          ...session,
-          class: classById.get(session.classId),
-          teacher: teacherById.get(session.teacherId),
-          classroom: classroomById.get(session.classroomId),
-        })),
-      };
+      const sessions = await schedulingRepo.listClassSessions(app.db);
+      return { classSessions: await enrichClassSessions(sessions) };
     });
 
     app.get('/v1/calendar', { preHandler: app.requireAdmin }, async (request) => {
       const query = calendarQuerySchema.parse(request.query);
       const from = query.from ? new Date(query.from) : undefined;
       const to = query.to ? new Date(query.to) : undefined;
-      const [sessions, classes, courses, teachers, classrooms] = await Promise.all([
+      const [sessionRows, courses] = await Promise.all([
         schedulingRepo.listClassSessions(app.db),
-        schedulingRepo.listClasses(app.db),
         catalogRepo.listCourses(app.db),
-        teachingRepo.listTeachers(app.db),
-        teachingRepo.listClassrooms(app.db),
       ]);
-      const classById = new Map(classes.map((item) => [item.id, item]));
+      const sessions = await enrichClassSessions(sessionRows);
       const courseById = new Map(courses.map((item) => [item.id, item]));
-      const teacherById = new Map(teachers.map((item) => [item.id, item]));
-      const classroomById = new Map(classrooms.map((item) => [item.id, item]));
 
       return {
         events: sessions
           .filter((session) => {
-            const classGroup = classById.get(session.classId);
+            const classGroup = session.class;
             if (!classGroup) return false;
             if (!overlapsRange(session, from, to)) return false;
             if (query.classId && session.classId !== query.classId) return false;
             if (query.courseId && classGroup.courseId !== query.courseId) return false;
-            if (query.teacherId && session.teacherId !== query.teacherId) return false;
+            if (query.teacherId && !session.teacherIds.includes(query.teacherId)) return false;
             if (query.classroomId && session.classroomId !== query.classroomId) return false;
             if (query.status && session.status !== query.status) return false;
             return true;
           })
           .map((session) => {
-            const classGroup = classById.get(session.classId);
+            const classGroup = session.class;
             const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
-            const teacher = teacherById.get(session.teacherId);
-            const classroom = classroomById.get(session.classroomId);
             return {
               id: session.id,
               type: 'class_session',
@@ -359,8 +391,17 @@ export const schedulingModule: AppModule = {
               status: session.status,
               class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
               course: course ? { id: course.id, name: course.name } : null,
-              teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
-              classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
+              teacher: session.teacher
+                ? { id: session.teacher.id, name: session.teacher.name }
+                : null,
+              teachers: session.teachers.map((teacher) => ({
+                id: teacher.id,
+                name: teacher.name,
+                role: teacher.role,
+              })),
+              classroom: session.classroom
+                ? { id: session.classroom.id, name: session.classroom.name }
+                : null,
             };
           }),
       };
@@ -375,7 +416,7 @@ export const schedulingModule: AppModule = {
       const to = query.to ? new Date(query.to) : defaultTo;
       const trialFrom = from > now ? from : now;
 
-      const [sessions, classes, courses, teachers, classrooms, campuses, trialSessions] =
+      const [sessionRows, classes, courses, teachers, classrooms, campuses, trialSessions] =
         await Promise.all([
           schedulingRepo.listClassSessions(app.db),
           schedulingRepo.listClasses(app.db),
@@ -385,6 +426,7 @@ export const schedulingModule: AppModule = {
           organizationRepo.listCampuses(app.db),
           trialRepo.listOpenFutureTrialSessions(app.db, { from: trialFrom, to }),
         ]);
+      const sessions = await enrichClassSessions(sessionRows);
       const classById = new Map(classes.map((item) => [item.id, item]));
       const courseById = new Map(courses.map((item) => [item.id, item]));
       const teacherById = new Map(teachers.map((item) => [item.id, item]));
@@ -403,7 +445,6 @@ export const schedulingModule: AppModule = {
         .map((session) => {
           const classGroup = classById.get(session.classId);
           const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
-          const teacher = teacherById.get(session.teacherId);
           const classroom = classroomById.get(session.classroomId);
           return {
             id: session.id,
@@ -417,7 +458,14 @@ export const schedulingModule: AppModule = {
             course: course
               ? { id: course.id, name: course.name, slug: course.slug, category: course.category }
               : null,
-            teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+            teacher: session.teacher
+              ? { id: session.teacher.id, name: session.teacher.name }
+              : null,
+            teachers: session.teachers.map((teacher) => ({
+              id: teacher.id,
+              name: teacher.name,
+              role: teacher.role,
+            })),
             classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
           };
         });
@@ -461,12 +509,14 @@ export const schedulingModule: AppModule = {
 
       const startsAt = new Date(body.startsAt);
       const endsAt = new Date(body.endsAt);
+      const teacherIds = normalizeSessionTeacherIds(body.teacherId, body.teacherIds);
 
       const conflict = await schedulingRepo.findScheduleConflict(app.db, {
         startsAt,
         endsAt,
         classroomId: body.classroomId,
         teacherId: body.teacherId,
+        teacherIds,
       });
       if (conflict) {
         throw Object.assign(new Error('Classroom or teacher time conflict'), { statusCode: 409 });
@@ -481,7 +531,13 @@ export const schedulingModule: AppModule = {
         endsAt,
         status: 'scheduled',
       });
-      return { classSession };
+      await schedulingRepo.replaceClassSessionTeachers(
+        app.db,
+        classSession.id,
+        body.teacherId,
+        teacherIds,
+      );
+      return { classSession: (await enrichClassSessions([classSession]))[0] };
     });
 
     app.post('/v1/class-sessions/batch', { preHandler: app.requireAdmin }, async (request) => {
@@ -491,6 +547,7 @@ export const schedulingModule: AppModule = {
 
       const teacherId = body.teacherId || classGroup.teacherId;
       const classroomId = body.classroomId || classGroup.classroomId;
+      const teacherIds = normalizeSessionTeacherIds(teacherId, body.teacherIds);
       const dates = datesForBatch(body);
       const createdSessions: Awaited<ReturnType<typeof schedulingRepo.createClassSession>>[] = [];
       const skipped: Array<{ date: string; reason: string }> = [];
@@ -507,6 +564,7 @@ export const schedulingModule: AppModule = {
           endsAt,
           classroomId,
           teacherId,
+          teacherIds,
         });
         if (overlap) {
           if (body.skipConflicts) {
@@ -525,10 +583,16 @@ export const schedulingModule: AppModule = {
           endsAt,
           status: 'scheduled',
         });
+        await schedulingRepo.replaceClassSessionTeachers(
+          app.db,
+          classSession.id,
+          teacherId,
+          teacherIds,
+        );
         createdSessions.push(classSession);
       }
 
-      return { classSessions: createdSessions, skipped };
+      return { classSessions: await enrichClassSessions(createdSessions), skipped };
     });
 
     app.patch(
@@ -539,11 +603,23 @@ export const schedulingModule: AppModule = {
         const current = await schedulingRepo.findSession(app.db, sessionId);
         if (!current) throw notFound('Class session not found');
         const body = sessionUpdateSchema.parse(request.body);
+        const { teacherIds: requestedTeacherIds, ...sessionPatch } = body;
 
         const startsAt = body.startsAt ? new Date(body.startsAt) : current.startsAt;
         const endsAt = body.endsAt ? new Date(body.endsAt) : current.endsAt;
         const classroomId = body.classroomId ?? current.classroomId;
         const teacherId = body.teacherId ?? current.teacherId;
+        const currentAssignments = await schedulingRepo.listClassSessionTeachers(app.db, [
+          sessionId,
+        ]);
+        const currentTeacherIds =
+          currentAssignments.length > 0
+            ? currentAssignments.map((assignment) => assignment.teacherId)
+            : [current.teacherId];
+        const teacherIds = normalizeSessionTeacherIds(
+          teacherId,
+          requestedTeacherIds ?? currentTeacherIds,
+        );
         const nextStatus = body.status ?? current.status;
 
         if (nextStatus !== 'cancelled') {
@@ -552,13 +628,14 @@ export const schedulingModule: AppModule = {
             endsAt,
             classroomId,
             teacherId,
+            teacherIds,
             ignoreSessionId: sessionId,
           });
           if (overlap) throw conflict();
         }
 
         const classSession = await schedulingRepo.updateClassSession(app.db, sessionId, {
-          ...body,
+          ...sessionPatch,
           startsAt,
           endsAt,
           classroomId,
@@ -566,7 +643,8 @@ export const schedulingModule: AppModule = {
           status: nextStatus,
         });
         if (!classSession) throw notFound('Class session not found');
-        return { classSession };
+        await schedulingRepo.replaceClassSessionTeachers(app.db, sessionId, teacherId, teacherIds);
+        return { classSession: (await enrichClassSessions([classSession]))[0] };
       },
     );
 

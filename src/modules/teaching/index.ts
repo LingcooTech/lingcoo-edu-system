@@ -218,6 +218,22 @@ export const teachingModule: AppModule = {
       return new Map(roster.map((entry) => [entry.studentId, entry.billingCourseId]));
     }
 
+    async function listAssignedSessionIdsForTeacher(teacherId: string) {
+      const assignments = await schedulingRepo.listClassSessionTeachersForTeacher(
+        app.db,
+        teacherId,
+      );
+      return new Set(assignments.map((assignment) => assignment.classSessionId));
+    }
+
+    function isTeacherAssignedToSession(
+      session: typeof schema.classSessions.$inferSelect,
+      teacherId: string,
+      assignedSessionIds: Set<string>,
+    ) {
+      return session.teacherId === teacherId || assignedSessionIds.has(session.id);
+    }
+
     app.get(
       '/public/teacher/dashboard',
       { preHandler: app.requireRole('teacher') },
@@ -251,6 +267,10 @@ export const teachingModule: AppModule = {
         const lessonAccountByStudentCourse = new Map(
           lessonAccounts.map((item) => [`${item.studentId}:${item.courseId}`, item]),
         );
+        const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
+        const mySessions = sessions.filter((session) =>
+          isTeacherAssignedToSession(session, account.teacherId!, assignedSessionIds),
+        );
         const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
         const enrollmentsByClassId = new Map<
           string,
@@ -281,9 +301,16 @@ export const teachingModule: AppModule = {
             };
           }),
         );
-        const mySessionIds = sessions
-          .filter((session) => session.teacherId === account.teacherId)
-          .map((session) => session.id);
+        const mySessionClassIds = new Set(mySessions.map((session) => session.classId));
+        for (const classId of mySessionClassIds) {
+          if (!enrollmentsByClassId.has(classId)) {
+            enrollmentsByClassId.set(
+              classId,
+              await schedulingRepo.listEnrollments(app.db, classId),
+            );
+          }
+        }
+        const mySessionIds = mySessions.map((session) => session.id);
         const temporaryStudents = await schedulingRepo.listTemporaryStudentsForSessions(
           app.db,
           mySessionIds,
@@ -297,26 +324,24 @@ export const teachingModule: AppModule = {
         }
 
         return {
-          sessions: sessions
-            .filter((session) => session.teacherId === account.teacherId)
-            .map((session) => {
-              const classGroup = classById.get(session.classId);
-              const sessionAttendance = attendanceRecords.filter(
-                (record) => record.classSessionId === session.id,
-              );
-              return {
-                ...session,
-                class: classGroup ? { name: classGroup.name } : undefined,
-                course: classGroup ? courseById.get(classGroup.courseId) : undefined,
-                classroom: classroomById.get(session.classroomId),
-                rosterCount: classGroup
-                  ? (enrollmentsByClassId.get(classGroup.id)?.length ?? 0) +
-                    (temporaryCountBySessionId.get(session.id) ?? 0)
-                  : 0,
-                attendanceCount: sessionAttendance.length,
-                attendanceSummary: summarizeAttendance(sessionAttendance),
-              };
-            }),
+          sessions: mySessions.map((session) => {
+            const classGroup = classById.get(session.classId);
+            const sessionAttendance = attendanceRecords.filter(
+              (record) => record.classSessionId === session.id,
+            );
+            return {
+              ...session,
+              class: classGroup ? { name: classGroup.name } : undefined,
+              course: classGroup ? courseById.get(classGroup.courseId) : undefined,
+              classroom: classroomById.get(session.classroomId),
+              rosterCount: classGroup
+                ? (enrollmentsByClassId.get(classGroup.id)?.length ?? 0) +
+                  (temporaryCountBySessionId.get(session.id) ?? 0)
+                : 0,
+              attendanceCount: sessionAttendance.length,
+              attendanceSummary: summarizeAttendance(sessionAttendance),
+            };
+          }),
           classes: classCards,
         };
       },
@@ -472,7 +497,14 @@ export const teachingModule: AppModule = {
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
-        const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
+        const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
+        const mySessions = sessions.filter((session) =>
+          isTeacherAssignedToSession(session, account.teacherId!, assignedSessionIds),
+        );
+        const mySessionClassIds = new Set(mySessions.map((session) => session.classId));
+        const myClasses = classes.filter(
+          (item) => item.teacherId === account.teacherId || mySessionClassIds.has(item.id),
+        );
         const enrollments = (
           await Promise.all(
             myClasses.map((classGroup) => schedulingRepo.listEnrollments(app.db, classGroup.id)),
@@ -485,9 +517,7 @@ export const teachingModule: AppModule = {
             (rosterCountByClassId.get(enrollment.classId) ?? 0) + 1,
           );
         }
-        const mySessionIds = sessions
-          .filter((session) => session.teacherId === account.teacherId)
-          .map((session) => session.id);
+        const mySessionIds = mySessions.map((session) => session.id);
         const temporaryStudents = await schedulingRepo.listTemporaryStudentsForSessions(
           app.db,
           mySessionIds,
@@ -501,11 +531,8 @@ export const teachingModule: AppModule = {
         }
 
         return {
-          events: sessions
-            .filter(
-              (session) =>
-                session.teacherId === account.teacherId && overlapsRange(session, from, to),
-            )
+          events: mySessions
+            .filter((session) => overlapsRange(session, from, to))
             .map((session) => {
               const classGroup = classById.get(session.classId);
               const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
@@ -546,7 +573,9 @@ export const teachingModule: AppModule = {
       if (!session) {
         throw notFound('Class session not found');
       }
-      if (session.teacherId !== account.teacherId) {
+      const assignments = await schedulingRepo.listClassSessionTeachers(app.db, [sessionId]);
+      const assigned = assignments.some((assignment) => assignment.teacherId === account.teacherId);
+      if (session.teacherId !== account.teacherId && !assigned) {
         throw Object.assign(new Error('无权操作该课次'), { statusCode: 403 });
       }
       return { account, session };

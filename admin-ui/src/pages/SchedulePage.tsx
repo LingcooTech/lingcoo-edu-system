@@ -36,6 +36,7 @@ const SESSIONS = () => '/v1/class-sessions';
 interface SessionForm {
   classId: string;
   teacherId: string;
+  teacherIds: string[];
   classroomId: string;
   startsAt: string;
   endsAt: string;
@@ -52,6 +53,8 @@ interface BatchForm {
   startTime: string;
   endTime: string;
   topic: string;
+  teacherId: string;
+  teacherIds: string[];
   skipConflicts: boolean;
 }
 
@@ -70,6 +73,10 @@ const WEEKDAYS = [
   { value: 6, label: '周六' },
   { value: 0, label: '周日' },
 ];
+
+function normalizeTeacherIds(primaryTeacherId: string, teacherIds: string[] = []) {
+  return Array.from(new Set([primaryTeacherId, ...teacherIds].filter(Boolean)));
+}
 
 function toDateKey(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value;
@@ -104,8 +111,10 @@ function defaultBatchForm(classes: ClassGroup[]): BatchForm {
   const today = new Date();
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 27);
+  const firstClass = classes[0];
+  const teacherId = firstClass?.teacherId ?? '';
   return {
-    classId: classes[0]?.id ?? '',
+    classId: firstClass?.id ?? '',
     startsOn: toDateKey(weekStart),
     endsOn: toDateKey(weekEnd),
     mode: 'weekly',
@@ -113,6 +122,8 @@ function defaultBatchForm(classes: ClassGroup[]): BatchForm {
     startTime: '16:00',
     endTime: '17:00',
     topic: '常规课',
+    teacherId,
+    teacherIds: teacherId ? [teacherId] : [],
     skipConflicts: true,
   };
 }
@@ -130,6 +141,7 @@ function defaultForm(
   return {
     classId: firstClass?.id ?? '',
     teacherId: firstClass?.teacherId ?? teachers[0]?.id ?? '',
+    teacherIds: normalizeTeacherIds(firstClass?.teacherId ?? teachers[0]?.id ?? ''),
     classroomId: firstClass?.classroomId ?? classrooms[0]?.id ?? '',
     startsAt: toDateTimeLocal(now),
     endsAt: toDateTimeLocal(end),
@@ -195,7 +207,9 @@ export function SchedulePage() {
       data
         .filter((session) => {
           if (filters.classId && session.classId !== filters.classId) return false;
-          if (filters.teacherId && session.teacherId !== filters.teacherId) return false;
+          if (filters.teacherId && !sessionTeacherIds(session).includes(filters.teacherId)) {
+            return false;
+          }
           if (filters.classroomId && session.classroomId !== filters.classroomId) return false;
           if (filters.status && session.status !== filters.status) return false;
           return true;
@@ -301,11 +315,63 @@ export function SchedulePage() {
     }));
   }
 
+  function selectBatchClass(classId: string) {
+    const classGroup = classes.find((item) => item.id === classId);
+    const teacherId = classGroup?.teacherId ?? batchForm.teacherId;
+    setBatchForm({
+      ...batchForm,
+      classId,
+      teacherId,
+      teacherIds: normalizeTeacherIds(teacherId),
+    });
+  }
+
+  function changeMainTeacher(teacherId: string) {
+    setForm({
+      ...form,
+      teacherId,
+      teacherIds: normalizeTeacherIds(teacherId, form.teacherIds),
+    });
+  }
+
+  function toggleSessionTeacher(teacherId: string) {
+    if (teacherId === form.teacherId) {
+      return;
+    }
+    const teacherIds = form.teacherIds.includes(teacherId)
+      ? form.teacherIds.filter((item) => item !== teacherId)
+      : [...form.teacherIds, teacherId];
+    setForm({ ...form, teacherIds: normalizeTeacherIds(form.teacherId, teacherIds) });
+  }
+
+  function changeBatchMainTeacher(teacherId: string) {
+    setBatchForm({
+      ...batchForm,
+      teacherId,
+      teacherIds: normalizeTeacherIds(teacherId, batchForm.teacherIds),
+    });
+  }
+
+  function toggleBatchTeacher(teacherId: string) {
+    if (teacherId === batchForm.teacherId) {
+      return;
+    }
+    const teacherIds = batchForm.teacherIds.includes(teacherId)
+      ? batchForm.teacherIds.filter((item) => item !== teacherId)
+      : [...batchForm.teacherIds, teacherId];
+    setBatchForm({
+      ...batchForm,
+      teacherIds: normalizeTeacherIds(batchForm.teacherId, teacherIds),
+    });
+  }
+
   function openEdit(session: ClassSession) {
+    const teacherIds = sessionTeacherIds(session);
     setEditing(session);
     setForm({
       classId: session.classId,
       teacherId: session.teacherId,
+      teacherIds,
       classroomId: session.classroomId,
       startsAt: toDateTimeLocal(session.startsAt),
       endsAt: toDateTimeLocal(session.endsAt),
@@ -319,19 +385,37 @@ export function SchedulePage() {
 
   function selectClass(classId: string) {
     const classGroup = classes.find((item) => item.id === classId);
+    const teacherId = classGroup?.teacherId ?? form.teacherId;
     setForm({
       ...form,
       classId,
-      teacherId: classGroup?.teacherId ?? form.teacherId,
+      teacherId,
+      teacherIds: normalizeTeacherIds(teacherId),
       classroomId: classGroup?.classroomId ?? form.classroomId,
     });
   }
 
   function hydrateSession(session: ClassSession): ClassSession {
+    const teacherIds = sessionTeacherIds(session);
     return {
       ...session,
+      teacherIds,
       class: classes.find((item) => item.id === session.classId) ?? session.class,
       teacher: teachers.find((item) => item.id === session.teacherId) ?? session.teacher,
+      teachers:
+        session.teachers ??
+        teacherIds
+          .map((teacherId) => {
+            const teacher = teachers.find((item) => item.id === teacherId);
+            return teacher
+              ? {
+                  id: teacher.id,
+                  name: teacher.name,
+                  role: teacherId === session.teacherId ? 'primary' : 'assistant',
+                }
+              : null;
+          })
+          .filter((teacher): teacher is NonNullable<typeof teacher> => teacher !== null),
       classroom: classrooms.find((item) => item.id === session.classroomId) ?? session.classroom,
     };
   }
@@ -345,6 +429,7 @@ export function SchedulePage() {
     try {
       const payload = {
         ...form,
+        teacherIds: normalizeTeacherIds(form.teacherId, form.teacherIds),
         topic: form.topic.trim(),
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: new Date(form.endsAt).toISOString(),
@@ -386,6 +471,7 @@ export function SchedulePage() {
         skipped: Array<{ date: string; reason: string }>;
       }>(`${SESSIONS()}/batch`, {
         ...batchForm,
+        teacherIds: normalizeTeacherIds(batchForm.teacherId, batchForm.teacherIds),
         topic: batchForm.topic.trim(),
         timezoneOffsetMinutes: new Date().getTimezoneOffset(),
       });
@@ -498,6 +584,22 @@ export function SchedulePage() {
   }
 
   const temporaryBillingOptions = billingAccountOptions(temporaryStudentForm.studentId);
+
+  function sessionTeacherIds(session: ClassSession) {
+    return normalizeTeacherIds(
+      session.teacherId,
+      session.teacherIds ?? session.teachers?.map((teacher) => teacher.id) ?? [],
+    );
+  }
+
+  function teacherNamesForSession(session: ClassSession) {
+    const names =
+      session.teachers?.map((teacher) => teacher.name).filter(Boolean) ??
+      sessionTeacherIds(session)
+        .map((teacherId) => teacherNameById.get(teacherId))
+        .filter(Boolean);
+    return names.length > 0 ? names.join('、') : (session.teacher?.name ?? '-');
+  }
 
   return (
     <PageFrame
@@ -644,9 +746,7 @@ export function SchedulePage() {
                         <div className="mt-1 line-clamp-2 text-sm font-medium">{session.topic}</div>
                         <div className="text-muted-foreground mt-1 text-xs">
                           {classNameById.get(session.classId) ?? session.class?.name ?? '班级'} ·{' '}
-                          {teacherNameById.get(session.teacherId) ??
-                            session.teacher?.name ??
-                            '老师'}
+                          {teacherNamesForSession(session)}
                         </div>
                         <div className="text-muted-foreground mt-1 text-xs">
                           {classroomNameById.get(session.classroomId) ??
@@ -679,7 +779,7 @@ export function SchedulePage() {
                   </div>
                 ),
               },
-              { key: 'teacher', header: '老师', cell: (row) => row.teacher?.name ?? '-' },
+              { key: 'teacher', header: '老师', cell: (row) => teacherNamesForSession(row) },
               { key: 'room', header: '教室', cell: (row) => row.classroom?.name ?? '-' },
               {
                 key: 'status',
@@ -791,11 +891,11 @@ export function SchedulePage() {
           </Field>
         </FieldRow>
         <FieldRow>
-          <Field label="老师" required>
+          <Field label="主授课老师" required>
             <select
               className="form-input"
               value={form.teacherId}
-              onChange={(event) => setForm({ ...form, teacherId: event.target.value })}
+              onChange={(event) => changeMainTeacher(event.target.value)}
             >
               <option value="">选择老师</option>
               {teachers.map((teacher) => (
@@ -820,6 +920,33 @@ export function SchedulePage() {
             </select>
           </Field>
         </FieldRow>
+        <Field label="协同/替班老师">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {teachers.map((teacher) => {
+              const checked = normalizeTeacherIds(form.teacherId, form.teacherIds).includes(
+                teacher.id,
+              );
+              const isPrimary = teacher.id === form.teacherId;
+              return (
+                <label
+                  key={teacher.id}
+                  className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isPrimary}
+                    onChange={() => toggleSessionTeacher(teacher.id)}
+                  />
+                  <span>{teacher.name}</span>
+                  {isPrimary ? (
+                    <span className="text-muted-foreground ml-auto text-xs">主老师</span>
+                  ) : null}
+                </label>
+              );
+            })}
+          </div>
+        </Field>
         {editing && (
           <Field label="状态">
             <select
@@ -956,7 +1083,7 @@ export function SchedulePage() {
         open={batchOpen}
         onClose={() => setBatchOpen(false)}
         title="快捷排课"
-        description="按班级默认老师和教室批量生成课次；遇到老师或教室冲突时可自动跳过。"
+        description="按班级默认老师和教室批量生成课次；可追加协同/替班老师，遇到老师或教室冲突时可自动跳过。"
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setBatchOpen(false)}>
@@ -978,7 +1105,7 @@ export function SchedulePage() {
             <select
               className="form-input"
               value={batchForm.classId}
-              onChange={(event) => setBatchForm({ ...batchForm, classId: event.target.value })}
+              onChange={(event) => selectBatchClass(event.target.value)}
             >
               <option value="">选择班级</option>
               {classes.map((classGroup) => (
@@ -997,6 +1124,48 @@ export function SchedulePage() {
               onChange={(event) => setBatchForm({ ...batchForm, topic: event.target.value })}
               placeholder="例如：常规课 / 第一阶段训练"
             />
+          </Field>
+          <Field label="主授课老师">
+            <select
+              className="form-input"
+              value={batchForm.teacherId}
+              onChange={(event) => changeBatchMainTeacher(event.target.value)}
+            >
+              <option value="">使用班级默认老师</option>
+              {teachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="协同/替班老师">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {teachers.map((teacher) => {
+                const checked = normalizeTeacherIds(
+                  batchForm.teacherId,
+                  batchForm.teacherIds,
+                ).includes(teacher.id);
+                const isPrimary = teacher.id === batchForm.teacherId;
+                return (
+                  <label
+                    key={teacher.id}
+                    className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={isPrimary}
+                      onChange={() => toggleBatchTeacher(teacher.id)}
+                    />
+                    <span>{teacher.name}</span>
+                    {isPrimary ? (
+                      <span className="text-muted-foreground ml-auto text-xs">主老师</span>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
           </Field>
           <FieldRow>
             <Field label="开始日期" required>

@@ -47,6 +47,54 @@ export async function listClassSessions(db: Database) {
   return db.select().from(schema.classSessions).orderBy(asc(schema.classSessions.startsAt));
 }
 
+export async function listClassSessionTeachers(db: Database, sessionIds: string[]) {
+  if (sessionIds.length === 0) {
+    return [];
+  }
+  return db
+    .select()
+    .from(schema.classSessionTeachers)
+    .where(inArray(schema.classSessionTeachers.classSessionId, Array.from(new Set(sessionIds))))
+    .orderBy(asc(schema.classSessionTeachers.createdAt));
+}
+
+export async function listClassSessionTeachersForTeacher(db: Database, teacherId: string) {
+  return db
+    .select()
+    .from(schema.classSessionTeachers)
+    .where(eq(schema.classSessionTeachers.teacherId, teacherId))
+    .orderBy(asc(schema.classSessionTeachers.createdAt));
+}
+
+export async function replaceClassSessionTeachers(
+  db: Database,
+  sessionId: string,
+  primaryTeacherId: string,
+  teacherIds: string[],
+) {
+  const normalizedTeacherIds = Array.from(
+    new Set([primaryTeacherId, ...teacherIds].filter(Boolean)),
+  );
+  await db
+    .delete(schema.classSessionTeachers)
+    .where(eq(schema.classSessionTeachers.classSessionId, sessionId));
+
+  if (normalizedTeacherIds.length === 0) {
+    return [];
+  }
+
+  return db
+    .insert(schema.classSessionTeachers)
+    .values(
+      normalizedTeacherIds.map((teacherId) => ({
+        classSessionId: sessionId,
+        teacherId,
+        role: teacherId === primaryTeacherId ? 'primary' : 'assistant',
+      })),
+    )
+    .returning();
+}
+
 export async function listSessionsForCourse(db: Database, courseId: string) {
   return db
     .select({ session: schema.classSessions })
@@ -160,6 +208,7 @@ export async function findScheduleConflict(
     endsAt: Date;
     classroomId: string;
     teacherId: string;
+    teacherIds?: string[];
     ignoreSessionId?: string;
   },
 ) {
@@ -167,15 +216,36 @@ export async function findScheduleConflict(
     .select()
     .from(schema.classSessions)
     .where(ne(schema.classSessions.status, 'cancelled'));
+  const assignments = await listClassSessionTeachers(
+    db,
+    candidates.map((session) => session.id),
+  );
+  const teacherIdsBySessionId = new Map<string, Set<string>>();
+  for (const assignment of assignments) {
+    const teacherIds = teacherIdsBySessionId.get(assignment.classSessionId) ?? new Set<string>();
+    teacherIds.add(assignment.teacherId);
+    teacherIdsBySessionId.set(assignment.classSessionId, teacherIds);
+  }
+  for (const session of candidates) {
+    if (!teacherIdsBySessionId.has(session.id)) {
+      teacherIdsBySessionId.set(session.id, new Set([session.teacherId]));
+    }
+  }
+  const inputTeacherIds = new Set(input.teacherIds ?? [input.teacherId]);
 
   return (
-    candidates.find(
-      (session) =>
+    candidates.find((session) => {
+      const assignedTeacherIds = teacherIdsBySessionId.get(session.id) ?? new Set<string>();
+      const teacherConflicts = [...assignedTeacherIds].some((teacherId) =>
+        inputTeacherIds.has(teacherId),
+      );
+      return (
         session.id !== input.ignoreSessionId &&
         input.startsAt < session.endsAt &&
         session.startsAt < input.endsAt &&
-        (session.classroomId === input.classroomId || session.teacherId === input.teacherId),
-    ) ?? null
+        (session.classroomId === input.classroomId || teacherConflicts)
+      );
+    }) ?? null
   );
 }
 
