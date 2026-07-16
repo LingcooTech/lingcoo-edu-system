@@ -66,6 +66,11 @@ const publicCalendarQuerySchema = z.object({
 
 const enrollmentSchema = z.object({
   studentId: z.string(),
+  billingCourseId: z.string().uuid().optional(),
+});
+
+const enrollmentBillingSchema = z.object({
+  billingCourseId: z.string().uuid(),
 });
 
 const temporaryStudentSchema = z.object({
@@ -201,6 +206,24 @@ export const schedulingModule: AppModule = {
           billingCourse: entry.billingCourse,
           lessonAccount: entry.lessonAccount,
         }));
+    }
+
+    async function requireStudentLessonAccount(input: { studentId: string; courseId: string }) {
+      const [lessonAccount] = await app.db
+        .select()
+        .from(schema.lessonAccounts)
+        .where(
+          and(
+            eq(schema.lessonAccounts.studentId, input.studentId),
+            eq(schema.lessonAccounts.courseId, input.courseId),
+          ),
+        )
+        .limit(1);
+
+      if (!lessonAccount) {
+        throw unprocessable('该学员暂无所选课程课时账户');
+      }
+      return lessonAccount;
     }
 
     async function requireLessonAccountForTemporaryStudent(input: {
@@ -690,15 +713,32 @@ export const schedulingModule: AppModule = {
         const { classId } = request.params as { classId: string };
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        const [enrollments, students] = await Promise.all([
-          schedulingRepo.listEnrollments(app.db, classId),
+        const enrollments = await schedulingRepo.listEnrollments(app.db, classId);
+        const studentIds = enrollments.map((item) => item.studentId);
+        const [students, courses, lessonAccounts] = await Promise.all([
           peopleRepo.listStudents(app.db),
+          catalogRepo.listCourses(app.db),
+          studentIds.length > 0
+            ? app.db
+                .select()
+                .from(schema.lessonAccounts)
+                .where(inArray(schema.lessonAccounts.studentId, studentIds))
+            : Promise.resolve([]),
         ]);
         const studentById = new Map(students.map((student) => [student.id, student]));
+        const courseById = new Map(courses.map((course) => [course.id, course]));
+        const lessonAccountByStudentCourse = new Map(
+          lessonAccounts.map((account) => [`${account.studentId}:${account.courseId}`, account]),
+        );
         return {
           enrollments: enrollments.map((enrollment) => ({
             ...enrollment,
             student: studentById.get(enrollment.studentId),
+            billingCourse: courseById.get(enrollment.billingCourseId) ?? null,
+            lessonAccount:
+              lessonAccountByStudentCourse.get(
+                `${enrollment.studentId}:${enrollment.billingCourseId}`,
+              ) ?? null,
           })),
         };
       },
@@ -713,6 +753,9 @@ export const schedulingModule: AppModule = {
         if (!classGroup) throw notFound('Class not found');
         const body = enrollmentSchema.parse(request.body);
         await peopleRepo.requireStudent(app.db, body.studentId);
+        const billingCourseId = body.billingCourseId ?? classGroup.courseId;
+        await catalogRepo.requireCourse(app.db, billingCourseId);
+        await requireStudentLessonAccount({ studentId: body.studentId, courseId: billingCourseId });
 
         const enrolledCount = await schedulingRepo.countActiveEnrollments(app.db, classId);
         if (enrolledCount >= classGroup.capacity) {
@@ -722,8 +765,39 @@ export const schedulingModule: AppModule = {
         const enrollment = await schedulingRepo.createEnrollment(app.db, {
           classId,
           studentId: body.studentId,
+          billingCourseId,
           active: true,
         });
+        return { enrollment };
+      },
+    );
+
+    app.patch(
+      '/v1/classes/:classId/enrollments/:enrollmentId',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { classId, enrollmentId } = request.params as {
+          classId: string;
+          enrollmentId: string;
+        };
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup) throw notFound('Class not found');
+        const body = enrollmentBillingSchema.parse(request.body);
+        await catalogRepo.requireCourse(app.db, body.billingCourseId);
+        const current = (await schedulingRepo.listEnrollments(app.db, classId)).find(
+          (item) => item.id === enrollmentId,
+        );
+        if (!current) throw notFound('Enrollment not found');
+        await requireStudentLessonAccount({
+          studentId: current.studentId,
+          courseId: body.billingCourseId,
+        });
+        const enrollment = await schedulingRepo.updateEnrollmentBillingCourse(app.db, {
+          classId,
+          enrollmentId,
+          billingCourseId: body.billingCourseId,
+        });
+        if (!enrollment) throw notFound('Enrollment not found');
         return { enrollment };
       },
     );

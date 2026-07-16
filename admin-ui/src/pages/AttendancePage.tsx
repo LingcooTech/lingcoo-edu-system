@@ -17,6 +17,7 @@ import { useApiResource } from '@/lib/useApiResource';
 interface AttendanceDraft {
   status: AttendanceStatus;
   note: string;
+  deductLesson: boolean;
 }
 
 const STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
@@ -38,7 +39,7 @@ const STATUS_LABEL: Record<AttendanceStatus, string> = {
 };
 
 function defaultDraft(): AttendanceDraft {
-  return { status: 'present', note: '' };
+  return { status: 'present', note: '', deductLesson: true };
 }
 
 export function AttendancePage() {
@@ -78,7 +79,10 @@ export function AttendancePage() {
     records.forEach((record) => {
       statuses[record.status]++;
     });
-    const lessonDeducted = statuses.present + statuses.late + statuses.absent + statuses.makeup;
+    const lessonDeducted = records.reduce(
+      (sum, record) => sum + (record.lessonDelta < 0 ? -record.lessonDelta : 0),
+      0,
+    );
     return { total, signed, statuses, lessonDeducted };
   }, [roster, records]);
 
@@ -113,7 +117,11 @@ export function AttendancePage() {
             (record) => record.studentId === entry.studentId,
           );
           nextDrafts[entry.studentId] = existing
-            ? { status: existing.status, note: existing.note ?? '' }
+            ? {
+                status: existing.status,
+                note: existing.note ?? '',
+                deductLesson: existing.lessonDelta < 0,
+              }
             : defaultDraft();
         });
         setDrafts(nextDrafts);
@@ -146,6 +154,7 @@ export function AttendancePage() {
         }>(`/v1/class-sessions/${selectedSession.id}/attendance/${entry.studentId}`, {
           status: draft.status,
           note: draft.note.trim() || undefined,
+          deductLesson: draft.status === 'absent' ? draft.deductLesson : undefined,
         });
         setRecords((current) =>
           current.map((record) => (record.id === attendanceRecord.id ? attendanceRecord : record)),
@@ -162,6 +171,7 @@ export function AttendancePage() {
               studentId: entry.studentId,
               status: draft.status,
               note: draft.note.trim() || undefined,
+              deductLesson: draft.status === 'absent' ? draft.deductLesson : undefined,
             },
           ],
         },
@@ -257,8 +267,8 @@ export function AttendancePage() {
         <div className="border-b px-4 py-3">
           <div className="text-sm font-semibold">后台补签与核销</div>
           <div className="text-muted-foreground mt-1 text-xs">
-            老师端用于老师到岗打卡，家长端用于学员到课确认；后台用于总览、补签和异常核销。到课、迟到、缺勤、补课会扣
-            1 课时；请假和试听不扣课时。
+            老师端用于老师到岗打卡，家长端用于学员到课确认；后台用于总览、补签和异常核销。到课、迟到、补课固定扣
+            1 课时；缺勤可单独选择是否扣课；请假和试听不扣课时。
           </div>
         </div>
         {loading ? (
@@ -312,16 +322,36 @@ export function AttendancePage() {
                       </option>
                     ))}
                   </select>
-                  <input
-                    className="form-input"
-                    placeholder="备注"
-                    value={draft.note}
-                    onChange={(event) => updateDraft(entry.studentId, { note: event.target.value })}
-                  />
+                  <div className="space-y-2">
+                    <input
+                      className="form-input"
+                      placeholder="备注"
+                      value={draft.note}
+                      onChange={(event) =>
+                        updateDraft(entry.studentId, { note: event.target.value })
+                      }
+                    />
+                    {draft.status === 'absent' ? (
+                      <label className="flex items-center gap-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300"
+                          checked={draft.deductLesson}
+                          onChange={(event) =>
+                            updateDraft(entry.studentId, {
+                              deductLesson: event.target.checked,
+                            })
+                          }
+                        />
+                        缺勤扣 1 课时
+                      </label>
+                    ) : null}
+                  </div>
                   <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
                     {record ? (
                       <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
                         已签到 · {STATUS_LABEL[record.status]}
+                        {record.status === 'absent' && record.lessonDelta === 0 ? ' · 未扣课' : ''}
                       </span>
                     ) : null}
                     <button

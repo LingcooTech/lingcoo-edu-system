@@ -341,7 +341,13 @@ export interface Student {
   school?: string | null;
   status: string;
   guardian?: { name: string; phone: string };
-  lessonAccounts?: Array<{ id?: string; balance: number; courseId: string; studentId?: string }>;
+  lessonAccounts?: Array<{
+    id?: string;
+    balance: number;
+    courseId: string;
+    studentId?: string;
+    course?: Course | null;
+  }>;
 }
 
 export interface ClassGroup {

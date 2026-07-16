@@ -224,7 +224,16 @@ async function seedDemo(): Promise<void> {
         .limit(1),
     );
     if (!existing) {
-      await db.insert(schema.classEnrollments).values({ classId, studentId, active: true });
+      const classGroup = await findOne(
+        db.select().from(schema.classes).where(eq(schema.classes.id, classId)).limit(1),
+      );
+      if (!classGroup) return;
+      await db.insert(schema.classEnrollments).values({
+        classId,
+        studentId,
+        billingCourseId: classGroup.courseId,
+        active: true,
+      });
     }
   }
 

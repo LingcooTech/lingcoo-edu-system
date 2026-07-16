@@ -221,7 +221,7 @@ async function findOrCreateStudentFromContact(
 
 async function upsertClassEnrollment(
   tx: Tx,
-  input: { classId: string; studentId: string; capacity: number },
+  input: { classId: string; studentId: string; billingCourseId: string; capacity: number },
 ) {
   const [existing] = await tx
     .select()
@@ -256,7 +256,7 @@ async function upsertClassEnrollment(
   if (existing) {
     const [enrollment] = await tx
       .update(schema.classEnrollments)
-      .set({ active: true })
+      .set({ active: true, billingCourseId: input.billingCourseId })
       .where(eq(schema.classEnrollments.id, existing.id))
       .returning();
     return enrollment;
@@ -267,6 +267,7 @@ async function upsertClassEnrollment(
     .values({
       classId: input.classId,
       studentId: input.studentId,
+      billingCourseId: input.billingCourseId,
       active: true,
     })
     .returning();
@@ -312,6 +313,7 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
     enrollment = await upsertClassEnrollment(tx, {
       classId: classGroup.id,
       studentId: input.studentId,
+      billingCourseId: input.courseId,
       capacity: classGroup.capacity,
     });
   }
@@ -442,6 +444,7 @@ async function createCourseContractGiftInTx(
     giftEnrollment = await upsertClassEnrollment(tx, {
       classId: giftClass.id,
       studentId: input.contract.studentId,
+      billingCourseId: input.gift.courseId,
       capacity: giftClass.capacity,
     });
   }

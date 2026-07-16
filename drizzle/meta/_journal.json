@@ -309,6 +309,13 @@
       "when": 1783296000000,
       "tag": "0043_class_session_temporary_students",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1783382400000,
+      "tag": "0044_class_enrollment_billing_course",
+      "breakpoints": true
     }
   ]
 }

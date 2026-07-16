@@ -99,6 +99,7 @@ const teacherAttendanceSchema = z.object({
       studentId: z.string(),
       status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
       note: z.string().optional(),
+      deductLesson: z.boolean().optional(),
     }),
   ),
 });
@@ -434,6 +435,7 @@ export const teachingModule: AppModule = {
         const enrollment = await schedulingRepo.createEnrollment(app.db, {
           classId: classGroup.id,
           studentId,
+          billingCourseId: classGroup.courseId,
           active: true,
         });
 

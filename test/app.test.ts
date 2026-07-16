@@ -161,9 +161,12 @@ async function createLessonNotificationFixture(
       status: 'scheduled',
     })
     .returning();
-  await app.db
-    .insert(schema.classEnrollments)
-    .values({ classId: classGroup.id, studentId: student.id, active: true });
+  await app.db.insert(schema.classEnrollments).values({
+    classId: classGroup.id,
+    studentId: student.id,
+    billingCourseId: course.id,
+    active: true,
+  });
   const [lessonAccount] = await app.db
     .insert(schema.lessonAccounts)
     .values({ studentId: student.id, courseId: course.id, balance: input.balance ?? 6 })

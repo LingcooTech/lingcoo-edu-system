@@ -27,7 +27,10 @@ interface ClassForm {
 interface Enrollment {
   id: string;
   studentId: string;
+  billingCourseId: string;
   student?: Student;
+  billingCourse?: Course | null;
+  lessonAccount?: { balance: number; courseId: string; course?: Course | null } | null;
 }
 
 const emptyClassForm: ClassForm = {
@@ -58,6 +61,7 @@ export function ClassesPage() {
   const [enrollmentClass, setEnrollmentClass] = useState<ClassGroup | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [studentId, setStudentId] = useState('');
+  const [billingCourseId, setBillingCourseId] = useState('');
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
 
   useEffect(() => {
@@ -68,6 +72,19 @@ export function ClassesPage() {
       .catch(() => setEnrollments([]))
       .finally(() => setLoadingEnrollments(false));
   }, [enrollmentClass]);
+
+  useEffect(() => {
+    if (!studentId || !enrollmentClass) {
+      setBillingCourseId('');
+      return;
+    }
+    const options = billingAccountOptions(studentId);
+    const defaultCourseId =
+      options.find((account) => account.courseId === enrollmentClass.courseId)?.courseId ??
+      options[0]?.courseId ??
+      '';
+    setBillingCourseId(defaultCourseId);
+  }, [studentId, enrollmentClass]);
 
   function defaults(): ClassForm {
     return {
@@ -88,6 +105,35 @@ export function ClassesPage() {
       teacher: teachers.find((item) => item.id === classGroup.teacherId) ?? classGroup.teacher,
       classroom:
         classrooms.find((item) => item.id === classGroup.classroomId) ?? classGroup.classroom,
+    };
+  }
+
+  function billingAccountOptions(targetStudentId: string) {
+    return [...(students.find((student) => student.id === targetStudentId)?.lessonAccounts ?? [])]
+      .filter((account) => account.courseId)
+      .sort(
+        (left, right) =>
+          (left.course?.name ?? left.courseId).localeCompare(
+            right.course?.name ?? right.courseId,
+          ) || right.balance - left.balance,
+      );
+  }
+
+  function hydrateEnrollment(enrollment: Enrollment): Enrollment {
+    const student = students.find((item) => item.id === enrollment.studentId) ?? enrollment.student;
+    const lessonAccount =
+      student?.lessonAccounts?.find((account) => account.courseId === enrollment.billingCourseId) ??
+      enrollment.lessonAccount ??
+      null;
+    return {
+      ...enrollment,
+      student,
+      billingCourse:
+        courses.find((course) => course.id === enrollment.billingCourseId) ??
+        lessonAccount?.course ??
+        enrollment.billingCourse ??
+        null,
+      lessonAccount,
     };
   }
 
@@ -112,7 +158,13 @@ export function ClassesPage() {
   }
 
   async function submit() {
-    if (!form.campusId || !form.courseId || !form.teacherId || !form.classroomId || !form.name.trim()) {
+    if (
+      !form.campusId ||
+      !form.courseId ||
+      !form.teacherId ||
+      !form.classroomId ||
+      !form.name.trim()
+    ) {
       toast.error('请填写班级名称并选择校区、课程、老师和教室');
       return;
     }
@@ -157,14 +209,13 @@ export function ClassesPage() {
   }
 
   async function addEnrollment() {
-    if (!enrollmentClass || !studentId) return;
+    if (!enrollmentClass || !studentId || !billingCourseId) return;
     try {
       const { enrollment } = await apiPost<{ enrollment: Enrollment }>(
         `${CLASSES()}/${enrollmentClass.id}/enrollments`,
-        { studentId },
+        { studentId, billingCourseId },
       );
-      const student = students.find((item) => item.id === enrollment.studentId);
-      setEnrollments([{ ...enrollment, student }, ...enrollments]);
+      setEnrollments([hydrateEnrollment(enrollment), ...enrollments]);
       setData(
         data.map((item) =>
           item.id === enrollmentClass.id
@@ -173,9 +224,35 @@ export function ClassesPage() {
         ),
       );
       setStudentId('');
+      setBillingCourseId('');
       toast.success('已加入班级');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '入班失败');
+    }
+  }
+
+  async function updateEnrollmentBillingCourse(
+    enrollment: Enrollment,
+    nextBillingCourseId: string,
+  ) {
+    if (
+      !enrollmentClass ||
+      !nextBillingCourseId ||
+      nextBillingCourseId === enrollment.billingCourseId
+    ) {
+      return;
+    }
+    try {
+      const { enrollment: updated } = await apiPatch<{ enrollment: Enrollment }>(
+        `${CLASSES()}/${enrollmentClass.id}/enrollments/${enrollment.id}`,
+        { billingCourseId: nextBillingCourseId },
+      );
+      setEnrollments((current) =>
+        current.map((item) => (item.id === updated.id ? hydrateEnrollment(updated) : item)),
+      );
+      toast.success('扣课账户已更新');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '更新扣课账户失败');
     }
   }
 
@@ -383,7 +460,7 @@ export function ClassesPage() {
         onClose={() => setEnrollmentClass(null)}
         title={enrollmentClass ? `管理入班 - ${enrollmentClass.name}` : '管理入班'}
       >
-        <div className="mb-4 flex items-end gap-2">
+        <div className="mb-4 grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <Field label="选择学员">
             <select
               className="form-input"
@@ -394,6 +471,21 @@ export function ClassesPage() {
               {students.map((student) => (
                 <option key={student.id} value={student.id}>
                   {student.name} · {student.grade}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="扣课账户">
+            <select
+              className="form-input"
+              value={billingCourseId}
+              disabled={!studentId}
+              onChange={(event) => setBillingCourseId(event.target.value)}
+            >
+              <option value="">选择扣课账户</option>
+              {billingAccountOptions(studentId).map((account) => (
+                <option key={account.courseId} value={account.courseId}>
+                  {account.course?.name ?? account.courseId} · 剩余 {account.balance} 课时
                 </option>
               ))}
             </select>
@@ -412,9 +504,24 @@ export function ClassesPage() {
                 className="resource-card flex items-center justify-between gap-3 p-3"
               >
                 <div className="cell-stack">
-                  <span className="cell-title">{enrollment.student?.name ?? enrollment.studentId}</span>
+                  <span className="cell-title">
+                    {enrollment.student?.name ?? enrollment.studentId}
+                  </span>
                   <span className="cell-subtitle">{enrollment.student?.grade ?? ''}</span>
                 </div>
+                <select
+                  className="form-input max-w-xs"
+                  value={enrollment.billingCourseId}
+                  onChange={(event) =>
+                    updateEnrollmentBillingCourse(enrollment, event.target.value)
+                  }
+                >
+                  {billingAccountOptions(enrollment.studentId).map((account) => (
+                    <option key={account.courseId} value={account.courseId}>
+                      扣 {account.course?.name ?? account.courseId} · 剩余 {account.balance} 课时
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   className="btn btn-ghost px-2 py-1 text-red-600"

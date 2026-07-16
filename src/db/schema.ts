@@ -609,6 +609,9 @@ export const classEnrollments = pgTable(
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'cascade' }),
+    billingCourseId: uuid('billing_course_id')
+      .notNull()
+      .references(() => courses.id, { onDelete: 'restrict' }),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -617,6 +620,7 @@ export const classEnrollments = pgTable(
       table.classId,
       table.studentId,
     ),
+    billingCourseIdx: index('class_enrollments_billing_course_idx').on(table.billingCourseId),
   }),
 );
 

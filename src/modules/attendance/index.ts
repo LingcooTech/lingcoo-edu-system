@@ -17,6 +17,7 @@ const attendanceSchema = z.object({
       studentId: z.string(),
       status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
       note: z.string().optional(),
+      deductLesson: z.boolean().optional(),
     }),
   ),
 });
@@ -24,6 +25,7 @@ const attendanceSchema = z.object({
 const attendanceCorrectionSchema = z.object({
   status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
   note: z.string().optional(),
+  deductLesson: z.boolean().optional(),
 });
 
 const publicCheckInSchema = z.object({
@@ -452,6 +454,7 @@ export const attendanceModule: AppModule = {
           studentId,
           status: body.status,
           note: body.note?.trim() || null,
+          deductLesson: body.deductLesson,
           courseId: billingCourseId,
         });
         if (!result) {

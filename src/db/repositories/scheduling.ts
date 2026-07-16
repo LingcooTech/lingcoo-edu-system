@@ -330,7 +330,7 @@ export async function listSessionRoster(db: Database, sessionId: string) {
       id: enrollment.id,
       source: 'enrollment',
       studentId: enrollment.studentId,
-      billingCourseId: classGroup.courseId,
+      billingCourseId: enrollment.billingCourseId,
       classEnrollmentId: enrollment.id,
     });
   }
@@ -370,7 +370,7 @@ export async function createEnrollment(
   if (existing) {
     const [enrollment] = await db
       .update(schema.classEnrollments)
-      .set({ active: true })
+      .set({ active: true, billingCourseId: values.billingCourseId })
       .where(eq(schema.classEnrollments.id, existing.id))
       .returning();
     return enrollment;
@@ -378,6 +378,23 @@ export async function createEnrollment(
 
   const [enrollment] = await db.insert(schema.classEnrollments).values(values).returning();
   return enrollment;
+}
+
+export async function updateEnrollmentBillingCourse(
+  db: Database,
+  input: { classId: string; enrollmentId: string; billingCourseId: string },
+) {
+  const [enrollment] = await db
+    .update(schema.classEnrollments)
+    .set({ billingCourseId: input.billingCourseId })
+    .where(
+      and(
+        eq(schema.classEnrollments.classId, input.classId),
+        eq(schema.classEnrollments.id, input.enrollmentId),
+      ),
+    )
+    .returning();
+  return enrollment ?? null;
 }
 
 export async function removeEnrollment(db: Database, classId: string, enrollmentId: string) {

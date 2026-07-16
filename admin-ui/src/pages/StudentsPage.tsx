@@ -502,8 +502,10 @@ export function StudentsPage() {
                       key={account.courseId}
                       className="flex justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
                     >
-                      <span>{account.courseId}</span>
-                      <span>{account.balance} 节</span>
+                      <span>{account.course?.name ?? account.courseId}</span>
+                      <span className={account.balance < 0 ? 'font-medium text-red-600' : ''}>
+                        {account.balance} 节{account.balance < 0 ? ' · 待校正' : ''}
+                      </span>
                     </div>
                   ))}
                 </div>

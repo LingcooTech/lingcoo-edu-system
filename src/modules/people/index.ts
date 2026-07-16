@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
+import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as schema from '../../db/schema.js';
@@ -40,14 +41,21 @@ export const peopleModule: AppModule = {
   name: 'people',
   async register(app) {
     async function enrichStudent(student: typeof schema.students.$inferSelect) {
-      const [guardian, accounts] = await Promise.all([
+      const [guardian, accounts, courses] = await Promise.all([
         student.guardianId ? peopleRepo.findGuardian(app.db, student.guardianId) : null,
         lessonRepo.listLessonAccounts(app.db),
+        catalogRepo.listCourses(app.db),
       ]);
+      const courseById = new Map(courses.map((course) => [course.id, course]));
       return {
         ...student,
         guardian: guardian ?? undefined,
-        lessonAccounts: accounts.filter((account) => account.studentId === student.id),
+        lessonAccounts: accounts
+          .filter((account) => account.studentId === student.id)
+          .map((account) => ({
+            ...account,
+            course: courseById.get(account.courseId) ?? null,
+          })),
       };
     }
 
@@ -174,18 +182,25 @@ export const peopleModule: AppModule = {
 
     app.get('/v1/students', { preHandler: app.requireAdmin }, async (request) => {
       const query = studentListQuerySchema.parse(request.query);
-      const [students, guardians, accounts] = await Promise.all([
+      const [students, guardians, accounts, courses] = await Promise.all([
         peopleRepo.listStudents(app.db, { scope: query.scope }),
         peopleRepo.listGuardians(app.db),
         lessonRepo.listLessonAccounts(app.db),
+        catalogRepo.listCourses(app.db),
       ]);
       const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
+      const courseById = new Map(courses.map((course) => [course.id, course]));
 
       return {
         students: students.map((student) => ({
           ...student,
           guardian: student.guardianId ? guardianById.get(student.guardianId) : undefined,
-          lessonAccounts: accounts.filter((account) => account.studentId === student.id),
+          lessonAccounts: accounts
+            .filter((account) => account.studentId === student.id)
+            .map((account) => ({
+              ...account,
+              course: courseById.get(account.courseId) ?? null,
+            })),
         })),
       };
     });

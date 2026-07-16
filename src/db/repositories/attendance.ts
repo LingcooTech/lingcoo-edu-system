@@ -6,7 +6,13 @@ import { applyLessonDelta } from './lesson.js';
 
 type AttendanceStatus = (typeof schema.attendanceStatusEnum.enumValues)[number];
 
-function lessonDeltaForStatus(status: AttendanceStatus): number {
+function lessonDeltaForStatus(
+  status: AttendanceStatus,
+  options: { deductLesson?: boolean } = {},
+): number {
+  if (status === 'absent' && options.deductLesson === false) {
+    return 0;
+  }
   if (status === 'present' || status === 'late' || status === 'absent' || status === 'makeup') {
     return -1;
   }
@@ -73,6 +79,7 @@ export async function recordAttendance(
       status: AttendanceStatus;
       note?: string;
       courseId?: string;
+      deductLesson?: boolean;
     }>;
     completeSession?: boolean;
   },
@@ -96,7 +103,9 @@ export async function recordAttendance(
         continue;
       }
 
-      const lessonDelta = lessonDeltaForStatus(record.status);
+      const lessonDelta = lessonDeltaForStatus(record.status, {
+        deductLesson: record.deductLesson,
+      });
       const [attendanceRecord] = await tx
         .insert(schema.attendanceRecords)
         .values({
@@ -140,6 +149,7 @@ export async function updateAttendanceRecord(
     status: AttendanceStatus;
     note?: string | null;
     courseId: string;
+    deductLesson?: boolean;
   },
 ) {
   return db.transaction(async (tx) => {
@@ -158,7 +168,9 @@ export async function updateAttendanceRecord(
       return null;
     }
 
-    const nextLessonDelta = lessonDeltaForStatus(input.status);
+    const nextLessonDelta = lessonDeltaForStatus(input.status, {
+      deductLesson: input.deductLesson,
+    });
     const lessonDeltaAdjustment = nextLessonDelta - existing.lessonDelta;
     const [updated] = await tx
       .update(schema.attendanceRecords)
