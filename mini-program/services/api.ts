@@ -873,6 +873,7 @@ export interface TeacherDashboardStudent {
     courseId: string;
     courseName: string;
     balance: number;
+    totalLessons: number;
   }>;
 }
 
@@ -987,6 +988,7 @@ export interface TeacherStudentSearchItem {
     id: string;
     courseId: string;
     balance: number;
+    totalLessons?: number;
     courseName: string;
   }>;
 }

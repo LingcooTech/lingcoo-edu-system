@@ -40,10 +40,13 @@ type MiniInputEvent = {
   currentTarget: { dataset: Record<string, string | undefined> };
   detail: { value: string };
 };
+type MiniPickerEvent = { detail: { value: string | number } };
+type MiniSliderEvent = { detail: { value: number } };
 
 interface StudentRow {
   id: string;
   name: string;
+  avatarText: string;
   grade: string;
   school: string;
   institutionName: string;
@@ -54,7 +57,19 @@ interface StudentRow {
     isMine: boolean;
     teacherName: string;
   }>;
-  balances: Array<{ courseName: string; balance: string }>;
+  balances: Array<{
+    courseId: string;
+    courseName: string;
+    balance: number | null;
+    totalLessons: number | null;
+    lessonCountLabel: string;
+  }>;
+  totalRemaining: number;
+}
+
+interface StudentFilterOption {
+  id: string;
+  label: string;
 }
 
 interface DateStripRow {
@@ -446,7 +461,20 @@ Component({
     }>,
     selectedDateKey: dateKey(startOfDay(new Date())),
     classes: [] as Array<ReturnType<typeof normalizeClass>>,
+    allStudents: [] as StudentRow[],
     students: [] as StudentRow[],
+    studentSearchKeyword: '',
+    studentClassFilterIndex: 0,
+    studentCourseFilterIndex: 0,
+    studentClassFilterOptions: [{ id: '', label: '全部班级' }] as StudentFilterOption[],
+    studentCourseFilterOptions: [{ id: '', label: '全部课程' }] as StudentFilterOption[],
+    studentBalanceFilterMax: 20,
+    studentBalanceFilterValue: 20,
+    studentBalanceFilterLabel: '不限',
+    studentFilteredCount: 0,
+    studentPage: 1,
+    studentPageSize: 15,
+    studentTotalPages: 1,
     feedbackEvents: [] as Array<
       ReturnType<typeof normalizeEvent> & {
         feedbackCount: number;
@@ -545,11 +573,46 @@ Component({
         const feedbackItems = Array.isArray(lessonFeedbacks) ? lessonFeedbacks : [];
         const assignmentItems = Array.isArray(homeworkAssignments) ? homeworkAssignments : [];
         const notificationItems = Array.isArray(teacherNotifications) ? teacherNotifications : [];
+        const normalizedClasses = dashboardClasses.map(normalizeClass);
+        const studentRows = this.buildStudentRows(
+          dashboard.students,
+          dashboardClasses,
+        ) as StudentRow[];
+        const classFilterOptions: StudentFilterOption[] = [
+          { id: '', label: '全部班级' },
+          ...normalizedClasses.map((classGroup) => ({
+            id: classGroup.id,
+            label: classGroup.name,
+          })),
+        ];
+        const courseOptionMap = new Map<string, string>();
+        for (const student of studentRows) {
+          for (const balance of student.balances) {
+            if (balance.courseId) courseOptionMap.set(balance.courseId, balance.courseName);
+          }
+        }
+        const courseFilterOptions: StudentFilterOption[] = [
+          { id: '', label: '全部课程' },
+          ...Array.from(courseOptionMap, ([id, label]) => ({ id, label })),
+        ];
+        const rawBalanceMax = Math.max(20, ...studentRows.map((student) => student.totalRemaining));
+        const balanceFilterMax = Math.ceil(rawBalanceMax / 5) * 5;
         this.setData({
           loading: false,
           calendarEvents: calendarItems,
-          classes: dashboardClasses.map(normalizeClass),
-          students: this.buildStudentRows(dashboard.students, dashboardClasses),
+          classes: normalizedClasses,
+          allStudents: studentRows,
+          students: studentRows.slice(0, this.data.studentPageSize),
+          studentClassFilterOptions: classFilterOptions,
+          studentCourseFilterOptions: courseFilterOptions,
+          studentClassFilterIndex: 0,
+          studentCourseFilterIndex: 0,
+          studentBalanceFilterMax: balanceFilterMax,
+          studentBalanceFilterValue: balanceFilterMax,
+          studentBalanceFilterLabel: '不限',
+          studentFilteredCount: studentRows.length,
+          studentPage: 1,
+          studentTotalPages: Math.max(1, Math.ceil(studentRows.length / this.data.studentPageSize)),
           lessonFeedbacks: feedbackItems,
           homeworkAssignments: assignmentItems,
           teacherNotifications: notificationItems.map(normalizeTeacherNotification),
@@ -570,6 +633,7 @@ Component({
           })),
           selectedDateKey,
         });
+        this.applyStudentFilters();
         this.recompute();
       } catch (error) {
         this.setData({ loading: false });
@@ -582,24 +646,37 @@ Component({
       legacyClasses: TeacherClass[] = [],
     ): StudentRow[] {
       if (Array.isArray(students)) {
-        return students.map((student) => ({
-          id: student.id,
-          name: student.name,
-          grade: student.grade,
-          school: student.school || '',
-          institutionName: student.institution?.name || '机构学员',
-          isMyStudent: student.isMyStudent,
-          classes: (student.classes ?? []).map((classGroup) => ({
-            id: classGroup.id,
-            name: classGroup.name,
-            isMine: classGroup.isMine,
-            teacherName: classGroup.teacher?.name || '',
-          })),
-          balances: (student.lessonAccounts ?? []).map((lessonAccount) => ({
-            courseName: lessonAccount.courseName,
-            balance: String(lessonAccount.balance),
-          })),
-        }));
+        return students.map((student) => {
+          const balances = (student.lessonAccounts ?? []).map((lessonAccount) => {
+            const totalLessons = Number.isFinite(lessonAccount.totalLessons)
+              ? lessonAccount.totalLessons
+              : null;
+            return {
+              courseId: lessonAccount.courseId,
+              courseName: lessonAccount.courseName,
+              balance: lessonAccount.balance,
+              totalLessons,
+              lessonCountLabel: `${lessonAccount.balance}/${totalLessons ?? '-'}`,
+            };
+          });
+          return {
+            id: student.id,
+            name: student.name,
+            avatarText: student.name.slice(0, 1),
+            grade: student.grade,
+            school: student.school || '',
+            institutionName: student.institution?.name || '机构学员',
+            isMyStudent: student.isMyStudent,
+            classes: (student.classes ?? []).map((classGroup) => ({
+              id: classGroup.id,
+              name: classGroup.name,
+              isMine: classGroup.isMine,
+              teacherName: classGroup.teacher?.name || '',
+            })),
+            balances,
+            totalRemaining: balances.reduce((sum, balance) => sum + (balance.balance ?? 0), 0),
+          };
+        });
       }
 
       const rows = new Map<string, StudentRow>();
@@ -608,12 +685,14 @@ Component({
           const current = rows.get(student.id) ?? {
             id: student.id,
             name: student.name,
+            avatarText: student.name.slice(0, 1),
             grade: student.grade,
             school: student.school || '',
             institutionName: '机构学员',
             isMyStudent: true,
             classes: [],
             balances: [],
+            totalRemaining: 0,
           };
           current.classes.push({
             id: classGroup.id,
@@ -622,18 +701,110 @@ Component({
             teacherName: '',
           });
           if (classGroup.course?.name) {
+            const balance =
+              student.lessonBalance === null || student.lessonBalance === undefined
+                ? null
+                : student.lessonBalance;
             current.balances.push({
+              courseId: classGroup.course.id,
               courseName: classGroup.course.name,
-              balance:
-                student.lessonBalance === null || student.lessonBalance === undefined
-                  ? '-'
-                  : String(student.lessonBalance),
+              balance,
+              totalLessons: null,
+              lessonCountLabel: balance === null ? '-/-' : `${balance}/-`,
             });
+            current.totalRemaining += balance ?? 0;
           }
           rows.set(student.id, current);
         }
       }
       return Array.from(rows.values());
+    },
+
+    applyStudentFilters(resetPage = false) {
+      const keyword = String(this.data.studentSearchKeyword || '')
+        .trim()
+        .toLocaleLowerCase('zh-CN');
+      const classOptions = this.data.studentClassFilterOptions as StudentFilterOption[];
+      const courseOptions = this.data.studentCourseFilterOptions as StudentFilterOption[];
+      const classId = classOptions[this.data.studentClassFilterIndex]?.id || '';
+      const courseId = courseOptions[this.data.studentCourseFilterIndex]?.id || '';
+      const balanceLimit = Number(this.data.studentBalanceFilterValue);
+      const balanceMax = Number(this.data.studentBalanceFilterMax);
+      const balanceLimited = balanceLimit < balanceMax;
+      const filtered = (this.data.allStudents as StudentRow[]).filter((student) => {
+        if (
+          keyword &&
+          ![student.name, student.grade, student.school]
+            .filter(Boolean)
+            .some((value) => value.toLocaleLowerCase('zh-CN').includes(keyword))
+        ) {
+          return false;
+        }
+        if (classId && !student.classes.some((classGroup) => classGroup.id === classId)) {
+          return false;
+        }
+        const targetBalances = courseId
+          ? student.balances.filter((balance) => balance.courseId === courseId)
+          : student.balances;
+        if (courseId && targetBalances.length === 0) {
+          return false;
+        }
+        const remaining = targetBalances.reduce((sum, balance) => sum + (balance.balance ?? 0), 0);
+        return !balanceLimited || remaining <= balanceLimit;
+      });
+      const totalPages = Math.max(1, Math.ceil(filtered.length / this.data.studentPageSize));
+      const requestedPage = resetPage ? 1 : Number(this.data.studentPage);
+      const page = Math.max(1, Math.min(requestedPage, totalPages));
+      const start = (page - 1) * this.data.studentPageSize;
+      this.setData({
+        students: filtered.slice(start, start + this.data.studentPageSize),
+        studentFilteredCount: filtered.length,
+        studentPage: page,
+        studentTotalPages: totalPages,
+        studentBalanceFilterLabel: balanceLimited ? `≤ ${balanceLimit} 课时` : '不限',
+      });
+    },
+
+    onStudentSearchInput(event: MiniInputEvent) {
+      this.setData({ studentSearchKeyword: event.detail.value });
+      this.applyStudentFilters(true);
+    },
+
+    onStudentClassFilterChange(event: MiniPickerEvent) {
+      this.setData({ studentClassFilterIndex: Number(event.detail.value) || 0 });
+      this.applyStudentFilters(true);
+    },
+
+    onStudentCourseFilterChange(event: MiniPickerEvent) {
+      this.setData({ studentCourseFilterIndex: Number(event.detail.value) || 0 });
+      this.applyStudentFilters(true);
+    },
+
+    onStudentBalanceFilterChange(event: MiniSliderEvent) {
+      this.setData({ studentBalanceFilterValue: Number(event.detail.value) });
+      this.applyStudentFilters(true);
+    },
+
+    resetStudentFilters() {
+      this.setData({
+        studentSearchKeyword: '',
+        studentClassFilterIndex: 0,
+        studentCourseFilterIndex: 0,
+        studentBalanceFilterValue: this.data.studentBalanceFilterMax,
+      });
+      this.applyStudentFilters(true);
+    },
+
+    previousStudentPage() {
+      if (this.data.studentPage <= 1) return;
+      this.setData({ studentPage: this.data.studentPage - 1 });
+      this.applyStudentFilters();
+    },
+
+    nextStudentPage() {
+      if (this.data.studentPage >= this.data.studentTotalPages) return;
+      this.setData({ studentPage: this.data.studentPage + 1 });
+      this.applyStudentFilters();
     },
 
     recompute() {

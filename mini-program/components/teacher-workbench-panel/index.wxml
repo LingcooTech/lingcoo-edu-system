@@ -280,35 +280,146 @@
     </block>
 
     <block wx:elif="{{activeView == 'students'}}">
-      <view class="section-title">学员</view>
-      <view wx:if="{{students.length}}" class="list">
-        <view wx:for="{{students}}" wx:key="id" class="card student-card student-link" data-id="{{item.id}}" bindtap="openStudentDetail">
+      <view class="student-list-heading">
+        <view class="section-title">学员</view>
+        <view class="student-result-count">共 {{studentFilteredCount}} 人</view>
+      </view>
+      <view class="card student-filter-card">
+        <view class="student-search">
+          <view class="student-search-icon">⌕</view>
+          <input
+            class="student-search-input"
+            value="{{studentSearchKeyword}}"
+            placeholder="搜索学员姓名、年级或学校"
+            confirm-type="search"
+            bindinput="onStudentSearchInput"
+          />
+        </view>
+        <view class="student-filter-grid">
+          <picker
+            mode="selector"
+            range="{{studentClassFilterOptions}}"
+            range-key="label"
+            value="{{studentClassFilterIndex}}"
+            bindchange="onStudentClassFilterChange"
+          >
+            <view class="student-filter-picker">
+              <view class="student-filter-label">班级</view>
+              <view class="student-filter-value">
+                {{studentClassFilterOptions[studentClassFilterIndex].label}}⌄
+              </view>
+            </view>
+          </picker>
+          <picker
+            mode="selector"
+            range="{{studentCourseFilterOptions}}"
+            range-key="label"
+            value="{{studentCourseFilterIndex}}"
+            bindchange="onStudentCourseFilterChange"
+          >
+            <view class="student-filter-picker">
+              <view class="student-filter-label">课程</view>
+              <view class="student-filter-value">
+                {{studentCourseFilterOptions[studentCourseFilterIndex].label}}⌄
+              </view>
+            </view>
+          </picker>
+        </view>
+        <view class="student-balance-filter">
           <view class="row-between">
             <view>
-              <view class="card-title">{{item.name}}</view>
-              <view class="card-meta">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
+              <view class="student-filter-label">总剩余课时上限</view>
+              <view class="student-filter-hint">按当前课程筛选，未选课程时按全部课程合计</view>
             </view>
-            <view class="pill">{{item.isMyStudent ? '我的学员' : item.institutionName}}</view>
+            <view class="student-balance-value">{{studentBalanceFilterLabel}}</view>
           </view>
-          <view class="chip-row">
+          <slider
+            min="0"
+            max="{{studentBalanceFilterMax}}"
+            step="1"
+            value="{{studentBalanceFilterValue}}"
+            activeColor="#9a6a4b"
+            backgroundColor="#ebe6df"
+            block-color="#9a6a4b"
+            block-size="18"
+            bindchange="onStudentBalanceFilterChange"
+          />
+        </view>
+        <view class="student-filter-footer">
+          <view>显示 {{studentFilteredCount}} 名机构学员</view>
+          <view class="student-filter-reset" bindtap="resetStudentFilters">重置筛选</view>
+        </view>
+      </view>
+
+      <view wx:if="{{students.length}}" class="student-compact-list">
+        <view
+          wx:for="{{students}}"
+          wx:key="id"
+          class="card student-card student-card-compact student-link"
+          data-id="{{item.id}}"
+          bindtap="openStudentDetail"
+        >
+          <view class="student-compact-head">
+            <view class="student-identity">
+              <view class="student-avatar">{{item.avatarText}}</view>
+              <view>
+                <view class="student-compact-name">{{item.name}}</view>
+                <view class="card-meta">
+                  {{item.grade}}{{item.school ? ' · ' + item.school : ''}}
+                </view>
+              </view>
+            </view>
+            <view class="{{item.isMyStudent ? 'student-owner-tag student-owner-tag-mine' : 'student-owner-tag'}}">
+              {{item.isMyStudent ? '我的学员' : item.institutionName}}
+            </view>
+          </view>
+          <view class="student-compact-classes">
             <view
               wx:for="{{item.classes}}"
+              wx:for-item="classItem"
               wx:key="id"
-              class="{{item.isMine ? 'chip chip-mine' : 'chip'}}"
+              class="{{classItem.isMine ? 'student-class-tag student-class-tag-mine' : 'student-class-tag'}}"
             >
-              {{item.name}}{{item.isMine ? ' · 我的班级' : (item.teacherName ? ' · ' + item.teacherName : '')}}
+              {{classItem.name}}{{classItem.isMine ? ' · 我的' : (classItem.teacherName ? ' · ' + classItem.teacherName : '')}}
             </view>
+            <view wx:if="{{!item.classes.length}}" class="card-meta">暂未加入班级</view>
           </view>
-          <view wx:if="{{!item.classes.length}}" class="card-meta">暂未加入班级</view>
-          <view class="balance-list">
-            <view wx:for="{{item.balances}}" wx:key="courseName" class="balance-row">
-              <view>{{item.courseName}}</view>
-              <view class="balance">{{item.balance}} 课时</view>
+          <view class="student-lesson-grid">
+            <view
+              wx:for="{{item.balances}}"
+              wx:for-item="balanceItem"
+              wx:key="courseId"
+              class="student-lesson-row"
+            >
+              <view class="student-lesson-course">{{balanceItem.courseName}}</view>
+              <view class="student-lesson-count">
+                <text>{{balanceItem.lessonCountLabel}}</text>
+                <text class="student-lesson-unit"> 剩余/总课时</text>
+              </view>
             </view>
+            <view wx:if="{{!item.balances.length}}" class="card-meta">暂无课时账户</view>
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">暂无成员。</view>
+      <view wx:else class="card empty-card">没有符合当前条件的学员。</view>
+
+      <view wx:if="{{studentTotalPages > 1}}" class="student-pagination">
+        <button
+          class="student-page-button"
+          disabled="{{studentPage <= 1}}"
+          bindtap="previousStudentPage"
+        >
+          上一页
+        </button>
+        <view class="student-page-status">{{studentPage}} / {{studentTotalPages}}</view>
+        <button
+          class="student-page-button"
+          disabled="{{studentPage >= studentTotalPages}}"
+          bindtap="nextStudentPage"
+        >
+          下一页
+        </button>
+      </view>
     </block>
 
     <block wx:elif="{{activeView == 'feedbacks'}}">

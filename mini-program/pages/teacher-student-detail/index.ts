@@ -28,6 +28,7 @@ type StudentProfile = {
   school: string;
   classCount: number;
   totalBalance: number;
+  totalLessons: number;
   totalStars: number;
   institutionName: string;
   isMyStudent: boolean;
@@ -40,6 +41,7 @@ type ClassRow = {
   courseName: string;
   classroomName: string;
   balance: string;
+  lessonCountLabel: string;
   teacherName: string;
   isMine: boolean;
 };
@@ -252,6 +254,9 @@ Page({
           const balance =
             (classGroup.course?.id ? balanceByCourseId.get(classGroup.course.id) : undefined) ??
             classStudent?.lessonBalance;
+          const lessonAccount = classGroup.course?.id
+            ? student?.lessonAccounts.find((item) => item.courseId === classGroup.course?.id)
+            : null;
           return {
             id: classGroup.id,
             courseId: classGroup.course?.id || '',
@@ -259,6 +264,10 @@ Page({
             courseName: classGroup.course?.name || '课程',
             classroomName: classGroup.classroom?.name || '教室待确认',
             balance: balance === null || balance === undefined ? '-' : String(balance),
+            lessonCountLabel:
+              balance === null || balance === undefined
+                ? '-/-'
+                : `${balance}/${lessonAccount?.totalLessons ?? '-'}`,
             teacherName: classGroup.teacher?.name || '',
             isMine: classGroup.isMine !== false,
           };
@@ -370,6 +379,11 @@ Page({
           classCount: classRows.length,
           totalBalance:
             student?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) || optionBalance,
+          totalLessons:
+            student?.lessonAccounts.reduce(
+              (sum, item) => sum + (item.totalLessons ?? item.balance),
+              0,
+            ) || optionBalance,
           totalStars,
           institutionName:
             ('institution' in profileStudent && profileStudent.institution?.name) || '所属机构',

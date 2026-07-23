@@ -733,6 +733,268 @@
   background: #f1e9e1;
 }
 
+.student-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.student-result-count {
+  margin-top: 20rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+  font-weight: 750;
+}
+
+.student-filter-card {
+  margin-bottom: 18rpx;
+  padding: 22rpx;
+}
+
+.student-search {
+  display: flex;
+  min-height: 74rpx;
+  align-items: center;
+  gap: 12rpx;
+  border: 1rpx solid rgba(33, 31, 28, 0.08);
+  border-radius: 20rpx;
+  background: #f7f5f2;
+  padding: 0 20rpx;
+}
+
+.student-search-icon {
+  color: #8b857c;
+  font-size: 32rpx;
+  line-height: 1;
+}
+
+.student-search-input {
+  min-width: 0;
+  height: 74rpx;
+  flex: 1;
+  color: #211f1c;
+  font-size: 25rpx;
+}
+
+.student-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.student-filter-picker {
+  min-width: 0;
+  border-radius: 18rpx;
+  background: #f7f5f2;
+  padding: 16rpx 18rpx;
+}
+
+.student-filter-label {
+  color: #8b857c;
+  font-size: 20rpx;
+  font-weight: 750;
+}
+
+.student-filter-value {
+  margin-top: 6rpx;
+  overflow: hidden;
+  color: #211f1c;
+  font-size: 24rpx;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-balance-filter {
+  margin-top: 14rpx;
+  border-radius: 18rpx;
+  background: #f7f5f2;
+  padding: 16rpx 18rpx 8rpx;
+}
+
+.student-filter-hint {
+  margin-top: 5rpx;
+  color: #a19a91;
+  font-size: 18rpx;
+}
+
+.student-balance-value {
+  flex-shrink: 0;
+  color: #9a6a4b;
+  font-size: 23rpx;
+  font-weight: 900;
+}
+
+.student-filter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+}
+
+.student-filter-reset {
+  color: #9a6a4b;
+  font-weight: 850;
+}
+
+.student-compact-list {
+  display: grid;
+  gap: 12rpx;
+}
+
+.student-card-compact {
+  padding: 20rpx 22rpx;
+}
+
+.student-compact-head,
+.student-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.student-compact-head {
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.student-identity {
+  gap: 14rpx;
+}
+
+.student-avatar {
+  display: flex;
+  width: 58rpx;
+  height: 58rpx;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18rpx;
+  background: #f2e5d9;
+  color: #9a6a4b;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.student-compact-name {
+  color: #211f1c;
+  font-size: 28rpx;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.student-owner-tag {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #f2f0ed;
+  color: #77716a;
+  font-size: 19rpx;
+  font-weight: 800;
+  padding: 7rpx 12rpx;
+}
+
+.student-owner-tag-mine {
+  background: #fff0e4;
+  color: #bd5b18;
+}
+
+.student-compact-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 14rpx;
+}
+
+.student-class-tag {
+  border-radius: 999rpx;
+  background: #f4f2ef;
+  color: #625d57;
+  font-size: 19rpx;
+  padding: 6rpx 11rpx;
+}
+
+.student-class-tag-mine {
+  background: #fff2e8;
+  color: #bd5b18;
+}
+
+.student-lesson-grid {
+  display: grid;
+  gap: 6rpx;
+  margin-top: 12rpx;
+  border-top: 1rpx solid rgba(33, 31, 28, 0.06);
+  padding-top: 10rpx;
+}
+
+.student-lesson-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  font-size: 22rpx;
+}
+
+.student-lesson-course {
+  min-width: 0;
+  overflow: hidden;
+  color: #625d57;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-lesson-count {
+  flex-shrink: 0;
+  color: #211f1c;
+  font-weight: 900;
+}
+
+.student-lesson-unit {
+  color: #9a948b;
+  font-size: 18rpx;
+  font-weight: 650;
+}
+
+.student-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22rpx;
+  margin-top: 20rpx;
+}
+
+.student-page-button {
+  min-width: 142rpx;
+  min-height: 64rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #211f1c;
+  font-size: 22rpx;
+  font-weight: 850;
+  line-height: 64rpx;
+  margin: 0;
+  padding: 0 22rpx;
+}
+
+.student-page-button::after {
+  border: 0;
+}
+
+.student-page-button[disabled] {
+  background: #f0eeeb;
+  color: #aaa39b;
+}
+
+.student-page-status {
+  color: #625d57;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
 .student-name {
   color: #211f1c;
   font-size: 26rpx;
