@@ -38,6 +38,7 @@ interface SessionForm {
   teacherId: string;
   teacherIds: string[];
   classroomId: string;
+  lessonUnits: number;
   startsAt: string;
   endsAt: string;
   topic: string;
@@ -46,6 +47,7 @@ interface SessionForm {
 
 interface BatchForm {
   classId: string;
+  lessonUnits: number;
   startsOn: string;
   endsOn: string;
   mode: 'daily' | 'weekly';
@@ -115,6 +117,7 @@ function defaultBatchForm(classes: ClassGroup[]): BatchForm {
   const teacherId = firstClass?.teacherId ?? '';
   return {
     classId: firstClass?.id ?? '',
+    lessonUnits: 1,
     startsOn: toDateKey(weekStart),
     endsOn: toDateKey(weekEnd),
     mode: 'weekly',
@@ -143,6 +146,7 @@ function defaultForm(
     teacherId: firstClass?.teacherId ?? teachers[0]?.id ?? '',
     teacherIds: normalizeTeacherIds(firstClass?.teacherId ?? teachers[0]?.id ?? ''),
     classroomId: firstClass?.classroomId ?? classrooms[0]?.id ?? '',
+    lessonUnits: 1,
     startsAt: toDateTimeLocal(now),
     endsAt: toDateTimeLocal(end),
     topic: '',
@@ -369,10 +373,11 @@ export function SchedulePage() {
     const teacherIds = sessionTeacherIds(session);
     setEditing(session);
     setForm({
-      classId: session.classId,
+      classId: session.classId ?? '',
       teacherId: session.teacherId,
       teacherIds,
       classroomId: session.classroomId,
+      lessonUnits: session.lessonUnits ?? 1,
       startsAt: toDateTimeLocal(session.startsAt),
       endsAt: toDateTimeLocal(session.endsAt),
       topic: session.topic,
@@ -400,7 +405,9 @@ export function SchedulePage() {
     return {
       ...session,
       teacherIds,
-      class: classes.find((item) => item.id === session.classId) ?? session.class,
+      class:
+        (session.classId ? classes.find((item) => item.id === session.classId) : undefined) ??
+        session.class,
       teacher: teachers.find((item) => item.id === session.teacherId) ?? session.teacher,
       teachers:
         session.teachers ??
@@ -745,8 +752,10 @@ export function SchedulePage() {
                         </div>
                         <div className="mt-1 line-clamp-2 text-sm font-medium">{session.topic}</div>
                         <div className="text-muted-foreground mt-1 text-xs">
-                          {classNameById.get(session.classId) ?? session.class?.name ?? '班级'} ·{' '}
-                          {teacherNamesForSession(session)}
+                          {(session.classId ? classNameById.get(session.classId) : null) ??
+                            session.class?.name ??
+                            '临时课次'}{' '}
+                          · {teacherNamesForSession(session)}
                         </div>
                         <div className="text-muted-foreground mt-1 text-xs">
                           {classroomNameById.get(session.classroomId) ??
@@ -871,6 +880,20 @@ export function SchedulePage() {
             value={form.topic}
             onChange={(event) => setForm({ ...form, topic: event.target.value })}
           />
+        </Field>
+        <Field label="每位学员扣课数量" required>
+          <input
+            className="form-input"
+            type="number"
+            min={0}
+            max={10}
+            step={1}
+            value={form.lessonUnits}
+            onChange={(event) => setForm({ ...form, lessonUnits: Number(event.target.value) })}
+          />
+          <div className="text-muted-foreground mt-1 text-xs">
+            点名时按该数量扣减课程余额；填 0 表示本课次不扣课。
+          </div>
         </Field>
         <FieldRow>
           <Field label="开始时间" required>
@@ -1124,6 +1147,22 @@ export function SchedulePage() {
               onChange={(event) => setBatchForm({ ...batchForm, topic: event.target.value })}
               placeholder="例如：常规课 / 第一阶段训练"
             />
+          </Field>
+          <Field label="每位学员扣课数量" required>
+            <input
+              className="form-input"
+              type="number"
+              min={0}
+              max={10}
+              step={1}
+              value={batchForm.lessonUnits}
+              onChange={(event) =>
+                setBatchForm({ ...batchForm, lessonUnits: Number(event.target.value) })
+              }
+            />
+            <div className="text-muted-foreground mt-1 text-xs">
+              本批生成的所有课次统一使用该扣课数量。
+            </div>
           </Field>
           <Field label="主授课老师">
             <select

@@ -87,7 +87,7 @@ export class LearningNotificationService {
         title: input.title,
         body: input.body,
         ctaLabel: '查看成长中心',
-        ctaUrl: '/account',
+        ctaUrl: '/pages/account/index',
         sourceEventName: input.sourceEventName,
         dedupeKey: `${input.dedupeKey}:${account.id}`.slice(0, 200),
         meta: input.meta ?? {},

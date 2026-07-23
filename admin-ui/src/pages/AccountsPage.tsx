@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { KeyRound, Pencil, Plus, Trash2, Unlink } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Account, AccountRole, Guardian, Teacher } from '@/api/types';
+import type { Account, AccountRole, Guardian, Teacher, TeacherPermissions } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AdminTabs, type AdminTabItem } from '@/components/shared/AdminTabs';
@@ -33,7 +33,32 @@ interface AccountForm {
   teacherId: string;
   guardianId: string;
   password: string;
+  teacherPermissions: TeacherPermissions;
 }
+
+const emptyTeacherPermissions: TeacherPermissions = {
+  createClassSession: false,
+  createAdHocSession: false,
+  manageSessionRoster: false,
+  enrollStudents: false,
+  viewAllStudents: false,
+  setLessonUnits: false,
+  manageClasses: false,
+};
+
+const teacherPermissionOptions: Array<{
+  key: keyof TeacherPermissions;
+  label: string;
+  hint: string;
+}> = [
+  { key: 'createClassSession', label: '给已有班级排课', hint: '为自己负责的班级添加课次' },
+  { key: 'createAdHocSession', label: '新建临时课次', hint: '不绑定正式班级的单次课程' },
+  { key: 'viewAllStudents', label: '查看全部学员', hint: '排课时可搜索全部在读学员' },
+  { key: 'manageSessionRoster', label: '调整课次学员', hint: '临时加入或移出本课次' },
+  { key: 'enrollStudents', label: '正式拉学员入班', hint: '将学员加入自己负责的班级' },
+  { key: 'setLessonUnits', label: '设置扣课数量', hint: '允许单次扣 0–10 课时' },
+  { key: 'manageClasses', label: '管理正式班级', hint: '预留给后续老师新建班级功能' },
+];
 
 const emptyForm: AccountForm = {
   role: 'parent',
@@ -45,6 +70,7 @@ const emptyForm: AccountForm = {
   teacherId: '',
   guardianId: '',
   password: '',
+  teacherPermissions: emptyTeacherPermissions,
 };
 
 function accountRoles(account: Account): AccountRole[] {
@@ -58,10 +84,15 @@ function accountHasRole(account: Account, role: AccountRole) {
 }
 
 function roleListLabel(account: Account) {
-  return accountRoles(account).map((role) => ROLE_LABEL[role]).join(' / ');
+  return accountRoles(account)
+    .map((role) => ROLE_LABEL[role])
+    .join(' / ');
 }
 
 function accountToForm(account: Account): AccountForm {
+  const teacherAssignment = (account.roleAssignments ?? account.roles ?? []).find(
+    (assignment) => assignment.role === 'teacher',
+  );
   return {
     role: account.role,
     roles: accountRoles(account),
@@ -72,6 +103,10 @@ function accountToForm(account: Account): AccountForm {
     teacherId: account.teacherId ?? '',
     guardianId: account.guardianId ?? '',
     password: '',
+    teacherPermissions: {
+      ...emptyTeacherPermissions,
+      ...(teacherAssignment?.teacherPermissions ?? {}),
+    },
   };
 }
 
@@ -86,6 +121,7 @@ function buildPayload(form: AccountForm, includePassword: boolean) {
     status: form.status,
     teacherId: form.roles.includes('teacher') ? form.teacherId || undefined : null,
     guardianId: form.roles.includes('parent') ? form.guardianId || undefined : null,
+    teacherPermissions: form.roles.includes('teacher') ? form.teacherPermissions : undefined,
     ...(includePassword && form.password.trim() ? { password: form.password.trim() } : {}),
   };
 }
@@ -499,20 +535,64 @@ export function AccountsPage() {
           </Field>
         )}
         {form.roles.includes('teacher') && (
-          <Field label="关联老师档案" required>
-            <select
-              className="form-input"
-              value={form.teacherId}
-              onChange={(event) => setForm({ ...form, teacherId: event.target.value })}
+          <>
+            <Field label="关联老师档案" required>
+              <select
+                className="form-input"
+                value={form.teacherId}
+                onChange={(event) => setForm({ ...form, teacherId: event.target.value })}
+              >
+                <option value="">请选择老师档案</option>
+                {teacherOptions.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name} {teacher.phone ? `· ${teacher.phone}` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label="老师工作台权限"
+              hint={
+                form.roles.includes('admin')
+                  ? '管理员 + 老师双重身份默认拥有全部权限'
+                  : '普通授课老师按需开通'
+              }
             >
-              <option value="">请选择老师档案</option>
-              {teacherOptions.map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
-                  {teacher.name} {teacher.phone ? `· ${teacher.phone}` : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {teacherPermissionOptions.map((permission) => {
+                  const adminTeacher = form.roles.includes('admin');
+                  return (
+                    <label
+                      key={permission.key}
+                      className="flex items-start gap-2 rounded-lg border border-stone-200 px-3 py-2"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={adminTeacher || Boolean(form.teacherPermissions[permission.key])}
+                        disabled={adminTeacher}
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            teacherPermissions: {
+                              ...form.teacherPermissions,
+                              [permission.key]: event.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-stone-700">
+                          {permission.label}
+                        </span>
+                        <span className="block text-xs text-stone-500">{permission.hint}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+          </>
         )}
         {form.roles.includes('parent') && (
           <Field label="关联家长档案" hint="免登录成交会自动创建；这里可手动补关联">

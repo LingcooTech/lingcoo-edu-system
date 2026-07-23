@@ -60,10 +60,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     });
   } catch (error) {
     throw new Error(
-      toUserFacingMessage(
-        error instanceof Error ? error.message : '',
-        '网络请求失败，请检查网络',
-      ),
+      toUserFacingMessage(error instanceof Error ? error.message : '', '网络请求失败，请检查网络'),
     );
   }
 
@@ -119,9 +116,22 @@ export interface AuthAccount {
   mustChangePassword: boolean;
 }
 
-// The back office no longer has its own login page — login happens on the
-// public web (the single front door). Here we only read the current account
-// (to gate /admin on role) and clear the shared session on logout.
+export async function adminLogin(identifier: string, password: string) {
+  const payload = await api<{ token: string; account: AuthAccount }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password, role: 'admin' }),
+  });
+  setToken(payload.token);
+  return payload.account;
+}
+
+export async function changeAdminPassword(currentPassword: string, newPassword: string) {
+  return api<{ ok: boolean }>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export async function fetchMe(): Promise<AuthAccount | null> {
   const payload = await api<{ account: AuthAccount | null }>('/auth/me');
   return payload.account;

@@ -154,7 +154,12 @@ export class LessonNotificationService {
       );
       mergeRunResult(
         result,
-        await this.notifyLessonConsumedTarget(target, balance, billingCourseId),
+        await this.notifyLessonConsumedTarget(
+          target,
+          balance,
+          billingCourseId,
+          Math.abs(record.lessonDelta),
+        ),
       );
     }
 
@@ -194,9 +199,13 @@ export class LessonNotificationService {
     target: LessonNotificationTarget,
     balance: number | null,
     billingCourseId?: string,
+    lessonUnits = 1,
   ) {
     const lessonName = `${target.courseName}（${target.className}）`;
-    const balanceText = balance === null ? '已扣减 1 课时' : `扣减 1 课时，剩余 ${balance} 课时`;
+    const balanceText =
+      balance === null
+        ? `已扣减 ${lessonUnits} 课时`
+        : `扣减 ${lessonUnits} 课时，剩余 ${balance} 课时`;
     const remainingCount = Math.max(balance ?? 0, 0);
 
     return this.notifyTargetParents({
@@ -210,7 +219,7 @@ export class LessonNotificationService {
       data: {
         thing16: { value: shortValue(target.studentName, '学员') },
         thing8: { value: shortValue(lessonName, '活动') },
-        number3: { value: '1' },
+        number3: { value: String(lessonUnits) },
         date5: { value: formatMessageTime(target.startsAt) },
         number4: { value: String(remainingCount) },
       },
@@ -251,7 +260,7 @@ export class LessonNotificationService {
         title: input.title,
         body: input.body,
         ctaLabel: '查看家长中心',
-        ctaUrl: '/account',
+        ctaUrl: '/pages/account/index',
         sourceEventName: input.sourceEventName,
         dedupeKey,
         meta: input.meta,

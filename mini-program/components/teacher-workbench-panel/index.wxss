@@ -133,6 +133,45 @@
   background: rgba(154, 106, 75, 0.08);
 }
 
+.calendar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.schedule-add-button {
+  height: 54rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 21rpx;
+  font-weight: 800;
+  line-height: 54rpx;
+  margin: 0;
+  padding: 0 20rpx;
+}
+
+.schedule-add-button::after {
+  border: 0;
+}
+
+.class-manage-button {
+  height: 64rpx;
+  margin: 20rpx 0 0;
+  border: 0;
+  border-radius: 18rpx;
+  background: #f1e8df;
+  color: #714b35;
+  font-size: 23rpx;
+  font-weight: 800;
+  line-height: 64rpx;
+}
+
+.class-manage-button::after {
+  border: 0;
+}
+
 .summary-value {
   color: #211f1c;
   font-size: 44rpx;
@@ -318,8 +357,7 @@
   border: 0;
   border-radius: 28rpx;
   background:
-    radial-gradient(circle at 92% 16%, rgba(255, 224, 143, 0.52), rgba(255, 224, 143, 0) 34%),
-    #fff;
+    radial-gradient(circle at 92% 16%, rgba(255, 224, 143, 0.52), rgba(255, 224, 143, 0) 34%), #fff;
   padding: 28rpx;
   box-shadow: 0 8rpx 24rpx rgba(33, 31, 28, 0.05);
 }

@@ -8,13 +8,13 @@ type AttendanceStatus = (typeof schema.attendanceStatusEnum.enumValues)[number];
 
 function lessonDeltaForStatus(
   status: AttendanceStatus,
-  options: { deductLesson?: boolean } = {},
+  options: { deductLesson?: boolean; lessonUnits?: number } = {},
 ): number {
   if (status === 'absent' && options.deductLesson === false) {
     return 0;
   }
   if (status === 'present' || status === 'late' || status === 'absent' || status === 'makeup') {
-    return -1;
+    return -(options.lessonUnits ?? 1);
   }
   return 0;
 }
@@ -55,8 +55,8 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
       schema.classSessions,
       eq(schema.attendanceRecords.classSessionId, schema.classSessions.id),
     )
-    .innerJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
-    .innerJoin(schema.courses, eq(schema.classes.courseId, schema.courses.id))
+    .leftJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
+    .innerJoin(schema.courses, eq(schema.classSessions.courseId, schema.courses.id))
     .where(inArray(schema.attendanceRecords.studentId, studentIds))
     .orderBy(desc(schema.classSessions.startsAt));
 }
@@ -80,6 +80,7 @@ export async function recordAttendance(
       note?: string;
       courseId?: string;
       deductLesson?: boolean;
+      lessonUnits?: number;
     }>;
     completeSession?: boolean;
   },
@@ -105,6 +106,7 @@ export async function recordAttendance(
 
       const lessonDelta = lessonDeltaForStatus(record.status, {
         deductLesson: record.deductLesson,
+        lessonUnits: record.lessonUnits,
       });
       const [attendanceRecord] = await tx
         .insert(schema.attendanceRecords)
@@ -150,6 +152,7 @@ export async function updateAttendanceRecord(
     note?: string | null;
     courseId: string;
     deductLesson?: boolean;
+    lessonUnits?: number;
   },
 ) {
   return db.transaction(async (tx) => {
@@ -170,6 +173,7 @@ export async function updateAttendanceRecord(
 
     const nextLessonDelta = lessonDeltaForStatus(input.status, {
       deductLesson: input.deductLesson,
+      lessonUnits: input.lessonUnits,
     });
     const lessonDeltaAdjustment = nextLessonDelta - existing.lessonDelta;
     const [updated] = await tx

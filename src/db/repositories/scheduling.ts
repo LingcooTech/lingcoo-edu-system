@@ -97,12 +97,10 @@ export async function replaceClassSessionTeachers(
 
 export async function listSessionsForCourse(db: Database, courseId: string) {
   return db
-    .select({ session: schema.classSessions })
+    .select()
     .from(schema.classSessions)
-    .innerJoin(schema.classes, eq(schema.classes.id, schema.classSessions.classId))
-    .where(eq(schema.classes.courseId, courseId))
-    .orderBy(asc(schema.classSessions.startsAt))
-    .then((rows) => rows.map((row) => row.session));
+    .where(eq(schema.classSessions.courseId, courseId))
+    .orderBy(asc(schema.classSessions.startsAt));
 }
 
 function lessonNotificationTargetSelect() {
@@ -372,7 +370,7 @@ export async function removeTemporaryStudent(
 
 export type SessionRosterEntry = {
   id: string;
-  source: 'enrollment' | 'temporary';
+  source: 'enrollment' | 'session_only' | 'temporary';
   studentId: string;
   billingCourseId: string;
   classEnrollmentId?: string;
@@ -383,6 +381,25 @@ export type SessionRosterEntry = {
 export async function listSessionRoster(db: Database, sessionId: string) {
   const session = await findSession(db, sessionId);
   if (!session) {
+    return [];
+  }
+  const snapshotRows = await db
+    .select()
+    .from(schema.classSessionStudents)
+    .where(eq(schema.classSessionStudents.classSessionId, sessionId))
+    .orderBy(asc(schema.classSessionStudents.createdAt));
+  if (snapshotRows.length > 0) {
+    return snapshotRows
+      .filter((row) => row.active)
+      .map((row) => ({
+        id: row.id,
+        source: row.source === 'enrollment' ? 'enrollment' : 'session_only',
+        studentId: row.studentId,
+        billingCourseId: row.billingCourseId,
+      })) satisfies SessionRosterEntry[];
+  }
+
+  if (!session.classId) {
     return [];
   }
   const [classGroup, enrollments, temporaryStudents] = await Promise.all([
@@ -420,6 +437,72 @@ export async function listSessionRoster(db: Database, sessionId: string) {
   }
 
   return Array.from(roster.values());
+}
+
+export async function listSessionStudentRows(db: Database, sessionId: string) {
+  return db
+    .select()
+    .from(schema.classSessionStudents)
+    .where(eq(schema.classSessionStudents.classSessionId, sessionId))
+    .orderBy(asc(schema.classSessionStudents.createdAt));
+}
+
+export async function replaceSessionRoster(
+  db: Database,
+  sessionId: string,
+  students: Array<{
+    studentId: string;
+    billingCourseId: string;
+    source: 'enrollment' | 'session_only';
+  }>,
+) {
+  await db
+    .delete(schema.classSessionStudents)
+    .where(eq(schema.classSessionStudents.classSessionId, sessionId));
+  if (students.length === 0) {
+    return [];
+  }
+  return db
+    .insert(schema.classSessionStudents)
+    .values(students.map((student) => ({ classSessionId: sessionId, ...student })))
+    .returning();
+}
+
+export async function upsertSessionStudent(
+  db: Database,
+  values: typeof schema.classSessionStudents.$inferInsert,
+) {
+  const [row] = await db
+    .insert(schema.classSessionStudents)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [schema.classSessionStudents.classSessionId, schema.classSessionStudents.studentId],
+      set: {
+        billingCourseId: values.billingCourseId,
+        source: values.source ?? 'session_only',
+        active: true,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function removeSessionStudent(
+  db: Database,
+  input: { sessionId: string; studentId: string },
+) {
+  const [row] = await db
+    .update(schema.classSessionStudents)
+    .set({ active: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.classSessionStudents.classSessionId, input.sessionId),
+        eq(schema.classSessionStudents.studentId, input.studentId),
+      ),
+    )
+    .returning();
+  return row ?? null;
 }
 
 export async function createEnrollment(

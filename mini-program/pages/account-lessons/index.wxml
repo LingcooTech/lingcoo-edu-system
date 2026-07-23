@@ -105,7 +105,7 @@
                 <view class="record-main">
                   <view class="record-time">{{event.startsAtLabel}}</view>
                   <view class="record-topic">{{event.title || '常规课程'}}</view>
-                  <view class="record-meta">{{event.class.name}} · {{event.classroomName}}</view>
+                  <view class="record-meta">{{event.className}} · {{event.classroomName}}</view>
                 </view>
                 <view class="record-status pending">待参与</view>
               </view>

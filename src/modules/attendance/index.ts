@@ -61,13 +61,12 @@ export const attendanceModule: AppModule = {
         throw notFound('Class session not found');
       }
 
-      const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-      if (!classGroup) {
-        throw notFound('Class not found');
-      }
+      const classGroup = session.classId
+        ? await schedulingRepo.findClass(app.db, session.classId)
+        : null;
 
       const [course, classrooms, rosterEntries, students, attendanceRecords] = await Promise.all([
-        catalogRepo.requireCourse(app.db, classGroup.courseId),
+        catalogRepo.requireCourse(app.db, session.courseId),
         teachingRepo.listClassrooms(app.db),
         schedulingRepo.listSessionRoster(app.db, sessionId),
         peopleRepo.listStudents(app.db),
@@ -115,10 +114,12 @@ export const attendanceModule: AppModule = {
 
       return {
         session: context.session,
-        class: {
-          id: context.classGroup.id,
-          name: context.classGroup.name,
-        },
+        class: context.classGroup
+          ? {
+              id: context.classGroup.id,
+              name: context.classGroup.name,
+            }
+          : null,
         course: {
           id: context.course.id,
           name: context.course.name,
@@ -155,13 +156,14 @@ export const attendanceModule: AppModule = {
       );
       const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
         sessionId,
-        courseId: context.classGroup.courseId,
+        courseId: context.session.courseId,
         records: [
           {
             studentId: body.studentId,
             status: 'present',
             note: '家长扫码签到',
             courseId: rosterEntry.billingCourseId,
+            lessonUnits: context.session.lessonUnits,
           },
         ],
         completeSession: false,
@@ -175,7 +177,7 @@ export const attendanceModule: AppModule = {
           .where(
             and(
               eq(schema.courseContracts.studentId, record.studentId),
-              eq(schema.courseContracts.courseId, context.classGroup.courseId),
+              eq(schema.courseContracts.courseId, context.session.courseId),
               eq(schema.courseContracts.status, 'active'),
             ),
           )
@@ -184,7 +186,7 @@ export const attendanceModule: AppModule = {
         if (contract) {
           await lessonRepo.checkAndCompleteCourseContract(app.db, {
             studentId: record.studentId,
-            courseId: context.classGroup.courseId,
+            courseId: context.session.courseId,
             contractId: contract.id,
           });
         }
@@ -346,11 +348,6 @@ export const attendanceModule: AppModule = {
           throw Object.assign(new Error('Class session not found'), { statusCode: 404 });
         }
 
-        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-        if (!classGroup) {
-          throw Object.assign(new Error('Class not found'), { statusCode: 404 });
-        }
-
         const body = attendanceSchema.parse(request.body);
         const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
         const billingCourseMap = billingCourseByStudentId(rosterEntries);
@@ -364,10 +361,11 @@ export const attendanceModule: AppModule = {
         const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
-          courseId: classGroup.courseId,
+          courseId: session.courseId,
           records: body.records.map((record) => ({
             ...record,
             courseId: billingCourseMap.get(record.studentId),
+            lessonUnits: session.lessonUnits,
           })),
           completeSession: false,
         });
@@ -380,7 +378,7 @@ export const attendanceModule: AppModule = {
             .where(
               and(
                 eq(schema.courseContracts.studentId, record.studentId),
-                eq(schema.courseContracts.courseId, classGroup.courseId),
+                eq(schema.courseContracts.courseId, session.courseId),
                 eq(schema.courseContracts.status, 'active'),
               ),
             )
@@ -389,7 +387,7 @@ export const attendanceModule: AppModule = {
           if (contract) {
             await lessonRepo.checkAndCompleteCourseContract(app.db, {
               studentId: record.studentId,
-              courseId: classGroup.courseId,
+              courseId: session.courseId,
               contractId: contract.id,
             });
           }
@@ -436,11 +434,6 @@ export const attendanceModule: AppModule = {
           throw Object.assign(new Error('Class session not found'), { statusCode: 404 });
         }
 
-        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-        if (!classGroup) {
-          throw Object.assign(new Error('Class not found'), { statusCode: 404 });
-        }
-
         const body = attendanceCorrectionSchema.parse(request.body);
         const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
         const billingCourseMap = billingCourseByStudentId(rosterEntries);
@@ -455,6 +448,7 @@ export const attendanceModule: AppModule = {
           status: body.status,
           note: body.note?.trim() || null,
           deductLesson: body.deductLesson,
+          lessonUnits: session.lessonUnits,
           courseId: billingCourseId,
         });
         if (!result) {

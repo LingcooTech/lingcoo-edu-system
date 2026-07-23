@@ -41,6 +41,7 @@ export type CheckInItem = ParentCheckInSession & {
   checkInKey: string;
   startsAtLabel: string;
   courseName: string;
+  className: string;
   classroomName: string;
   attendanceStatusLabel: string;
 };
@@ -48,6 +49,7 @@ export type CheckInItem = ParentCheckInSession & {
 export type CalendarEventItem = ParentCalendarEvent & {
   startsAtLabel: string;
   courseName: string;
+  className: string;
   classroomName: string;
 };
 
@@ -221,6 +223,7 @@ export function toCheckInItem(item: ParentCheckInSession): CheckInItem {
     checkInKey: `${item.sessionId}:${item.student.id}`,
     startsAtLabel: formatDateTime(item.startsAt),
     courseName: item.course?.name || '课程',
+    className: item.class?.name || '临时课次',
     classroomName: item.classroom?.name || '教室待确认',
     attendanceStatusLabel: item.attendanceStatus
       ? attendanceStatusLabel(item.attendanceStatus)
@@ -233,6 +236,7 @@ export function toCalendarEventItem(item: ParentCalendarEvent): CalendarEventIte
     ...item,
     startsAtLabel: formatDateTime(item.startsAt),
     courseName: item.course?.name || '课程',
+    className: item.class?.name || '临时课次',
     classroomName: item.classroom?.name || '教室待确认',
   };
 }

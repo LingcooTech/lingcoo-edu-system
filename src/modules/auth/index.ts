@@ -9,6 +9,10 @@ import { httpError } from '../../lib/http-error.js';
 import { hashPassword, verifyPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import { SmtpSettingsService } from '../../lib/smtp-settings.js';
 import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
+import {
+  ALL_TEACHER_PERMISSIONS,
+  normalizeTeacherPermissions,
+} from '../../lib/teacher-permissions.js';
 import type { AppModule } from '../types.js';
 
 const AUTH_COOKIE = 'fd_edu_token';
@@ -17,6 +21,7 @@ const TOKEN_TTL = '14d';
 const loginSchema = z.object({
   identifier: z.string().min(1),
   password: z.string().min(1),
+  role: z.enum(['admin', 'teacher', 'parent']).optional(),
 });
 
 const registerSchema = z.object({
@@ -56,6 +61,15 @@ const wechatMiniBindPhoneSchema = z
 
 const accountRoleSchema = z.enum(['admin', 'teacher', 'parent']);
 const workRoleSchema = z.enum(['admin', 'teacher']);
+const teacherPermissionsSchema = z.object({
+  createClassSession: z.boolean().optional(),
+  createAdHocSession: z.boolean().optional(),
+  manageSessionRoster: z.boolean().optional(),
+  enrollStudents: z.boolean().optional(),
+  viewAllStudents: z.boolean().optional(),
+  setLessonUnits: z.boolean().optional(),
+  manageClasses: z.boolean().optional(),
+});
 
 const adminAccountCreateSchema = z.object({
   role: accountRoleSchema,
@@ -66,6 +80,7 @@ const adminAccountCreateSchema = z.object({
   status: z.enum(['active', 'suspended']).default('active'),
   guardianId: z.string().uuid().optional().nullable(),
   teacherId: z.string().uuid().optional().nullable(),
+  teacherPermissions: teacherPermissionsSchema.optional(),
   password: z.string().min(6).optional(),
 });
 
@@ -110,6 +125,7 @@ type PublicRoleAssignment = {
   status: accountsRepo.AccountStatus;
   guardianId: string | null;
   teacherId: string | null;
+  teacherPermissions: ReturnType<typeof normalizeTeacherPermissions>;
 };
 
 function legacyRoleAssignment(account: accountsRepo.Account): PublicRoleAssignment {
@@ -119,6 +135,7 @@ function legacyRoleAssignment(account: accountsRepo.Account): PublicRoleAssignme
     status: account.status,
     guardianId: account.role === 'parent' ? (account.guardianId ?? null) : null,
     teacherId: account.role === 'teacher' ? (account.teacherId ?? null) : null,
+    teacherPermissions: normalizeTeacherPermissions(),
   };
 }
 
@@ -133,6 +150,9 @@ function toPublicRoleAssignments(
     status: assignment.status,
     guardianId: assignment.role === 'parent' ? (assignment.guardianId ?? null) : null,
     teacherId: assignment.role === 'teacher' ? (assignment.teacherId ?? null) : null,
+    teacherPermissions: normalizeTeacherPermissions(
+      assignment.role === 'teacher' ? assignment.teacherPermissions : {},
+    ),
   }));
 }
 
@@ -319,7 +339,7 @@ export const authModule: AppModule = {
         return reply.unauthorized('账号或密码不正确');
       }
 
-      return signIn(reply, account);
+      return signIn(reply, account, body.role, Boolean(body.role));
     });
 
     app.post('/auth/wechat-mini/login', async (request, reply) => {
@@ -590,6 +610,12 @@ export const authModule: AppModule = {
           role,
           guardianId,
           teacherId,
+          teacherPermissions:
+            role === 'teacher'
+              ? roles.includes('admin')
+                ? ALL_TEACHER_PERMISSIONS
+                : normalizeTeacherPermissions(body.teacherPermissions)
+              : {},
           status: body.status,
         })),
       );
@@ -629,6 +655,12 @@ export const authModule: AppModule = {
           ? current.teacherId
           : body.teacherId
         : null;
+      const currentTeacherPermissions = currentAssignments.find(
+        (assignment) => assignment.role === 'teacher',
+      )?.teacherPermissions;
+      const teacherPermissions = nextRoles.includes('admin')
+        ? ALL_TEACHER_PERMISSIONS
+        : normalizeTeacherPermissions(body.teacherPermissions ?? currentTeacherPermissions);
 
       await ensureUniqueIdentifiers({ email, phone, ignoreAccountId: accountId });
       await validateProfileLinks({ roles: nextRoles, guardianId, teacherId });
@@ -649,6 +681,7 @@ export const authModule: AppModule = {
           role,
           guardianId,
           teacherId,
+          teacherPermissions: role === 'teacher' ? teacherPermissions : {},
           status: body.status ?? current.status,
         })),
       );

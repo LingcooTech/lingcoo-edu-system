@@ -68,7 +68,7 @@ export function Sidebar({
 
   async function handleLogout() {
     await logout();
-    window.location.href = '/login';
+    window.location.href = '/admin/login';
   }
 
   return (

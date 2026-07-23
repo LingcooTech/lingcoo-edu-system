@@ -100,9 +100,12 @@
       </view>
 
       <view class="card calendar-card">
-        <view class="calendar-toolbar" bindtap="toggleCalendar">
+        <view class="calendar-toolbar">
           <view>{{monthLabel}}</view>
-          <view class="calendar-toggle">{{calendarExpanded ? '收起' : '展开'}}</view>
+          <view class="calendar-actions">
+            <button wx:if="{{canSchedule}}" class="schedule-add-button" catchtap="openScheduleCreate">＋ 添加课次</button>
+            <view class="calendar-toggle" bindtap="toggleCalendar">{{calendarExpanded ? '收起' : '展开'}}</view>
+          </view>
         </view>
         <view wx:if="{{!calendarExpanded}}" class="week-row">
           <view
@@ -156,7 +159,10 @@
     </block>
 
     <block wx:elif="{{activeView == 'classes'}}">
-      <view class="section-title">班级</view>
+      <view class="row-between">
+        <view class="section-title">班级</view>
+        <button wx:if="{{canManageClasses}}" class="schedule-add-button" catchtap="openClassCreate">＋ 新建班级</button>
+      </view>
       <view wx:if="{{classes.length}}" class="list">
         <view wx:for="{{classes}}" wx:key="id" class="card class-card">
           <view class="row-between">
@@ -196,6 +202,12 @@
               <view class="balance">{{student.lessonBalanceLabel}} 课时</view>
             </view>
           </view>
+          <button
+            wx:if="{{canManageClasses}}"
+            class="class-manage-button"
+            data-id="{{item.id}}"
+            catchtap="openClassManage"
+          >管理班级与成员</button>
         </view>
       </view>
       <view wx:else class="card empty-card">暂无班级。</view>
@@ -306,7 +318,7 @@
       <view wx:if="{{rollCallSession}}" class="sheet-session">
         <view class="sheet-time">{{rollCallSession.timeLabel}}</view>
         <view class="sheet-date">{{rollCallSession.dateLabel}}</view>
-        <view class="sheet-desc">{{rollCallSession.title}} · {{rollCallSession.classroomName}}</view>
+        <view class="sheet-desc">{{rollCallSession.title}} · {{rollCallSession.classroomName}} · 本次扣 {{rollCallSession.lessonUnits}} 课时</view>
       </view>
       <view class="roll-summary">
         <view>

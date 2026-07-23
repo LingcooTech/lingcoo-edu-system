@@ -186,7 +186,7 @@ export const parentCenterModule: AppModule = {
 
       return items.map((item) => {
         const session = item.classSessionId ? (sessionById.get(item.classSessionId) ?? null) : null;
-        const classGroup = session ? (classById.get(session.classId) ?? null) : null;
+        const classGroup = session?.classId ? (classById.get(session.classId) ?? null) : null;
         return {
           ...item,
           student:
@@ -236,7 +236,7 @@ export const parentCenterModule: AppModule = {
 
       return items.map((item) => {
         const session = sessionById.get(item.classSessionId) ?? null;
-        const classGroup = session ? (classById.get(session.classId) ?? null) : null;
+        const classGroup = session?.classId ? (classById.get(session.classId) ?? null) : null;
         const teacher = item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null;
         const personalAssignment =
           assignmentByKey.get(`${item.classSessionId}:${item.studentId}`) ?? null;
@@ -287,7 +287,7 @@ export const parentCenterModule: AppModule = {
         const session = item.classSessionId ? (sessionById.get(item.classSessionId) ?? null) : null;
         const classGroup =
           (item.classId ? (classById.get(item.classId) ?? null) : null) ??
-          (session ? (classById.get(session.classId) ?? null) : null);
+          (session?.classId ? (classById.get(session.classId) ?? null) : null);
         const teacher =
           (item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null) ??
           (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);
@@ -618,7 +618,8 @@ export const parentCenterModule: AppModule = {
       const visibleSessions = sessions
         .filter(
           (session) =>
-            (classIdSet.has(session.classId) || temporarySessionIds.has(session.id)) &&
+            (Boolean(session.classId && classIdSet.has(session.classId)) ||
+              temporarySessionIds.has(session.id)) &&
             session.status === 'scheduled' &&
             session.endsAt >= windowStartsAt &&
             session.startsAt <= windowEndsAt,
@@ -629,15 +630,23 @@ export const parentCenterModule: AppModule = {
       }
 
       const sessionIds = visibleSessions.map((session) => session.id);
-      const attendanceRecords = await app.db
-        .select()
-        .from(schema.attendanceRecords)
-        .where(
-          and(
-            inArray(schema.attendanceRecords.classSessionId, sessionIds),
-            inArray(schema.attendanceRecords.studentId, studentIds),
+      const [attendanceRecords, sessionRosters] = await Promise.all([
+        app.db
+          .select()
+          .from(schema.attendanceRecords)
+          .where(
+            and(
+              inArray(schema.attendanceRecords.classSessionId, sessionIds),
+              inArray(schema.attendanceRecords.studentId, studentIds),
+            ),
           ),
-        );
+        Promise.all(
+          sessionIds.map(async (sessionId) => ({
+            sessionId,
+            roster: await schedulingRepo.listSessionRoster(app.db, sessionId),
+          })),
+        ),
+      ]);
 
       const studentById = new Map(students.map((student) => [student.id, student]));
       const classById = new Map(classes.map((classGroup) => [classGroup.id, classGroup]));
@@ -660,22 +669,20 @@ export const parentCenterModule: AppModule = {
       const attendanceBySessionStudent = new Map(
         attendanceRecords.map((record) => [`${record.classSessionId}:${record.studentId}`, record]),
       );
+      const rosterBySessionId = new Map(
+        sessionRosters.map((item) => [item.sessionId, item.roster]),
+      );
 
       return {
         checkInSessions: visibleSessions.flatMap((session) => {
-          const classGroup = classById.get(session.classId);
-          if (!classGroup) {
-            return [];
-          }
-          const course = courseById.get(classGroup.courseId) ?? null;
+          const classGroup = session.classId ? classById.get(session.classId) : null;
+          const course = courseById.get(session.courseId) ?? null;
           const classroom = classroomById.get(session.classroomId) ?? null;
-          const participantIds = new Set<string>();
-          for (const enrollment of enrollmentsByClassId.get(session.classId) ?? []) {
-            participantIds.add(enrollment.studentId);
-          }
-          for (const entry of temporaryEntriesBySessionId.get(session.id) ?? []) {
-            participantIds.add(entry.studentId);
-          }
+          const participantIds = new Set(
+            (rosterBySessionId.get(session.id) ?? [])
+              .map((entry) => entry.studentId)
+              .filter((studentId) => studentById.has(studentId)),
+          );
           return Array.from(participantIds).flatMap((studentId) => {
             const student = studentById.get(studentId);
             if (!student) {
@@ -690,7 +697,7 @@ export const parentCenterModule: AppModule = {
                 topic: session.topic,
                 status: session.status,
                 student: { id: student.id, name: student.name, grade: student.grade },
-                class: { id: classGroup.id, name: classGroup.name },
+                class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
                 course,
                 classroom,
                 checkedIn: Boolean(attendanceRecord),
@@ -769,51 +776,55 @@ export const parentCenterModule: AppModule = {
       const attendanceBySessionStudent = new Map(
         attendanceRecords.map((record) => [`${record.classSessionId}:${record.studentId}`, record]),
       );
+      const matchingSessions = sessions.filter(
+        (session) =>
+          (Boolean(session.classId && classIdSet.has(session.classId)) ||
+            temporarySessionIds.has(session.id)) &&
+          overlapsRange(session, from, to),
+      );
+      const sessionRosters = await Promise.all(
+        matchingSessions.map(async (session) => ({
+          sessionId: session.id,
+          roster: await schedulingRepo.listSessionRoster(app.db, session.id),
+        })),
+      );
+      const rosterBySessionId = new Map(
+        sessionRosters.map((item) => [item.sessionId, item.roster]),
+      );
 
       return {
-        events: sessions
-          .filter(
-            (session) =>
-              (classIdSet.has(session.classId) || temporarySessionIds.has(session.id)) &&
-              overlapsRange(session, from, to),
-          )
-          .flatMap((session) => {
-            const classGroup = classById.get(session.classId);
-            if (!classGroup) return [];
-            const course = courseById.get(classGroup.courseId) ?? null;
-            const classroom = classroomById.get(session.classroomId) ?? null;
-            const participantIds = new Set<string>();
-            for (const enrollment of enrollmentsByClassId.get(session.classId) ?? []) {
-              participantIds.add(enrollment.studentId);
-            }
-            for (const entry of temporaryEntriesBySessionId.get(session.id) ?? []) {
-              participantIds.add(entry.studentId);
-            }
-            return Array.from(participantIds).flatMap((studentId) => {
-              const student = studentById.get(studentId);
-              if (!student) return [];
-              const attendanceRecord = attendanceBySessionStudent.get(
-                `${session.id}:${student.id}`,
-              );
-              return [
-                {
-                  id: `${session.id}:${student.id}`,
-                  sessionId: session.id,
-                  type: 'class_session',
-                  title: session.topic,
-                  startsAt: session.startsAt,
-                  endsAt: session.endsAt,
-                  status: session.status,
-                  student: { id: student.id, name: student.name, grade: student.grade },
-                  class: { id: classGroup.id, name: classGroup.name },
-                  course,
-                  classroom,
-                  attendanceStatus: attendanceRecord?.status ?? null,
-                  checkedIn: Boolean(attendanceRecord),
-                },
-              ];
-            });
-          }),
+        events: matchingSessions.flatMap((session) => {
+          const classGroup = session.classId ? classById.get(session.classId) : null;
+          const course = courseById.get(session.courseId) ?? null;
+          const classroom = classroomById.get(session.classroomId) ?? null;
+          const participantIds = new Set(
+            (rosterBySessionId.get(session.id) ?? [])
+              .map((entry) => entry.studentId)
+              .filter((studentId) => studentById.has(studentId)),
+          );
+          return Array.from(participantIds).flatMap((studentId) => {
+            const student = studentById.get(studentId);
+            if (!student) return [];
+            const attendanceRecord = attendanceBySessionStudent.get(`${session.id}:${student.id}`);
+            return [
+              {
+                id: `${session.id}:${student.id}`,
+                sessionId: session.id,
+                type: 'class_session',
+                title: session.topic,
+                startsAt: session.startsAt,
+                endsAt: session.endsAt,
+                status: session.status,
+                student: { id: student.id, name: student.name, grade: student.grade },
+                class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+                course,
+                classroom,
+                attendanceStatus: attendanceRecord?.status ?? null,
+                checkedIn: Boolean(attendanceRecord),
+              },
+            ];
+          });
+        }),
       };
     });
 
@@ -834,10 +845,6 @@ export const parentCenterModule: AppModule = {
           throw httpError(422, '课次已取消');
         }
 
-        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-        if (!classGroup) {
-          throw httpError(404, 'Class not found');
-        }
         const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
         const rosterEntry = rosterEntries.find((entry) => entry.studentId === body.studentId);
         if (!rosterEntry) {
@@ -855,13 +862,14 @@ export const parentCenterModule: AppModule = {
         const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
         const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
           sessionId,
-          courseId: classGroup.courseId,
+          courseId: session.courseId,
           records: [
             {
               studentId: body.studentId,
               status: 'present',
               note: '家长中心签到',
               courseId: rosterEntry.billingCourseId,
+              lessonUnits: session.lessonUnits,
             },
           ],
           completeSession: false,
@@ -961,16 +969,12 @@ export const parentCenterModule: AppModule = {
           if (!session) {
             throw httpError(404, 'Class session not found');
           }
-          const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-          if (!classGroup) {
-            throw httpError(404, 'Class not found');
-          }
           const rosterEntries = await schedulingRepo.listSessionRoster(app.db, body.classSessionId);
           const rosterEntry = rosterEntries.find((entry) => entry.studentId === body.studentId);
           if (!rosterEntry) {
             throw httpError(422, '该学员未加入本课次');
           }
-          courseId = rosterEntry.billingCourseId;
+          courseId = rosterEntry.billingCourseId || session.courseId;
         } else if (courseId) {
           await assertCourseBelongsToStudent(body.studentId, courseId);
         }

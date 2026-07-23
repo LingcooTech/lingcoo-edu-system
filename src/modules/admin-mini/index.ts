@@ -129,8 +129,8 @@ export const adminMiniModule: AppModule = {
           };
         }),
         upcomingSessions: upcomingSessions.map((item) => {
-          const classGroup = classById.get(item.classId);
-          const course = classGroup ? courseById.get(classGroup.courseId) : null;
+          const classGroup = item.classId ? classById.get(item.classId) : null;
+          const course = courseById.get(item.courseId) ?? null;
           const teacher = teacherById.get(item.teacherId);
           const classroom = classroomById.get(item.classroomId);
           return {

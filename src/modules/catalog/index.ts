@@ -230,7 +230,7 @@ export const catalogModule: AppModule = {
         const session = item.classSessionId ? (sessionById.get(item.classSessionId) ?? null) : null;
         const classGroup =
           (item.classId ? (classById.get(item.classId) ?? null) : null) ??
-          (session ? (classById.get(session.classId) ?? null) : null);
+          (session?.classId ? (classById.get(session.classId) ?? null) : null);
         const teacher =
           (item.teacherId ? (teacherById.get(item.teacherId) ?? null) : null) ??
           (classGroup?.teacherId ? (teacherById.get(classGroup.teacherId) ?? null) : null);

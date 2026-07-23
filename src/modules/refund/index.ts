@@ -103,7 +103,7 @@ export const refundModule: AppModule = {
           title: '退款申请已提交',
           body: `订单 ${order.orderNo} 的退款申请已受理，工作人员会尽快审核。`,
           ctaLabel: '查看订单',
-          ctaUrl: '/account',
+          ctaUrl: '/pages/account-orders/index',
           sourceEventName: 'refund.applied',
           dedupeKey: `refund.applied:${refund.id}`,
         });
@@ -162,7 +162,7 @@ export const refundModule: AppModule = {
                 ? `订单 ${order.orderNo}（${reasonLabel}）已标记退款。`
                 : `订单 ${order.orderNo} 的退款申请未通过${body.adminNote ? `：${body.adminNote}` : ''}`,
             ctaLabel: '查看订单',
-            ctaUrl: '/account',
+            ctaUrl: '/pages/account-orders/index',
             sourceEventName: body.decision === 'approve' ? 'refund.approved' : 'refund.rejected',
             dedupeKey: `refund.${body.decision}:${refund.id}`,
           });

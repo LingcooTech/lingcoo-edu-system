@@ -159,8 +159,7 @@ export function TrialDetailPage() {
           amount: detail.trialSession.reservationFeeAmount,
           successTitle: '席位已保留',
           successMessage: '支付成功后，本场试听名额已为孩子保留。',
-          successActionLabel: '查看预约',
-          successActionHref: '/account',
+          successActionLabel: '完成',
         });
         setCheckoutOpen(true);
       } else {

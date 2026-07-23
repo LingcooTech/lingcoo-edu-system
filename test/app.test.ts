@@ -153,6 +153,7 @@ async function createLessonNotificationFixture(
     .insert(schema.classSessions)
     .values({
       classId: classGroup.id,
+      courseId: course.id,
       teacherId: teacher.id,
       classroomId: classroom.id,
       startsAt: input.startsAt,

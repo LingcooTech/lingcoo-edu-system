@@ -370,7 +370,7 @@ export class PaymentService {
           ? `订单 ${order.orderNo} 已支付，${order.lessonCount} 课时已到账。`
           : `订单 ${order.orderNo} 已支付，请完善孩子信息后开通课时。`,
       ctaLabel: '查看订单',
-      ctaUrl: '/account',
+      ctaUrl: '/pages/account-orders/index',
       sourceEventName: 'payment.paid',
       dedupeKey: `payment.paid:${order.orderNo}:${provider}:${providerOrderId}`,
     });

@@ -38,7 +38,9 @@ export function CheckInPage() {
 
   useSeo({
     title: payload?.session.topic ? `课堂签到：${payload.session.topic}` : '课堂签到',
-    description: payload ? `${payload.class.name} · ${payload.course.name}` : undefined,
+    description: payload
+      ? `${payload.class?.name ?? '临时课次'} · ${payload.course.name}`
+      : undefined,
   });
 
   async function submit(event: FormEvent) {
@@ -103,7 +105,7 @@ export function CheckInPage() {
         <article className="pwcard p-6 md:p-8">
           <h1 className="text-ink text-3xl font-bold">{payload.session.topic}</h1>
           <p className="text-ink-soft mt-3 text-sm leading-7">
-            {payload.class.name} · {payload.course.name}
+            {payload.class?.name ?? '临时课次'} · {payload.course.name}
           </p>
           <div className="text-ink-soft mt-6 grid gap-3 text-sm sm:grid-cols-3">
             <div className="bg-paper rounded-2xl p-4">

@@ -303,22 +303,12 @@ export function CheckoutModal({
               </div>
               <div className="mt-3 text-base font-bold text-green-800">{successTitle}</div>
               <p className="mt-1 text-sm text-green-700">{successMessage}</p>
-              {checkout?.defaultPassword ? (
-                <p className="mt-3 rounded-xl bg-white p-3 text-left text-sm text-green-800">
-                  可用手机号 {checkout.loginIdentifier} 和默认密码 {checkout.defaultPassword}{' '}
-                  登录，首次登录需修改密码。
-                </p>
-              ) : null}
-              <a
-                href={
-                  target.type === 'order' ? (target.successActionHref ?? '/account') : '/account'
-                }
-                className="pwbtn pwbtn-primary mt-4 w-full"
-              >
-                {target.type === 'order'
-                  ? (target.successActionLabel ?? '查看预约')
-                  : '查看课时余额'}
-              </a>
+              <p className="mt-3 rounded-xl bg-white p-3 text-left text-sm text-green-800">
+                家长端服务已迁移到微信小程序，请使用下单手机号在小程序中登录或绑定微信后查看预约与课时。
+              </p>
+              <button type="button" onClick={onClose} className="pwbtn pwbtn-primary mt-4 w-full">
+                完成
+              </button>
             </section>
           ) : (
             <>

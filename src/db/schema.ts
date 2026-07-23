@@ -128,6 +128,16 @@ export const courseContractStatusEnum = pgEnum('course_contract_status', [
 ]);
 export const auditOutcomeEnum = pgEnum('audit_outcome', ['succeeded', 'failed']);
 
+export interface TeacherPermissions {
+  createClassSession?: boolean;
+  createAdHocSession?: boolean;
+  manageSessionRoster?: boolean;
+  enrollStudents?: boolean;
+  viewAllStudents?: boolean;
+  setLessonUnits?: boolean;
+  manageClasses?: boolean;
+}
+
 // Unified identity: a single account table + role. One login endpoint, the JWT
 // carries the role. Replaces the former split `users` (admin) / `parents` tables.
 // `guardians` / `students` / `teachers` stay as profile records; a parent account
@@ -175,6 +185,10 @@ export const accountRoleAssignments = pgTable(
     role: accountRoleEnum('role').notNull(),
     guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
     teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    teacherPermissions: jsonb('teacher_permissions')
+      .$type<TeacherPermissions>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     status: accountStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -628,9 +642,10 @@ export const classSessions = pgTable(
   'class_sessions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    classId: uuid('class_id')
+    classId: uuid('class_id').references(() => classes.id, { onDelete: 'cascade' }),
+    courseId: uuid('course_id')
       .notNull()
-      .references(() => classes.id, { onDelete: 'cascade' }),
+      .references(() => courses.id, { onDelete: 'restrict' }),
     teacherId: uuid('teacher_id')
       .notNull()
       .references(() => teachers.id, { onDelete: 'restrict' }),
@@ -640,7 +655,12 @@ export const classSessions = pgTable(
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
     topic: varchar('topic', { length: 200 }).notNull(),
+    sessionType: varchar('session_type', { length: 40 }).notNull().default('class'),
+    lessonUnits: integer('lesson_units').notNull().default(1),
     status: classSessionStatusEnum('status').notNull().default('scheduled'),
+    createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -650,6 +670,34 @@ export const classSessions = pgTable(
       table.startsAt,
     ),
     teacherTimeIdx: index('class_sessions_teacher_time_idx').on(table.teacherId, table.startsAt),
+  }),
+);
+
+export const classSessionStudents = pgTable(
+  'class_session_students',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    classSessionId: uuid('class_session_id')
+      .notNull()
+      .references(() => classSessions.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    billingCourseId: uuid('billing_course_id')
+      .notNull()
+      .references(() => courses.id, { onDelete: 'restrict' }),
+    source: varchar('source', { length: 40 }).notNull().default('session_only'),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionStudentUnique: uniqueIndex('class_session_students_session_student_idx').on(
+      table.classSessionId,
+      table.studentId,
+    ),
+    sessionIdx: index('class_session_students_session_idx').on(table.classSessionId),
+    studentIdx: index('class_session_students_student_idx').on(table.studentId),
   }),
 );
 

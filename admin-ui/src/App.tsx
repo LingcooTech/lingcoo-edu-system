@@ -4,6 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { fetchMe, getToken, type AuthAccount } from '@/api/client';
 import { Shell } from '@/components/layout/Shell';
 import { AccountsPage } from '@/pages/AccountsPage';
+import { AdminChangePasswordPage } from '@/pages/AdminChangePasswordPage';
 import { AttendancePage } from '@/pages/AttendancePage';
 import { BusinessModelPage } from '@/pages/BusinessModelPage';
 import { CampusesPage } from '@/pages/CampusesPage';
@@ -19,6 +20,7 @@ import { ForbiddenPage } from '@/pages/ForbiddenPage';
 import { GuardiansPage } from '@/pages/GuardiansPage';
 import { InstitutionHomePage } from '@/pages/InstitutionHomePage';
 import { LeadsPage } from '@/pages/LeadsPage';
+import { LoginPage } from '@/pages/LoginPage';
 import { LessonsPage } from '@/pages/LessonsPage';
 import { MarketingPage } from '@/pages/MarketingPage';
 import { OrdersPage } from '@/pages/OrdersPage';
@@ -38,27 +40,28 @@ type GateState =
   | { status: 'forbidden' }
   | { status: 'ok'; account: AuthAccount };
 
-// /admin has no login page of its own. The gate verifies the shared session
-// (cookie/token set by the public front door) and only admits role=admin;
-// no token bounces to the public login, a non-admin sees a Forbidden page.
 function ProtectedRoute() {
   const [state, setState] = useState<GateState>({ status: 'loading' });
 
   useEffect(() => {
     if (!getToken()) {
-      window.location.href = '/login?redirect=/admin';
+      window.location.href = '/admin/login';
       return;
     }
     fetchMe()
       .then((account) => {
         if (account && account.role === 'admin') {
+          if (account.mustChangePassword) {
+            window.location.href = '/admin/change-password';
+            return;
+          }
           setState({ status: 'ok', account });
         } else {
           setState({ status: 'forbidden' });
         }
       })
       .catch(() => {
-        window.location.href = '/login?redirect=/admin';
+        window.location.href = '/admin/login';
       });
   }, []);
 
@@ -77,6 +80,8 @@ function ProtectedRoute() {
 
 const router = createBrowserRouter(
   [
+    { path: '/login', element: <LoginPage /> },
+    { path: '/change-password', element: <AdminChangePasswordPage /> },
     {
       path: '/',
       element: <ProtectedRoute />,

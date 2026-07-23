@@ -173,6 +173,9 @@ export async function upsertRoleAssignment(
       set: {
         guardianId: values.guardianId ?? null,
         teacherId: values.teacherId ?? null,
+        ...(values.teacherPermissions !== undefined
+          ? { teacherPermissions: values.teacherPermissions }
+          : {}),
         status: values.status ?? 'active',
         updatedAt: new Date(),
       },
@@ -188,6 +191,7 @@ export async function replaceRoleAssignmentsForAccount(
     role: AccountRole;
     guardianId?: string | null;
     teacherId?: string | null;
+    teacherPermissions?: schema.TeacherPermissions;
     status?: AccountStatus;
   }>,
 ) {
@@ -207,6 +211,8 @@ export async function replaceRoleAssignmentsForAccount(
         role: assignment.role,
         guardianId: assignment.role === 'parent' ? (assignment.guardianId ?? null) : null,
         teacherId: assignment.role === 'teacher' ? (assignment.teacherId ?? null) : null,
+        teacherPermissions:
+          assignment.role === 'teacher' ? (assignment.teacherPermissions ?? {}) : {},
         status: assignment.status ?? 'active',
       })),
     )

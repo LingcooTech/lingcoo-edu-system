@@ -13,7 +13,7 @@
           <view class="row-between">
             <view>
               <view class="row-title">{{item.courseName}} · {{item.topic}}</view>
-              <view class="row-meta">{{item.student.name}} · {{item.class.name}}</view>
+              <view class="row-meta">{{item.student.name}} · {{item.className}}</view>
             </view>
             <view wx:if="{{item.checkedIn}}" class="attendance-status">{{item.attendanceStatusLabel}}</view>
             <button

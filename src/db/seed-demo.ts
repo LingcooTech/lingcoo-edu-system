@@ -266,8 +266,13 @@ async function seedDemo(): Promise<void> {
       console.log(JSON.stringify({ msg: 'skip session (conflict)', topic: values.topic }));
       return undefined;
     }
+    const classGroup = await findOne(
+      db.select().from(schema.classes).where(eq(schema.classes.id, values.classId)).limit(1),
+    );
+    if (!classGroup) return undefined;
     return createClassSession(db, {
       classId: values.classId,
+      courseId: classGroup.courseId,
       teacherId: teacher.id,
       classroomId: classroom.id,
       startsAt: values.startsAt,

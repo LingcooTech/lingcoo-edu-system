@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ChevronDown, LogOut, Menu, Shield, UserRound, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 import { loadHome, type HomePayload } from '@/api/client';
-import { useSession } from '@/features/session';
 import { updateDocumentFavicon } from '@/lib/favicon';
 
 const defaultNavItems = [
@@ -15,12 +14,6 @@ const defaultNavItems = [
   { to: '/stories', label: '成长故事', end: false },
   { to: '/about', label: '关于', end: false },
 ];
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员',
-  teacher: '老师',
-  parent: '家长',
-};
 
 function navItemsFor(organization?: HomePayload['organization']) {
   const configured = organization?.publicSite?.navigation;
@@ -81,10 +74,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [homeLoaded, setHomeLoaded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const accountRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
-  const { account, openAuth, logout } = useSession();
 
   useEffect(() => {
     loadHome()
@@ -100,27 +90,10 @@ export function Layout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close the account dropdown when clicking outside it.
-  useEffect(() => {
-    if (!accountOpen) {
-      return;
-    }
-    function onClick(event: MouseEvent) {
-      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
-        setAccountOpen(false);
-      }
-    }
-    window.addEventListener('mousedown', onClick);
-    return () => window.removeEventListener('mousedown', onClick);
-  }, [accountOpen]);
-
   const organization = home?.organization;
   const navItems = homeLoaded ? navItemsFor(organization) : [];
   const primaryCtaText = organization?.publicProfile.ctaText || '预约试听';
   const primaryCtaLink = organization?.publicProfile.ctaLink || '/register';
-  const accountMenuPath = account?.role === 'teacher' ? '/teacher' : '/account';
-  const accountMenuLabel = account?.role === 'teacher' ? '老师工作台' : '个人中心';
-
   useEffect(() => {
     if (homeLoaded) {
       updateDocumentFavicon(organization?.branding.faviconUrl);
@@ -129,7 +102,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setDrawerOpen(false);
-    setAccountOpen(false);
   }, [location.pathname, location.search]);
 
   return (
@@ -160,63 +132,9 @@ export function Layout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="site-actions">
-            {account ? (
-              <div className="relative" ref={accountRef}>
-                <button
-                  type="button"
-                  className="site-account-trigger"
-                  aria-haspopup="menu"
-                  aria-expanded={accountOpen}
-                  onClick={() => setAccountOpen((open) => !open)}
-                >
-                  <span className="site-avatar">
-                    {(account.displayName || '账').slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="hidden max-w-24 truncate sm:inline">{account.displayName}</span>
-                  <ChevronDown className="text-muted h-4 w-4" />
-                </button>
-                {accountOpen ? (
-                  <div className="site-account-menu" role="menu">
-                    <div className="site-account-menu-head">
-                      <div className="text-ink font-semibold">{account.displayName}</div>
-                      <div className="text-muted text-xs">{ROLE_LABEL[account.role] ?? '账号'}</div>
-                    </div>
-                    <Link to={accountMenuPath} role="menuitem" className="site-account-menu-item">
-                      <UserRound className="h-4 w-4" />
-                      {accountMenuLabel}
-                    </Link>
-                    {account.role === 'admin' ? (
-                      <a href="/admin" role="menuitem" className="site-account-menu-item">
-                        <Shield className="h-4 w-4" />
-                        管理后台
-                      </a>
-                    ) : null}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="site-account-menu-item w-full text-left"
-                      onClick={() => {
-                        setAccountOpen(false);
-                        void logout();
-                      }}
-                    >
-                      <LogOut className="h-4 w-4" />
-                      退出登录
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="site-login-trigger"
-                onClick={() => openAuth('login')}
-                aria-label="登录或注册"
-              >
-                <UserRound className="h-4 w-4" />
-                <span>登录 / 注册</span>
-              </button>
-            )}
+            <Link to={primaryCtaLink} className="pwbtn pwbtn-primary">
+              {primaryCtaText}
+            </Link>
           </div>
         </div>
       </header>
@@ -258,31 +176,6 @@ export function Layout({ children }: { children: ReactNode }) {
               <Link to={primaryCtaLink} className="pwbtn pwbtn-primary w-full">
                 {primaryCtaText}
               </Link>
-              {account ? (
-                <div className="grid gap-2">
-                  <Link to={accountMenuPath} className="pwbtn pwbtn-outline w-full">
-                    {accountMenuLabel}
-                  </Link>
-                  <button
-                    type="button"
-                    className="pwbtn pwbtn-outline w-full"
-                    onClick={() => void logout()}
-                  >
-                    退出登录
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="pwbtn pwbtn-outline w-full"
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    openAuth('login');
-                  }}
-                >
-                  登录 / 注册
-                </button>
-              )}
             </div>
           </aside>
         </div>

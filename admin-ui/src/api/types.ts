@@ -174,12 +174,23 @@ export interface Guardian {
 
 export type AccountRole = 'admin' | 'teacher' | 'parent';
 
+export interface TeacherPermissions {
+  createClassSession: boolean;
+  createAdHocSession: boolean;
+  manageSessionRoster: boolean;
+  enrollStudents: boolean;
+  viewAllStudents: boolean;
+  setLessonUnits: boolean;
+  manageClasses: boolean;
+}
+
 export interface AccountRoleAssignment {
   id: string;
   role: AccountRole;
   status: 'active' | 'suspended';
   guardianId?: string | null;
   teacherId?: string | null;
+  teacherPermissions?: TeacherPermissions;
 }
 
 export interface Account {
@@ -367,15 +378,19 @@ export interface ClassGroup {
 
 export interface ClassSession {
   id: string;
-  classId: string;
+  classId: string | null;
+  courseId: string;
   teacherId: string;
   teacherIds?: string[];
   classroomId: string;
   startsAt: string;
   endsAt: string;
   topic: string;
+  sessionType?: 'class' | 'ad_hoc' | string;
+  lessonUnits?: number;
   status: string;
   class?: { name: string };
+  course?: Course;
   teacher?: { id?: string; name: string };
   teachers?: Array<{ id: string; name: string; role?: string }>;
   classroom?: { name: string };
@@ -383,7 +398,7 @@ export interface ClassSession {
 
 export interface SessionRosterEntry {
   id: string;
-  source: 'enrollment' | 'temporary';
+  source: 'enrollment' | 'temporary' | 'session_only';
   studentId: string;
   billingCourseId: string;
   classEnrollmentId?: string;

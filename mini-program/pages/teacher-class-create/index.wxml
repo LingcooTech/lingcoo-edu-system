@@ -1,0 +1,70 @@
+<custom-navbar title="新建正式班级" show-back="{{true}}" />
+<view class="page teacher-class-page">
+  <skeleton wx:if="{{loading}}" variant="hub" />
+  <block wx:else>
+    <view wx:if="{{error}}" class="error-card">{{error}}</view>
+
+    <view wx:if="{{options}}" class="form-card">
+      <view class="section-title">班级信息</view>
+      <view class="field">
+        <view class="field-label">课程</view>
+        <picker range="{{options.courses}}" range-key="name" value="{{courseIndex}}" bindchange="changeCourse">
+          <view class="picker-value">{{options.courses[courseIndex].name}} ›</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="field-label">班级名称</view>
+        <input class="text-input" value="{{name}}" maxlength="160" bindinput="changeName" placeholder="填写班级名称" />
+      </view>
+      <view class="field">
+        <view class="field-label">教室</view>
+        <picker range="{{options.classrooms}}" range-key="name" value="{{classroomIndex}}" bindchange="changeClassroom">
+          <view class="picker-value">{{options.classrooms[classroomIndex].name}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <view class="field">
+          <view class="field-label">班级容量</view>
+          <input class="text-input" type="number" value="{{capacity}}" bindinput="changeCapacity" />
+        </view>
+        <view class="field">
+          <view class="field-label">初始状态</view>
+          <picker range="{{statusOptions}}" range-key="label" value="{{statusIndex}}" bindchange="changeStatus">
+            <view class="picker-value">{{statusOptions[statusIndex].label}} ›</view>
+          </picker>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{options}}" class="student-card">
+      <view class="row-between">
+        <view>
+          <view class="section-title">初始学员</view>
+          <view class="hint">可先建空班，也可从全部学员中选择 · 已选 {{selectedCount}}/{{capacity}}</view>
+        </view>
+      </view>
+      <view wx:if="{{options.permissions.viewAllStudents && options.permissions.enrollStudents}}" class="search-row">
+        <input class="search-input" value="{{keyword}}" bindinput="changeKeyword" confirm-type="search" bindconfirm="loadStudents" placeholder="搜索姓名、年级或学校" />
+        <button class="search-button" loading="{{studentLoading}}" bindtap="loadStudents">搜索</button>
+      </view>
+      <view wx:if="{{!options.permissions.viewAllStudents || !options.permissions.enrollStudents}}" class="empty-card">
+        当前仅可新建空班；选择学员还需要“查看全部学员”和“拉学员入班”权限。
+      </view>
+      <view wx:elif="{{students.length}}" class="student-list">
+        <view wx:for="{{students}}" wx:key="id" class="student-row" data-id="{{item.id}}" bindtap="toggleStudent">
+          <view class="{{item.selected ? 'check check-active' : 'check'}}">{{item.selected ? '✓' : ''}}</view>
+          <view class="student-info">
+            <view class="student-name">{{item.name}}</view>
+            <view class="hint">{{item.grade}}{{item.school ? ' · ' + item.school : ''}} · 余额 {{item.balanceLabel}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty-card">{{studentLoading ? '正在加载学员…' : '没有符合条件的学员'}}</view>
+    </view>
+
+    <view class="submit-bar">
+      <view class="submit-summary">{{name || '新班级'}} · {{selectedCount}} 名学员</view>
+      <button class="submit-button" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">创建班级</button>
+    </view>
+  </block>
+</view>

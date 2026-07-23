@@ -1,0 +1,109 @@
+<custom-navbar title="添加课次" show-back="{{true}}" />
+<view class="page schedule-create-page">
+  <skeleton wx:if="{{loading}}" variant="hub" />
+  <block wx:else>
+    <view wx:if="{{error}}" class="error-card">{{error}}</view>
+
+    <view wx:if="{{options}}" class="form-card">
+      <view class="section-title">课程信息</view>
+      <view class="field">
+        <view class="field-label">排课类型</view>
+        <picker range="{{modeOptions}}" range-key="label" value="{{modeIndex}}" bindchange="changeMode">
+          <view class="picker-value">{{modeOptions[modeIndex].label}} ›</view>
+        </picker>
+      </view>
+
+      <view wx:if="{{modeOptions[modeIndex].key == 'class'}}" class="field">
+        <view class="field-label">正式班级</view>
+        <picker range="{{options.classes}}" range-key="name" value="{{classIndex}}" bindchange="changeClass">
+          <view class="picker-value">{{options.classes[classIndex].name}} ›</view>
+        </picker>
+      </view>
+      <view wx:else class="field">
+        <view class="field-label">课程</view>
+        <picker range="{{options.courses}}" range-key="name" value="{{courseIndex}}" bindchange="changeCourse">
+          <view class="picker-value">{{options.courses[courseIndex].name}} ›</view>
+        </picker>
+      </view>
+
+      <view class="field">
+        <view class="field-label">教室</view>
+        <picker range="{{options.classrooms}}" range-key="name" value="{{classroomIndex}}" bindchange="changeClassroom">
+          <view class="picker-value">{{options.classrooms[classroomIndex].name}} ›</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="field-label">日期</view>
+        <picker mode="date" value="{{date}}" bindchange="changeDate">
+          <view class="picker-value">{{date}} ›</view>
+        </picker>
+      </view>
+      <view class="time-row">
+        <view class="field">
+          <view class="field-label">上课</view>
+          <picker mode="time" value="{{startTime}}" bindchange="changeStartTime">
+            <view class="picker-value">{{startTime}} ›</view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">下课</view>
+          <picker mode="time" value="{{endTime}}" bindchange="changeEndTime">
+            <view class="picker-value">{{endTime}} ›</view>
+          </picker>
+        </view>
+      </view>
+      <view class="field">
+        <view class="field-label">课程内容</view>
+        <input class="text-input" value="{{topic}}" maxlength="200" bindinput="changeTopic" placeholder="例如：色彩基础练习" />
+      </view>
+      <view class="field">
+        <view class="field-label">本次扣减课时</view>
+        <view class="unit-stepper">
+          <button class="step-button" disabled="{{!options.permissions.setLessonUnits}}" bindtap="decreaseUnits">−</button>
+          <view class="unit-value">{{lessonUnits}}</view>
+          <button class="step-button" disabled="{{!options.permissions.setLessonUnits}}" bindtap="increaseUnits">＋</button>
+        </view>
+        <view wx:if="{{!options.permissions.setLessonUnits}}" class="hint">当前固定扣 1 课时</view>
+      </view>
+    </view>
+
+    <view wx:if="{{options}}" class="student-card">
+      <view class="student-head">
+        <view>
+          <view class="section-title">选择学员</view>
+          <view class="hint">已选 {{selectedCount}} 人 · 搜到 {{totalStudents}} 人</view>
+        </view>
+      </view>
+      <view class="search-row">
+        <input class="search-input" value="{{keyword}}" bindinput="changeKeyword" confirm-type="search" bindconfirm="loadStudents" placeholder="搜索姓名、年级或学校" />
+        <button class="search-button" loading="{{studentLoading}}" bindtap="loadStudents">搜索</button>
+      </view>
+      <view wx:if="{{!options.permissions.viewAllStudents}}" class="empty-card">当前账号未开通查看全部学员权限。</view>
+      <view wx:elif="{{students.length}}" class="student-list">
+        <view wx:for="{{students}}" wx:key="id" class="student-row">
+          <view class="student-main" data-id="{{item.id}}" bindtap="toggleStudent">
+            <view class="{{item.selected ? 'check check-active' : 'check'}}">{{item.selected ? '✓' : ''}}</view>
+            <view class="student-info">
+              <view class="student-name">{{item.name}}</view>
+              <view class="hint">{{item.grade}}{{item.school ? ' · ' + item.school : ''}} · 余额 {{item.balanceLabel}}</view>
+            </view>
+          </view>
+          <button
+            wx:if="{{item.selected && modeOptions[modeIndex].key == 'class' && options.permissions.enrollStudents}}"
+            class="{{item.enrollmentMode == 'class' ? 'mode-button mode-button-active' : 'mode-button'}}"
+            data-id="{{item.id}}"
+            bindtap="toggleEnrollmentMode"
+          >
+            {{item.enrollmentMode == 'class' ? '正式入班' : '仅本课次'}}
+          </button>
+        </view>
+      </view>
+      <view wx:else class="empty-card">{{studentLoading ? '正在加载学员…' : '没有符合条件的学员'}}</view>
+    </view>
+
+    <view class="submit-bar">
+      <view class="submit-summary">共 {{selectedCount}} 名学员 · 扣 {{lessonUnits}} 课时</view>
+      <button class="submit-button" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">确认排课</button>
+    </view>
+  </block>
+</view>

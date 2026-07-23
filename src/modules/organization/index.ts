@@ -358,7 +358,7 @@ export const organizationModule: AppModule = {
         },
         todaySessions: sessions.slice(0, 5).map((session) => ({
           ...session,
-          class: classById.get(session.classId),
+          class: session.classId ? classById.get(session.classId) : null,
         })),
       };
     });

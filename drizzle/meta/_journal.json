@@ -323,6 +323,13 @@
       "when": 1783468800000,
       "tag": "0045_class_session_teachers",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1784764800000,
+      "tag": "0046_teacher_scheduling",
+      "breakpoints": true
     }
   ]
 }

@@ -676,7 +676,7 @@ export interface ParentCheckInSession {
   topic: string;
   status: string;
   student: { id: string; name: string; grade: string };
-  class: { id: string; name: string };
+  class: { id: string; name: string } | null;
   course: Course | null;
   classroom: { id: string; name: string } | null;
   checkedIn: boolean;
@@ -699,7 +699,7 @@ export interface ParentCalendarEvent {
   endsAt: string;
   status: string;
   student: { id: string; name: string; grade: string };
-  class: { id: string; name: string };
+  class: { id: string; name: string } | null;
   course: Course | null;
   classroom: { id: string; name: string } | null;
   checkedIn: boolean;
@@ -1166,7 +1166,7 @@ export interface PublicCheckInPayload {
     topic: string;
     status: string;
   };
-  class: { id: string; name: string };
+  class: { id: string; name: string } | null;
   course: { id: string; name: string };
   classroom: { id: string; name: string } | null;
   roster: PublicCheckInStudent[];

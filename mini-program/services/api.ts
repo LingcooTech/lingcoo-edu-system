@@ -604,7 +604,7 @@ export interface ParentCheckInSession {
   topic: string;
   status: string;
   student: { id: string; name: string; grade: string };
-  class: { id: string; name: string };
+  class: { id: string; name: string } | null;
   course: Course | null;
   classroom: { id: string; name: string } | null;
   checkedIn: boolean;
@@ -621,7 +621,7 @@ export interface ParentCalendarEvent {
   endsAt: string;
   status: string;
   student: { id: string; name: string; grade: string };
-  class: { id: string; name: string };
+  class: { id: string; name: string } | null;
   course: Course | null;
   classroom: { id: string; name: string } | null;
   checkedIn: boolean;
@@ -821,10 +821,13 @@ export interface TeacherClass {
   name: string;
   status: string;
   capacity: number;
+  courseId?: string;
+  classroomId?: string;
   course?: { id: string; name: string };
-  classroom?: { name: string };
+  classroom?: { id?: string; name: string };
   students: Array<{
     id: string;
+    enrollmentId?: string;
     name: string;
     grade: string;
     school?: string | null;
@@ -902,6 +905,48 @@ export interface TeacherCalendarEvent {
   rosterCount: number;
   attendanceCount: number;
   attendanceSummary?: AttendanceSummary;
+  lessonUnits?: number;
+  sessionType?: 'class' | 'ad_hoc' | string;
+}
+
+export interface TeacherPermissions {
+  createClassSession: boolean;
+  createAdHocSession: boolean;
+  manageSessionRoster: boolean;
+  enrollStudents: boolean;
+  viewAllStudents: boolean;
+  setLessonUnits: boolean;
+  manageClasses: boolean;
+}
+
+export interface TeacherSchedulingOptions {
+  permissions: TeacherPermissions;
+  classes: Array<{
+    id: string;
+    name: string;
+    courseId: string;
+    classroomId: string;
+    capacity: number;
+    status: string;
+    course?: Course | null;
+  }>;
+  courses: Course[];
+  classrooms: Array<
+    PublicClassroom & { campus?: { id: string; name: string; address?: string | null } | null }
+  >;
+}
+
+export interface TeacherStudentSearchItem {
+  id: string;
+  name: string;
+  grade: string;
+  school?: string | null;
+  lessonAccounts: Array<{
+    id: string;
+    courseId: string;
+    balance: number;
+    courseName: string;
+  }>;
 }
 
 export interface TeacherHomeworkCheckIn extends ParentHomeworkCheckIn {
@@ -1361,6 +1406,103 @@ export async function fetchTeacherDashboard(): Promise<{
   classes: TeacherClass[];
 }> {
   return request('/public/teacher/dashboard');
+}
+
+export function fetchTeacherCapabilities(): Promise<{
+  teacherId: string;
+  isAdminTeacher: boolean;
+  permissions: TeacherPermissions;
+}> {
+  return request('/public/teacher/capabilities');
+}
+
+export function fetchTeacherSchedulingOptions(): Promise<TeacherSchedulingOptions> {
+  return request('/public/teacher/scheduling-options');
+}
+
+export function searchTeacherStudents(params: {
+  search?: string;
+  courseId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{
+  students: TeacherStudentSearchItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+}> {
+  return request(`/public/teacher/students${buildQueryString(params)}`);
+}
+
+export function createTeacherClassSession(input: {
+  classId?: string | null;
+  courseId: string;
+  classroomId: string;
+  startsAt: string;
+  endsAt: string;
+  topic: string;
+  lessonUnits: number;
+  students: Array<{
+    studentId: string;
+    enrollmentMode: 'class' | 'session_only';
+  }>;
+}): Promise<{ classSession: TeacherCalendarEvent }> {
+  return request('/public/teacher/class-sessions', {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export function createTeacherClass(input: {
+  courseId: string;
+  classroomId: string;
+  name: string;
+  capacity: number;
+  status: 'recruiting' | 'active';
+  studentIds: string[];
+}): Promise<{ class: TeacherClass }> {
+  return request('/public/teacher/classes', {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export function fetchTeacherClass(classId: string): Promise<{ class: TeacherClass }> {
+  return request(`/public/teacher/classes/${classId}`);
+}
+
+export function updateTeacherClass(
+  classId: string,
+  input: {
+    classroomId?: string;
+    name?: string;
+    capacity?: number;
+    status?: 'recruiting' | 'active' | 'paused' | 'completed';
+  },
+): Promise<{ class: TeacherClass }> {
+  return request(`/public/teacher/classes/${classId}`, {
+    method: 'PATCH',
+    data: input,
+  });
+}
+
+export function addTeacherClassStudent(
+  classId: string,
+  studentId: string,
+): Promise<{ enrollment: { id: string; studentId: string } }> {
+  return request(`/public/teacher/classes/${classId}/students`, {
+    method: 'POST',
+    data: { studentId },
+  });
+}
+
+export function removeTeacherClassStudent(
+  classId: string,
+  studentId: string,
+): Promise<{ enrollment: { id: string; studentId: string } }> {
+  return request(`/public/teacher/classes/${classId}/students/${studentId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function fetchTeacherNotifications(

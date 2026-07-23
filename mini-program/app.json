@@ -27,6 +27,9 @@
     "pages/account-feedbacks/index",
     "pages/account-notifications/index",
     "pages/teacher-workbench/index",
+    "pages/teacher-schedule-create/index",
+    "pages/teacher-class-create/index",
+    "pages/teacher-class-manage/index",
     "pages/teacher-student-detail/index"
   ],
   "window": {

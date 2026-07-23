@@ -32,6 +32,7 @@ const sessionSchema = z.object({
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
   topic: z.string().min(1),
+  lessonUnits: z.number().int().min(0).max(10).default(1),
   status: z.enum(['scheduled', 'completed', 'cancelled']).default('scheduled'),
 });
 
@@ -46,6 +47,7 @@ const batchSessionSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
   topic: z.string().min(1),
+  lessonUnits: z.number().int().min(0).max(10).default(1),
   teacherId: z.string().optional(),
   teacherIds: z.array(z.string()).max(12).optional(),
   classroomId: z.string().optional(),
@@ -169,8 +171,9 @@ export const schedulingModule: AppModule = {
       if (sessions.length === 0) {
         return [];
       }
-      const [classes, teachers, classrooms, assignments] = await Promise.all([
+      const [classes, courses, teachers, classrooms, assignments] = await Promise.all([
         schedulingRepo.listClasses(app.db),
+        catalogRepo.listCourses(app.db),
         teachingRepo.listTeachers(app.db),
         teachingRepo.listClassrooms(app.db),
         schedulingRepo.listClassSessionTeachers(
@@ -179,6 +182,7 @@ export const schedulingModule: AppModule = {
         ),
       ]);
       const classById = new Map(classes.map((item) => [item.id, item]));
+      const courseById = new Map(courses.map((item) => [item.id, item]));
       const teacherById = new Map(teachers.map((item) => [item.id, item]));
       const classroomById = new Map(classrooms.map((item) => [item.id, item]));
       const assignmentsBySessionId = new Map<string, typeof assignments>();
@@ -205,7 +209,8 @@ export const schedulingModule: AppModule = {
           ...session,
           teacherIds: teachersForSession.map((teacher) => teacher.id),
           teachers: teachersForSession,
-          class: classById.get(session.classId),
+          class: session.classId ? classById.get(session.classId) : undefined,
+          course: courseById.get(session.courseId),
           teacher: teacherById.get(session.teacherId),
           classroom: classroomById.get(session.classroomId),
         };
@@ -248,19 +253,31 @@ export const schedulingModule: AppModule = {
     }
 
     async function enrichTemporaryStudents(sessionId: string) {
-      const roster = await enrichSessionRoster(sessionId);
+      const [roster, temporaryStudents] = await Promise.all([
+        enrichSessionRoster(sessionId),
+        schedulingRepo.listTemporaryStudents(app.db, sessionId),
+      ]);
+      const temporaryStudentByStudentId = new Map(
+        temporaryStudents.map((item) => [item.studentId, item]),
+      );
       return roster
-        .filter((entry) => entry.source === 'temporary')
-        .map((entry) => ({
-          id: entry.temporaryStudentId ?? entry.id,
-          classSessionId: sessionId,
-          studentId: entry.studentId,
-          billingCourseId: entry.billingCourseId,
-          note: entry.note ?? null,
-          student: entry.student,
-          billingCourse: entry.billingCourse,
-          lessonAccount: entry.lessonAccount,
-        }));
+        .filter((entry) => entry.source === 'temporary' || entry.source === 'session_only')
+        .map((entry) => {
+          const temporaryStudent = temporaryStudentByStudentId.get(entry.studentId);
+          return {
+            id:
+              temporaryStudent?.id ??
+              ('temporaryStudentId' in entry ? entry.temporaryStudentId : null) ??
+              entry.id,
+            classSessionId: sessionId,
+            studentId: entry.studentId,
+            billingCourseId: entry.billingCourseId,
+            note: temporaryStudent?.note ?? ('note' in entry ? entry.note : null) ?? null,
+            student: entry.student,
+            billingCourse: entry.billingCourse,
+            lessonAccount: entry.lessonAccount,
+          };
+        });
     }
 
     async function requireStudentLessonAccount(input: { studentId: string; courseId: string }) {
@@ -435,7 +452,7 @@ export const schedulingModule: AppModule = {
 
       const classEvents = sessions
         .filter((session) => {
-          const classGroup = classById.get(session.classId);
+          const classGroup = session.classId ? classById.get(session.classId) : undefined;
           if (!classGroup) return false;
           if (!['recruiting', 'active'].includes(classGroup.status)) return false;
           if (!courseById.has(classGroup.courseId)) return false;
@@ -443,7 +460,7 @@ export const schedulingModule: AppModule = {
           return overlapsRange(session, from, to);
         })
         .map((session) => {
-          const classGroup = classById.get(session.classId);
+          const classGroup = session.classId ? classById.get(session.classId) : undefined;
           const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
           const classroom = classroomById.get(session.classroomId);
           return {
@@ -506,6 +523,8 @@ export const schedulingModule: AppModule = {
 
     app.post('/v1/class-sessions', { preHandler: app.requireAdmin }, async (request) => {
       const body = sessionCreateSchema.parse(request.body);
+      const classGroup = await schedulingRepo.findClass(app.db, body.classId);
+      if (!classGroup) throw notFound('Class not found');
 
       const startsAt = new Date(body.startsAt);
       const endsAt = new Date(body.endsAt);
@@ -524,11 +543,13 @@ export const schedulingModule: AppModule = {
 
       const classSession = await schedulingRepo.createClassSession(app.db, {
         classId: body.classId,
+        courseId: classGroup.courseId,
         teacherId: body.teacherId,
         classroomId: body.classroomId,
         topic: body.topic,
         startsAt,
         endsAt,
+        lessonUnits: body.lessonUnits,
         status: 'scheduled',
       });
       await schedulingRepo.replaceClassSessionTeachers(
@@ -576,11 +597,13 @@ export const schedulingModule: AppModule = {
 
         const classSession = await schedulingRepo.createClassSession(app.db, {
           classId: classGroup.id,
+          courseId: classGroup.courseId,
           teacherId,
           classroomId,
           topic: body.topic.trim(),
           startsAt,
           endsAt,
+          lessonUnits: body.lessonUnits,
           status: 'scheduled',
         });
         await schedulingRepo.replaceClassSessionTeachers(
@@ -691,7 +714,9 @@ export const schedulingModule: AppModule = {
         const body = temporaryStudentSchema.parse(request.body);
         const session = await schedulingRepo.findSession(app.db, sessionId);
         if (!session) throw notFound('Class session not found');
-        const classGroup = await schedulingRepo.findClass(app.db, session.classId);
+        const classGroup = session.classId
+          ? await schedulingRepo.findClass(app.db, session.classId)
+          : null;
         if (!classGroup) throw notFound('Class not found');
 
         const [student, billingCourse, enrollments, existingTemporaryStudent] = await Promise.all([
@@ -724,6 +749,15 @@ export const schedulingModule: AppModule = {
           billingCourseId: billingCourse.id,
           note: body.note?.trim() || null,
         });
+        if ((await schedulingRepo.listSessionStudentRows(app.db, sessionId)).length > 0) {
+          await schedulingRepo.upsertSessionStudent(app.db, {
+            classSessionId: sessionId,
+            studentId: student.id,
+            billingCourseId: billingCourse.id,
+            source: 'session_only',
+            active: true,
+          });
+        }
         const [enriched] = (await enrichTemporaryStudents(sessionId)).filter(
           (item) => item.id === temporaryStudent.id,
         );
@@ -765,6 +799,12 @@ export const schedulingModule: AppModule = {
           temporaryStudentId,
         });
         if (!removed) throw notFound('Temporary student not found');
+        if ((await schedulingRepo.listSessionStudentRows(app.db, sessionId)).length > 0) {
+          await schedulingRepo.removeSessionStudent(app.db, {
+            sessionId,
+            studentId: temporaryStudent.studentId,
+          });
+        }
         return { temporaryStudent: removed };
       },
     );
