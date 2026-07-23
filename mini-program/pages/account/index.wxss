@@ -172,6 +172,199 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.teacher-profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: -24rpx -24rpx 0;
+  margin-top: -88px;
+  padding: calc(88px + 34rpx) 34rpx 46rpx;
+  background:
+    radial-gradient(circle at 12% 82%, rgba(255, 211, 111, 0.48), transparent 34%),
+    radial-gradient(circle at 88% 22%, rgba(255, 119, 72, 0.34), transparent 36%),
+    linear-gradient(135deg, #ffc64f 0%, #ff8a3d 100%);
+  color: #fff;
+  text-align: center;
+}
+
+.teacher-profile-avatar {
+  display: flex;
+  width: 144rpx;
+  height: 144rpx;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  border: 6rpx solid rgba(255, 255, 255, 0.82);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 14rpx 32rpx rgba(141, 75, 25, 0.2);
+  font-size: 54rpx;
+  font-weight: 900;
+}
+
+.teacher-profile-avatar image {
+  width: 100%;
+  height: 100%;
+}
+
+.teacher-profile-name {
+  margin-top: 20rpx;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.teacher-profile-title {
+  margin-top: 8rpx;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.teacher-profile-tagline {
+  max-width: 620rpx;
+  margin-top: 18rpx;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.teacher-profile-card {
+  margin-top: 24rpx;
+  border: 1rpx solid rgba(33, 31, 28, 0.05);
+  border-radius: 28rpx;
+  background: #fff;
+  padding: 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(33, 31, 28, 0.05);
+}
+
+.teacher-profile-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.teacher-profile-card-title {
+  color: #211f1c;
+  font-size: 31rpx;
+  font-weight: 900;
+}
+
+.teacher-profile-card-desc {
+  margin-top: 7rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+}
+
+.teacher-account-status,
+.teacher-profile-edit {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 800;
+  padding: 10rpx 18rpx;
+}
+
+.teacher-account-status {
+  background: #e8f3e9;
+  color: #3f7547;
+}
+
+.teacher-profile-edit {
+  background: #f4ede7;
+  color: #9a6a4b;
+}
+
+.teacher-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 24rpx;
+  border-top: 1rpx solid #eeeae5;
+  color: #8b857c;
+  font-size: 24rpx;
+  padding-top: 22rpx;
+}
+
+.teacher-account-row text:last-child {
+  max-width: 430rpx;
+  overflow: hidden;
+  color: #322f2b;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-profile-copy {
+  margin-top: 24rpx;
+  color: #57534e;
+  font-size: 25rpx;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.teacher-profile-empty {
+  margin-top: 24rpx;
+  border-radius: 20rpx;
+  background: #f8f6f2;
+  color: #9a9389;
+  font-size: 24rpx;
+  padding: 28rpx;
+  text-align: center;
+}
+
+.teacher-specialties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.teacher-specialty {
+  border-radius: 999rpx;
+  background: #fff3e6;
+  color: #9a5f31;
+  font-size: 21rpx;
+  font-weight: 750;
+  padding: 9rpx 16rpx;
+}
+
+.teacher-profile-summary {
+  display: grid;
+  grid-template-columns: 180rpx minmax(0, 1fr);
+  gap: 18rpx;
+  margin-top: 24rpx;
+  border-top: 1rpx solid #eeeae5;
+  padding-top: 22rpx;
+}
+
+.teacher-profile-summary-label {
+  color: #8b857c;
+  font-size: 21rpx;
+}
+
+.teacher-profile-summary-value {
+  margin-top: 7rpx;
+  color: #322f2b;
+  font-size: 24rpx;
+  font-weight: 750;
+}
+
+.teacher-profile-summary-value.line-clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.teacher-role-button {
+  width: 100%;
+  margin-top: 24rpx;
+  background: #fff;
+  color: #9a6a4b;
+}
+
 .core-panel,
 .entry-panel,
 .panel {

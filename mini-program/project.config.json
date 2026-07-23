@@ -21,6 +21,7 @@
         "showShadowRootInWxmlPanel": true,
         "packNpmManually": false,
         "compileWorklet": false,
+        "ignoreDevUnusedFiles": false,
         "uglifyFileName": false,
         "uploadWithSourceMap": true,
         "packNpmRelationList": [],

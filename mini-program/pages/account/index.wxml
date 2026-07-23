@@ -15,12 +15,93 @@
   </block>
 
   <block wx:elif="{{account && account.role == 'teacher'}}">
-    <teacher-workbench-panel
-      id="teacherWorkbench"
-      can-switch-role="{{canSwitchWorkRole}}"
-      switching-role="{{switchingRole}}"
-      bind:switchrole="onSwitchWorkRole"
-    />
+    <view class="teacher-profile-hero">
+      <view class="teacher-profile-avatar">
+        <image
+          wx:if="{{teacherProfile && teacherProfile.teacher.avatarUrl}}"
+          src="{{teacherProfile.teacher.avatarUrl}}"
+          mode="aspectFill"
+        />
+        <text wx:else>{{avatarText}}</text>
+      </view>
+      <view class="teacher-profile-name">
+        {{teacherProfile ? teacherProfile.teacher.name : account.displayName || '老师'}}
+      </view>
+      <view class="teacher-profile-title">
+        {{teacherProfile ? teacherProfile.teacher.title || '授课老师' : '授课老师'}}
+        <text wx:if="{{teacherProfile && teacherProfile.institution}}"> · {{teacherProfile.institution.name}}</text>
+      </view>
+      <view wx:if="{{teacherProfile && teacherProfile.teacher.tagline}}" class="teacher-profile-tagline">
+        {{teacherProfile.teacher.tagline}}
+      </view>
+    </view>
+
+    <skeleton wx:if="{{teacherProfileLoading && !teacherProfile}}" variant="hub" />
+
+    <block wx:if="{{teacherProfile}}">
+      <view class="teacher-profile-card">
+        <view class="teacher-profile-card-head">
+          <view>
+            <view class="teacher-profile-card-title">账号信息</view>
+            <view class="teacher-profile-card-desc">账号资料由管理员统一维护</view>
+          </view>
+          <view class="teacher-account-status">正常</view>
+        </view>
+        <view class="teacher-account-row">
+          <text>登录手机号</text>
+          <text>{{teacherProfile.account.phone || '未绑定'}}</text>
+        </view>
+        <view class="teacher-account-row">
+          <text>登录邮箱</text>
+          <text>{{teacherProfile.account.email || '未绑定'}}</text>
+        </view>
+      </view>
+
+      <view class="teacher-profile-card">
+        <view class="teacher-profile-card-head">
+          <view>
+            <view class="teacher-profile-card-title">个人介绍</view>
+            <view class="teacher-profile-card-desc">这些内容会用于老师公开介绍</view>
+          </view>
+          <navigator class="teacher-profile-edit" url="/pages/teacher-profile-edit/index">
+            编辑
+          </navigator>
+        </view>
+        <view wx:if="{{teacherProfile.teacher.bio}}" class="teacher-profile-copy">
+          {{teacherProfile.teacher.bio}}
+        </view>
+        <view wx:else class="teacher-profile-empty">还没有填写个人介绍</view>
+        <view wx:if="{{teacherProfile.teacher.specialties.length}}" class="teacher-specialties">
+          <view
+            wx:for="{{teacherProfile.teacher.specialties}}"
+            wx:key="*this"
+            class="teacher-specialty"
+          >{{item}}</view>
+        </view>
+        <view class="teacher-profile-summary">
+          <view>
+            <view class="teacher-profile-summary-label">教龄</view>
+            <view class="teacher-profile-summary-value">
+              {{teacherProfile.teacher.teachingYears || '待完善'}}
+            </view>
+          </view>
+          <view>
+            <view class="teacher-profile-summary-label">教学经历</view>
+            <view class="teacher-profile-summary-value line-clamp">
+              {{teacherProfile.teacher.teachingExperience || '待完善'}}
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <button
+      wx:if="{{canSwitchWorkRole}}"
+      class="mini-button teacher-role-button"
+      loading="{{switchingRole}}"
+      disabled="{{switchingRole}}"
+      bindtap="onSwitchWorkRole"
+    >切换到管理看板</button>
 
     <view class="logout-wrap">
       <button class="mini-button logout-button" bindtap="onLogout">退出登录</button>
@@ -358,4 +439,4 @@
     </view>
   </view>
 </view>
-<tabbar />
+<tabbar role="{{account.role}}" />

@@ -1,9 +1,11 @@
-<custom-navbar title="老师工作台" show-back="{{true}}" />
+<custom-navbar title="工作" />
 <view class="page teacher-workbench-page">
   <teacher-workbench-panel
+    wx:if="{{account}}"
     id="teacherWorkbench"
     can-switch-role="{{canSwitchWorkRole}}"
     switching-role="{{switchingRole}}"
     bind:switchrole="onSwitchWorkRole"
   />
 </view>
+<tabbar role="teacher" />

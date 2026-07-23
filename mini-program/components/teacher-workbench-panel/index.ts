@@ -15,6 +15,7 @@ import {
   type SessionAttendanceRecord,
   type TeacherCalendarEvent,
   type TeacherClass,
+  type TeacherDashboardStudent,
   type TeacherNotification,
   type HomeworkAssignment,
   type TeacherHomeworkCheckIn,
@@ -23,10 +24,18 @@ import {
 } from '../../services/api';
 import { TEACHER_WORKBENCH_ICONS } from '../../utils/icons';
 
-type ActiveView = 'schedule' | 'classes' | 'students' | 'feedbacks' | 'homework';
+type ActiveView =
+  | 'students'
+  | 'classes'
+  | 'schedule'
+  | 'rollcall'
+  | 'records'
+  | 'feedbacks'
+  | 'homework';
 type MetricScope = 'today' | 'week' | 'month';
 type FeedbackScope = 'today' | 'pending' | 'history';
 type MiniTapEvent = { currentTarget: { dataset: Record<string, string | undefined> } };
+type MiniScrollEvent = { detail: { scrollLeft: number } };
 type MiniInputEvent = {
   currentTarget: { dataset: Record<string, string | undefined> };
   detail: { value: string };
@@ -37,8 +46,23 @@ interface StudentRow {
   name: string;
   grade: string;
   school: string;
-  classes: string[];
+  institutionName: string;
+  isMyStudent: boolean;
+  classes: Array<{
+    id: string;
+    name: string;
+    isMine: boolean;
+    teacherName: string;
+  }>;
   balances: Array<{ courseName: string; balance: string }>;
+}
+
+interface DateStripRow {
+  key: string;
+  anchorId: string;
+  label: string;
+  day: number;
+  className: string;
 }
 
 interface RollCallRow extends TeacherRosterStudent {
@@ -84,9 +108,11 @@ type TeacherNoticeItem = {
 };
 
 const VIEW_TABS: Array<{ key: ActiveView; label: string; iconSrc: string }> = [
-  { key: 'schedule', label: '课表', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
+  { key: 'students', label: '学员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
   { key: 'classes', label: '班级', iconSrc: TEACHER_WORKBENCH_ICONS.classes },
-  { key: 'students', label: '成员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
+  { key: 'schedule', label: '课表', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
+  { key: 'rollcall', label: '点名', iconSrc: TEACHER_WORKBENCH_ICONS.rollcall },
+  { key: 'records', label: '上课记录', iconSrc: TEACHER_WORKBENCH_ICONS.records },
   { key: 'feedbacks', label: '互动', iconSrc: TEACHER_WORKBENCH_ICONS.feedbacks },
   { key: 'homework', label: '批阅', iconSrc: TEACHER_WORKBENCH_ICONS.homework },
 ];
@@ -174,6 +200,32 @@ function weekDaysAround(value: Date) {
   const mondayOffset = day === 0 ? -6 : 1 - day;
   const monday = addDays(base, mondayOffset);
   return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+}
+
+function dateStripDaysAround(value: Date) {
+  const selected = startOfDay(value);
+  return Array.from({ length: 61 }, (_, index) => addDays(selected, index - 30));
+}
+
+function buildDateStripRows(
+  days: Date[],
+  calendarEvents: TeacherCalendarEvent[],
+  selectedDateKey: string,
+): DateStripRow[] {
+  const eventDateKeys = new Set(
+    (calendarEvents ?? []).map((event) => dateKey(new Date(event.startsAt))),
+  );
+  return days.map((day) => {
+    const key = dateKey(day);
+    return {
+      key,
+      anchorId: `schedule-date-${key}`,
+      label: `周${'日一二三四五六'[day.getDay()]}`,
+      day: day.getDate(),
+      className:
+        key === selectedDateKey ? 'day day-active' : eventDateKeys.has(key) ? 'day day-has' : 'day',
+    };
+  });
 }
 
 function monthDaysAround(value: Date) {
@@ -265,8 +317,8 @@ function countStatuses(rows: RollCallRow[]) {
 }
 
 function calendarRange() {
-  const from = addDays(startOfMonth(new Date()), -365);
-  const to = addMonths(startOfMonth(new Date()), 3);
+  const from = addMonths(startOfMonth(new Date()), -60);
+  const to = addMonths(startOfMonth(new Date()), 60);
   to.setHours(23, 59, 59, 999);
   return { from: from.toISOString(), to: to.toISOString() };
 }
@@ -281,7 +333,7 @@ function isRollCallPending(event: TeacherCalendarEvent) {
 }
 
 function viewClassName(activeView: ActiveView, key: ActiveView) {
-  return activeView === key ? 'tab tab-active' : 'tab';
+  return activeView === key ? 'quick-action quick-action-active' : 'quick-action';
 }
 
 function scopeClassName(metricScope: MetricScope, key: MetricScope) {
@@ -301,6 +353,9 @@ function summaryTitle(metricScope: MetricScope) {
 function normalizeClass(classGroup: TeacherClass) {
   return {
     ...classGroup,
+    isMine: classGroup.isMine !== false,
+    teacherName: classGroup.teacher?.name || '',
+    scopeLabel: classGroup.isMine !== false ? '我的班级' : classGroup.teacher?.name || '机构班级',
     statusLabel: CLASS_STATUS_LABEL[classGroup.status] ?? '未知状态',
     courseName: classGroup.course?.name || '课程',
     classroomName: classGroup.classroom?.name || '空间待确认',
@@ -317,6 +372,9 @@ function normalizeEvent(event: TeacherCalendarEvent) {
   const pending = isRollCallPending(event);
   return {
     ...event,
+    isMine: event.isMine !== false,
+    teacherName: event.teacher?.name || '',
+    scopeLabel: event.isMine !== false ? '我的课次' : event.teacher?.name || '机构课次',
     dateLabel: dateLabel(event.startsAt),
     timeLabel: timeRange(event.startsAt, event.endsAt),
     className: event.class?.name || '班级',
@@ -374,7 +432,12 @@ Component({
     monthWeekdays: ['日', '一', '二', '三', '四', '五', '六'],
     todayPendingEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
     selectedEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
-    weekDays: [] as Array<{ key: string; label: string; day: number; className: string }>,
+    rollCallEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
+    recordEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
+    dateStripDays: [] as DateStripRow[],
+    selectedDateAnchor: '',
+    visibleDateKey: dateKey(startOfDay(new Date())),
+    dateStripExtending: false,
     monthDays: [] as Array<{
       key: string;
       day: number;
@@ -476,27 +539,34 @@ Component({
         ]);
         const today = startOfDay(new Date());
         const selectedDateKey = this.data.selectedDateKey || dateKey(today);
+        const dashboardClasses = Array.isArray(dashboard.classes) ? dashboard.classes : [];
+        const calendarItems = Array.isArray(calendarEvents) ? calendarEvents : [];
+        const homeworkItems = Array.isArray(homeworkCheckIns) ? homeworkCheckIns : [];
+        const feedbackItems = Array.isArray(lessonFeedbacks) ? lessonFeedbacks : [];
+        const assignmentItems = Array.isArray(homeworkAssignments) ? homeworkAssignments : [];
+        const notificationItems = Array.isArray(teacherNotifications) ? teacherNotifications : [];
         this.setData({
           loading: false,
-          calendarEvents,
-          classes: dashboard.classes.map(normalizeClass),
-          students: this.buildStudentRows(dashboard.classes),
-          lessonFeedbacks,
-          homeworkAssignments,
-          teacherNotifications: teacherNotifications.map(normalizeTeacherNotification),
-          pendingAttentionCount: teacherNotifications.filter((item) => item.status === 'unread')
+          calendarEvents: calendarItems,
+          classes: dashboardClasses.map(normalizeClass),
+          students: this.buildStudentRows(dashboard.students, dashboardClasses),
+          lessonFeedbacks: feedbackItems,
+          homeworkAssignments: assignmentItems,
+          teacherNotifications: notificationItems.map(normalizeTeacherNotification),
+          pendingAttentionCount: notificationItems.filter((item) => item.status === 'unread')
             .length,
           canSchedule:
             capabilities.permissions.createClassSession ||
             capabilities.permissions.createAdHocSession,
           canManageClasses: capabilities.permissions.manageClasses,
-          homeworkCheckIns: homeworkCheckIns.map((item) => ({
+          homeworkCheckIns: homeworkItems.map((item) => ({
             ...item,
             statusLabel: HOMEWORK_STATUS_LABEL[item.reviewStatus] ?? '未知状态',
             dateLabel: formatDateTime(item.createdAt),
             studentName: item.student?.name || '成员',
             courseName: item.course?.name || item.title,
             className: item.class?.name || '班级',
+            scopeLabel: item.isMine !== false ? '我的学员' : '机构学员',
           })),
           selectedDateKey,
         });
@@ -507,19 +577,50 @@ Component({
       }
     },
 
-    buildStudentRows(classes: TeacherClass[]): StudentRow[] {
+    buildStudentRows(
+      students?: TeacherDashboardStudent[],
+      legacyClasses: TeacherClass[] = [],
+    ): StudentRow[] {
+      if (Array.isArray(students)) {
+        return students.map((student) => ({
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          school: student.school || '',
+          institutionName: student.institution?.name || '机构学员',
+          isMyStudent: student.isMyStudent,
+          classes: (student.classes ?? []).map((classGroup) => ({
+            id: classGroup.id,
+            name: classGroup.name,
+            isMine: classGroup.isMine,
+            teacherName: classGroup.teacher?.name || '',
+          })),
+          balances: (student.lessonAccounts ?? []).map((lessonAccount) => ({
+            courseName: lessonAccount.courseName,
+            balance: String(lessonAccount.balance),
+          })),
+        }));
+      }
+
       const rows = new Map<string, StudentRow>();
-      for (const classGroup of classes) {
-        for (const student of classGroup.students) {
+      for (const classGroup of legacyClasses ?? []) {
+        for (const student of classGroup.students ?? []) {
           const current = rows.get(student.id) ?? {
             id: student.id,
             name: student.name,
             grade: student.grade,
             school: student.school || '',
+            institutionName: '机构学员',
+            isMyStudent: true,
             classes: [],
             balances: [],
           };
-          current.classes.push(classGroup.name);
+          current.classes.push({
+            id: classGroup.id,
+            name: classGroup.name,
+            isMine: true,
+            teacherName: '',
+          });
           if (classGroup.course?.name) {
             current.balances.push({
               courseName: classGroup.course.name,
@@ -538,7 +639,7 @@ Component({
     recompute() {
       const today = startOfDay(new Date());
       const selectedDate = new Date(`${this.data.selectedDateKey}T00:00:00`);
-      const weekDays = weekDaysAround(selectedDate);
+      const dateStripDays = dateStripDaysAround(selectedDate);
       const monthDays = monthDaysAround(selectedDate);
       const currentWeekDays = weekDaysAround(today);
       const weekStart = currentWeekDays[0];
@@ -568,7 +669,20 @@ Component({
           (event) => sameDate(new Date(event.startsAt), today) && event.status !== 'cancelled',
         )
         .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-      const todayPendingEvents = todayEvents.filter(isRollCallPending);
+      const todayPendingEvents = todayEvents.filter(
+        (event) => event.isMine !== false && isRollCallPending(event),
+      );
+      const pendingHomeworkCount = homeworkCheckIns.filter(
+        (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
+      ).length;
+      const recordEvents = calendarEvents
+        .filter(
+          (event) =>
+            event.status !== 'cancelled' &&
+            (event.status === 'completed' || event.attendanceCount > 0),
+        )
+        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+        .slice(0, 60);
       const feedbackCountBySession = new Map<string, number>();
       for (const feedback of lessonFeedbacks) {
         feedbackCountBySession.set(
@@ -629,6 +743,12 @@ Component({
       this.setData({
         viewTabs: VIEW_TABS.map((item) => ({
           ...item,
+          badge:
+            item.key === 'rollcall'
+              ? todayPendingEvents.length
+              : item.key === 'homework'
+                ? pendingHomeworkCount
+                : 0,
           className: viewClassName(this.data.activeView, item.key),
         })),
         scopeTabs: SCOPE_TABS.map((item) => ({
@@ -643,14 +763,14 @@ Component({
         summaryTitle: summaryTitle(this.data.metricScope),
         stats: {
           courseCount: metricEvents.filter((event) => event.status !== 'cancelled').length,
-          pendingRollCall: metricEvents.filter(isRollCallPending).length,
+          pendingRollCall: metricEvents.filter(
+            (event) => event.isMine !== false && isRollCallPending(event),
+          ).length,
           leaveMessages: metricEvents.reduce(
             (sum, event) => sum + (event.attendanceSummary?.leave ?? 0),
             0,
           ),
-          pendingHomework: homeworkCheckIns.filter(
-            (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
-          ).length,
+          pendingHomework: pendingHomeworkCount,
         },
         todayCourseCount: todayEvents.length,
         todayPendingCount: todayPendingEvents.length,
@@ -658,27 +778,14 @@ Component({
           ? `今天共有 ${todayEvents.length} 场课程`
           : '今天暂无课程',
         todayPendingEvents: todayPendingEvents.map(normalizeEvent),
+        rollCallEvents: todayPendingEvents.map(normalizeEvent),
+        recordEvents: recordEvents.map(normalizeEvent),
         selectedEvents: calendarEvents
           .filter((event) => dateKey(new Date(event.startsAt)) === this.data.selectedDateKey)
           .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
           .map(normalizeEvent),
-        weekDays: weekDays.map((day) => {
-          const key = dateKey(day);
-          const hasSession = calendarEvents.some(
-            (event) => dateKey(new Date(event.startsAt)) === key,
-          );
-          return {
-            key,
-            label: `周${'日一二三四五六'[day.getDay()]}`,
-            day: day.getDate(),
-            className:
-              key === this.data.selectedDateKey
-                ? 'day day-active'
-                : hasSession
-                  ? 'day day-has'
-                  : 'day',
-          };
-        }),
+        dateStripDays: buildDateStripRows(dateStripDays, calendarEvents, this.data.selectedDateKey),
+        selectedDateAnchor: `schedule-date-${dateKey(addDays(selectedDate, -3))}`,
         monthLabel: `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月`,
         monthDays: monthDays.map((day) => {
           const key = dateKey(day);
@@ -767,12 +874,89 @@ Component({
     selectDay(event: MiniTapEvent) {
       const key = String(event.currentTarget.dataset.key || '');
       if (!key) return;
-      this.setData({ selectedDateKey: key });
+      this.setData({ selectedDateKey: key, visibleDateKey: key });
       this.recompute();
     },
 
+    onDateStripScroll(event: MiniScrollEvent) {
+      const rows = this.data.dateStripDays as DateStripRow[];
+      if (!rows.length) return;
+      const system = wx.getSystemInfoSync();
+      const windowWidth = system.windowWidth || 375;
+      const pxPerRpx = windowWidth / 750;
+      const itemStep = 102 * pxPerRpx;
+      const viewportCenter = event.detail.scrollLeft + windowWidth / 2;
+      const index = Math.max(
+        0,
+        Math.min(rows.length - 1, Math.round((viewportCenter - 16 * pxPerRpx) / itemStep)),
+      );
+      const visibleDate = new Date(`${rows[index].key}T00:00:00`);
+      const monthLabel = `${visibleDate.getFullYear()}年${visibleDate.getMonth() + 1}月`;
+      if (monthLabel !== this.data.monthLabel || rows[index].key !== this.data.visibleDateKey) {
+        this.setData({ monthLabel, visibleDateKey: rows[index].key });
+      }
+    },
+
+    extendDateStripForward() {
+      if (this.data.dateStripExtending) return;
+      const rows = this.data.dateStripDays as DateStripRow[];
+      const last = rows[rows.length - 1];
+      if (!last) return;
+      const lastDate = new Date(`${last.key}T00:00:00`);
+      const additions = Array.from({ length: 60 }, (_, index) => addDays(lastDate, index + 1));
+      this.setData(
+        {
+          dateStripExtending: true,
+          dateStripDays: [
+            ...rows,
+            ...buildDateStripRows(
+              additions,
+              this.data.calendarEvents as TeacherCalendarEvent[],
+              this.data.selectedDateKey,
+            ),
+          ],
+        },
+        () => this.setData({ dateStripExtending: false }),
+      );
+    },
+
+    extendDateStripBackward() {
+      if (this.data.dateStripExtending) return;
+      const rows = this.data.dateStripDays as DateStripRow[];
+      const first = rows[0];
+      if (!first) return;
+      const firstDate = new Date(`${first.key}T00:00:00`);
+      const additions = Array.from({ length: 60 }, (_, index) => addDays(firstDate, index - 60));
+      this.setData(
+        {
+          dateStripExtending: true,
+          selectedDateAnchor: '',
+          dateStripDays: [
+            ...buildDateStripRows(
+              additions,
+              this.data.calendarEvents as TeacherCalendarEvent[],
+              this.data.selectedDateKey,
+            ),
+            ...rows,
+          ],
+        },
+        () => {
+          this.setData({
+            selectedDateAnchor: first.anchorId,
+            dateStripExtending: false,
+          });
+        },
+      );
+    },
+
     toggleCalendar() {
-      this.setData({ calendarExpanded: !this.data.calendarExpanded });
+      const calendarExpanded = !this.data.calendarExpanded;
+      this.setData({
+        calendarExpanded,
+        ...(calendarExpanded && this.data.visibleDateKey
+          ? { selectedDateKey: this.data.visibleDateKey }
+          : {}),
+      });
       this.recompute();
     },
 

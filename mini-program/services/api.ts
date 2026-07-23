@@ -410,6 +410,18 @@ export interface PublicTeacherDetail {
   courses: Course[];
 }
 
+export interface TeacherOwnProfile {
+  account: {
+    id: string;
+    displayName: string;
+    phone: string | null;
+    email: string | null;
+    status: string;
+  };
+  teacher: PublicTeacher;
+  institution: { id: string; name: string; logoUrl?: string | null } | null;
+}
+
 export interface AuthAccount {
   id: string;
   role: string;
@@ -735,6 +747,7 @@ export interface HomeworkAssignment {
   } | null;
   class?: { id: string; name: string } | null;
   teacher?: { id: string; name: string } | null;
+  isMine?: boolean;
 }
 
 export interface StudentWork {
@@ -764,6 +777,7 @@ export interface StudentWork {
   } | null;
   class?: { id: string; name: string } | null;
   teacher?: { id: string; name: string } | null;
+  isMine?: boolean;
 }
 
 export interface CreateStudentWorkInput {
@@ -808,6 +822,8 @@ export interface TeacherClassSession {
   endsAt: string;
   topic: string;
   status: string;
+  isMine?: boolean;
+  teacher?: { id: string; name: string } | null;
   class?: { name: string };
   course?: { name: string };
   classroom?: { name: string };
@@ -821,6 +837,8 @@ export interface TeacherClass {
   name: string;
   status: string;
   capacity: number;
+  isMine?: boolean;
+  teacher?: { id: string; name: string } | null;
   courseId?: string;
   classroomId?: string;
   course?: { id: string; name: string };
@@ -833,6 +851,28 @@ export interface TeacherClass {
     school?: string | null;
     status?: string;
     lessonBalance?: number | null;
+  }>;
+}
+
+export interface TeacherDashboardStudent {
+  id: string;
+  name: string;
+  grade: string;
+  school?: string | null;
+  status?: string;
+  institution?: { id: string; name: string } | null;
+  isMyStudent: boolean;
+  classes: Array<{
+    id: string;
+    name: string;
+    isMine: boolean;
+    teacher?: { id: string; name: string } | null;
+  }>;
+  lessonAccounts: Array<{
+    id: string;
+    courseId: string;
+    courseName: string;
+    balance: number;
   }>;
 }
 
@@ -899,7 +939,9 @@ export interface TeacherCalendarEvent {
   startsAt: string;
   endsAt: string;
   status: string;
-  class: { id: string; name: string } | null;
+  isMine?: boolean;
+  teacher?: { id: string; name: string } | null;
+  class: { id: string; name: string; isMine?: boolean } | null;
   course: { id: string; name: string } | null;
   classroom: { id: string; name: string } | null;
   rosterCount: number;
@@ -952,6 +994,7 @@ export interface TeacherStudentSearchItem {
 export interface TeacherHomeworkCheckIn extends ParentHomeworkCheckIn {
   student?: { id: string; name: string; grade: string } | null;
   reviewer?: { id: string; name: string } | null;
+  isMine?: boolean;
 }
 
 export interface TeacherLessonFeedback {
@@ -971,6 +1014,7 @@ export interface TeacherLessonFeedback {
   session?: TeacherClassSession | null;
   class?: { id: string; name: string } | null;
   teacher?: { id: string; name: string } | null;
+  isMine?: boolean;
 }
 
 interface ApiErrorPayload {
@@ -1404,6 +1448,11 @@ export function searchAdminData(keyword: string): Promise<AdminSearchResult> {
 export async function fetchTeacherDashboard(): Promise<{
   sessions: TeacherClassSession[];
   classes: TeacherClass[];
+  students: TeacherDashboardStudent[];
+  scope: {
+    isInstitutionWide: boolean;
+    institutionId?: string | null;
+  };
 }> {
   return request('/public/teacher/dashboard');
 }
@@ -1414,6 +1463,32 @@ export function fetchTeacherCapabilities(): Promise<{
   permissions: TeacherPermissions;
 }> {
   return request('/public/teacher/capabilities');
+}
+
+export function fetchTeacherProfile(): Promise<TeacherOwnProfile> {
+  return request('/public/teacher/profile');
+}
+
+export function updateTeacherProfile(input: {
+  name?: string;
+  title?: string;
+  avatarUrl?: string;
+  tagline?: string;
+  education?: string;
+  teachingExperience?: string;
+  teachingStyle?: string;
+  achievements?: string;
+  teachingYears?: string;
+  studentCount?: string;
+  practiceDuration?: string;
+  teachingPhilosophy?: string;
+  bio?: string;
+  specialties?: string[];
+}): Promise<{ teacher: PublicTeacher }> {
+  return request('/public/teacher/profile', {
+    method: 'PATCH',
+    data: input,
+  });
 }
 
 export function fetchTeacherSchedulingOptions(): Promise<TeacherSchedulingOptions> {

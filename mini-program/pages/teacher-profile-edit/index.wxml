@@ -1,0 +1,70 @@
+<custom-navbar title="编辑个人介绍" show-back="{{true}}" />
+<view class="page teacher-profile-edit-page">
+  <skeleton wx:if="{{loading}}" variant="hub" />
+  <block wx:else>
+    <view wx:if="{{error}}" class="error-card">{{error}}</view>
+
+    <view class="edit-card">
+      <view class="section-title">基础介绍</view>
+      <view class="field">
+        <view class="field-label">姓名</view>
+        <input class="text-input" value="{{name}}" maxlength="160" data-field="name" bindinput="changeField" />
+      </view>
+      <view class="field">
+        <view class="field-label">职称 / 头衔</view>
+        <input class="text-input" value="{{title}}" maxlength="120" data-field="title" bindinput="changeField" placeholder="例如：创意美术老师" />
+      </view>
+      <view class="field">
+        <view class="field-label">一句话介绍</view>
+        <input class="text-input" value="{{tagline}}" maxlength="200" data-field="tagline" bindinput="changeField" placeholder="展示在老师主页顶部" />
+      </view>
+      <view class="field-row">
+        <view class="field">
+          <view class="field-label">教龄</view>
+          <input class="text-input" value="{{teachingYears}}" maxlength="40" data-field="teachingYears" bindinput="changeField" placeholder="例如：8 年" />
+        </view>
+        <view class="field">
+          <view class="field-label">累计学员</view>
+          <input class="text-input" value="{{studentCount}}" maxlength="40" data-field="studentCount" bindinput="changeField" placeholder="例如：300+" />
+        </view>
+      </view>
+      <view class="field">
+        <view class="field-label">擅长方向</view>
+        <input class="text-input" value="{{specialtiesText}}" data-field="specialtiesText" bindinput="changeField" placeholder="用逗号或顿号分隔，例如：素描、色彩、创意画" />
+      </view>
+    </view>
+
+    <view class="edit-card">
+      <view class="section-title">详细资料</view>
+      <view class="field">
+        <view class="field-label">个人简介</view>
+        <textarea class="text-area" value="{{bio}}" maxlength="4000" data-field="bio" bindinput="changeField" placeholder="介绍自己的教学背景和特点" />
+      </view>
+      <view class="field">
+        <view class="field-label">教育背景</view>
+        <textarea class="text-area compact" value="{{education}}" maxlength="2000" data-field="education" bindinput="changeField" />
+      </view>
+      <view class="field">
+        <view class="field-label">教学经历</view>
+        <textarea class="text-area" value="{{teachingExperience}}" maxlength="4000" data-field="teachingExperience" bindinput="changeField" />
+      </view>
+      <view class="field">
+        <view class="field-label">教学风格</view>
+        <textarea class="text-area" value="{{teachingStyle}}" maxlength="4000" data-field="teachingStyle" bindinput="changeField" />
+      </view>
+      <view class="field">
+        <view class="field-label">教学理念</view>
+        <textarea class="text-area" value="{{teachingPhilosophy}}" maxlength="4000" data-field="teachingPhilosophy" bindinput="changeField" />
+      </view>
+      <view class="field">
+        <view class="field-label">荣誉与成果</view>
+        <textarea class="text-area" value="{{achievements}}" maxlength="4000" data-field="achievements" bindinput="changeField" />
+      </view>
+    </view>
+
+    <view class="submit-bar">
+      <view class="submit-hint">保存后同步更新老师公开介绍</view>
+      <button class="submit-button" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">保存</button>
+    </view>
+  </block>
+</view>

@@ -7,6 +7,9 @@
         <view class="profile-eyebrow">学员档案</view>
         <view class="profile-name">{{profile.name}}</view>
         <view class="profile-meta">{{profile.grade}}{{profile.school ? ' · ' + profile.school : ''}}</view>
+        <view class="identity-pill">
+          {{profile.isMyStudent ? '我的学员' : profile.institutionName}}
+        </view>
       </view>
       <view class="profile-stats">
         <view>
@@ -42,7 +45,9 @@
         <view wx:for="{{classes}}" wx:key="id" class="card row-card">
           <view>
             <view class="row-title">{{item.name}}</view>
-            <view class="row-meta">{{item.courseName}} · {{item.classroomName}}</view>
+            <view class="row-meta">
+              {{item.courseName}} · {{item.classroomName}} · {{item.isMine ? '我的班级' : (item.teacherName || '机构班级')}}
+            </view>
           </view>
           <view class="balance">{{item.balance}} 课时</view>
         </view>
@@ -82,7 +87,7 @@
         <view wx:for="{{attendance}}" wx:key="id" class="card row-card">
           <view>
             <view class="row-title">{{item.title}}</view>
-            <view class="row-meta">{{item.dateLabel}} · {{item.className}}</view>
+            <view class="row-meta">{{item.dateLabel}} · {{item.className}} · {{item.scopeLabel}}</view>
           </view>
           <view class="status-pill">{{item.statusLabel}}</view>
         </view>
@@ -97,7 +102,7 @@
           <view class="row-between">
             <view>
               <view class="row-title">{{item.courseName}} · {{item.className}}</view>
-              <view class="row-meta">{{item.dateLabel}}</view>
+              <view class="row-meta">{{item.dateLabel}} · {{item.scopeLabel}}</view>
             </view>
             <view class="status-pill">{{item.ratingLabel}}</view>
           </view>
@@ -115,7 +120,7 @@
           <view class="row-between">
             <view>
               <view class="row-title">{{item.title}}</view>
-              <view class="row-meta">{{item.dateLabel}}</view>
+              <view class="row-meta">{{item.dateLabel}} · {{item.scopeLabel}}</view>
             </view>
             <view class="status-pill">{{item.ratingLabel}}</view>
           </view>
@@ -196,7 +201,9 @@
             <view class="student-work-body">
               <view class="student-work-head">
                 <view class="row-title">{{item.titleLabel}}</view>
-                <view class="row-meta">{{item.courseName}}{{item.className ? ' · ' + item.className : ''}}</view>
+              <view class="row-meta">
+                {{item.courseName}}{{item.className ? ' · ' + item.className : ''}} · {{item.scopeLabel}}
+              </view>
               </view>
               <view wx:if="{{item.description}}" class="student-work-desc">{{item.description}}</view>
               <view class="row-meta">{{item.createdAtLabel}}</view>

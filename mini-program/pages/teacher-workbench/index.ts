@@ -39,6 +39,10 @@ Page({
   async loadSession() {
     try {
       const payload = await fetchMe();
+      if (!payload.account || payload.account.role !== 'teacher') {
+        wx.switchTab({ url: '/pages/account/index' });
+        return;
+      }
       this.setData({
         account: payload.account,
         canSwitchWorkRole: canSwitchWorkRole(payload.account),
@@ -46,6 +50,7 @@ Page({
     } catch {
       clearToken();
       this.setData({ account: null, canSwitchWorkRole: false });
+      wx.switchTab({ url: '/pages/account/index' });
     }
   },
 

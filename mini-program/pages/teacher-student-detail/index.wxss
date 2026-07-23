@@ -29,6 +29,17 @@
   font-weight: 800;
 }
 
+.identity-pill {
+  display: inline-flex;
+  margin-top: 16rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.78);
+  color: #9a4b15;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
 .profile-name {
   margin-top: 10rpx;
   color: #211f1c;

@@ -1,4 +1,5 @@
 import { TABBAR_ICONS } from '../../utils/tabbar';
+import { fetchMe, hasToken } from '../../services/api';
 
 interface TabBarItem {
   pagePath: string;
@@ -9,6 +10,17 @@ interface TabBarItem {
 }
 
 Component({
+  properties: {
+    role: {
+      type: String,
+      value: '',
+      observer() {
+        this.initItems();
+        this.updateActiveTab();
+      },
+    },
+  },
+
   data: {
     items: [] as TabBarItem[],
     safeAreaStyle: '',
@@ -18,6 +30,7 @@ Component({
     attached() {
       this.initItems();
       this.updateActiveTab();
+      void this.resolveRole();
     },
   },
 
@@ -29,7 +42,7 @@ Component({
 
   methods: {
     initItems() {
-      const tabbarConfig = [
+      const publicTabbarConfig = [
         {
           pagePath: 'pages/home/index',
           text: '首页',
@@ -61,6 +74,22 @@ Component({
           activeIcon: TABBAR_ICONS.account.active,
         },
       ];
+      const teacherTabbarConfig = [
+        {
+          pagePath: 'pages/teacher-workbench/index',
+          text: '工作',
+          icon: TABBAR_ICONS.work.inactive,
+          activeIcon: TABBAR_ICONS.work.active,
+        },
+        {
+          pagePath: 'pages/account/index',
+          text: '我的',
+          icon: TABBAR_ICONS.account.inactive,
+          activeIcon: TABBAR_ICONS.account.active,
+        },
+      ];
+      const tabbarConfig =
+        this.properties.role === 'teacher' ? teacherTabbarConfig : publicTabbarConfig;
 
       this.setData({
         items: tabbarConfig.map((item) => ({
@@ -73,6 +102,19 @@ Component({
       this.setData({
         safeAreaStyle: `height: env(safe-area-inset-bottom);`,
       });
+    },
+
+    async resolveRole() {
+      if (this.properties.role || !hasToken()) return;
+      try {
+        const { account } = await fetchMe();
+        if (!account || account.role !== 'teacher') return;
+        this.setData({ role: account.role });
+        this.initItems();
+        this.updateActiveTab();
+      } catch {
+        // Guests and expired sessions keep the public navigation.
+      }
     },
 
     updateActiveTab() {
@@ -98,7 +140,14 @@ Component({
 
       if (currentPath === path) return;
 
-      // Navigate to the selected tab
+      if (path === 'pages/teacher-workbench/index') {
+        wx.navigateTo({
+          url: `/${path}`,
+          fail: () => wx.redirectTo({ url: `/${path}` }),
+        });
+        return;
+      }
+
       wx.switchTab({
         url: `/${path}`,
       });

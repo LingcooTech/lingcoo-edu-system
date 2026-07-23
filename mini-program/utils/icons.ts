@@ -39,9 +39,7 @@ function iconConfig(color: string) {
 }
 
 function svgToDataUri(svg: string): string {
-  const encoded = encodeURIComponent(svg.trim())
-    .replace(/'/g, '%27')
-    .replace(/"/g, '%22');
+  const encoded = encodeURIComponent(svg.trim()).replace(/'/g, '%27').replace(/"/g, '%22');
   return `data:image/svg+xml,${encoded}`;
 }
 
@@ -86,8 +84,7 @@ export const GUEST_ACCOUNT_ICONS = {
     'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2224%22%20r%3D%2210%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M14%2054c3-11%2011-17%2018-17s15%206%2018%2017%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2229%22%20r%3D%227%22%20fill%3D%22%23fff%22%20opacity%3D%22.85%22%2F%3E%3Ccircle%20cx%3D%2248%22%20cy%3D%2229%22%20r%3D%227%22%20fill%3D%22%23fff%22%20opacity%3D%22.85%22%2F%3E%3C%2Fsvg%3E',
   check:
     'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%2214%22%20y%3D%2212%22%20width%3D%2236%22%20height%3D%2244%22%20rx%3D%227%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22m22%2035%208%208%2015-18%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E',
-  star:
-    'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22m32%208%207%2015%2016%202-12%2012%203%2017-14-8-14%208%203-17L9%2025l16-2%207-15Z%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E',
+  star: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22m32%208%207%2015%2016%202-12%2012%203%2017-14-8-14%208%203-17L9%2025l16-2%207-15Z%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E',
 };
 
 export const TEACHER_WORKBENCH_ICONS = {
@@ -105,6 +102,17 @@ export const TEACHER_WORKBENCH_ICONS = {
   students: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
     <circle cx="32" cy="23" r="11" fill="none" stroke="#9A6A4B" stroke-width="6"/>
     <path d="M14 54c3-12 10-18 18-18s15 6 18 18" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+  </svg>`),
+  rollcall: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="25" cy="22" r="10" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <path d="M9 52c3-11 9-17 16-17 5 0 10 3 13 8" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="47" cy="43" r="12" fill="#FFF3E6" stroke="#9A6A4B" stroke-width="5"/>
+    <path d="m41 43 4 4 8-9" fill="none" stroke="#9A6A4B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`),
+  records: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect x="13" y="13" width="38" height="43" rx="7" fill="none" stroke="#9A6A4B" stroke-width="6"/>
+    <path d="M22 9v10M42 9v10M13 26h38" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+    <path d="m23 42 6 6 13-15" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`),
   feedbacks: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
     <path d="M12 16h40a7 7 0 0 1 7 7v20a7 7 0 0 1-7 7H34l-14 8v-8h-8a7 7 0 0 1-7-7V23a7 7 0 0 1 7-7Z" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linejoin="round"/>

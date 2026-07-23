@@ -3,6 +3,14 @@ const TABBAR_ICON_COLOR = '#8b857c';
 const TABBAR_ICON_COLOR_ACTIVE = '#9a6a4b';
 
 const TABBAR_ICONS_DATA = {
+  work: {
+    inactive: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${TABBAR_ICON_COLOR}" stroke-width="2">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/><path d="m15 5 3 3"/>
+    </svg>`,
+    active: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${TABBAR_ICON_COLOR_ACTIVE}" stroke-width="2">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/><path d="m15 5 3 3"/>
+    </svg>`,
+  },
   home: {
     inactive: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${TABBAR_ICON_COLOR}" stroke-width="2">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
@@ -46,13 +54,15 @@ const TABBAR_ICONS_DATA = {
 };
 
 function svgToDataUri(svg: string): string {
-  const encoded = encodeURIComponent(svg.trim())
-    .replace(/'/g, '%27')
-    .replace(/"/g, '%22');
+  const encoded = encodeURIComponent(svg.trim()).replace(/'/g, '%27').replace(/"/g, '%22');
   return `data:image/svg+xml,${encoded}`;
 }
 
 export const TABBAR_ICONS = {
+  work: {
+    inactive: svgToDataUri(TABBAR_ICONS_DATA.work.inactive),
+    active: svgToDataUri(TABBAR_ICONS_DATA.work.active),
+  },
   home: {
     inactive: svgToDataUri(TABBAR_ICONS_DATA.home.inactive),
     active: svgToDataUri(TABBAR_ICONS_DATA.home.active),

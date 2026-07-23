@@ -30,6 +30,7 @@
     "pages/teacher-schedule-create/index",
     "pages/teacher-class-create/index",
     "pages/teacher-class-manage/index",
+    "pages/teacher-profile-edit/index",
     "pages/teacher-student-detail/index"
   ],
   "window": {

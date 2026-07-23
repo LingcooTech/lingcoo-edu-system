@@ -45,6 +45,25 @@ const teacherSchema = z.object({
 
 const teacherUpdateSchema = teacherSchema.partial();
 
+const teacherSelfProfileUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    title: z.string().trim().max(120).optional(),
+    avatarUrl: z.string().trim().max(500).optional(),
+    tagline: z.string().trim().max(200).optional(),
+    education: z.string().trim().max(2000).optional(),
+    teachingExperience: z.string().trim().max(4000).optional(),
+    teachingStyle: z.string().trim().max(4000).optional(),
+    achievements: z.string().trim().max(4000).optional(),
+    teachingYears: z.string().trim().max(40).optional(),
+    studentCount: z.string().trim().max(40).optional(),
+    practiceDuration: z.string().trim().max(40).optional(),
+    teachingPhilosophy: z.string().trim().max(4000).optional(),
+    bio: z.string().trim().max(4000).optional(),
+    specialties: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, { message: 'No changes supplied' });
+
 type TeacherRow = typeof schema.teachers.$inferSelect;
 
 function normalizeTeacherBody<T extends { practiceDuration?: string; retentionRate?: string }>(
@@ -298,6 +317,36 @@ export const teachingModule: AppModule = {
       return access;
     }
 
+    async function resolveTeacherDataScope(
+      access: Awaited<ReturnType<typeof requireTeacherAccessForAccount>>,
+    ) {
+      const teachers = await teachingRepo.listTeachers(app.db);
+      const currentTeacher = teachers.find((teacher) => teacher.id === access.teacherId);
+      if (!currentTeacher) {
+        throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
+      }
+      const institution = await teachingRepo.findInstitution(app.db, currentTeacher.institutionId);
+      const visibleTeacherIds = new Set(
+        access.isAdminTeacher
+          ? teachers
+              .filter(
+                (teacher) =>
+                  !currentTeacher.institutionId ||
+                  teacher.institutionId === currentTeacher.institutionId,
+              )
+              .map((teacher) => teacher.id)
+          : [access.teacherId],
+      );
+      return {
+        currentTeacher,
+        teachers,
+        teacherById: new Map(teachers.map((teacher) => [teacher.id, teacher])),
+        visibleTeacherIds,
+        institutionId: currentTeacher.institutionId,
+        institution,
+      };
+    }
+
     async function ensureSessionRosterSnapshot(sessionId: string) {
       const rows = await schedulingRepo.listSessionStudentRows(app.db, sessionId);
       if (rows.length > 0) return;
@@ -324,6 +373,50 @@ export const teachingModule: AppModule = {
           isAdminTeacher: access.isAdminTeacher,
           permissions: access.permissions,
         };
+      },
+    );
+
+    app.get(
+      '/public/teacher/profile',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const teacher = await teachingRepo.findTeacher(app.db, access.teacherId);
+        if (!teacher) throw notFound('Teacher not found');
+        const institution = await teachingRepo.findInstitution(app.db, teacher.institutionId);
+        return {
+          account: {
+            id: access.account.id,
+            displayName: access.account.displayName,
+            phone: access.account.phone,
+            email: access.account.email,
+            status: access.account.status,
+          },
+          teacher: toTeacherDto(teacher),
+          institution: institution
+            ? {
+                id: institution.id,
+                name: institution.name,
+                logoUrl: institution.logoUrl,
+              }
+            : null,
+        };
+      },
+    );
+
+    app.patch(
+      '/public/teacher/profile',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const body = teacherSelfProfileUpdateSchema.parse(request.body);
+        const teacher = await teachingRepo.updateTeacher(
+          app.db,
+          access.teacherId,
+          normalizeTeacherBody(body),
+        );
+        if (!teacher) throw notFound('Teacher not found');
+        return { teacher: toTeacherDto(teacher) };
       },
     );
 
@@ -539,7 +632,7 @@ export const teachingModule: AppModule = {
             });
           }
         }
-        let classroomId = body.classroomId;
+        const classroomId = body.classroomId;
         let campusId: string | undefined;
         if (classroomId) {
           const classroom = await teachingRepo.findClassroom(app.db, classroomId);
@@ -655,12 +748,49 @@ export const teachingModule: AppModule = {
       async (request) => {
         const access = await requireTeacherAccessForAccount(request.account!.id);
         requireTeacherPermission(access.permissions, 'viewAllStudents');
+        const dataScope = await resolveTeacherDataScope(access);
         const query = teacherStudentSearchSchema.parse(request.query);
-        const [students, lessonAccounts, courses] = await Promise.all([
+        const [students, lessonAccounts, courses, classes] = await Promise.all([
           peopleRepo.listStudents(app.db, { scope: 'all' }),
           app.db.select().from(schema.lessonAccounts),
           catalogRepo.listCourses(app.db),
+          schedulingRepo.listClasses(app.db),
         ]);
+        const institutionTeacherIds = new Set(
+          dataScope.teachers
+            .filter(
+              (teacher) =>
+                !dataScope.institutionId || teacher.institutionId === dataScope.institutionId,
+            )
+            .map((teacher) => teacher.id),
+        );
+        const institutionClasses = classes.filter((classGroup) =>
+          institutionTeacherIds.has(classGroup.teacherId),
+        );
+        const institutionEnrollments = (
+          await Promise.all(
+            institutionClasses.map((classGroup) =>
+              schedulingRepo.listEnrollments(app.db, classGroup.id),
+            ),
+          )
+        ).flat();
+        const institutionCourseIds = new Set(
+          courses
+            .filter(
+              (course) =>
+                !dataScope.institutionId ||
+                course.providerInstitutionId === dataScope.institutionId,
+            )
+            .map((course) => course.id),
+        );
+        const institutionStudentIds = new Set(
+          institutionEnrollments.map((enrollment) => enrollment.studentId),
+        );
+        for (const lessonAccount of lessonAccounts) {
+          if (institutionCourseIds.has(lessonAccount.courseId)) {
+            institutionStudentIds.add(lessonAccount.studentId);
+          }
+        }
         const search = query.search.toLocaleLowerCase('zh-CN');
         const eligibleStudentIds = query.courseId
           ? new Set(
@@ -671,6 +801,7 @@ export const teachingModule: AppModule = {
           : null;
         const filtered = students.filter((student) => {
           if (student.status !== 'active') return false;
+          if (dataScope.institutionId && !institutionStudentIds.has(student.id)) return false;
           if (eligibleStudentIds && !eligibleStudentIds.has(student.id)) return false;
           if (!search) return true;
           return [student.name, student.grade, student.school]
@@ -689,6 +820,7 @@ export const teachingModule: AppModule = {
               .filter(
                 (account) =>
                   account.studentId === student.id &&
+                  institutionCourseIds.has(account.courseId) &&
                   (!query.courseId || account.courseId === query.courseId),
               )
               .map((account) => ({
@@ -1069,6 +1201,7 @@ export const teachingModule: AppModule = {
       async (request) => {
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const account = { ...access.account, teacherId: access.teacherId };
+        const dataScope = await resolveTeacherDataScope(access);
 
         const [
           sessions,
@@ -1095,21 +1228,41 @@ export const teachingModule: AppModule = {
           lessonAccounts.map((item) => [`${item.studentId}:${item.courseId}`, item]),
         );
         const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
-        const mySessions = sessions.filter((session) =>
-          isTeacherAssignedToSession(session, account.teacherId!, assignedSessionIds),
+        const assignedClassIds = new Set(
+          sessions
+            .filter(
+              (session) =>
+                session.classId &&
+                isTeacherAssignedToSession(session, account.teacherId, assignedSessionIds),
+            )
+            .map((session) => session.classId!),
         );
-        const myClasses = classes.filter((item) => item.teacherId === account.teacherId);
+        const visibleClasses = classes.filter(
+          (classGroup) =>
+            dataScope.visibleTeacherIds.has(classGroup.teacherId) ||
+            assignedClassIds.has(classGroup.id),
+        );
+        const visibleClassIds = new Set(visibleClasses.map((classGroup) => classGroup.id));
+        const visibleSessions = sessions.filter(
+          (session) =>
+            isTeacherAssignedToSession(session, account.teacherId!, assignedSessionIds) ||
+            dataScope.visibleTeacherIds.has(session.teacherId) ||
+            Boolean(session.classId && visibleClassIds.has(session.classId)),
+        );
         const enrollmentsByClassId = new Map<
           string,
           Awaited<ReturnType<typeof schedulingRepo.listEnrollments>>
         >();
 
         const classCards = await Promise.all(
-          myClasses.map(async (classGroup) => {
+          visibleClasses.map(async (classGroup) => {
             const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
             enrollmentsByClassId.set(classGroup.id, enrollments);
+            const teacher = dataScope.teacherById.get(classGroup.teacherId);
             return {
               ...classGroup,
+              isMine: classGroup.teacherId === access.teacherId,
+              teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
               course: courseById.get(classGroup.courseId),
               classroom: classroomById.get(classGroup.classroomId),
               students: enrollments
@@ -1128,8 +1281,8 @@ export const teachingModule: AppModule = {
             };
           }),
         );
-        const mySessionClassIds = new Set(mySessions.map((session) => session.classId));
-        for (const classId of mySessionClassIds) {
+        const visibleSessionClassIds = new Set(visibleSessions.map((session) => session.classId));
+        for (const classId of visibleSessionClassIds) {
           if (!classId) continue;
           if (!enrollmentsByClassId.has(classId)) {
             enrollmentsByClassId.set(
@@ -1138,25 +1291,135 @@ export const teachingModule: AppModule = {
             );
           }
         }
-        const mySessionIds = mySessions.map((session) => session.id);
-        const rosterCounts = await Promise.all(
-          mySessionIds.map(async (sessionId) => ({
+        const visibleSessionIds = visibleSessions.map((session) => session.id);
+        const sessionRosters = await Promise.all(
+          visibleSessionIds.map(async (sessionId) => ({
             sessionId,
-            count: (await schedulingRepo.listSessionRoster(app.db, sessionId)).length,
+            roster: await schedulingRepo.listSessionRoster(app.db, sessionId),
           })),
         );
         const rosterCountBySessionId = new Map(
-          rosterCounts.map((item) => [item.sessionId, item.count]),
+          sessionRosters.map((item) => [item.sessionId, item.roster.length]),
         );
 
+        const ownClassIds = new Set(
+          visibleClasses
+            .filter((classGroup) => classGroup.teacherId === access.teacherId)
+            .map((classGroup) => classGroup.id),
+        );
+        const ownStudentIds = new Set<string>();
+        for (const [classId, enrollments] of enrollmentsByClassId) {
+          if (!ownClassIds.has(classId)) continue;
+          for (const enrollment of enrollments) ownStudentIds.add(enrollment.studentId);
+        }
+        for (const item of sessionRosters) {
+          const session = visibleSessions.find((candidate) => candidate.id === item.sessionId);
+          if (
+            session &&
+            isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds)
+          ) {
+            for (const rosterEntry of item.roster) ownStudentIds.add(rosterEntry.studentId);
+          }
+        }
+
+        const visibleCourseIds = new Set(
+          courses
+            .filter(
+              (course) =>
+                !dataScope.institutionId ||
+                course.providerInstitutionId === dataScope.institutionId,
+            )
+            .map((course) => course.id),
+        );
+        for (const classGroup of visibleClasses) visibleCourseIds.add(classGroup.courseId);
+        const visibleStudentIds = new Set(
+          Array.from(enrollmentsByClassId.values())
+            .flat()
+            .map((enrollment) => enrollment.studentId),
+        );
+        if (access.isAdminTeacher) {
+          if (!dataScope.institutionId) {
+            for (const student of students) {
+              if (student.status === 'active') visibleStudentIds.add(student.id);
+            }
+          } else {
+            for (const lessonAccount of lessonAccounts) {
+              if (visibleCourseIds.has(lessonAccount.courseId)) {
+                visibleStudentIds.add(lessonAccount.studentId);
+              }
+            }
+          }
+        }
+        const studentClasses = new Map<
+          string,
+          Array<{
+            id: string;
+            name: string;
+            isMine: boolean;
+            teacher: { id: string; name: string } | null;
+          }>
+        >();
+        for (const classGroup of visibleClasses) {
+          const teacher = dataScope.teacherById.get(classGroup.teacherId);
+          for (const enrollment of enrollmentsByClassId.get(classGroup.id) ?? []) {
+            studentClasses.set(enrollment.studentId, [
+              ...(studentClasses.get(enrollment.studentId) ?? []),
+              {
+                id: classGroup.id,
+                name: classGroup.name,
+                isMine: classGroup.teacherId === access.teacherId,
+                teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+              },
+            ]);
+          }
+        }
+        const dashboardStudents = students
+          .filter((student) => visibleStudentIds.has(student.id) && student.status !== 'archived')
+          .map((student) => ({
+            id: student.id,
+            name: student.name,
+            grade: student.grade,
+            school: student.school,
+            status: student.status,
+            institution: dataScope.institutionId
+              ? {
+                  id: dataScope.institutionId,
+                  name: dataScope.institution?.name ?? '所属机构',
+                }
+              : null,
+            isMyStudent: ownStudentIds.has(student.id),
+            classes: studentClasses.get(student.id) ?? [],
+            lessonAccounts: lessonAccounts
+              .filter(
+                (lessonAccount) =>
+                  lessonAccount.studentId === student.id &&
+                  visibleCourseIds.has(lessonAccount.courseId),
+              )
+              .map((lessonAccount) => ({
+                id: lessonAccount.id,
+                courseId: lessonAccount.courseId,
+                courseName: courseById.get(lessonAccount.courseId)?.name ?? '课程',
+                balance: lessonAccount.balance,
+              })),
+          }))
+          .sort(
+            (a, b) =>
+              Number(b.isMyStudent) - Number(a.isMyStudent) ||
+              a.name.localeCompare(b.name, 'zh-CN'),
+          );
+
         return {
-          sessions: mySessions.map((session) => {
+          students: dashboardStudents,
+          sessions: visibleSessions.map((session) => {
             const classGroup = session.classId ? classById.get(session.classId) : null;
+            const teacher = dataScope.teacherById.get(session.teacherId);
             const sessionAttendance = attendanceRecords.filter(
               (record) => record.classSessionId === session.id,
             );
             return {
               ...session,
+              isMine: isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds),
+              teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
               class: classGroup ? { name: classGroup.name } : undefined,
               course: courseById.get(session.courseId),
               classroom: classroomById.get(session.classroomId),
@@ -1166,6 +1429,10 @@ export const teachingModule: AppModule = {
             };
           }),
           classes: classCards,
+          scope: {
+            isInstitutionWide: access.isAdminTeacher,
+            institutionId: dataScope.institutionId,
+          },
         };
       },
     );
@@ -1308,6 +1575,7 @@ export const teachingModule: AppModule = {
       async (request) => {
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const account = { ...access.account, teacherId: access.teacherId };
+        const dataScope = await resolveTeacherDataScope(access);
         const query = teacherCalendarQuerySchema.parse(request.query);
         const from = query.from ? new Date(query.from) : undefined;
         const to = query.to ? new Date(query.to) : undefined;
@@ -1323,16 +1591,18 @@ export const teachingModule: AppModule = {
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
         const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
-        const mySessions = sessions.filter((session) =>
-          isTeacherAssignedToSession(session, account.teacherId!, assignedSessionIds),
+        const visibleClassIds = new Set(
+          classes
+            .filter((classGroup) => dataScope.visibleTeacherIds.has(classGroup.teacherId))
+            .map((classGroup) => classGroup.id),
         );
-        const mySessionClassIds = new Set(
-          mySessions.map((session) => session.classId).filter(Boolean),
+        const visibleSessions = sessions.filter(
+          (session) =>
+            isTeacherAssignedToSession(session, account.teacherId!, assignedSessionIds) ||
+            dataScope.visibleTeacherIds.has(session.teacherId) ||
+            Boolean(session.classId && visibleClassIds.has(session.classId)),
         );
-        const myClasses = classes.filter(
-          (item) => item.teacherId === account.teacherId || mySessionClassIds.has(item.id),
-        );
-        const mySessionIds = mySessions.map((session) => session.id);
+        const mySessionIds = visibleSessions.map((session) => session.id);
         const rosterCounts = await Promise.all(
           mySessionIds.map(async (sessionId) => ({
             sessionId,
@@ -1344,12 +1614,13 @@ export const teachingModule: AppModule = {
         );
 
         return {
-          events: mySessions
+          events: visibleSessions
             .filter((session) => overlapsRange(session, from, to))
             .map((session) => {
               const classGroup = session.classId ? classById.get(session.classId) : null;
               const course = courseById.get(session.courseId);
               const classroom = classroomById.get(session.classroomId);
+              const teacher = dataScope.teacherById.get(session.teacherId);
               const sessionAttendance = attendanceRecords.filter(
                 (record) => record.classSessionId === session.id,
               );
@@ -1360,7 +1631,15 @@ export const teachingModule: AppModule = {
                 startsAt: session.startsAt,
                 endsAt: session.endsAt,
                 status: session.status,
-                class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+                isMine: isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds),
+                teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+                class: classGroup
+                  ? {
+                      id: classGroup.id,
+                      name: classGroup.name,
+                      isMine: classGroup.teacherId === access.teacherId,
+                    }
+                  : null,
                 course: course ? { id: course.id, name: course.name } : null,
                 classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
                 lessonUnits: session.lessonUnits,
@@ -1374,21 +1653,34 @@ export const teachingModule: AppModule = {
       },
     );
 
-    // Resolves the authenticated teacher's session and asserts they own it, so a
-    // teacher can only read/record attendance for their own class sessions.
+    // Ordinary teachers can only operate their own sessions. A teacher who also
+    // has the administrator role can operate institution sessions while staying
+    // in the teacher workbench.
     async function requireOwnedSession(accountId: string, sessionId: string) {
       const access = await requireTeacherAccessForAccount(accountId);
       const account = { ...access.account, teacherId: access.teacherId };
+      const dataScope = await resolveTeacherDataScope(access);
       const session = await schedulingRepo.findSession(app.db, sessionId);
       if (!session) {
         throw notFound('Class session not found');
       }
       const assignments = await schedulingRepo.listClassSessionTeachers(app.db, [sessionId]);
       const assigned = assignments.some((assignment) => assignment.teacherId === account.teacherId);
-      if (session.teacherId !== account.teacherId && !assigned) {
+      const classGroup = session.classId
+        ? await schedulingRepo.findClass(app.db, session.classId)
+        : null;
+      const institutionVisible =
+        access.isAdminTeacher &&
+        (dataScope.visibleTeacherIds.has(session.teacherId) ||
+          Boolean(classGroup && dataScope.visibleTeacherIds.has(classGroup.teacherId)));
+      if (session.teacherId !== account.teacherId && !assigned && !institutionVisible) {
         throw Object.assign(new Error('无权操作该课次'), { statusCode: 403 });
       }
-      return { account, session };
+      return {
+        account,
+        session,
+        isMine: session.teacherId === account.teacherId || assigned,
+      };
     }
 
     async function requireTeacherAccount(accountId: string) {
@@ -1466,10 +1758,9 @@ export const teachingModule: AppModule = {
     }
 
     async function loadTeacherHomeworkScope(accountId: string) {
-      const account = await accountsRepo.findById(app.db, accountId);
-      if (!account?.teacherId) {
-        throw Object.assign(new Error('Teacher profile is not linked'), { statusCode: 422 });
-      }
+      const access = await requireTeacherAccessForAccount(accountId);
+      const account = { ...access.account, teacherId: access.teacherId };
+      const dataScope = await resolveTeacherDataScope(access);
 
       const [classes, courses, students, sessions, teachers] = await Promise.all([
         schedulingRepo.listClasses(app.db),
@@ -1478,10 +1769,24 @@ export const teachingModule: AppModule = {
         schedulingRepo.listClassSessions(app.db),
         teachingRepo.listTeachers(app.db),
       ]);
-      const myClasses = classes.filter((classGroup) => classGroup.teacherId === account.teacherId);
-      const myClassIds = new Set(myClasses.map((classGroup) => classGroup.id));
+      const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
+      const assignedClassIds = new Set(
+        sessions
+          .filter(
+            (session) =>
+              session.classId &&
+              isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds),
+          )
+          .map((session) => session.classId!),
+      );
+      const scopedClasses = classes.filter(
+        (classGroup) =>
+          dataScope.visibleTeacherIds.has(classGroup.teacherId) ||
+          assignedClassIds.has(classGroup.id),
+      );
+      const scopedClassIds = new Set(scopedClasses.map((classGroup) => classGroup.id));
       const mySessionIds = sessions
-        .filter((session) => Boolean(session.classId && myClassIds.has(session.classId)))
+        .filter((session) => Boolean(session.classId && scopedClassIds.has(session.classId)))
         .map((session) => session.id);
       const temporaryStudents = await schedulingRepo.listTemporaryStudentsForSessions(
         app.db,
@@ -1489,18 +1794,23 @@ export const teachingModule: AppModule = {
       );
       const enrollments = (
         await Promise.all(
-          myClasses.map((classGroup) => schedulingRepo.listEnrollments(app.db, classGroup.id)),
+          scopedClasses.map((classGroup) => schedulingRepo.listEnrollments(app.db, classGroup.id)),
         )
       ).flat();
       const studentIds = new Set(enrollments.map((enrollment) => enrollment.studentId));
       for (const temporaryStudent of temporaryStudents) {
         studentIds.add(temporaryStudent.studentId);
       }
-      const courseIds = new Set(myClasses.map((classGroup) => classGroup.courseId));
-      const classIds = new Set(myClasses.map((classGroup) => classGroup.id));
+      const courseIds = new Set(scopedClasses.map((classGroup) => classGroup.courseId));
+      const classIds = new Set(scopedClasses.map((classGroup) => classGroup.id));
+      const ownClassIds = new Set(
+        scopedClasses
+          .filter((classGroup) => classGroup.teacherId === access.teacherId)
+          .map((classGroup) => classGroup.id),
+      );
       const classByStudentCourse = new Map<string, typeof schema.classes.$inferSelect>();
 
-      for (const classGroup of myClasses) {
+      for (const classGroup of scopedClasses) {
         const classEnrollments = enrollments.filter(
           (enrollment) => enrollment.classId === classGroup.id,
         );
@@ -1524,6 +1834,7 @@ export const teachingModule: AppModule = {
       return {
         account,
         teacherId: account.teacherId,
+        ownClassIds,
         studentIds,
         courseIds,
         classIds,
@@ -1610,6 +1921,7 @@ export const teachingModule: AppModule = {
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
           reviewer: reviewer ? { id: reviewer.id, name: reviewer.name } : null,
+          isMine: Boolean(classGroup && scope.ownClassIds.has(classGroup.id)),
         };
       });
     }
@@ -1646,6 +1958,7 @@ export const teachingModule: AppModule = {
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
           teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+          isMine: Boolean(classGroup && scope.ownClassIds.has(classGroup.id)),
         };
       });
     }
@@ -1673,6 +1986,7 @@ export const teachingModule: AppModule = {
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
           teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+          isMine: Boolean(classGroup && scope.ownClassIds.has(classGroup.id)),
         };
       });
     }
@@ -1728,6 +2042,7 @@ export const teachingModule: AppModule = {
           session,
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
           teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+          isMine: Boolean(classGroup && scope.ownClassIds.has(classGroup.id)),
         };
       });
     }

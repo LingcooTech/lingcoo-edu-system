@@ -14,8 +14,8 @@ import {
   type HomeworkAssignment,
   type StudentWork,
   type TeacherCalendarEvent,
-  type TeacherClass,
   type TeacherClassOption,
+  type TeacherDashboardStudent,
 } from '../../services/api';
 import { toUserFacingMessage } from '../../utils/user-facing-message';
 
@@ -29,6 +29,8 @@ type StudentProfile = {
   classCount: number;
   totalBalance: number;
   totalStars: number;
+  institutionName: string;
+  isMyStudent: boolean;
 };
 
 type ClassRow = {
@@ -38,6 +40,8 @@ type ClassRow = {
   courseName: string;
   classroomName: string;
   balance: string;
+  teacherName: string;
+  isMine: boolean;
 };
 
 type ClassOptionRow = TeacherClassOption & {
@@ -53,6 +57,7 @@ type AttendanceRow = {
   className: string;
   statusLabel: string;
   lessonDelta: number;
+  scopeLabel: string;
 };
 
 type FeedbackRow = {
@@ -64,6 +69,7 @@ type FeedbackRow = {
   rating: number;
   ratingLabel: string;
   assignmentContent: string;
+  scopeLabel: string;
 };
 
 type HomeworkRow = {
@@ -75,6 +81,7 @@ type HomeworkRow = {
   teacherFeedback: string;
   rating: number;
   ratingLabel: string;
+  scopeLabel: string;
 };
 
 type WorkRow = StudentWork & {
@@ -83,6 +90,7 @@ type WorkRow = StudentWork & {
   courseName: string;
   className: string;
   coverUrl: string;
+  scopeLabel: string;
 };
 
 type ActiveTab = 'overview' | 'attendance' | 'interactions' | 'homework' | 'works';
@@ -135,14 +143,6 @@ function ratingLabel(rating?: number | null) {
   return rating && rating > 0 ? `${rating} 星` : '未评分';
 }
 
-function findStudent(classes: TeacherClass[], studentId: string) {
-  for (const classGroup of classes) {
-    const student = classGroup.students.find((item) => item.id === studentId);
-    if (student) return student;
-  }
-  return null;
-}
-
 function toWorkRow(item: StudentWork): WorkRow {
   return {
     ...item,
@@ -151,6 +151,7 @@ function toWorkRow(item: StudentWork): WorkRow {
     courseName: item.course?.name || '课程',
     className: item.class?.name || '',
     coverUrl: item.imageUrls[0] || '',
+    scopeLabel: item.isMine !== false ? '我的学员' : item.teacher?.name || '机构学员',
   };
 }
 
@@ -183,7 +184,12 @@ Page({
     maxWorkImages: MAX_WORK_IMAGES,
   },
 
-  onLoad(query: { studentId?: string; courseId?: string; notificationId?: string; tab?: ActiveTab }) {
+  onLoad(query: {
+    studentId?: string;
+    courseId?: string;
+    notificationId?: string;
+    tab?: ActiveTab;
+  }) {
     const activeTab = query.tab || 'overview';
     this.setData({
       studentId: query.studentId || '',
@@ -231,25 +237,30 @@ Page({
           : Promise.resolve(null),
         fetchTeacherStudentWorks(),
       ]);
-      const student = findStudent(dashboard.classes, studentId);
+      const student = dashboard.students.find((item) => item.id === studentId) ?? null;
       if (!student && !classOptionsPayload?.student) {
         throw new Error('暂无权限查看该学员');
       }
 
+      const balanceByCourseId = new Map(
+        (student?.lessonAccounts ?? []).map((item) => [item.courseId, item.balance]),
+      );
       const classRows = dashboard.classes
         .filter((classGroup) => classGroup.students.some((item) => item.id === studentId))
         .map((classGroup) => {
           const classStudent = classGroup.students.find((item) => item.id === studentId);
+          const balance =
+            (classGroup.course?.id ? balanceByCourseId.get(classGroup.course.id) : undefined) ??
+            classStudent?.lessonBalance;
           return {
             id: classGroup.id,
             courseId: classGroup.course?.id || '',
             name: classGroup.name,
             courseName: classGroup.course?.name || '课程',
             classroomName: classGroup.classroom?.name || '教室待确认',
-            balance:
-              classStudent?.lessonBalance === null || classStudent?.lessonBalance === undefined
-                ? '-'
-                : String(classStudent.lessonBalance),
+            balance: balance === null || balance === undefined ? '-' : String(balance),
+            teacherName: classGroup.teacher?.name || '',
+            isMine: classGroup.isMine !== false,
           };
         });
       const classIds = new Set(classRows.map((item) => item.id));
@@ -281,6 +292,8 @@ Page({
                 className: event?.class?.name || payload.class?.name || '班级',
                 statusLabel: ATTENDANCE_STATUS_LABEL[record.status] ?? '未知状态',
                 lessonDelta: record.lessonDelta,
+                scopeLabel:
+                  event?.isMine !== false ? '我的课次' : event?.teacher?.name || '机构课次',
               };
             }),
         )
@@ -308,6 +321,7 @@ Page({
             rating: item.rating || 0,
             ratingLabel: ratingLabel(item.rating),
             assignmentContent: (personal ?? classAssignment)?.content || '',
+            scopeLabel: item.isMine !== false ? '我的学员' : item.teacher?.name || '机构学员',
           };
         });
       const homeworkRows = homeworkCheckIns
@@ -322,6 +336,7 @@ Page({
           teacherFeedback: item.teacherFeedback || '',
           rating: item.rating || 0,
           ratingLabel: ratingLabel(item.rating),
+          scopeLabel: item.isMine !== false ? '我的学员' : '机构学员',
         }));
       const totalStars =
         feedbackRows.reduce((sum, item) => sum + item.rating, 0) +
@@ -339,11 +354,11 @@ Page({
                 ? '开课中'
                 : item.status),
         })) ?? [];
-      const profileStudent = student ?? classOptionsPayload!.student;
-      const optionBalance = classOptionsPayload?.lessonAccounts.reduce(
-        (sum, item) => sum + item.balance,
-        0,
-      ) ?? 0;
+      const profileStudent = (student ?? classOptionsPayload!.student) as
+        | TeacherDashboardStudent
+        | NonNullable<typeof classOptionsPayload>['student'];
+      const optionBalance =
+        classOptionsPayload?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) ?? 0;
 
       this.setData({
         loading: false,
@@ -354,9 +369,11 @@ Page({
           school: profileStudent.school || '',
           classCount: classRows.length,
           totalBalance:
-            classRows.reduce((sum, item) => sum + (Number(item.balance) || 0), 0) ||
-            optionBalance,
+            student?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) || optionBalance,
           totalStars,
+          institutionName:
+            ('institution' in profileStudent && profileStudent.institution?.name) || '所属机构',
+          isMyStudent: 'isMyStudent' in profileStudent ? profileStudent.isMyStudent : true,
         },
         classes: classRows,
         classOptions,
@@ -430,7 +447,10 @@ Page({
       try {
         uploaded.push(await this.uploadOneWorkImage(filePath));
       } catch (error) {
-        wx.showToast({ title: error instanceof Error ? error.message : '图片上传失败', icon: 'none' });
+        wx.showToast({
+          title: error instanceof Error ? error.message : '图片上传失败',
+          icon: 'none',
+        });
       }
     }
     wx.hideLoading();

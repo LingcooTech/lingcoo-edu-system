@@ -11,6 +11,7 @@ import {
   fetchParentNotifications,
   fetchParentOrders,
   fetchParentSeatReservations,
+  fetchTeacherProfile,
   hasToken,
   logout,
   setToken,
@@ -19,6 +20,7 @@ import {
   wechatMiniLogin,
   type AuthAccount,
   type ParentSeatReservation,
+  type TeacherOwnProfile,
 } from '../../services/api';
 import {
   orderStatusLabel,
@@ -158,6 +160,8 @@ Page({
     bindToken: '',
     loginSheetVisible: false,
     account: null as AuthAccount | null,
+    teacherProfile: null as TeacherOwnProfile | null,
+    teacherProfileLoading: false,
     canSwitchWorkRole: false,
     switchingRole: false,
     defaultPassword: '',
@@ -188,10 +192,7 @@ Page({
         return;
       }
       if (this.data.account?.role === 'teacher') {
-        const panel = this.selectComponent('#teacherWorkbench') as {
-          refresh?: () => Promise<void>;
-        } | null;
-        Promise.resolve(panel?.refresh?.()).finally(() => wx.stopPullDownRefresh());
+        this.loadTeacherProfile().finally(() => wx.stopPullDownRefresh());
         return;
       }
       this.loadSummary().finally(() => wx.stopPullDownRefresh());
@@ -244,6 +245,35 @@ Page({
       bindToken: '',
       avatarText: source.slice(0, 1).toUpperCase(),
     });
+    if (account.role === 'teacher') {
+      void this.loadTeacherProfile();
+    } else {
+      this.setData({ teacherProfile: null, teacherProfileLoading: false });
+    }
+  },
+
+  async loadTeacherProfile() {
+    if (this.data.account?.role !== 'teacher') return;
+    this.setData({ teacherProfileLoading: true });
+    try {
+      const teacherProfile = await fetchTeacherProfile();
+      const source =
+        teacherProfile.teacher.name ||
+        teacherProfile.account.displayName ||
+        teacherProfile.account.phone ||
+        '我';
+      this.setData({
+        teacherProfile,
+        avatarText: source.slice(0, 1).toUpperCase(),
+      });
+    } catch (error) {
+      wx.showToast({
+        title: error instanceof Error ? error.message : '老师资料加载失败',
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ teacherProfileLoading: false });
+    }
   },
 
   async loadSummary() {
@@ -313,6 +343,8 @@ Page({
   resetAccountState() {
     this.setData({
       account: null,
+      teacherProfile: null,
+      teacherProfileLoading: false,
       canSwitchWorkRole: false,
       switchingRole: false,
       bindToken: '',
@@ -340,6 +372,9 @@ Page({
         title: targetRole === 'admin' ? '已切到管理看板' : '已切到老师工作台',
         icon: 'success',
       });
+      if (targetRole === 'teacher') {
+        setTimeout(() => this.openTeacherWorkbench(), 300);
+      }
     } catch (error) {
       wx.showToast({
         title: error instanceof Error ? error.message : '切换身份失败',
@@ -401,6 +436,9 @@ Page({
               this.setData({ defaultPassword: '', bindToken: '', loginSheetVisible: false });
               this.updateTabBadge(0);
               wx.showToast({ title: '登录成功', icon: 'success' });
+              if (payload.account.role === 'teacher') {
+                setTimeout(() => this.openTeacherWorkbench(), 300);
+              }
               return;
             }
             this.applyAccount(payload.account);
@@ -455,6 +493,13 @@ Page({
     return;
   },
 
+  openTeacherWorkbench() {
+    wx.navigateTo({
+      url: '/pages/teacher-workbench/index',
+      fail: () => wx.redirectTo({ url: '/pages/teacher-workbench/index' }),
+    });
+  },
+
   async bindPhoneWithToken(bindToken: string, input: { phoneCode?: string; displayName?: string }) {
     if (!bindToken) {
       wx.showToast({ title: '请先完成快捷登录', icon: 'none' });
@@ -473,6 +518,9 @@ Page({
       if (payload.account.role === 'admin' || payload.account.role === 'teacher') {
         this.updateTabBadge(0);
         wx.showToast({ title: '绑定成功', icon: 'success' });
+        if (payload.account.role === 'teacher') {
+          setTimeout(() => this.openTeacherWorkbench(), 300);
+        }
         return;
       }
       await this.loadSummary();
@@ -494,7 +542,10 @@ Page({
   onPhoneAuth(event: PhoneAuthEvent) {
     const code = event.detail.code;
     if (!code) {
-      wx.showToast({ title: toUserFacingMessage(event.detail.errMsg, '未授权手机号'), icon: 'none' });
+      wx.showToast({
+        title: toUserFacingMessage(event.detail.errMsg, '未授权手机号'),
+        icon: 'none',
+      });
       return;
     }
     this.bindPhone({ phoneCode: code });

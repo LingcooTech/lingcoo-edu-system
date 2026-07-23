@@ -51,7 +51,7 @@
       </view>
     </view>
 
-    <view class="tabs">
+    <view class="quick-grid">
       <view
         wx:for="{{viewTabs}}"
         wx:key="key"
@@ -59,10 +59,11 @@
         data-key="{{item.key}}"
         bindtap="switchView"
       >
-        <view class="tab-icon">
-          <image class="tab-icon-image" src="{{item.iconSrc}}" mode="aspectFit" />
+        <view class="quick-icon">
+          <image class="quick-icon-image" src="{{item.iconSrc}}" mode="aspectFit" />
+          <view wx:if="{{item.badge}}" class="quick-badge">{{item.badge > 99 ? '99+' : item.badge}}</view>
         </view>
-        <view class="tab-label">{{item.label}}</view>
+        <view class="quick-label">{{item.label}}</view>
       </view>
     </view>
 
@@ -107,18 +108,35 @@
             <view class="calendar-toggle" bindtap="toggleCalendar">{{calendarExpanded ? '收起' : '展开'}}</view>
           </view>
         </view>
-        <view wx:if="{{!calendarExpanded}}" class="week-row">
-          <view
-            wx:for="{{weekDays}}"
-            wx:key="key"
-            class="{{item.className}}"
-            data-key="{{item.key}}"
-            bindtap="selectDay"
-          >
-            <view class="day-label">{{item.label}}</view>
-            <view class="day-num">{{item.day}}</view>
+        <scroll-view
+          wx:if="{{!calendarExpanded}}"
+          class="date-strip"
+          scroll-x
+          enhanced
+          enable-flex
+          show-scrollbar="{{false}}"
+          scroll-with-animation
+          scroll-into-view="{{selectedDateAnchor}}"
+          upper-threshold="80"
+          lower-threshold="80"
+          bindscroll="onDateStripScroll"
+          bindscrolltoupper="extendDateStripBackward"
+          bindscrolltolower="extendDateStripForward"
+        >
+          <view class="date-strip-track">
+            <view
+              wx:for="{{dateStripDays}}"
+              wx:key="key"
+              id="{{item.anchorId}}"
+              class="{{item.className}}"
+              data-key="{{item.key}}"
+              bindtap="selectDay"
+            >
+              <view class="day-label">{{item.label}}</view>
+              <view class="day-num">{{item.day}}</view>
+            </view>
           </view>
-        </view>
+        </scroll-view>
         <view wx:else>
           <view class="month-weekdays">
             <view wx:for="{{monthWeekdays}}" wx:key="*this">周{{item}}</view>
@@ -142,7 +160,7 @@
               <view>
                 <view class="session-time">{{item.timeLabel}}</view>
                 <view class="session-class">{{item.className}}</view>
-                <view class="card-meta">{{item.classroomName}} · {{item.title}}</view>
+                <view class="card-meta">{{item.classroomName}} · {{item.title}} · {{item.scopeLabel}}</view>
               </view>
               <view class="status-text">{{item.statusLabel}}</view>
             </view>
@@ -150,12 +168,60 @@
               <view class="card-meta">
                 已签 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
               </view>
-              <button class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">签到</button>
+              <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">签到</button>
+              <view wx:else class="pill subtle">仅查看</view>
             </view>
           </view>
         </view>
         <view wx:else class="empty-card">当天暂无课程。</view>
       </view>
+    </block>
+
+    <block wx:elif="{{activeView == 'rollcall'}}">
+      <view class="section-title">今日待点名</view>
+      <view wx:if="{{rollCallEvents.length}}" class="list">
+        <view wx:for="{{rollCallEvents}}" wx:key="id" class="card compact-card">
+          <view class="row-between">
+            <view>
+              <view class="card-title">{{item.className}} · {{item.title}}</view>
+              <view class="card-meta">{{item.timeLabel}} · {{item.courseName}} · {{item.scopeLabel}}</view>
+            </view>
+            <view class="pill">{{item.statusLabel}}</view>
+          </view>
+          <view class="session-foot">
+            <view class="card-meta">
+              已签 {{item.attendanceCount}}/{{item.rosterCount}} · {{item.classroomName}}
+            </view>
+            <button class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">开始点名</button>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">今天没有待点名课次。</view>
+    </block>
+
+    <block wx:elif="{{activeView == 'records'}}">
+      <view class="section-title">上课记录</view>
+      <view wx:if="{{recordEvents.length}}" class="list">
+        <view wx:for="{{recordEvents}}" wx:key="id" class="card compact-card">
+          <view class="row-between">
+            <view>
+              <view class="card-title">{{item.className}} · {{item.title}}</view>
+              <view class="card-meta">
+                {{item.dateLabel}} · {{item.timeLabel}} · {{item.courseName}} · {{item.scopeLabel}}
+              </view>
+            </view>
+            <view class="pill subtle">{{item.statusLabel}}</view>
+          </view>
+          <view class="session-foot">
+            <view class="card-meta">
+              已签 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
+            </view>
+            <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">查看点名</button>
+            <view wx:else class="pill subtle">仅查看</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="card empty-card">暂无上课记录。</view>
     </block>
 
     <block wx:elif="{{activeView == 'classes'}}">
@@ -168,7 +234,7 @@
           <view class="row-between">
             <view>
               <view class="card-title">{{item.name}}</view>
-              <view class="card-meta">{{item.courseName}} · {{item.classroomName}}</view>
+              <view class="card-meta">{{item.courseName}} · {{item.classroomName}} · {{item.scopeLabel}}</view>
             </view>
             <view class="pill subtle">{{item.statusLabel}}</view>
           </view>
@@ -203,7 +269,7 @@
             </view>
           </view>
           <button
-            wx:if="{{canManageClasses}}"
+            wx:if="{{canManageClasses && item.isMine}}"
             class="class-manage-button"
             data-id="{{item.id}}"
             catchtap="openClassManage"
@@ -214,7 +280,7 @@
     </block>
 
     <block wx:elif="{{activeView == 'students'}}">
-      <view class="section-title">成员</view>
+      <view class="section-title">学员</view>
       <view wx:if="{{students.length}}" class="list">
         <view wx:for="{{students}}" wx:key="id" class="card student-card student-link" data-id="{{item.id}}" bindtap="openStudentDetail">
           <view class="row-between">
@@ -222,11 +288,18 @@
               <view class="card-title">{{item.name}}</view>
               <view class="card-meta">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
             </view>
-            <view class="pill">{{item.classes.length}} 个班级</view>
+            <view class="pill">{{item.isMyStudent ? '我的学员' : item.institutionName}}</view>
           </view>
           <view class="chip-row">
-            <view wx:for="{{item.classes}}" wx:key="*this" class="chip">{{item}}</view>
+            <view
+              wx:for="{{item.classes}}"
+              wx:key="id"
+              class="{{item.isMine ? 'chip chip-mine' : 'chip'}}"
+            >
+              {{item.name}}{{item.isMine ? ' · 我的班级' : (item.teacherName ? ' · ' + item.teacherName : '')}}
+            </view>
           </view>
+          <view wx:if="{{!item.classes.length}}" class="card-meta">暂未加入班级</view>
           <view class="balance-list">
             <view wx:for="{{item.balances}}" wx:key="courseName" class="balance-row">
               <view>{{item.courseName}}</view>
@@ -256,13 +329,14 @@
           <view class="row-between">
             <view>
               <view class="card-title">{{item.className}} · {{item.title}}</view>
-              <view class="card-meta">{{item.dateLabel}} · {{item.timeLabel}} · {{item.courseName}}</view>
+              <view class="card-meta">{{item.dateLabel}} · {{item.timeLabel}} · {{item.courseName}} · {{item.scopeLabel}}</view>
             </view>
             <view class="pill">{{item.interactionStatusLabel}}</view>
           </view>
           <view class="session-foot">
             <view class="card-meta">{{item.classroomName}}</view>
-            <button class="mini-button" data-id="{{item.id}}" catchtap="openFeedback">做互动</button>
+            <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openFeedback">做互动</button>
+            <view wx:else class="pill subtle">仅查看</view>
           </view>
         </view>
       </view>
@@ -276,7 +350,7 @@
           <view class="row-between">
             <view>
               <view class="card-title">{{item.studentName}} · {{item.courseName}}</view>
-              <view class="card-meta">{{item.className}} · {{item.dateLabel}}</view>
+              <view class="card-meta">{{item.className}} · {{item.dateLabel}} · {{item.scopeLabel}}</view>
             </view>
             <view class="pill">{{item.statusLabel}}</view>
           </view>
