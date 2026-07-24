@@ -834,6 +834,7 @@ export interface TeacherClassSession {
 
 export interface TeacherClass {
   id: string;
+  campusId: string;
   name: string;
   status: string;
   capacity: number;
@@ -843,6 +844,7 @@ export interface TeacherClass {
   classroomId?: string;
   course?: { id: string; name: string };
   classroom?: { id?: string; name: string };
+  campus?: { id: string; name: string } | null;
   students: Array<{
     id: string;
     enrollmentId?: string;
@@ -867,6 +869,7 @@ export interface TeacherDashboardStudent {
     name: string;
     isMine: boolean;
     teacher?: { id: string; name: string } | null;
+    campus?: { id: string; name: string } | null;
   }>;
   lessonAccounts: Array<{
     id: string;

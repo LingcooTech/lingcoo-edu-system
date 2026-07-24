@@ -41,21 +41,18 @@ type MiniInputEvent = {
   detail: { value: string };
 };
 type MiniPickerEvent = { detail: { value: string | number } };
-type MiniSliderEvent = { detail: { value: number } };
 
 interface StudentRow {
   id: string;
   name: string;
-  avatarText: string;
-  grade: string;
-  school: string;
-  institutionName: string;
   isMyStudent: boolean;
   classes: Array<{
     id: string;
     name: string;
     isMine: boolean;
     teacherName: string;
+    campusId: string;
+    campusName: string;
   }>;
   balances: Array<{
     courseId: string;
@@ -464,13 +461,19 @@ Component({
     allStudents: [] as StudentRow[],
     students: [] as StudentRow[],
     studentSearchKeyword: '',
+    studentCampusFilterIndex: 0,
     studentClassFilterIndex: 0,
     studentCourseFilterIndex: 0,
+    studentLessonFilterIndex: 0,
+    studentCampusFilterOptions: [{ id: '', label: '全部校区' }] as StudentFilterOption[],
     studentClassFilterOptions: [{ id: '', label: '全部班级' }] as StudentFilterOption[],
     studentCourseFilterOptions: [{ id: '', label: '全部课程' }] as StudentFilterOption[],
-    studentBalanceFilterMax: 20,
-    studentBalanceFilterValue: 20,
-    studentBalanceFilterLabel: '不限',
+    studentLessonFilterOptions: [
+      { id: '', label: '全部课时' },
+      { id: 'lte3', label: '≤3课时' },
+      { id: '4to10', label: '4-10课时' },
+      { id: 'gt10', label: '>10课时' },
+    ] as StudentFilterOption[],
     studentFilteredCount: 0,
     studentPage: 1,
     studentPageSize: 15,
@@ -585,6 +588,16 @@ Component({
             label: classGroup.name,
           })),
         ];
+        const campusOptionMap = new Map<string, string>();
+        for (const classGroup of normalizedClasses) {
+          if (classGroup.campus?.id) {
+            campusOptionMap.set(classGroup.campus.id, classGroup.campus.name);
+          }
+        }
+        const campusFilterOptions: StudentFilterOption[] = [
+          { id: '', label: '全部校区' },
+          ...Array.from(campusOptionMap, ([id, label]) => ({ id, label })),
+        ];
         const courseOptionMap = new Map<string, string>();
         for (const student of studentRows) {
           for (const balance of student.balances) {
@@ -595,21 +608,19 @@ Component({
           { id: '', label: '全部课程' },
           ...Array.from(courseOptionMap, ([id, label]) => ({ id, label })),
         ];
-        const rawBalanceMax = Math.max(20, ...studentRows.map((student) => student.totalRemaining));
-        const balanceFilterMax = Math.ceil(rawBalanceMax / 5) * 5;
         this.setData({
           loading: false,
           calendarEvents: calendarItems,
           classes: normalizedClasses,
           allStudents: studentRows,
           students: studentRows.slice(0, this.data.studentPageSize),
+          studentCampusFilterOptions: campusFilterOptions,
           studentClassFilterOptions: classFilterOptions,
           studentCourseFilterOptions: courseFilterOptions,
+          studentCampusFilterIndex: 0,
           studentClassFilterIndex: 0,
           studentCourseFilterIndex: 0,
-          studentBalanceFilterMax: balanceFilterMax,
-          studentBalanceFilterValue: balanceFilterMax,
-          studentBalanceFilterLabel: '不限',
+          studentLessonFilterIndex: 0,
           studentFilteredCount: studentRows.length,
           studentPage: 1,
           studentTotalPages: Math.max(1, Math.ceil(studentRows.length / this.data.studentPageSize)),
@@ -656,22 +667,20 @@ Component({
               courseName: lessonAccount.courseName,
               balance: lessonAccount.balance,
               totalLessons,
-              lessonCountLabel: `${lessonAccount.balance}/${totalLessons ?? '-'}`,
+              lessonCountLabel: `剩余${lessonAccount.balance}/总计${totalLessons ?? '-'}`,
             };
           });
           return {
             id: student.id,
             name: student.name,
-            avatarText: student.name.slice(0, 1),
-            grade: student.grade,
-            school: student.school || '',
-            institutionName: student.institution?.name || '机构学员',
             isMyStudent: student.isMyStudent,
             classes: (student.classes ?? []).map((classGroup) => ({
               id: classGroup.id,
               name: classGroup.name,
               isMine: classGroup.isMine,
               teacherName: classGroup.teacher?.name || '',
+              campusId: classGroup.campus?.id || '',
+              campusName: classGroup.campus?.name || '',
             })),
             balances,
             totalRemaining: balances.reduce((sum, balance) => sum + (balance.balance ?? 0), 0),
@@ -685,10 +694,6 @@ Component({
           const current = rows.get(student.id) ?? {
             id: student.id,
             name: student.name,
-            avatarText: student.name.slice(0, 1),
-            grade: student.grade,
-            school: student.school || '',
-            institutionName: '机构学员',
             isMyStudent: true,
             classes: [],
             balances: [],
@@ -699,6 +704,8 @@ Component({
             name: classGroup.name,
             isMine: true,
             teacherName: '',
+            campusId: classGroup.campus?.id || classGroup.campusId || '',
+            campusName: classGroup.campus?.name || '',
           });
           if (classGroup.course?.name) {
             const balance =
@@ -710,7 +717,7 @@ Component({
               courseName: classGroup.course.name,
               balance,
               totalLessons: null,
-              lessonCountLabel: balance === null ? '-/-' : `${balance}/-`,
+              lessonCountLabel: balance === null ? '剩余-/总计-' : `剩余${balance}/总计-`,
             });
             current.totalRemaining += balance ?? 0;
           }
@@ -724,19 +731,21 @@ Component({
       const keyword = String(this.data.studentSearchKeyword || '')
         .trim()
         .toLocaleLowerCase('zh-CN');
+      const campusOptions = this.data.studentCampusFilterOptions as StudentFilterOption[];
       const classOptions = this.data.studentClassFilterOptions as StudentFilterOption[];
       const courseOptions = this.data.studentCourseFilterOptions as StudentFilterOption[];
+      const lessonOptions = this.data.studentLessonFilterOptions as StudentFilterOption[];
+      const campusId = campusOptions[this.data.studentCampusFilterIndex]?.id || '';
       const classId = classOptions[this.data.studentClassFilterIndex]?.id || '';
       const courseId = courseOptions[this.data.studentCourseFilterIndex]?.id || '';
-      const balanceLimit = Number(this.data.studentBalanceFilterValue);
-      const balanceMax = Number(this.data.studentBalanceFilterMax);
-      const balanceLimited = balanceLimit < balanceMax;
+      const lessonRange = lessonOptions[this.data.studentLessonFilterIndex]?.id || '';
       const filtered = (this.data.allStudents as StudentRow[]).filter((student) => {
+        if (keyword && !student.name.toLocaleLowerCase('zh-CN').includes(keyword)) {
+          return false;
+        }
         if (
-          keyword &&
-          ![student.name, student.grade, student.school]
-            .filter(Boolean)
-            .some((value) => value.toLocaleLowerCase('zh-CN').includes(keyword))
+          campusId &&
+          !student.classes.some((classGroup) => classGroup.campusId === campusId)
         ) {
           return false;
         }
@@ -750,7 +759,10 @@ Component({
           return false;
         }
         const remaining = targetBalances.reduce((sum, balance) => sum + (balance.balance ?? 0), 0);
-        return !balanceLimited || remaining <= balanceLimit;
+        if (lessonRange === 'lte3') return remaining <= 3;
+        if (lessonRange === '4to10') return remaining >= 4 && remaining <= 10;
+        if (lessonRange === 'gt10') return remaining > 10;
+        return true;
       });
       const totalPages = Math.max(1, Math.ceil(filtered.length / this.data.studentPageSize));
       const requestedPage = resetPage ? 1 : Number(this.data.studentPage);
@@ -761,12 +773,16 @@ Component({
         studentFilteredCount: filtered.length,
         studentPage: page,
         studentTotalPages: totalPages,
-        studentBalanceFilterLabel: balanceLimited ? `≤ ${balanceLimit} 课时` : '不限',
       });
     },
 
     onStudentSearchInput(event: MiniInputEvent) {
       this.setData({ studentSearchKeyword: event.detail.value });
+      this.applyStudentFilters(true);
+    },
+
+    onStudentCampusFilterChange(event: MiniPickerEvent) {
+      this.setData({ studentCampusFilterIndex: Number(event.detail.value) || 0 });
       this.applyStudentFilters(true);
     },
 
@@ -780,17 +796,18 @@ Component({
       this.applyStudentFilters(true);
     },
 
-    onStudentBalanceFilterChange(event: MiniSliderEvent) {
-      this.setData({ studentBalanceFilterValue: Number(event.detail.value) });
+    onStudentLessonFilterChange(event: MiniPickerEvent) {
+      this.setData({ studentLessonFilterIndex: Number(event.detail.value) || 0 });
       this.applyStudentFilters(true);
     },
 
     resetStudentFilters() {
       this.setData({
         studentSearchKeyword: '',
+        studentCampusFilterIndex: 0,
         studentClassFilterIndex: 0,
         studentCourseFilterIndex: 0,
-        studentBalanceFilterValue: this.data.studentBalanceFilterMax,
+        studentLessonFilterIndex: 0,
       });
       this.applyStudentFilters(true);
     },

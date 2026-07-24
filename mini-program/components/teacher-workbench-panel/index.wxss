@@ -783,47 +783,38 @@
   margin-top: 14rpx;
 }
 
-.student-filter-picker {
+.student-filter-grid > picker {
   min-width: 0;
-  border-radius: 18rpx;
-  background: #f7f5f2;
-  padding: 16rpx 18rpx;
 }
 
-.student-filter-label {
-  color: #8b857c;
-  font-size: 20rpx;
-  font-weight: 750;
+.student-filter-picker {
+  display: flex;
+  min-height: 66rpx;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  border-radius: 18rpx;
+  background: #f7f5f2;
+  padding: 0 18rpx;
 }
 
 .student-filter-value {
-  margin-top: 6rpx;
+  display: block;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   color: #211f1c;
-  font-size: 24rpx;
-  font-weight: 850;
+  font-size: 22rpx;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.student-balance-filter {
-  margin-top: 14rpx;
-  border-radius: 18rpx;
-  background: #f7f5f2;
-  padding: 16rpx 18rpx 8rpx;
-}
-
-.student-filter-hint {
-  margin-top: 5rpx;
-  color: #a19a91;
-  font-size: 18rpx;
-}
-
-.student-balance-value {
+.student-filter-arrow {
   flex-shrink: 0;
-  color: #9a6a4b;
-  font-size: 23rpx;
-  font-weight: 900;
+  color: #9a948b;
+  font-size: 20rpx;
 }
 
 .student-filter-footer {
@@ -842,46 +833,24 @@
 
 .student-compact-list {
   display: grid;
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
 .student-card-compact {
-  padding: 20rpx 22rpx;
-}
-
-.student-compact-head,
-.student-identity {
-  display: flex;
-  min-width: 0;
-  align-items: center;
+  padding: 16rpx 20rpx;
 }
 
 .student-compact-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
   justify-content: space-between;
   gap: 14rpx;
 }
 
-.student-identity {
-  gap: 14rpx;
-}
-
-.student-avatar {
-  display: flex;
-  width: 58rpx;
-  height: 58rpx;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 18rpx;
-  background: #f2e5d9;
-  color: #9a6a4b;
-  font-size: 25rpx;
-  font-weight: 900;
-}
-
 .student-compact-name {
   color: #211f1c;
-  font-size: 28rpx;
+  font-size: 27rpx;
   font-weight: 900;
   line-height: 1.25;
 }
@@ -904,8 +873,8 @@
 .student-compact-classes {
   display: flex;
   flex-wrap: wrap;
-  gap: 8rpx;
-  margin-top: 14rpx;
+  gap: 6rpx;
+  margin-top: 10rpx;
 }
 
 .student-class-tag {
@@ -923,10 +892,10 @@
 
 .student-lesson-grid {
   display: grid;
-  gap: 6rpx;
-  margin-top: 12rpx;
+  gap: 4rpx;
+  margin-top: 8rpx;
   border-top: 1rpx solid rgba(33, 31, 28, 0.06);
-  padding-top: 10rpx;
+  padding-top: 8rpx;
 }
 
 .student-lesson-row {
@@ -950,12 +919,6 @@
   flex-shrink: 0;
   color: #211f1c;
   font-weight: 900;
-}
-
-.student-lesson-unit {
-  color: #9a948b;
-  font-size: 18rpx;
-  font-weight: 650;
 }
 
 .student-pagination {

@@ -1367,6 +1367,7 @@ export const teachingModule: AppModule = {
           classes,
           courses,
           classrooms,
+          campuses,
           students,
           attendanceRecords,
           lessonAccounts,
@@ -1375,6 +1376,7 @@ export const teachingModule: AppModule = {
           schedulingRepo.listClasses(app.db),
           catalogRepo.listCourses(app.db),
           teachingRepo.listClassrooms(app.db),
+          organizationRepo.listCampuses(app.db),
           peopleRepo.listStudents(app.db),
           app.db.select().from(schema.attendanceRecords),
           app.db.select().from(schema.lessonAccounts),
@@ -1382,6 +1384,7 @@ export const teachingModule: AppModule = {
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+        const campusById = new Map(campuses.map((item) => [item.id, item]));
         const studentById = new Map(students.map((item) => [item.id, item]));
         const lessonAccountByStudentCourse = new Map(
           lessonAccounts.map((item) => [`${item.studentId}:${item.courseId}`, item]),
@@ -1447,6 +1450,7 @@ export const teachingModule: AppModule = {
               teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
               course: courseById.get(classGroup.courseId),
               classroom: classroomById.get(classGroup.classroomId),
+              campus: campusById.get(classGroup.campusId) ?? null,
               students: enrollments
                 .map((enrollment) => studentById.get(enrollment.studentId))
                 .filter(Boolean)
@@ -1524,6 +1528,7 @@ export const teachingModule: AppModule = {
             name: string;
             isMine: boolean;
             teacher: { id: string; name: string } | null;
+            campus: { id: string; name: string } | null;
           }>
         >();
         for (const classGroup of visibleClasses) {
@@ -1536,6 +1541,12 @@ export const teachingModule: AppModule = {
                 name: classGroup.name,
                 isMine: classGroup.teacherId === access.teacherId,
                 teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+                campus: campusById.has(classGroup.campusId)
+                  ? {
+                      id: classGroup.campusId,
+                      name: campusById.get(classGroup.campusId)!.name,
+                    }
+                  : null,
               },
             ]);
           }

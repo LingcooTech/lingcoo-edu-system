@@ -290,12 +290,26 @@
           <input
             class="student-search-input"
             value="{{studentSearchKeyword}}"
-            placeholder="搜索学员姓名、年级或学校"
+            placeholder="搜索学员姓名"
             confirm-type="search"
             bindinput="onStudentSearchInput"
           />
         </view>
         <view class="student-filter-grid">
+          <picker
+            mode="selector"
+            range="{{studentCampusFilterOptions}}"
+            range-key="label"
+            value="{{studentCampusFilterIndex}}"
+            bindchange="onStudentCampusFilterChange"
+          >
+            <view class="student-filter-picker">
+              <text class="student-filter-value">
+                {{studentCampusFilterOptions[studentCampusFilterIndex].label}}
+              </text>
+              <text class="student-filter-arrow">⌄</text>
+            </view>
+          </picker>
           <picker
             mode="selector"
             range="{{studentClassFilterOptions}}"
@@ -304,10 +318,10 @@
             bindchange="onStudentClassFilterChange"
           >
             <view class="student-filter-picker">
-              <view class="student-filter-label">班级</view>
-              <view class="student-filter-value">
-                {{studentClassFilterOptions[studentClassFilterIndex].label}}⌄
-              </view>
+              <text class="student-filter-value">
+                {{studentClassFilterOptions[studentClassFilterIndex].label}}
+              </text>
+              <text class="student-filter-arrow">⌄</text>
             </view>
           </picker>
           <picker
@@ -318,35 +332,29 @@
             bindchange="onStudentCourseFilterChange"
           >
             <view class="student-filter-picker">
-              <view class="student-filter-label">课程</view>
-              <view class="student-filter-value">
-                {{studentCourseFilterOptions[studentCourseFilterIndex].label}}⌄
-              </view>
+              <text class="student-filter-value">
+                {{studentCourseFilterOptions[studentCourseFilterIndex].label}}
+              </text>
+              <text class="student-filter-arrow">⌄</text>
+            </view>
+          </picker>
+          <picker
+            mode="selector"
+            range="{{studentLessonFilterOptions}}"
+            range-key="label"
+            value="{{studentLessonFilterIndex}}"
+            bindchange="onStudentLessonFilterChange"
+          >
+            <view class="student-filter-picker">
+              <text class="student-filter-value">
+                {{studentLessonFilterOptions[studentLessonFilterIndex].label}}
+              </text>
+              <text class="student-filter-arrow">⌄</text>
             </view>
           </picker>
         </view>
-        <view class="student-balance-filter">
-          <view class="row-between">
-            <view>
-              <view class="student-filter-label">总剩余课时上限</view>
-              <view class="student-filter-hint">按当前课程筛选，未选课程时按全部课程合计</view>
-            </view>
-            <view class="student-balance-value">{{studentBalanceFilterLabel}}</view>
-          </view>
-          <slider
-            min="0"
-            max="{{studentBalanceFilterMax}}"
-            step="1"
-            value="{{studentBalanceFilterValue}}"
-            activeColor="#9a6a4b"
-            backgroundColor="#ebe6df"
-            block-color="#9a6a4b"
-            block-size="18"
-            bindchange="onStudentBalanceFilterChange"
-          />
-        </view>
         <view class="student-filter-footer">
-          <view>显示 {{studentFilteredCount}} 名机构学员</view>
+          <view>显示 {{studentFilteredCount}} 名学员</view>
           <view class="student-filter-reset" bindtap="resetStudentFilters">重置筛选</view>
         </view>
       </view>
@@ -360,18 +368,8 @@
           bindtap="openStudentDetail"
         >
           <view class="student-compact-head">
-            <view class="student-identity">
-              <view class="student-avatar">{{item.avatarText}}</view>
-              <view>
-                <view class="student-compact-name">{{item.name}}</view>
-                <view class="card-meta">
-                  {{item.grade}}{{item.school ? ' · ' + item.school : ''}}
-                </view>
-              </view>
-            </view>
-            <view class="{{item.isMyStudent ? 'student-owner-tag student-owner-tag-mine' : 'student-owner-tag'}}">
-              {{item.isMyStudent ? '我的学员' : item.institutionName}}
-            </view>
+            <view class="student-compact-name">{{item.name}}</view>
+            <view wx:if="{{item.isMyStudent}}" class="student-owner-tag student-owner-tag-mine">我的学员</view>
           </view>
           <view class="student-compact-classes">
             <view
@@ -394,7 +392,6 @@
               <view class="student-lesson-course">{{balanceItem.courseName}}</view>
               <view class="student-lesson-count">
                 <text>{{balanceItem.lessonCountLabel}}</text>
-                <text class="student-lesson-unit"> 剩余/总课时</text>
               </view>
             </view>
             <view wx:if="{{!item.balances.length}}" class="card-meta">暂无课时账户</view>
