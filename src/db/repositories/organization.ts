@@ -60,6 +60,15 @@ export async function listCampuses(db: Database) {
   return db.select().from(schema.campuses);
 }
 
+export async function findCampus(db: Database, campusId: string) {
+  const [campus] = await db
+    .select()
+    .from(schema.campuses)
+    .where(eq(schema.campuses.id, campusId))
+    .limit(1);
+  return campus ?? null;
+}
+
 export async function createCampus(db: Database, values: typeof schema.campuses.$inferInsert) {
   const [campus] = await db.insert(schema.campuses).values(values).returning();
   return campus;

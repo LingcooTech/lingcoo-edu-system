@@ -835,6 +835,7 @@ export interface TeacherClassSession {
 export interface TeacherClass {
   id: string;
   campusId: string;
+  teacherId: string;
   name: string;
   status: string;
   capacity: number;

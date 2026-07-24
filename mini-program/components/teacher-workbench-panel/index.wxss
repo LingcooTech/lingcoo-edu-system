@@ -172,6 +172,194 @@
   border: 0;
 }
 
+.class-list-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.class-list-count {
+  margin-top: 6rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+}
+
+.class-create-button {
+  height: 58rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 850;
+  line-height: 58rpx;
+  margin: 0 0 18rpx;
+  padding: 0 22rpx;
+}
+
+.class-create-button::after {
+  border: 0;
+}
+
+.class-filter-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190rpx;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+  padding: 18rpx;
+}
+
+.class-search {
+  display: flex;
+  min-width: 0;
+  height: 68rpx;
+  align-items: center;
+  gap: 10rpx;
+  border-radius: 18rpx;
+  background: #f7f5f2;
+  padding: 0 16rpx;
+}
+
+.class-search-input {
+  min-width: 0;
+  height: 68rpx;
+  flex: 1;
+  color: #211f1c;
+  font-size: 23rpx;
+}
+
+.class-status-picker {
+  display: flex;
+  height: 68rpx;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  border-radius: 18rpx;
+  background: #f7f5f2;
+  color: #211f1c;
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 68rpx;
+  padding: 0 16rpx;
+}
+
+.class-warning {
+  margin-bottom: 16rpx;
+  border-radius: 18rpx;
+  background: #fff1dc;
+  color: #b76527;
+  font-size: 22rpx;
+  font-weight: 750;
+  padding: 18rpx 20rpx;
+}
+
+.class-simple-list {
+  overflow: hidden;
+  border-radius: 26rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(33, 31, 28, 0.05);
+}
+
+.class-simple-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  border-bottom: 1rpx solid #eeeae5;
+  padding: 24rpx 22rpx;
+}
+
+.class-simple-row:last-child {
+  border-bottom: 0;
+}
+
+.class-simple-row:active {
+  background: #f8f5f1;
+}
+
+.class-simple-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.class-simple-title-row,
+.class-simple-meta,
+.class-meta-item,
+.class-simple-side {
+  display: flex;
+  align-items: center;
+}
+
+.class-simple-title-row {
+  gap: 9rpx;
+}
+
+.class-simple-name {
+  overflow: hidden;
+  color: #211f1c;
+  font-size: 28rpx;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.class-alert-dot {
+  display: flex;
+  width: 28rpx;
+  height: 28rpx;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #e6534b;
+  color: #fff;
+  font-size: 19rpx;
+  font-weight: 900;
+}
+
+.class-simple-meta {
+  gap: 28rpx;
+  margin-top: 12rpx;
+  color: #7c756d;
+  font-size: 22rpx;
+}
+
+.class-meta-item {
+  min-width: 0;
+  gap: 8rpx;
+}
+
+.class-meta-icon {
+  color: #b9784f;
+  font-size: 20rpx;
+  font-weight: 900;
+}
+
+.class-simple-course {
+  margin-top: 8rpx;
+  overflow: hidden;
+  color: #9a948b;
+  font-size: 21rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.class-simple-side {
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.class-row-arrow {
+  color: #aaa39b;
+  font-size: 36rpx;
+  line-height: 1;
+}
+
 .summary-value {
   color: #211f1c;
   font-size: 44rpx;
@@ -807,14 +995,18 @@
   color: #211f1c;
   font-size: 22rpx;
   font-weight: 800;
+  line-height: 66rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .student-filter-arrow {
+  width: 0;
+  height: 0;
   flex-shrink: 0;
-  color: #9a948b;
-  font-size: 20rpx;
+  border-top: 8rpx solid #9a948b;
+  border-right: 7rpx solid transparent;
+  border-left: 7rpx solid transparent;
 }
 
 .student-filter-footer {
@@ -843,9 +1035,17 @@
 .student-compact-head {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14rpx;
+  gap: 18rpx;
+}
+
+.student-name-group {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10rpx;
 }
 
 .student-compact-name {
@@ -872,9 +1072,11 @@
 
 .student-compact-classes {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
   gap: 6rpx;
-  margin-top: 10rpx;
 }
 
 .student-class-tag {
@@ -941,6 +1143,7 @@
   line-height: 64rpx;
   margin: 0;
   padding: 0 22rpx;
+  white-space: nowrap;
 }
 
 .student-page-button::after {
@@ -953,9 +1156,14 @@
 }
 
 .student-page-status {
+  min-width: 116rpx;
+  flex-shrink: 0;
   color: #625d57;
   font-size: 22rpx;
   font-weight: 800;
+  line-height: 64rpx;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .student-name {

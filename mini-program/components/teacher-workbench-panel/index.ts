@@ -149,6 +149,14 @@ const CLASS_STATUS_LABEL: Record<string, string> = {
   archived: '已归档',
 };
 
+const CLASS_FILTER_OPTIONS: StudentFilterOption[] = [
+  { id: '', label: '全部状态' },
+  { id: 'recruiting', label: '招生中' },
+  { id: 'active', label: '进行中' },
+  { id: 'paused', label: '暂停' },
+  { id: 'completed', label: '已完成' },
+];
+
 const HOMEWORK_STATUS_LABEL: Record<string, string> = {
   submitted: '待批阅',
   reviewed: '已批阅',
@@ -458,6 +466,14 @@ Component({
     }>,
     selectedDateKey: dateKey(startOfDay(new Date())),
     classes: [] as Array<ReturnType<typeof normalizeClass>>,
+    filteredClasses: [] as Array<ReturnType<typeof normalizeClass> & {
+      sessionCount: number;
+      upcomingSessionCount: number;
+    }>,
+    classSearchKeyword: '',
+    classStatusFilterIndex: 0,
+    classStatusFilterOptions: CLASS_FILTER_OPTIONS,
+    classUnscheduledCount: 0,
     allStudents: [] as StudentRow[],
     students: [] as StudentRow[],
     studentSearchKeyword: '',
@@ -576,7 +592,20 @@ Component({
         const feedbackItems = Array.isArray(lessonFeedbacks) ? lessonFeedbacks : [];
         const assignmentItems = Array.isArray(homeworkAssignments) ? homeworkAssignments : [];
         const notificationItems = Array.isArray(teacherNotifications) ? teacherNotifications : [];
-        const normalizedClasses = dashboardClasses.map(normalizeClass);
+        const now = Date.now();
+        const normalizedClasses = dashboardClasses.map((classGroup) => {
+          const normalized = normalizeClass(classGroup);
+          const classSessions = calendarItems.filter(
+            (event) => event.class?.id === classGroup.id && event.status !== 'cancelled',
+          );
+          return {
+            ...normalized,
+            sessionCount: classSessions.length,
+            upcomingSessionCount: classSessions.filter(
+              (event) => new Date(event.startsAt).getTime() >= now,
+            ).length,
+          };
+        });
         const studentRows = this.buildStudentRows(
           dashboard.students,
           dashboardClasses,
@@ -612,6 +641,13 @@ Component({
           loading: false,
           calendarEvents: calendarItems,
           classes: normalizedClasses,
+          filteredClasses: normalizedClasses,
+          classSearchKeyword: '',
+          classStatusFilterIndex: 0,
+          classUnscheduledCount: normalizedClasses.filter(
+            (item) =>
+              ['recruiting', 'active'].includes(item.status) && item.upcomingSessionCount === 0,
+          ).length,
           allStudents: studentRows,
           students: studentRows.slice(0, this.data.studentPageSize),
           studentCampusFilterOptions: campusFilterOptions,
@@ -645,6 +681,7 @@ Component({
           selectedDateKey,
         });
         this.applyStudentFilters();
+        this.applyClassFilters();
         this.recompute();
       } catch (error) {
         this.setData({ loading: false });
@@ -822,6 +859,39 @@ Component({
       if (this.data.studentPage >= this.data.studentTotalPages) return;
       this.setData({ studentPage: this.data.studentPage + 1 });
       this.applyStudentFilters();
+    },
+
+    applyClassFilters() {
+      const keyword = String(this.data.classSearchKeyword || '')
+        .trim()
+        .toLocaleLowerCase('zh-CN');
+      const statusOptions = this.data.classStatusFilterOptions as StudentFilterOption[];
+      const status = statusOptions[this.data.classStatusFilterIndex]?.id || '';
+      const filtered = (
+        this.data.classes as Array<
+          ReturnType<typeof normalizeClass> & {
+            sessionCount: number;
+            upcomingSessionCount: number;
+          }
+        >
+      ).filter((classGroup) => {
+        if (status && classGroup.status !== status) return false;
+        if (!keyword) return true;
+        return [classGroup.name, classGroup.courseName, classGroup.teacherName]
+          .filter(Boolean)
+          .some((value) => value.toLocaleLowerCase('zh-CN').includes(keyword));
+      });
+      this.setData({ filteredClasses: filtered });
+    },
+
+    onClassSearchInput(event: MiniInputEvent) {
+      this.setData({ classSearchKeyword: event.detail.value });
+      this.applyClassFilters();
+    },
+
+    onClassStatusFilterChange(event: MiniPickerEvent) {
+      this.setData({ classStatusFilterIndex: Number(event.detail.value) || 0 });
+      this.applyClassFilters();
     },
 
     recompute() {

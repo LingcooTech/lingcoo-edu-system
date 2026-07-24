@@ -40,6 +40,7 @@ Page({
   data: {
     loading: true,
     saving: false,
+    requestedClassId: '',
     options: null as TeacherSchedulingOptions | null,
     modeOptions: [] as Array<{ key: 'class' | 'ad_hoc'; label: string }>,
     modeIndex: 0,
@@ -59,7 +60,8 @@ Page({
     error: '',
   },
 
-  onLoad() {
+  onLoad(query: Record<string, string | undefined>) {
+    this.setData({ requestedClassId: String(query.classId || '') });
     this.loadOptions();
   },
 
@@ -77,7 +79,17 @@ Page({
       if (modeOptions.length === 0) {
         throw new Error('当前账号尚未开通排课权限');
       }
-      this.setData({ options, modeOptions, loading: false });
+      const requestedClassIndex = options.classes.findIndex(
+        (classGroup) => classGroup.id === this.data.requestedClassId,
+      );
+      const classModeIndex = modeOptions.findIndex((mode) => mode.key === 'class');
+      this.setData({
+        options,
+        modeOptions,
+        modeIndex: requestedClassIndex >= 0 && classModeIndex >= 0 ? classModeIndex : 0,
+        classIndex: requestedClassIndex >= 0 ? requestedClassIndex : 0,
+        loading: false,
+      });
       this.applyModeDefaults();
       await this.loadStudents();
     } catch (error) {

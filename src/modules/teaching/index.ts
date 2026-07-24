@@ -481,13 +481,14 @@ export const teachingModule: AppModule = {
         const institutionCourseIds = new Set(institutionCourses.map((course) => course.id));
         const courseById = new Map(institutionCourses.map((course) => [course.id, course]));
         const campusById = new Map(campuses.map((campus) => [campus.id, campus]));
-        const ownClasses = classes.filter(
+        const manageableClasses = classes.filter(
           (classGroup) =>
-            classGroup.teacherId === access.teacherId &&
             institutionCourseIds.has(classGroup.courseId) &&
+            (classGroup.teacherId === access.teacherId ||
+              (access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))) &&
             ['recruiting', 'active'].includes(classGroup.status),
         );
-        const allowedCourseIds = new Set(ownClasses.map((classGroup) => classGroup.courseId));
+        const allowedCourseIds = new Set(manageableClasses.map((classGroup) => classGroup.courseId));
         const selectableCourses =
           access.permissions.createAdHocSession || access.permissions.manageClasses
             ? institutionCourses.filter((course) => course.status === 'published')
@@ -508,7 +509,7 @@ export const teachingModule: AppModule = {
         }
         return {
           permissions: access.permissions,
-          classes: ownClasses.map((classGroup) => ({
+          classes: manageableClasses.map((classGroup) => ({
             ...classGroup,
             course: courseById.get(classGroup.courseId) ?? null,
           })),
@@ -647,23 +648,34 @@ export const teachingModule: AppModule = {
         const { classId } = request.params as { classId: string };
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const dataScope = await resolveTeacherDataScope(access);
-        requireTeacherPermission(access.permissions, 'manageClasses');
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        if (classGroup.teacherId !== access.teacherId) {
+        const [assignedSessionIds, classSessions] = await Promise.all([
+          listAssignedSessionIdsForTeacher(access.teacherId),
+          schedulingRepo.listClassSessions(app.db),
+        ]);
+        const assignedToClass = classSessions.some(
+          (session) =>
+            session.classId === classGroup.id &&
+            isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds),
+        );
+        if (!dataScope.visibleTeacherIds.has(classGroup.teacherId) && !assignedToClass) {
           throw Object.assign(new Error('无权查看该班级'), { statusCode: 403 });
         }
-        const [course, classroom, enrollments, students, lessonAccounts] = await Promise.all([
-          catalogRepo.requireCourse(app.db, classGroup.courseId),
-          teachingRepo.findClassroom(app.db, classGroup.classroomId),
-          schedulingRepo.listEnrollments(app.db, classGroup.id),
-          peopleRepo.listStudents(app.db, { scope: 'all' }),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(eq(schema.lessonAccounts.courseId, classGroup.courseId)),
-        ]);
+        const [course, classroom, campus, enrollments, students, lessonAccounts] =
+          await Promise.all([
+            catalogRepo.requireCourse(app.db, classGroup.courseId),
+            teachingRepo.findClassroom(app.db, classGroup.classroomId),
+            organizationRepo.findCampus(app.db, classGroup.campusId),
+            schedulingRepo.listEnrollments(app.db, classGroup.id),
+            peopleRepo.listStudents(app.db, { scope: 'all' }),
+            app.db
+              .select()
+              .from(schema.lessonAccounts)
+              .where(eq(schema.lessonAccounts.courseId, classGroup.courseId)),
+          ]);
         requireCourseInTeacherInstitution(course, dataScope.institutionId);
+        const teacher = dataScope.teacherById.get(classGroup.teacherId);
         const studentById = new Map(students.map((student) => [student.id, student]));
         const balanceByStudentId = new Map(
           lessonAccounts.map((account) => [account.studentId, account.balance]),
@@ -673,6 +685,8 @@ export const teachingModule: AppModule = {
             ...classGroup,
             course,
             classroom,
+            campus,
+            teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
             students: enrollments.flatMap((enrollment) => {
               const student = studentById.get(enrollment.studentId);
               return student
@@ -704,7 +718,10 @@ export const teachingModule: AppModule = {
         const body = teacherClassUpdateSchema.parse(request.body);
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        if (classGroup.teacherId !== access.teacherId) {
+        if (
+          classGroup.teacherId !== access.teacherId &&
+          !(access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))
+        ) {
           throw Object.assign(new Error('无权修改该班级'), { statusCode: 403 });
         }
         const course = await catalogRepo.requireCourse(app.db, classGroup.courseId);
@@ -759,7 +776,10 @@ export const teachingModule: AppModule = {
         const body = teacherClassStudentSchema.parse(request.body);
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        if (classGroup.teacherId !== access.teacherId) {
+        if (
+          classGroup.teacherId !== access.teacherId &&
+          !(access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))
+        ) {
           throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
         }
         const course = await catalogRepo.requireCourse(app.db, classGroup.courseId);
@@ -831,7 +851,10 @@ export const teachingModule: AppModule = {
         requireTeacherPermission(access.permissions, 'enrollStudents');
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        if (classGroup.teacherId !== access.teacherId) {
+        if (
+          classGroup.teacherId !== access.teacherId &&
+          !(access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))
+        ) {
           throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
         }
         const course = await catalogRepo.requireCourse(app.db, classGroup.courseId);
@@ -974,7 +997,10 @@ export const teachingModule: AppModule = {
         if (body.classId && !classGroup) throw notFound('Class not found');
         if (classGroup) {
           requireTeacherPermission(access.permissions, 'createClassSession');
-          if (classGroup.teacherId !== access.teacherId) {
+          if (
+            classGroup.teacherId !== access.teacherId &&
+            !(access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))
+          ) {
             throw Object.assign(new Error('只能为自己负责的班级排课'), { statusCode: 403 });
           }
           if (!['recruiting', 'active'].includes(classGroup.status)) {
@@ -1085,12 +1111,13 @@ export const teachingModule: AppModule = {
           }
         }
 
+        const sessionTeacherId = classGroup?.teacherId ?? access.teacherId;
         const overlap = await schedulingRepo.findScheduleConflict(app.db, {
           startsAt,
           endsAt,
           classroomId: classroom.id,
-          teacherId: access.teacherId,
-          teacherIds: [access.teacherId],
+          teacherId: sessionTeacherId,
+          teacherIds: [sessionTeacherId],
         });
         if (overlap) {
           throw Object.assign(new Error('老师或教室在该时间段已有安排'), { statusCode: 409 });
@@ -1110,7 +1137,7 @@ export const teachingModule: AppModule = {
           const created = await schedulingRepo.createClassSession(txDb, {
             classId: classGroup?.id ?? null,
             courseId: body.courseId,
-            teacherId: access.teacherId,
+            teacherId: sessionTeacherId,
             classroomId: classroom.id,
             startsAt,
             endsAt,
@@ -1120,8 +1147,8 @@ export const teachingModule: AppModule = {
             status: 'scheduled',
             createdByAccountId: request.account!.id,
           });
-          await schedulingRepo.replaceClassSessionTeachers(txDb, created.id, access.teacherId, [
-            access.teacherId,
+          await schedulingRepo.replaceClassSessionTeachers(txDb, created.id, sessionTeacherId, [
+            sessionTeacherId,
           ]);
           await schedulingRepo.replaceSessionRoster(
             txDb,

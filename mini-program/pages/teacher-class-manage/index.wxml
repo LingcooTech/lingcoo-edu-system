@@ -1,74 +1,254 @@
-<custom-navbar title="管理班级" show-back="{{true}}" />
-<view class="page teacher-class-page">
+<custom-navbar title="班级详情" show-back="{{true}}" />
+<view class="teacher-class-detail-page">
   <skeleton wx:if="{{loading}}" variant="hub" />
   <block wx:else>
     <view wx:if="{{error}}" class="error-card">{{error}}</view>
 
-    <view wx:if="{{classGroup && options}}" class="form-card">
-      <view class="section-title">班级设置</view>
-      <view class="course-label">{{classGroup.course.name || '课程'}}</view>
-      <view class="field">
-        <view class="field-label">班级名称</view>
-        <input class="text-input" value="{{name}}" maxlength="160" bindinput="changeName" />
+    <block wx:if="{{classGroup && options}}">
+      <view class="class-hero">
+        <view class="class-hero-head">
+          <view class="class-hero-title">{{classGroup.name}}</view>
+          <view class="class-status">{{statusLabel}}</view>
+        </view>
+        <view class="class-hero-course">{{classGroup.course.name || '未关联课程'}}</view>
+        <view class="class-hero-grid">
+          <view class="class-hero-item">
+            <text class="class-hero-label">班级老师</text>
+            <text>{{teacherName}}</text>
+          </view>
+          <view class="class-hero-item">
+            <text class="class-hero-label">上课地点</text>
+            <text>{{campusName}} · {{classroomName}}</text>
+          </view>
+          <view class="class-hero-item">
+            <text class="class-hero-label">人数/容量</text>
+            <text>{{classGroup.students.length}}/{{classGroup.capacity}}</text>
+          </view>
+          <view class="class-hero-item">
+            <text class="class-hero-label">后续课次</text>
+            <text>{{upcomingSessionCount}} 次</text>
+          </view>
+        </view>
+        <button wx:if="{{canEditClass}}" class="hero-setting-button" bindtap="toggleSettings">
+          {{settingsVisible ? '收起设置' : '班级设置'}}
+        </button>
       </view>
-      <view class="field">
-        <view class="field-label">教室</view>
-        <picker range="{{options.classrooms}}" range-key="name" value="{{classroomIndex}}" bindchange="changeClassroom">
-          <view class="picker-value">{{options.classrooms[classroomIndex].name}} ›</view>
-        </picker>
-      </view>
-      <view class="field-row">
+
+      <view wx:if="{{settingsVisible && canEditClass}}" class="settings-card">
+        <view class="card-section-title">班级设置</view>
         <view class="field">
-          <view class="field-label">容量</view>
-          <input class="text-input" type="number" value="{{capacity}}" bindinput="changeCapacity" />
+          <view class="field-label">班级名称</view>
+          <input class="text-input" value="{{name}}" maxlength="160" bindinput="changeName" />
         </view>
         <view class="field">
-          <view class="field-label">状态</view>
-          <picker range="{{statusOptions}}" range-key="label" value="{{statusIndex}}" bindchange="changeStatus">
-            <view class="picker-value">{{statusOptions[statusIndex].label}} ›</view>
+          <view class="field-label">教室</view>
+          <picker
+            range="{{options.classrooms}}"
+            range-key="name"
+            value="{{classroomIndex}}"
+            bindchange="changeClassroom"
+          >
+            <view class="picker-value">{{options.classrooms[classroomIndex].name}} ›</view>
           </picker>
         </view>
+        <view class="field-row">
+          <view class="field">
+            <view class="field-label">容量</view>
+            <input class="text-input" type="number" value="{{capacity}}" bindinput="changeCapacity" />
+          </view>
+          <view class="field">
+            <view class="field-label">状态</view>
+            <picker
+              range="{{statusOptions}}"
+              range-key="label"
+              value="{{statusIndex}}"
+              bindchange="changeStatus"
+            >
+              <view class="picker-value">{{statusOptions[statusIndex].label}} ›</view>
+            </picker>
+          </view>
+        </view>
+        <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveClass">
+          保存班级设置
+        </button>
       </view>
-      <button class="save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveClass">保存班级设置</button>
-    </view>
 
-    <view wx:if="{{classGroup}}" class="member-card">
-      <view class="section-title">当前成员（{{classGroup.students.length}}/{{classGroup.capacity}}）</view>
-      <view wx:if="{{classGroup.students.length}}" class="member-list">
-        <view wx:for="{{classGroup.students}}" wx:key="id" class="member-row">
-          <view class="member-info">
-            <view class="student-name">{{item.name}}</view>
-            <view class="hint">{{item.grade}}{{item.school ? ' · ' + item.school : ''}} · 余额 {{item.lessonBalance == null ? '-' : item.lessonBalance}}</view>
+      <view class="detail-tabs">
+        <view
+          wx:for="{{classTabs}}"
+          wx:key="key"
+          class="{{item.className}}"
+          data-key="{{item.key}}"
+          bindtap="switchTab"
+        >
+          {{item.label}}
+        </view>
+      </view>
+
+      <view wx:if="{{activeTab == 'schedule'}}" class="detail-content">
+        <view class="content-toolbar">
+          <view>
+            <view class="card-section-title">排课信息</view>
+            <view class="content-hint">共 {{sessions.length}} 个课次 · 已完成 {{completedSessionCount}} 次</view>
+          </view>
+          <button wx:if="{{canScheduleClass}}" class="outline-action" bindtap="openScheduleCreate">
+            ＋ 添加课次
+          </button>
+        </view>
+        <view wx:if="{{sessions.length}}" class="session-list">
+          <view wx:for="{{sessions}}" wx:key="id" class="session-row">
+            <view class="session-date-block">
+              <view class="session-day">{{item.dateLabel}}</view>
+              <view class="session-time">{{item.timeLabel}}</view>
+            </view>
+            <view class="session-main">
+              <view class="session-topic">{{item.title}}</view>
+              <view class="content-hint">
+                {{item.classroom ? item.classroom.name : classroomName}} · 扣 {{item.lessonUnits || 1}} 课时
+              </view>
+            </view>
+            <view class="session-side">
+              <view class="{{item.status == 'cancelled' ? 'session-status session-status-muted' : 'session-status'}}">
+                {{item.statusLabel}}
+              </view>
+              <view class="session-attendance">{{item.attendanceLabel}}</view>
+            </view>
+          </view>
+        </view>
+        <view wx:else class="detail-empty">
+          <view class="detail-empty-title">尚未安排课次</view>
+          <view class="content-hint">可以从这里为当前班级添加正式课次。</view>
+        </view>
+      </view>
+
+      <view wx:elif="{{activeTab == 'students'}}" class="detail-content">
+        <view class="content-toolbar">
+          <view>
+            <view class="card-section-title">班级学员</view>
+            <view class="content-hint">{{classGroup.students.length}}/{{classGroup.capacity}} 人</view>
           </view>
           <button
-            class="remove-button"
-            loading="{{memberSavingId == item.id}}"
-            data-id="{{item.id}}"
-            data-name="{{item.name}}"
-            bindtap="removeStudent"
-          >移出</button>
+            wx:if="{{canEditClass && options.permissions.viewAllStudents && options.permissions.enrollStudents}}"
+            class="outline-action"
+            bindtap="toggleAddStudent"
+          >
+            {{addStudentVisible ? '收起' : '＋ 添加学员'}}
+          </button>
         </view>
-      </view>
-      <view wx:else class="empty-card">当前是空班。</view>
-    </view>
 
-    <view wx:if="{{classGroup && options && options.permissions.viewAllStudents && options.permissions.enrollStudents}}" class="member-card">
-      <view class="section-title">添加学员</view>
-      <view class="hint">仅展示拥有“{{classGroup.course.name}}”课时账户的学员。</view>
-      <view class="search-row">
-        <input class="search-input" value="{{keyword}}" bindinput="changeKeyword" confirm-type="search" bindconfirm="searchCandidates" placeholder="搜索姓名、年级或学校" />
-        <button class="search-button" loading="{{studentLoading}}" bindtap="searchCandidates">搜索</button>
-      </view>
-      <view wx:if="{{candidates.length}}" class="member-list">
-        <view wx:for="{{candidates}}" wx:key="id" class="member-row">
-          <view class="member-info">
-            <view class="student-name">{{item.name}}</view>
-            <view class="hint">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
+        <view wx:if="{{addStudentVisible}}" class="candidate-panel">
+          <view class="search-row">
+            <input
+              class="search-input"
+              value="{{keyword}}"
+              bindinput="changeKeyword"
+              confirm-type="search"
+              bindconfirm="searchCandidates"
+              placeholder="搜索机构学员"
+            />
+            <button class="search-button" loading="{{studentLoading}}" bindtap="searchCandidates">搜索</button>
           </view>
-          <button class="add-button" loading="{{memberSavingId == item.id}}" data-id="{{item.id}}" bindtap="addStudent">入班</button>
+          <view wx:if="{{candidates.length}}" class="candidate-list">
+            <view wx:for="{{candidates}}" wx:key="id" class="candidate-row">
+              <view>
+                <view class="student-name">{{item.name}}</view>
+                <view class="content-hint">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
+              </view>
+              <button
+                class="add-button"
+                loading="{{memberSavingId == item.id}}"
+                data-id="{{item.id}}"
+                bindtap="addStudent"
+              >入班</button>
+            </view>
+          </view>
+          <view wx:else class="detail-empty compact-empty">
+            {{studentLoading ? '正在加载学员…' : '没有可添加的学员'}}
+          </view>
         </view>
+
+        <view wx:if="{{classGroup.students.length}}" class="class-member-list">
+          <view wx:for="{{classGroup.students}}" wx:key="id" class="class-member-row">
+            <view class="member-main" data-id="{{item.id}}" bindtap="openStudentDetail">
+              <view class="member-name">{{item.name}}</view>
+              <view class="member-course">消耗课程：{{classGroup.course.name}}</view>
+              <view class="member-balance">剩余 {{item.lessonBalance == null ? '-' : item.lessonBalance}} 课时</view>
+            </view>
+            <button
+              wx:if="{{canEditClass && options.permissions.enrollStudents}}"
+              class="remove-button"
+              loading="{{memberSavingId == item.id}}"
+              data-id="{{item.id}}"
+              data-name="{{item.name}}"
+              bindtap="removeStudent"
+            >移出</button>
+          </view>
+        </view>
+        <view wx:else class="detail-empty">当前是空班，可通过“添加学员”建立班级成员。</view>
       </view>
-      <view wx:else class="empty-card">{{studentLoading ? '正在加载学员…' : '没有可添加的学员'}}</view>
-    </view>
+
+      <view wx:elif="{{activeTab == 'attendance'}}" class="detail-content">
+        <view class="content-toolbar">
+          <view>
+            <view class="card-section-title">点名情况</view>
+            <view class="content-hint">选择课次查看或完成点名</view>
+          </view>
+          <view class="attendance-total">已点 {{completedSessionCount}} 次</view>
+        </view>
+
+        <scroll-view wx:if="{{attendanceSessions.length}}" class="attendance-date-strip" scroll-x enhanced>
+          <view class="attendance-date-track">
+            <view
+              wx:for="{{attendanceSessions}}"
+              wx:key="id"
+              class="{{item.dateChipClass}}"
+              data-id="{{item.id}}"
+              bindtap="selectAttendanceSession"
+            >
+              <view class="attendance-chip-date">{{item.dateLabel}}</view>
+              <view class="attendance-chip-count">{{item.attendanceLabel}}</view>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view wx:if="{{attendanceSessionId}}" class="attendance-panel">
+          <view class="attendance-panel-title">{{attendanceSessionTitle}}</view>
+          <view wx:if="{{attendanceError}}" class="error-card compact-error">{{attendanceError}}</view>
+          <view wx:if="{{attendanceLoading}}" class="detail-empty compact-empty">正在加载点名名单…</view>
+          <view wx:elif="{{attendanceRows.length}}" class="attendance-roster">
+            <view wx:for="{{attendanceRows}}" wx:key="id" class="attendance-student">
+              <view class="attendance-student-head">
+                <view class="member-name">{{item.name}}</view>
+                <view class="{{item.recorded ? 'attendance-result attendance-result-done' : 'attendance-result'}}">
+                  {{item.recorded ? item.statusLabel : '待点名'}}
+                </view>
+              </view>
+              <view wx:if="{{!item.recorded}}" class="attendance-options">
+                <view
+                  wx:for="{{attendanceStatusOptions}}"
+                  wx:for-item="statusItem"
+                  wx:key="value"
+                  class="{{item.draftStatus == statusItem.value ? 'attendance-option attendance-option-active' : 'attendance-option'}}"
+                  data-id="{{item.id}}"
+                  data-status="{{statusItem.value}}"
+                  bindtap="selectAttendanceStatus"
+                >
+                  {{statusItem.label}}
+                </view>
+              </view>
+            </view>
+            <button
+              class="primary-button attendance-save"
+              loading="{{attendanceSaving}}"
+              disabled="{{attendanceSaving}}"
+              bindtap="saveAttendance"
+            >保存点名</button>
+          </view>
+          <view wx:else class="detail-empty compact-empty">本课次暂无学员。</view>
+        </view>
+        <view wx:elif="{{attendanceSessions.length}}" class="detail-empty">请在上方选择一个课次。</view>
+        <view wx:else class="detail-empty">当前班级还没有可以点名的课次。</view>
+      </view>
+    </block>
   </block>
 </view>
