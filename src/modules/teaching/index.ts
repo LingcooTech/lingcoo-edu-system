@@ -144,6 +144,7 @@ const teacherClassOptionsQuerySchema = z.object({
 
 const teacherEnrollmentSchema = z.object({
   classId: z.string().uuid(),
+  billingCourseId: z.string().uuid().optional(),
   notificationId: z.string().uuid().optional(),
 });
 
@@ -181,6 +182,7 @@ const teacherCourseContractCreateSchema = z.object({
 const teacherSessionStudentSchema = z.object({
   studentId: z.string().uuid(),
   enrollmentMode: z.enum(['class', 'session_only']).default('session_only'),
+  billingCourseId: z.string().uuid().optional(),
 });
 
 const teacherSessionCreateSchema = z.object({
@@ -223,6 +225,7 @@ const teacherClassUpdateSchema = z
 
 const teacherClassStudentSchema = z.object({
   studentId: z.string().uuid(),
+  billingCourseId: z.string().uuid().optional(),
 });
 
 function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, to?: Date) {
@@ -779,17 +782,16 @@ export const teachingModule: AppModule = {
             organizationRepo.findCampus(app.db, classGroup.campusId),
             schedulingRepo.listEnrollments(app.db, classGroup.id),
             peopleRepo.listStudents(app.db, { scope: 'all' }),
-            app.db
-              .select()
-              .from(schema.lessonAccounts)
-              .where(eq(schema.lessonAccounts.courseId, classGroup.courseId)),
+            app.db.select().from(schema.lessonAccounts),
           ]);
         requireCourseInTeacherInstitution(course, dataScope.institutionId);
         const teacher = dataScope.teacherById.get(classGroup.teacherId);
         const studentById = new Map(students.map((student) => [student.id, student]));
-        const balanceByStudentId = new Map(
-          lessonAccounts.map((account) => [account.studentId, account.balance]),
+        const lessonAccountByStudentCourse = new Map(
+          lessonAccounts.map((account) => [`${account.studentId}:${account.courseId}`, account]),
         );
+        const courses = await catalogRepo.listCourses(app.db);
+        const courseById = new Map(courses.map((item) => [item.id, item]));
         return {
           class: {
             ...classGroup,
@@ -807,7 +809,13 @@ export const teachingModule: AppModule = {
                       name: student.name,
                       grade: student.grade,
                       school: student.school,
-                      lessonBalance: balanceByStudentId.get(student.id) ?? null,
+                      billingCourseId: enrollment.billingCourseId,
+                      billingCourseName:
+                        courseById.get(enrollment.billingCourseId)?.name ?? '课时档案',
+                      lessonBalance:
+                        lessonAccountByStudentCourse.get(
+                          `${student.id}:${enrollment.billingCourseId}`,
+                        )?.balance ?? null,
                     },
                   ]
                 : [];
@@ -903,18 +911,21 @@ export const teachingModule: AppModule = {
         if (student.status !== 'active') {
           throw Object.assign(new Error('该学员当前不可用'), { statusCode: 422 });
         }
+        const billingCourseId = body.billingCourseId ?? classGroup.courseId;
+        const billingCourse = await catalogRepo.requireCourse(app.db, billingCourseId);
+        requireCourseInTeacherInstitution(billingCourse, dataScope.institutionId);
         const [lessonAccount] = await app.db
           .select()
           .from(schema.lessonAccounts)
           .where(
             and(
               eq(schema.lessonAccounts.studentId, body.studentId),
-              eq(schema.lessonAccounts.courseId, classGroup.courseId),
+              eq(schema.lessonAccounts.courseId, billingCourseId),
             ),
           )
           .limit(1);
         if (!lessonAccount) {
-          throw Object.assign(new Error('该学员暂无此课程的正式课时档案'), { statusCode: 422 });
+          throw Object.assign(new Error('该学员暂无所选扣课档案'), { statusCode: 422 });
         }
         const allClasses = await schedulingRepo.listClasses(app.db);
         const sameCourseEnrollments = (
@@ -940,7 +951,7 @@ export const teachingModule: AppModule = {
         const enrollment = await schedulingRepo.createEnrollment(app.db, {
           classId,
           studentId: body.studentId,
-          billingCourseId: classGroup.courseId,
+          billingCourseId,
           active: true,
         });
         return { enrollment };
@@ -1204,14 +1215,12 @@ export const teachingModule: AppModule = {
         if (endsAt <= startsAt) {
           throw Object.assign(new Error('下课时间必须晚于上课时间'), { statusCode: 422 });
         }
-        const [course, classroom, students, lessonAccounts] = await Promise.all([
+        const [course, classroom, students, lessonAccounts, courses] = await Promise.all([
           catalogRepo.requireCourse(app.db, body.courseId),
           teachingRepo.findClassroom(app.db, body.classroomId),
           peopleRepo.listStudents(app.db, { scope: 'all' }),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(eq(schema.lessonAccounts.courseId, body.courseId)),
+          app.db.select().from(schema.lessonAccounts),
+          catalogRepo.listCourses(app.db),
         ]);
         if (course.status === 'archived' || (!classGroup && course.status !== 'published')) {
           throw Object.assign(new Error('不能选择已归档课程'), { statusCode: 422 });
@@ -1230,7 +1239,15 @@ export const teachingModule: AppModule = {
           throw Object.assign(new Error('无权选择其他机构课程使用的教室'), { statusCode: 403 });
         }
         const uniqueStudentInputs = Array.from(
-          new Map(body.students.map((student) => [student.studentId, student])).values(),
+          new Map(
+            body.students.map((student) => [
+              student.studentId,
+              {
+                ...student,
+                billingCourseId: student.billingCourseId ?? body.courseId,
+              },
+            ]),
+          ).values(),
         );
         if (uniqueStudentInputs.length !== body.students.length) {
           throw Object.assign(new Error('学员名单存在重复项'), { statusCode: 422 });
@@ -1239,14 +1256,26 @@ export const teachingModule: AppModule = {
           throw Object.assign(new Error('课次人数超过教室容量'), { statusCode: 409 });
         }
         const studentById = new Map(students.map((student) => [student.id, student]));
-        const lessonAccountStudentIds = new Set(lessonAccounts.map((account) => account.studentId));
+        const billingCourseById = new Map(courses.map((item) => [item.id, item]));
+        const lessonAccountKeys = new Set(
+          lessonAccounts.map((account) => `${account.studentId}:${account.courseId}`),
+        );
         for (const item of uniqueStudentInputs) {
           const student = studentById.get(item.studentId);
           if (!student || student.status !== 'active') {
             throw Object.assign(new Error('学员不存在或已停用'), { statusCode: 422 });
           }
-          if (!lessonAccountStudentIds.has(item.studentId)) {
-            throw Object.assign(new Error(`${student.name} 暂无该课程的课时账户`), {
+          const billingCourse = billingCourseById.get(item.billingCourseId);
+          if (
+            !billingCourse ||
+            !courseBelongsToTeacherInstitution(billingCourse, dataScope.institutionId)
+          ) {
+            throw Object.assign(new Error(`${student.name} 的扣课档案不属于当前机构`), {
+              statusCode: 403,
+            });
+          }
+          if (!lessonAccountKeys.has(`${item.studentId}:${item.billingCourseId}`)) {
+            throw Object.assign(new Error(`${student.name} 暂无所选扣课档案`), {
               statusCode: 422,
             });
           }
@@ -1312,7 +1341,7 @@ export const teachingModule: AppModule = {
             await schedulingRepo.createEnrollment(txDb, {
               classId: classGroup!.id,
               studentId: item.studentId,
-              billingCourseId: body.courseId,
+              billingCourseId: item.billingCourseId,
               active: true,
             });
             enrolledStudentIds.add(item.studentId);
@@ -1338,7 +1367,7 @@ export const teachingModule: AppModule = {
             created.id,
             uniqueStudentInputs.map((item) => ({
               studentId: item.studentId,
-              billingCourseId: body.courseId,
+              billingCourseId: item.billingCourseId,
               source: enrolledStudentIds.has(item.studentId) ? 'enrollment' : 'session_only',
             })),
           );
@@ -1347,7 +1376,7 @@ export const teachingModule: AppModule = {
               await schedulingRepo.createTemporaryStudent(txDb, {
                 classSessionId: created.id,
                 studentId: item.studentId,
-                billingCourseId: body.courseId,
+                billingCourseId: item.billingCourseId,
                 note: '老师排课添加',
               });
             }
@@ -1367,6 +1396,76 @@ export const teachingModule: AppModule = {
       },
     );
 
+    app.get(
+      '/public/teacher/class-sessions/:sessionId',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const dataScope = await resolveTeacherDataScope(access);
+        const owned = await requireOwnedSession(request.account!.id, sessionId);
+        const [classGroup, course, classroom, roster, students, courses, lessonAccounts, attendance] =
+          await Promise.all([
+            owned.session.classId
+              ? schedulingRepo.findClass(app.db, owned.session.classId)
+              : Promise.resolve(null),
+            catalogRepo.requireCourse(app.db, owned.session.courseId),
+            teachingRepo.findClassroom(app.db, owned.session.classroomId),
+            schedulingRepo.listSessionRoster(app.db, sessionId),
+            peopleRepo.listStudents(app.db, { scope: 'all' }),
+            catalogRepo.listCourses(app.db),
+            app.db.select().from(schema.lessonAccounts),
+            attendanceRepo.listAttendanceForSession(app.db, sessionId),
+          ]);
+        const visibleCourses = courses.filter((item) =>
+          courseBelongsToTeacherInstitution(item, dataScope.institutionId),
+        );
+        const visibleCourseIds = new Set(visibleCourses.map((item) => item.id));
+        const courseById = new Map(visibleCourses.map((item) => [item.id, item]));
+        const studentById = new Map(students.map((item) => [item.id, item]));
+        const attendedStudentIds = new Set(attendance.map((item) => item.studentId));
+        return {
+          session: owned.session,
+          class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
+          course: { id: course.id, name: course.name },
+          classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
+          canEdit:
+            owned.session.status === 'scheduled' &&
+            attendance.length === 0 &&
+            (owned.isMine || access.isAdminTeacher),
+          roster: roster.flatMap((entry) => {
+            const student = studentById.get(entry.studentId);
+            if (!student) return [];
+            return [
+              {
+                id: student.id,
+                name: student.name,
+                grade: student.grade,
+                school: student.school,
+                source: entry.source,
+                billingCourseId: entry.billingCourseId,
+                billingCourseName:
+                  courseById.get(entry.billingCourseId)?.name ?? '课时档案',
+                canRemove: !attendedStudentIds.has(student.id),
+                lessonAccounts: lessonAccounts
+                  .filter(
+                    (account) =>
+                      account.studentId === student.id &&
+                      visibleCourseIds.has(account.courseId),
+                  )
+                  .map((account) => ({
+                    id: account.id,
+                    courseId: account.courseId,
+                    courseName: courseById.get(account.courseId)?.name ?? '课程',
+                    balance: account.balance,
+                  })),
+              },
+            ];
+          }),
+        };
+      },
+    );
+
     app.patch(
       '/public/teacher/class-sessions/:sessionId',
       { preHandler: app.requireRole('teacher') },
@@ -1374,9 +1473,9 @@ export const teachingModule: AppModule = {
         const { sessionId } = request.params as { sessionId: string };
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const dataScope = await resolveTeacherDataScope(access);
-        const session = await schedulingRepo.findSession(app.db, sessionId);
-        if (!session) throw notFound('Class session not found');
-        if (session.teacherId !== access.teacherId) {
+        const owned = await requireOwnedSession(request.account!.id, sessionId);
+        const session = owned.session;
+        if (!owned.isMine && !access.isAdminTeacher) {
           throw Object.assign(new Error('只能修改自己负责的课次'), { statusCode: 403 });
         }
         const course = await catalogRepo.requireCourse(app.db, session.courseId);
@@ -1387,6 +1486,13 @@ export const teachingModule: AppModule = {
         );
         if (session.status === 'completed') {
           throw Object.assign(new Error('已完成课次不能修改'), { statusCode: 422 });
+        }
+        const existingAttendance = await attendanceRepo.listAttendanceForSession(
+          app.db,
+          session.id,
+        );
+        if (existingAttendance.length > 0) {
+          throw Object.assign(new Error('已开始点名的课次不能修改'), { statusCode: 422 });
         }
         const body = teacherSessionUpdateSchema.parse(request.body);
         if (body.lessonUnits !== undefined && body.lessonUnits !== session.lessonUnits) {
@@ -1419,8 +1525,8 @@ export const teachingModule: AppModule = {
             startsAt,
             endsAt,
             classroomId,
-            teacherId: access.teacherId,
-            teacherIds: [access.teacherId],
+            teacherId: session.teacherId,
+            teacherIds: [session.teacherId],
             ignoreSessionId: session.id,
           });
           if (overlap) {
@@ -1449,50 +1555,71 @@ export const teachingModule: AppModule = {
         const dataScope = await resolveTeacherDataScope(access);
         requireTeacherPermission(access.permissions, 'manageSessionRoster');
         requireTeacherPermission(access.permissions, 'viewAllStudents');
-        const session = await schedulingRepo.findSession(app.db, sessionId);
-        if (!session) throw notFound('Class session not found');
-        if (session.teacherId !== access.teacherId || session.status !== 'scheduled') {
+        const owned = await requireOwnedSession(request.account!.id, sessionId);
+        const session = owned.session;
+        if ((!owned.isMine && !access.isAdminTeacher) || session.status !== 'scheduled') {
           throw Object.assign(new Error('只能调整自己尚未完成的课次'), { statusCode: 403 });
         }
+        const [currentRoster, attendance] = await Promise.all([
+          schedulingRepo.listSessionRoster(app.db, session.id),
+          attendanceRepo.listAttendanceForSession(app.db, session.id),
+        ]);
+        const currentRosterEntry = currentRoster.find(
+          (entry) => entry.studentId === body.studentId,
+        );
         const course = await catalogRepo.requireCourse(app.db, session.courseId);
         requireCourseInTeacherInstitution(course, dataScope.institutionId);
-        const [student, lessonAccount] = await Promise.all([
+        const billingCourseId = body.billingCourseId ?? session.courseId;
+        if (
+          attendance.some((record) => record.studentId === body.studentId) &&
+          currentRosterEntry &&
+          currentRosterEntry.billingCourseId !== billingCourseId
+        ) {
+          throw Object.assign(new Error('该学员已点名，不能修改扣课档案'), {
+            statusCode: 422,
+          });
+        }
+        const [student, billingCourse, lessonAccount] = await Promise.all([
           peopleRepo.requireStudent(app.db, body.studentId),
+          catalogRepo.requireCourse(app.db, billingCourseId),
           app.db
             .select()
             .from(schema.lessonAccounts)
             .where(
               and(
                 eq(schema.lessonAccounts.studentId, body.studentId),
-                eq(schema.lessonAccounts.courseId, session.courseId),
+                eq(schema.lessonAccounts.courseId, billingCourseId),
               ),
             )
             .limit(1),
         ]);
+        requireCourseInTeacherInstitution(billingCourse, dataScope.institutionId);
         if (student.status !== 'active' || lessonAccount.length === 0) {
-          throw Object.assign(new Error('该学员没有可用的课程课时账户'), { statusCode: 422 });
+          throw Object.assign(new Error('该学员没有所选扣课档案'), { statusCode: 422 });
         }
         let source: 'enrollment' | 'session_only' = 'session_only';
         if (body.enrollmentMode === 'class') {
-          requireTeacherPermission(access.permissions, 'enrollStudents');
           if (!session.classId) {
             throw Object.assign(new Error('临时课次不能将学员正式加入班级'), {
               statusCode: 422,
             });
           }
           const classGroup = await schedulingRepo.findClass(app.db, session.classId);
-          if (!classGroup || classGroup.teacherId !== access.teacherId) {
-            throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
-          }
+          if (!classGroup) throw notFound('Class not found');
           const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
-          if (!enrollments.some((item) => item.studentId === student.id)) {
+          const existingEnrollment = enrollments.find((item) => item.studentId === student.id);
+          if (!existingEnrollment) {
+            requireTeacherPermission(access.permissions, 'enrollStudents');
+            if (classGroup.teacherId !== access.teacherId && !access.isAdminTeacher) {
+              throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
+            }
             if (enrollments.length >= classGroup.capacity) {
               throw Object.assign(new Error('班级已满'), { statusCode: 409 });
             }
             await schedulingRepo.createEnrollment(app.db, {
               classId: classGroup.id,
               studentId: student.id,
-              billingCourseId: session.courseId,
+              billingCourseId,
               active: true,
             });
           }
@@ -1502,7 +1629,7 @@ export const teachingModule: AppModule = {
         const rosterStudent = await schedulingRepo.upsertSessionStudent(app.db, {
           classSessionId: session.id,
           studentId: student.id,
-          billingCourseId: session.courseId,
+          billingCourseId,
           source,
           active: true,
         });
@@ -1514,7 +1641,7 @@ export const teachingModule: AppModule = {
           await schedulingRepo.createTemporaryStudent(app.db, {
             classSessionId: session.id,
             studentId: student.id,
-            billingCourseId: session.courseId,
+            billingCourseId,
             note: '老师临时添加',
           });
         }
@@ -1533,9 +1660,9 @@ export const teachingModule: AppModule = {
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const dataScope = await resolveTeacherDataScope(access);
         requireTeacherPermission(access.permissions, 'manageSessionRoster');
-        const session = await schedulingRepo.findSession(app.db, sessionId);
-        if (!session) throw notFound('Class session not found');
-        if (session.teacherId !== access.teacherId || session.status !== 'scheduled') {
+        const owned = await requireOwnedSession(request.account!.id, sessionId);
+        const session = owned.session;
+        if ((!owned.isMine && !access.isAdminTeacher) || session.status !== 'scheduled') {
           throw Object.assign(new Error('只能调整自己尚未完成的课次'), { statusCode: 403 });
         }
         const course = await catalogRepo.requireCourse(app.db, session.courseId);
@@ -1929,18 +2056,21 @@ export const teachingModule: AppModule = {
         }
 
         await peopleRepo.requireStudent(app.db, studentId);
+        const billingCourseId = body.billingCourseId ?? classGroup.courseId;
+        const billingCourse = await catalogRepo.requireCourse(app.db, billingCourseId);
+        requireCourseInTeacherInstitution(billingCourse, dataScope.institutionId);
         const [lessonAccount] = await app.db
           .select()
           .from(schema.lessonAccounts)
           .where(
             and(
               eq(schema.lessonAccounts.studentId, studentId),
-              eq(schema.lessonAccounts.courseId, classGroup.courseId),
+              eq(schema.lessonAccounts.courseId, billingCourseId),
             ),
           )
           .limit(1);
         if (!lessonAccount) {
-          throw Object.assign(new Error('该学员暂无此课程的正式课时档案'), { statusCode: 422 });
+          throw Object.assign(new Error('该学员暂无所选扣课档案'), { statusCode: 422 });
         }
 
         const allClasses = await schedulingRepo.listClasses(app.db);
@@ -1974,7 +2104,7 @@ export const teachingModule: AppModule = {
         const enrollment = await schedulingRepo.createEnrollment(app.db, {
           classId: classGroup.id,
           studentId,
-          billingCourseId: classGroup.courseId,
+          billingCourseId,
           active: true,
         });
 

@@ -18,7 +18,7 @@
           </view>
           <view class="class-hero-item">
             <text class="class-hero-label">上课地点</text>
-            <text>{{campusName}} · {{classroomName}}</text>
+            <text>{{locationName}}</text>
           </view>
           <view class="class-hero-item">
             <text class="class-hero-label">人数/容量</text>
@@ -96,7 +96,13 @@
           </button>
         </view>
         <view wx:if="{{sessions.length}}" class="session-list">
-          <view wx:for="{{sessions}}" wx:key="id" class="session-row">
+          <view
+            wx:for="{{sessions}}"
+            wx:key="id"
+            class="session-row"
+            data-id="{{item.id}}"
+            bindtap="openSessionEdit"
+          >
             <view class="session-date-block">
               <view class="session-day">{{item.dateLabel}}</view>
               <view class="session-time">{{item.timeLabel}}</view>
@@ -112,6 +118,9 @@
                 {{item.statusLabel}}
               </view>
               <view class="session-attendance">{{item.attendanceLabel}}</view>
+              <view class="session-edit-hint">
+                {{item.status == 'scheduled' && item.attendanceCount == 0 ? '编辑 ›' : '查看 ›'}}
+              </view>
             </view>
           </view>
         </view>
@@ -143,23 +152,36 @@
               value="{{keyword}}"
               bindinput="changeKeyword"
               confirm-type="search"
-              bindconfirm="searchCandidates"
-              placeholder="搜索机构学员"
+              bindconfirm="applyCandidateSearch"
+              placeholder="搜索姓名、年级或学校"
             />
-            <button class="search-button" loading="{{studentLoading}}" bindtap="searchCandidates">搜索</button>
+            <button class="search-button" loading="{{studentLoading}}" bindtap="applyCandidateSearch">搜索</button>
           </view>
+          <view class="candidate-summary">显示 {{candidates.length}}/{{allCandidates.length}} 名学员</view>
           <view wx:if="{{candidates.length}}" class="candidate-list">
             <view wx:for="{{candidates}}" wx:key="id" class="candidate-row">
-              <view>
+              <view class="candidate-main">
                 <view class="student-name">{{item.name}}</view>
                 <view class="content-hint">{{item.grade}}{{item.school ? ' · ' + item.school : ''}}</view>
               </view>
+              <picker
+                wx:if="{{item.billingOptions.length}}"
+                range="{{item.billingOptions}}"
+                range-key="label"
+                value="{{item.billingIndex}}"
+                data-id="{{item.id}}"
+                bindchange="changeCandidateBilling"
+              >
+                <view class="candidate-billing">扣课课包：{{item.billingOptions[item.billingIndex].label}} ›</view>
+              </picker>
+              <view wx:else class="candidate-billing candidate-billing-empty">暂无可扣课档案</view>
               <button
                 class="add-button"
+                disabled="{{!item.billingCourseId}}"
                 loading="{{memberSavingId == item.id}}"
                 data-id="{{item.id}}"
                 bindtap="addStudent"
-              >入班</button>
+              >添加</button>
             </view>
           </view>
           <view wx:else class="detail-empty compact-empty">
@@ -171,7 +193,7 @@
           <view wx:for="{{classGroup.students}}" wx:key="id" class="class-member-row">
             <view class="member-main" data-id="{{item.id}}" bindtap="openStudentDetail">
               <view class="member-name">{{item.name}}</view>
-              <view class="member-course">消耗课程：{{classGroup.course.name}}</view>
+              <view class="member-course">扣课课包：{{item.billingCourseName || classGroup.course.name}}</view>
               <view class="member-balance">剩余 {{item.lessonBalance == null ? '-' : item.lessonBalance}} 课时</view>
             </view>
             <button

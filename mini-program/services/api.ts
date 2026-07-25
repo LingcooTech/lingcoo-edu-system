@@ -818,10 +818,15 @@ export interface AttendanceSummary {
 
 export interface TeacherClassSession {
   id: string;
+  classId?: string | null;
+  courseId?: string;
+  classroomId?: string;
   startsAt: string;
   endsAt: string;
   topic: string;
   status: string;
+  lessonUnits?: number;
+  sessionType?: 'class' | 'ad_hoc' | string;
   isMine?: boolean;
   teacher?: { id: string; name: string } | null;
   class?: { name: string };
@@ -853,8 +858,36 @@ export interface TeacherClass {
     grade: string;
     school?: string | null;
     status?: string;
+    billingCourseId?: string;
+    billingCourseName?: string;
     lessonBalance?: number | null;
   }>;
+}
+
+export interface TeacherSessionDetailRosterStudent {
+  id: string;
+  name: string;
+  grade: string;
+  school?: string | null;
+  source: string;
+  billingCourseId: string;
+  billingCourseName: string;
+  canRemove: boolean;
+  lessonAccounts: Array<{
+    id: string;
+    courseId: string;
+    courseName: string;
+    balance: number;
+  }>;
+}
+
+export interface TeacherSessionDetail {
+  session: TeacherClassSession;
+  class: { id: string; name: string } | null;
+  course: { id: string; name: string };
+  classroom: { id: string; name: string } | null;
+  canEdit: boolean;
+  roster: TeacherSessionDetailRosterStudent[];
 }
 
 export interface TeacherDashboardStudent {
@@ -1586,6 +1619,7 @@ export function createTeacherClassSession(input: {
   students: Array<{
     studentId: string;
     enrollmentMode: 'class' | 'session_only';
+    billingCourseId: string;
   }>;
 }): Promise<{ classSession: TeacherCalendarEvent }> {
   return request('/public/teacher/class-sessions', {
@@ -1630,11 +1664,62 @@ export function updateTeacherClass(
 export function addTeacherClassStudent(
   classId: string,
   studentId: string,
+  billingCourseId: string,
 ): Promise<{ enrollment: { id: string; studentId: string } }> {
   return request(`/public/teacher/classes/${classId}/students`, {
     method: 'POST',
-    data: { studentId },
+    data: { studentId, billingCourseId },
   });
+}
+
+export function fetchTeacherClassSession(sessionId: string): Promise<TeacherSessionDetail> {
+  return request(`/public/teacher/class-sessions/${encodeURIComponent(sessionId)}`);
+}
+
+export function updateTeacherClassSession(
+  sessionId: string,
+  input: {
+    classroomId?: string;
+    startsAt?: string;
+    endsAt?: string;
+    topic?: string;
+    lessonUnits?: number;
+    status?: 'scheduled' | 'cancelled';
+  },
+): Promise<{ classSession: TeacherClassSession }> {
+  return request(`/public/teacher/class-sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    data: input,
+  });
+}
+
+export function addTeacherClassSessionStudent(
+  sessionId: string,
+  input: {
+    studentId: string;
+    enrollmentMode: 'class' | 'session_only';
+    billingCourseId: string;
+  },
+): Promise<{ rosterStudent: unknown }> {
+  return request(
+    `/public/teacher/class-sessions/${encodeURIComponent(sessionId)}/students`,
+    {
+      method: 'POST',
+      data: input,
+    },
+  );
+}
+
+export function removeTeacherClassSessionStudent(
+  sessionId: string,
+  studentId: string,
+): Promise<{ rosterStudent: unknown }> {
+  return request(
+    `/public/teacher/class-sessions/${encodeURIComponent(sessionId)}/students/${encodeURIComponent(
+      studentId,
+    )}`,
+    { method: 'DELETE' },
+  );
 }
 
 export function removeTeacherClassStudent(

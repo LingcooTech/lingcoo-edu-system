@@ -152,7 +152,6 @@ Page({
       const fetched: TeacherStudentSearchItem[] = [];
       do {
         const result = await searchTeacherStudents({
-          courseId,
           page,
           pageSize,
         });

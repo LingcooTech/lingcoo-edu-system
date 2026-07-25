@@ -156,7 +156,13 @@
           </view>
         </view>
         <view wx:if="{{selectedEvents.length}}" class="session-list">
-          <view wx:for="{{selectedEvents}}" wx:key="id" class="session-row">
+          <view
+            wx:for="{{selectedEvents}}"
+            wx:key="id"
+            class="session-row"
+            data-id="{{item.id}}"
+            bindtap="openSessionEdit"
+          >
             <view class="row-between">
               <view>
                 <view class="session-time">{{item.timeLabel}}</view>
@@ -280,7 +286,10 @@
             </view>
           </picker>
         </view>
-        <view class="class-filter-count">共 {{filteredClasses.length}} 个班级</view>
+        <view class="class-filter-footer">
+          <view class="class-filter-count">共 {{filteredClasses.length}} 个班级</view>
+          <view class="class-filter-reset" bindtap="resetClassFilters">重置筛选</view>
+        </view>
       </view>
 
       <view wx:if="{{classUnscheduledCount}}" class="class-warning">
@@ -794,7 +803,6 @@
       <view class="sheet-head">
         <view>
           <view class="sheet-title">新增学员档案</view>
-          <view class="sheet-meta">仅管理员、老师双重身份可创建</view>
         </view>
         <view class="sheet-close-icon" aria-role="button" aria-label="关闭" bindtap="closeStudentCreate">×</view>
       </view>
@@ -837,9 +845,30 @@
       <scroll-view class="sheet-scroll academic-scroll" scroll-y>
         <view class="academic-form">
           <view class="form-label">学员</view>
-          <picker mode="selector" range="{{contractStudentOptions}}" range-key="label" value="{{contractStudentIndex}}" bindchange="onContractStudentChange">
-            <view class="academic-picker">{{contractStudentOptions[contractStudentIndex].label}}</view>
-          </picker>
+          <view class="contract-student-search">
+            <view class="student-search-icon">⌕</view>
+            <input
+              class="contract-student-input"
+              value="{{contractStudentKeyword}}"
+              bindinput="onContractStudentSearchInput"
+              placeholder="搜索学员姓名、班级或课程"
+              confirm-type="search"
+            />
+          </view>
+          <view wx:if="{{contractStudentName}}" class="contract-selected-student">已选择：{{contractStudentName}}</view>
+          <view wx:if="{{contractFilteredStudentOptions.length}}" class="contract-student-list">
+            <view
+              wx:for="{{contractFilteredStudentOptions}}"
+              wx:key="id"
+              class="contract-student-row {{contractStudentId == item.id ? 'contract-student-row-active' : ''}}"
+              data-id="{{item.id}}"
+              bindtap="selectContractStudent"
+            >
+              <view class="{{contractStudentId == item.id ? 'check check-active' : 'check'}}">{{contractStudentId == item.id ? '✓' : ''}}</view>
+              <view class="contract-student-name">{{item.label}}</view>
+            </view>
+          </view>
+          <view wx:else class="contract-student-empty">没有匹配的学员</view>
           <view class="form-label">正式课程</view>
           <picker mode="selector" range="{{contractCourseOptions}}" range-key="label" value="{{contractCourseIndex}}" bindchange="onContractCourseChange">
             <view class="academic-picker">{{contractCourseOptions[contractCourseIndex].label}}</view>
@@ -871,11 +900,15 @@
           <view class="form-two-cols">
             <view>
               <view class="form-label">开始日期</view>
-              <input class="academic-input" value="{{contractForm.startsAt}}" data-field="startsAt" bindinput="onContractInput" placeholder="YYYY-MM-DD" />
+              <picker mode="date" value="{{contractForm.startsAt}}" data-field="startsAt" bindchange="onContractDateChange">
+                <view class="academic-picker">{{contractForm.startsAt || '选择开始日期'}}</view>
+              </picker>
             </view>
             <view>
               <view class="form-label">结束日期</view>
-              <input class="academic-input" value="{{contractForm.endsAt}}" data-field="endsAt" bindinput="onContractInput" placeholder="YYYY-MM-DD" />
+              <picker mode="date" value="{{contractForm.endsAt}}" data-field="endsAt" bindchange="onContractDateChange">
+                <view class="academic-picker">{{contractForm.endsAt || '选择结束日期'}}</view>
+              </picker>
             </view>
           </view>
           <view class="form-label">备注</view>

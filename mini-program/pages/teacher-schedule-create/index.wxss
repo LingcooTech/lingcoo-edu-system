@@ -93,16 +93,22 @@
 }
 
 .student-head,
+.student-section-head,
+.class-student-row,
+.class-student-main,
 .student-main,
 .student-row,
 .search-row,
+.student-list-summary,
 .submit-bar {
   display: flex;
   align-items: center;
 }
 
 .student-head,
-.student-row,
+.student-section-head,
+.class-student-main,
+.student-list-summary,
 .submit-bar {
   justify-content: space-between;
 }
@@ -114,54 +120,82 @@
 }
 
 .search-row {
-  gap: 12rpx;
-  margin-top: 22rpx;
+  gap: 10rpx;
+  margin-top: 18rpx;
 }
 
 .search-input {
+  height: 70rpx;
+  min-height: 70rpx;
   flex: 1;
+  font-size: 24rpx;
+  line-height: 70rpx;
+  padding: 0 20rpx;
 }
 
 .search-button {
-  width: 116rpx;
-  height: 76rpx;
+  width: 108rpx;
+  max-width: 108rpx;
+  height: 70rpx;
+  flex: 0 0 108rpx;
   border: 0;
   border-radius: 18rpx;
-  background: #211f1c;
+  background: #9a6a4b;
   color: #fff;
-  font-size: 24rpx;
-  line-height: 76rpx;
+  font-size: 22rpx;
+  font-weight: 850;
+  line-height: 70rpx;
   margin: 0;
   padding: 0;
 }
 
 .student-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10rpx;
   margin-top: 16rpx;
 }
 
 .student-row {
-  gap: 12rpx;
-  border-bottom: 1rpx solid #eeeae5;
-  padding: 20rpx 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10rpx;
+  border: 1rpx solid rgba(33, 31, 28, 0.06);
+  border-radius: 18rpx;
+  background: #fbfaf8;
+  padding: 16rpx 14rpx;
+}
+
+.student-row-active {
+  border-color: rgba(154, 106, 75, 0.28);
+  background: #f1e9e1;
+}
+
+.student-row-disabled {
+  opacity: 0.55;
 }
 
 .student-main {
+  width: 100%;
   min-width: 0;
   flex: 1;
-  gap: 16rpx;
+  gap: 10rpx;
 }
 
 .check {
   display: flex;
-  width: 42rpx;
-  height: 42rpx;
+  width: 38rpx;
+  height: 38rpx;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border: 2rpx solid #c9c2b8;
   border-radius: 12rpx;
   color: #fff;
-  font-size: 24rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .check-active {
@@ -171,25 +205,38 @@
 
 .student-info {
   min-width: 0;
+  flex: 1;
 }
 
 .student-name {
+  overflow: hidden;
   color: #211f1c;
-  font-size: 27rpx;
+  font-size: 24rpx;
   font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-row .hint,
+.class-student-row .hint {
+  overflow: hidden;
+  font-size: 20rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mode-button {
-  min-width: 130rpx;
-  height: 54rpx;
+  align-self: flex-end;
+  min-width: 112rpx;
+  height: 44rpx;
   border: 0;
   border-radius: 999rpx;
   background: #f3f0ec;
   color: #6b6258;
-  font-size: 20rpx;
-  line-height: 54rpx;
+  font-size: 18rpx;
+  line-height: 44rpx;
   margin: 0;
-  padding: 0 16rpx;
+  padding: 0 14rpx;
 }
 
 .mode-button-active {
@@ -197,11 +244,122 @@
   color: #386a41;
 }
 
+.student-section-head {
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+
+.student-section-title {
+  color: #332e29;
+  font-size: 25rpx;
+  font-weight: 850;
+}
+
+.student-section-count {
+  flex-shrink: 0;
+  color: #8b857c;
+  font-size: 21rpx;
+}
+
+.other-student-head {
+  margin-top: 30rpx;
+  border-top: 1rpx solid #eeeae5;
+  padding-top: 26rpx;
+}
+
+.class-student-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.class-student-row {
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10rpx;
+  border: 1rpx solid rgba(154, 106, 75, 0.18);
+  border-radius: 18rpx;
+  background: #f8f2ec;
+  padding: 14rpx;
+}
+
+.class-student-main {
+  min-width: 0;
+  gap: 10rpx;
+}
+
+.class-student-row-removed {
+  border-color: rgba(33, 31, 28, 0.06);
+  background: #fbfaf8;
+  opacity: 0.65;
+}
+
+.roster-button {
+  display: flex;
+  width: 76rpx;
+  max-width: 76rpx;
+  height: 44rpx;
+  flex: 0 0 76rpx;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999rpx;
+  font-size: 18rpx;
+  font-weight: 850;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+}
+
+.roster-remove-button {
+  background: #fff0ee;
+  color: #a83f35;
+}
+
+.roster-add-button {
+  background: #9a6a4b;
+  color: #fff;
+}
+
+.roster-button::after {
+  border: 0;
+}
+
+.billing-picker {
+  overflow: hidden;
+  border-radius: 12rpx;
+  background: rgba(154, 106, 75, 0.09);
+  color: #714b35;
+  font-size: 18rpx;
+  line-height: 1.35;
+  padding: 10rpx 12rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.billing-picker-empty {
+  background: #f1efec;
+  color: #99928a;
+}
+
+.student-list-summary {
+  margin-top: 14rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+  line-height: 1.35;
+}
+
 .empty-card {
   padding: 30rpx 0;
   color: #8b857c;
   font-size: 24rpx;
   text-align: center;
+}
+
+.compact-empty {
+  padding: 24rpx 0 8rpx;
 }
 
 .submit-bar {
@@ -234,4 +392,27 @@
   line-height: 78rpx;
   margin: 0;
   padding: 0 30rpx;
+}
+
+.cancel-session-button {
+  width: 142rpx;
+  height: 66rpx;
+  border: 0;
+  border-radius: 18rpx;
+  background: #fff0ee;
+  color: #a83f35;
+  font-size: 21rpx;
+  font-weight: 850;
+  line-height: 66rpx;
+  margin: 0;
+  padding: 0;
+}
+
+.cancel-session-button::after {
+  border: 0;
+}
+
+.readonly-label {
+  color: #8b857c;
+  font-size: 21rpx;
 }

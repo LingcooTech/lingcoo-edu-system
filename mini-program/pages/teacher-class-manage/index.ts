@@ -39,6 +39,19 @@ type AttendanceRow = TeacherRosterStudent & {
   statusLabel: string;
 };
 
+type CandidateBillingOption = {
+  id: string;
+  label: string;
+  balance: number;
+};
+
+type CandidateRow = TeacherStudentSearchItem & {
+  searchText: string;
+  billingOptions: CandidateBillingOption[];
+  billingIndex: number;
+  billingCourseId: string;
+};
+
 const STATUS_OPTIONS = [
   { value: 'recruiting' as const, label: '招生中' },
   { value: 'active' as const, label: '进行中' },
@@ -143,6 +156,7 @@ Page({
     teacherName: '',
     campusName: '',
     classroomName: '',
+    locationName: '',
     sessions: [] as ClassSessionRow[],
     attendanceSessions: [] as ClassSessionRow[],
     upcomingSessionCount: 0,
@@ -155,7 +169,8 @@ Page({
     settingsVisible: false,
     addStudentVisible: false,
     keyword: '',
-    candidates: [] as TeacherStudentSearchItem[],
+    allCandidates: [] as CandidateRow[],
+    candidates: [] as CandidateRow[],
     studentLoading: false,
     attendanceStatusOptions: ATTENDANCE_OPTIONS,
     attendanceLoading: false,
@@ -229,6 +244,8 @@ Page({
         teacherName: classGroup.teacher?.name || '未指定老师',
         campusName: classGroup.campus?.name || '未设置校区',
         classroomName: classGroup.classroom?.name || '未分配教室',
+        locationName:
+          classGroup.classroom?.name || classGroup.campus?.name || '未设置上课地点',
         sessions,
         attendanceSessions: sessions.filter((session) => session.status !== 'cancelled'),
         upcomingSessionCount: sessions.filter(
@@ -290,6 +307,15 @@ Page({
     this.setData({ keyword: event.detail.value });
   },
 
+  applyCandidateSearch() {
+    const keyword = String(this.data.keyword || '').trim().toLocaleLowerCase('zh-CN');
+    this.setData({
+      candidates: (this.data.allCandidates as CandidateRow[]).filter(
+        (student) => !keyword || student.searchText.includes(keyword),
+      ),
+    });
+  },
+
   async saveClass() {
     const options = this.data.options;
     const classGroup = this.data.classGroup;
@@ -323,6 +349,14 @@ Page({
     });
   },
 
+  openSessionEdit(event: TapEvent) {
+    const sessionId = String(event.currentTarget.dataset.id || '');
+    if (!sessionId) return;
+    wx.navigateTo({
+      url: `/pages/teacher-schedule-create/index?sessionId=${encodeURIComponent(sessionId)}`,
+    });
+  },
+
   openStudentDetail(event: TapEvent) {
     const studentId = String(event.currentTarget.dataset.id || '');
     if (!studentId) return;
@@ -346,18 +380,47 @@ Page({
     }
     this.setData({ studentLoading: true, error: '' });
     try {
-      const result = await searchTeacherStudents({
-        search: this.data.keyword,
-        courseId,
-        page: 1,
-        pageSize: 50,
-      });
+      const fetched: TeacherStudentSearchItem[] = [];
+      const pageSize = 50;
+      let page = 1;
+      let total = 0;
+      do {
+        const result = await searchTeacherStudents({ page, pageSize });
+        total = result.total;
+        fetched.push(...result.students);
+        if (result.students.length === 0) break;
+        page += 1;
+      } while (fetched.length < total);
       const memberIds = new Set(
         classGroup.students.map((student: TeacherClass['students'][number]) => student.id),
       );
+      const allCandidates = fetched
+        .filter((student) => !memberIds.has(student.id))
+        .map((student) => {
+          const billingOptions = student.lessonAccounts.map((account) => ({
+            id: account.courseId,
+            label: `${account.courseName} · 余 ${account.balance}`,
+            balance: account.balance,
+          }));
+          const billingIndex = Math.max(
+            billingOptions.findIndex((option) => option.id === courseId),
+            0,
+          );
+          return {
+            ...student,
+            searchText: [student.name, student.grade, student.school]
+              .filter(Boolean)
+              .join(' ')
+              .toLocaleLowerCase('zh-CN'),
+            billingOptions,
+            billingIndex,
+            billingCourseId: billingOptions[billingIndex]?.id ?? '',
+          };
+        });
       this.setData({
-        candidates: result.students.filter((student) => !memberIds.has(student.id)),
+        allCandidates,
       });
+      this.applyCandidateSearch();
     } catch (error) {
       this.setData({ error: error instanceof Error ? error.message : '学员加载失败' });
     } finally {
@@ -368,9 +431,16 @@ Page({
   async addStudent(event: TapEvent) {
     const studentId = String(event.currentTarget.dataset.id || '');
     if (!studentId || this.data.memberSavingId) return;
+    const student = (this.data.allCandidates as CandidateRow[]).find(
+      (item) => item.id === studentId,
+    );
+    if (!student?.billingCourseId) {
+      wx.showToast({ title: '请先为学员建立可扣课档案', icon: 'none' });
+      return;
+    }
     this.setData({ memberSavingId: studentId, error: '' });
     try {
-      await addTeacherClassStudent(this.data.classId, studentId);
+      await addTeacherClassStudent(this.data.classId, studentId, student.billingCourseId);
       wx.showToast({ title: '学员已入班', icon: 'success' });
       await this.load();
     } catch (error) {
@@ -378,6 +448,23 @@ Page({
     } finally {
       this.setData({ memberSavingId: '' });
     }
+  },
+
+  changeCandidateBilling(event: PickerEvent & { currentTarget: { dataset: { id?: string } } }) {
+    const studentId = String(event.currentTarget.dataset.id || '');
+    const billingIndex = Number(event.detail.value);
+    const updateCandidate = (student: CandidateRow) =>
+      student.id === studentId
+        ? {
+            ...student,
+            billingIndex,
+            billingCourseId: student.billingOptions[billingIndex]?.id ?? '',
+          }
+        : student;
+    this.setData({
+      allCandidates: (this.data.allCandidates as CandidateRow[]).map(updateCandidate),
+      candidates: (this.data.candidates as CandidateRow[]).map(updateCandidate),
+    });
   },
 
   removeStudent(event: TapEvent) {

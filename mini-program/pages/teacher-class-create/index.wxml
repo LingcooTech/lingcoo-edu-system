@@ -55,7 +55,7 @@
         当前仅可新建空班；选择学员还需要“查看全部学员”和“拉学员入班”权限。
       </view>
       <view wx:elif="{{students.length}}" class="student-list">
-        <view wx:for="{{students}}" wx:key="id" class="student-row" data-id="{{item.id}}" bindtap="toggleStudent">
+        <view wx:for="{{students}}" wx:key="id" class="student-row {{item.selected ? 'student-row-active' : ''}}" data-id="{{item.id}}" bindtap="toggleStudent">
           <view class="{{item.selected ? 'check check-active' : 'check'}}">{{item.selected ? '✓' : ''}}</view>
           <view class="student-info">
             <view class="student-name">{{item.name}}</view>

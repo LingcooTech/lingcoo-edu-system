@@ -46,7 +46,10 @@ type MiniInputEvent = {
   currentTarget: { dataset: Record<string, string | undefined> };
   detail: { value: string };
 };
-type MiniPickerEvent = { detail: { value: string | number } };
+type MiniPickerEvent = {
+  currentTarget: { dataset: Record<string, string | undefined> };
+  detail: { value: string | number };
+};
 
 interface StudentRow {
   id: string;
@@ -79,6 +82,7 @@ interface StudentFilterOption {
 interface ContractStudentOption {
   id: string;
   label: string;
+  searchText: string;
 }
 
 interface ContractCourseOption {
@@ -502,10 +506,18 @@ function packageMatchesCourse(coursePackage: CoursePackage, course: Course | nul
 }
 
 function buildContractStudentOptions(students: StudentRow[]): ContractStudentOption[] {
-  return [
-    { id: '', label: '选择学员' },
-    ...students.map((student) => ({ id: student.id, label: student.name })),
-  ];
+  return students.map((student) => ({
+    id: student.id,
+    label: student.name,
+    searchText: [
+      student.name,
+      ...student.classes.map((classGroup) => classGroup.name),
+      ...student.balances.map((balance) => balance.courseName),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('zh-CN'),
+  }));
 }
 
 function buildContractCourseOptions(courses: Course[]): ContractCourseOption[] {
@@ -536,6 +548,21 @@ function buildContractPackageOptions(
       };
     }),
   ];
+}
+
+function packageFormPatch(
+  coursePackage: ContractPackageOption | undefined,
+  currentForm: ContractCreateForm,
+): Partial<ContractCreateForm> {
+  if (!coursePackage?.id) return {};
+  const patch: Partial<ContractCreateForm> = {
+    lessonCount: String(coursePackage.lessonCount),
+    paidYuan: String(moneyYuan(coursePackage.priceAmount)),
+  };
+  if (!(currentForm.title || '').trim()) {
+    patch.title = coursePackage.label.split(' · ')[0];
+  }
+  return patch;
 }
 
 function buildContractClassOptions(
@@ -677,7 +704,11 @@ Component({
     contractCreateSaving: false,
     contractCreateError: '',
     contractForm: { ...EMPTY_CONTRACT_CREATE_FORM } as ContractCreateForm,
-    contractStudentOptions: [{ id: '', label: '选择学员' }] as ContractStudentOption[],
+    contractStudentOptions: [] as ContractStudentOption[],
+    contractFilteredStudentOptions: [] as ContractStudentOption[],
+    contractStudentKeyword: '',
+    contractStudentId: '',
+    contractStudentName: '',
     contractCourseOptions: [{ id: '', label: '选择课程' }] as ContractCourseOption[],
     contractPackageOptions: [
       { id: '', label: '自定义课时', lessonCount: 0, priceAmount: 0 },
@@ -870,6 +901,10 @@ Component({
           studentPage: 1,
           studentTotalPages: Math.max(1, Math.ceil(studentRows.length / this.data.studentPageSize)),
           contractStudentOptions: buildContractStudentOptions(studentRows),
+          contractFilteredStudentOptions: buildContractStudentOptions(studentRows),
+          contractStudentKeyword: '',
+          contractStudentId: '',
+          contractStudentName: '',
           contractCourseOptions,
           contractPackageOptions: buildContractPackageOptions(
             schedulingOptions.coursePackages ?? [],
@@ -1179,21 +1214,39 @@ Component({
       if (!this.data.canCreateAcademicRecords) return;
       const schedulingOptions = this.data.schedulingOptions as TeacherSchedulingOptions | null;
       const contractCourseOptions = buildContractCourseOptions(schedulingOptions?.courses ?? []);
+      const contractStudentOptions = buildContractStudentOptions(this.data.allStudents as StudentRow[]);
+      const contractCourseIndex = contractCourseOptions.length > 1 ? 1 : 0;
+      const selectedCourseId = contractCourseOptions[contractCourseIndex]?.id || '';
+      const selectedCourse =
+        schedulingOptions?.courses.find((course) => course.id === selectedCourseId) ?? null;
+      const contractPackageOptions = buildContractPackageOptions(
+        schedulingOptions?.coursePackages ?? [],
+        selectedCourse,
+      );
+      const contractPackageIndex = contractPackageOptions.length > 1 ? 1 : 0;
+      const contractForm = {
+        ...EMPTY_CONTRACT_CREATE_FORM,
+        ...packageFormPatch(contractPackageOptions[contractPackageIndex], EMPTY_CONTRACT_CREATE_FORM),
+      };
       this.setData({
         contractCreateVisible: true,
         contractCreateSaving: false,
         contractCreateError: '',
-        contractForm: { ...EMPTY_CONTRACT_CREATE_FORM },
-        contractStudentOptions: buildContractStudentOptions(this.data.allStudents as StudentRow[]),
+        contractForm,
+        contractStudentOptions,
+        contractFilteredStudentOptions: contractStudentOptions,
+        contractStudentKeyword: '',
+        contractStudentId: '',
+        contractStudentName: '',
         contractCourseOptions,
-        contractPackageOptions: buildContractPackageOptions(
-          schedulingOptions?.coursePackages ?? [],
-          null,
+        contractPackageOptions,
+        contractClassOptions: buildContractClassOptions(
+          schedulingOptions?.classes ?? [],
+          selectedCourseId,
         ),
-        contractClassOptions: buildContractClassOptions(schedulingOptions?.classes ?? []),
         contractStudentIndex: 0,
-        contractCourseIndex: 0,
-        contractPackageIndex: 0,
+        contractCourseIndex,
+        contractPackageIndex,
         contractClassIndex: 0,
         paymentMethodIndex: 0,
       });
@@ -1211,6 +1264,36 @@ Component({
       this.setData({ contractStudentIndex: Number(event.detail.value) || 0 });
     },
 
+    onContractStudentSearchInput(event: MiniInputEvent) {
+      const keyword = event.detail.value;
+      this.setData({ contractStudentKeyword: keyword });
+      this.filterContractStudents(keyword);
+    },
+
+    filterContractStudents(keywordValue = this.data.contractStudentKeyword) {
+      const keyword = String(keywordValue || '').trim().toLocaleLowerCase('zh-CN');
+      const options = this.data.contractStudentOptions as ContractStudentOption[];
+      this.setData({
+        contractFilteredStudentOptions: options.filter(
+          (student) => !keyword || student.searchText.includes(keyword),
+        ),
+      });
+    },
+
+    selectContractStudent(event: MiniTapEvent) {
+      const studentId = String(event.currentTarget.dataset.id || '');
+      if (!studentId) return;
+      const student = (this.data.contractStudentOptions as ContractStudentOption[]).find(
+        (item) => item.id === studentId,
+      );
+      this.setData({
+        contractStudentId: studentId,
+        contractStudentName: student?.label || '',
+        contractStudentKeyword: student?.label || '',
+      });
+      this.filterContractStudents(student?.label || '');
+    },
+
     onContractCourseChange(event: MiniPickerEvent) {
       const courseIndex = Number(event.detail.value) || 0;
       const schedulingOptions = this.data.schedulingOptions as TeacherSchedulingOptions | null;
@@ -1218,18 +1301,27 @@ Component({
       const selectedCourseId = courseOptions[courseIndex]?.id || '';
       const selectedCourse =
         schedulingOptions?.courses.find((course) => course.id === selectedCourseId) ?? null;
+      const packageOptions = buildContractPackageOptions(
+        schedulingOptions?.coursePackages ?? [],
+        selectedCourse,
+      );
+      const packageIndex = packageOptions.length > 1 ? 1 : 0;
+      const formPatch = packageOptions[packageIndex]?.id
+        ? packageFormPatch(packageOptions[packageIndex], this.data.contractForm as ContractCreateForm)
+        : { title: '', lessonCount: '', paidYuan: '' };
       this.setData({
         contractCourseIndex: courseIndex,
-        contractPackageOptions: buildContractPackageOptions(
-          schedulingOptions?.coursePackages ?? [],
-          selectedCourse,
-        ),
+        contractPackageOptions: packageOptions,
         contractClassOptions: buildContractClassOptions(
           schedulingOptions?.classes ?? [],
           selectedCourseId,
         ),
-        contractPackageIndex: 0,
+        contractPackageIndex: packageIndex,
         contractClassIndex: 0,
+        contractForm: {
+          ...(this.data.contractForm as ContractCreateForm),
+          ...formPatch,
+        },
       });
     },
 
@@ -1250,6 +1342,17 @@ Component({
         contractForm: {
           ...(this.data.contractForm as ContractCreateForm),
           ...patch,
+        },
+      });
+    },
+
+    onContractDateChange(event: MiniPickerEvent) {
+      const field = event.currentTarget.dataset.field as 'startsAt' | 'endsAt' | undefined;
+      if (!field) return;
+      this.setData({
+        contractForm: {
+          ...(this.data.contractForm as ContractCreateForm),
+          [field]: String(event.detail.value || ''),
         },
       });
     },
@@ -1283,12 +1386,11 @@ Component({
     },
 
     async submitContractCreate() {
-      const studentOptions = this.data.contractStudentOptions as ContractStudentOption[];
       const courseOptions = this.data.contractCourseOptions as ContractCourseOption[];
       const packageOptions = this.data.contractPackageOptions as ContractPackageOption[];
       const classOptions = this.data.contractClassOptions as ContractClassOption[];
       const form = this.data.contractForm as ContractCreateForm;
-      const studentId = studentOptions[this.data.contractStudentIndex]?.id || '';
+      const studentId = this.data.contractStudentId || '';
       const courseId = courseOptions[this.data.contractCourseIndex]?.id || '';
       const packageId = packageOptions[this.data.contractPackageIndex]?.id || '';
       const classId = classOptions[this.data.contractClassIndex]?.id || '';
@@ -1394,6 +1496,16 @@ Component({
 
     onClassStatusFilterChange(event: MiniPickerEvent) {
       this.setData({ classStatusFilterIndex: Number(event.detail.value) || 0 });
+      this.applyClassFilters();
+    },
+
+    resetClassFilters() {
+      this.setData({
+        classSearchKeyword: '',
+        classCampusFilterIndex: 0,
+        classTeacherFilterIndex: 0,
+        classStatusFilterIndex: 0,
+      });
       this.applyClassFilters();
     },
 
@@ -1974,6 +2086,14 @@ Component({
 
     openScheduleCreate() {
       wx.navigateTo({ url: '/pages/teacher-schedule-create/index' });
+    },
+
+    openSessionEdit(event: MiniTapEvent) {
+      const sessionId = String(event.currentTarget.dataset.id || '');
+      if (!sessionId) return;
+      wx.navigateTo({
+        url: `/pages/teacher-schedule-create/index?sessionId=${encodeURIComponent(sessionId)}`,
+      });
     },
 
     openClassCreate() {

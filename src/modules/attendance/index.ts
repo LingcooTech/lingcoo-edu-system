@@ -170,14 +170,16 @@ export const attendanceModule: AppModule = {
       });
 
       // Check and auto-complete course contract if all lessons are consumed
+      const billingCourseMap = billingCourseByStudentId(context.rosterEntries);
       for (const record of attendanceRecords) {
+        const billingCourseId = billingCourseMap.get(record.studentId) ?? context.session.courseId;
         const [contract] = await app.db
           .select()
           .from(schema.courseContracts)
           .where(
             and(
               eq(schema.courseContracts.studentId, record.studentId),
-              eq(schema.courseContracts.courseId, context.session.courseId),
+              eq(schema.courseContracts.courseId, billingCourseId),
               eq(schema.courseContracts.status, 'active'),
             ),
           )
@@ -186,7 +188,7 @@ export const attendanceModule: AppModule = {
         if (contract) {
           await lessonRepo.checkAndCompleteCourseContract(app.db, {
             studentId: record.studentId,
-            courseId: context.session.courseId,
+            courseId: billingCourseId,
             contractId: contract.id,
           });
         }
@@ -195,7 +197,7 @@ export const attendanceModule: AppModule = {
       await lessonNotifications.notifyLessonConsumedForAttendance({
         sessionId,
         records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
-        billingCourseIdByStudentId: billingCourseByStudentId(context.rosterEntries),
+        billingCourseIdByStudentId: billingCourseMap,
       });
 
       const latestAttendanceRecords = alreadyCheckedIn
@@ -274,7 +276,7 @@ export const attendanceModule: AppModule = {
 
         const sessionsWithAttendance = sessionAttendance.filter((sa) => sa.records.length > 0);
 
-        sessionsWithAttendance.forEach(({ session, records }) => {
+        sessionsWithAttendance.forEach(({ records }) => {
           records.forEach((record) => {
             if (!studentStats.has(record.studentId)) {
               const student = studentById.get(record.studentId);
@@ -372,13 +374,14 @@ export const attendanceModule: AppModule = {
 
         // Check and auto-complete course contracts if all lessons are consumed
         for (const record of attendanceRecords) {
+          const billingCourseId = billingCourseMap.get(record.studentId) ?? session.courseId;
           const [contract] = await app.db
             .select()
             .from(schema.courseContracts)
             .where(
               and(
                 eq(schema.courseContracts.studentId, record.studentId),
-                eq(schema.courseContracts.courseId, session.courseId),
+                eq(schema.courseContracts.courseId, billingCourseId),
                 eq(schema.courseContracts.status, 'active'),
               ),
             )
@@ -387,7 +390,7 @@ export const attendanceModule: AppModule = {
           if (contract) {
             await lessonRepo.checkAndCompleteCourseContract(app.db, {
               studentId: record.studentId,
-              courseId: session.courseId,
+              courseId: billingCourseId,
               contractId: contract.id,
             });
           }
