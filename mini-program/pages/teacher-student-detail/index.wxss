@@ -5,10 +5,8 @@
 }
 
 .profile-card {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24rpx;
+  display: grid;
+  gap: 22rpx;
   overflow: hidden;
   border-radius: 30rpx;
   background:
@@ -50,24 +48,26 @@
 
 .profile-meta {
   margin-top: 10rpx;
+  overflow: hidden;
   color: #8b857c;
   font-size: 25rpx;
   line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-stats {
   display: grid;
-  width: 340rpx;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  grid-template-columns: 0.8fr 1.4fr 0.8fr;
   gap: 10rpx;
-  flex-shrink: 0;
   text-align: center;
 }
 
 .profile-stats > view {
   border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.76);
-  padding: 16rpx 6rpx;
+  padding: 12rpx 6rpx;
 }
 
 .stat-value {
@@ -75,6 +75,14 @@
   font-size: 34rpx;
   font-weight: 900;
   line-height: 1.1;
+}
+
+.stat-value-lessons {
+  overflow: hidden;
+  font-size: 20rpx;
+  line-height: 38rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stat-label {
@@ -146,6 +154,11 @@
   gap: 22rpx;
 }
 
+.row-card > view:first-child,
+.row-between > view:first-child {
+  min-width: 0;
+}
+
 .row-title {
   color: #211f1c;
   font-size: 29rpx;
@@ -169,6 +182,7 @@
   font-size: 23rpx;
   font-weight: 850;
   padding: 10rpx 18rpx;
+  white-space: nowrap;
 }
 
 .text-content,

@@ -4,7 +4,7 @@
 
 .admin-hero {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 22rpx;
   border-radius: 30rpx;
@@ -45,22 +45,49 @@
 }
 
 .role-switch-button {
+  display: flex;
   box-sizing: border-box;
-  min-width: 132rpx;
-  height: 54rpx;
-  border: 0;
+  flex-shrink: 0;
+  width: 148rpx;
+  height: 46rpx;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid rgba(255, 255, 255, 0.16);
   border-radius: 999rpx;
-  background: #211f1c;
+  background: linear-gradient(135deg, #35312d 0%, #211f1c 100%);
+  box-shadow: 0 4rpx 12rpx rgba(33, 31, 28, 0.14);
   color: #fff;
-  font-size: 22rpx;
+  font-size: 20rpx;
   font-weight: 850;
-  line-height: 54rpx;
-  margin: 0;
-  padding: 0 20rpx;
+  line-height: 1;
+  margin: 0 0 0 auto;
+  padding: 0 14rpx;
 }
 
-.role-switch-button::after {
-  border: 0;
+.role-switch-button:active {
+  opacity: 0.86;
+}
+
+.role-switch-button.is-disabled {
+  opacity: 0.68;
+}
+
+.role-switch-spinner {
+  width: 18rpx;
+  height: 18rpx;
+  flex-shrink: 0;
+  margin-right: 8rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.38);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: role-switch-spin 0.8s linear infinite;
+}
+
+@keyframes role-switch-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .admin-badge,

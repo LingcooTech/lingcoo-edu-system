@@ -126,6 +126,7 @@ Component({
 
   methods: {
     requestRoleSwitch() {
+      if (this.data.switchingRole) return;
       this.triggerEvent('switchrole');
     },
 

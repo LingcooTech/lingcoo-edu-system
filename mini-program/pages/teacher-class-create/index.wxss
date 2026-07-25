@@ -78,12 +78,17 @@
 }
 
 .search-row {
-  gap: 12rpx;
+  gap: 10rpx;
   margin-top: 22rpx;
 }
 
 .search-input {
+  height: 70rpx;
+  min-height: 70rpx;
   flex: 1;
+  font-size: 24rpx;
+  line-height: 70rpx;
+  padding: 0 20rpx;
 }
 
 .search-button,
@@ -94,12 +99,15 @@
 }
 
 .search-button {
-  width: 116rpx;
-  height: 76rpx;
-  background: #211f1c;
+  width: 108rpx;
+  max-width: 108rpx;
+  height: 70rpx;
+  flex: 0 0 108rpx;
+  background: #9a6a4b;
   color: #fff;
-  font-size: 24rpx;
-  line-height: 76rpx;
+  font-size: 22rpx;
+  font-weight: 850;
+  line-height: 70rpx;
   padding: 0;
 }
 
@@ -110,6 +118,16 @@
 
 .student-list {
   margin-top: 16rpx;
+}
+
+.student-list-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+  line-height: 1.35;
 }
 
 .student-row {

@@ -26,11 +26,12 @@ type StudentProfile = {
   name: string;
   grade: string;
   school: string;
+  metaLabel: string;
+  lessonCountLabel: string;
   classCount: number;
   totalBalance: number;
   totalLessons: number;
   totalStars: number;
-  institutionName: string;
   isMyStudent: boolean;
 };
 
@@ -42,6 +43,7 @@ type ClassRow = {
   classroomName: string;
   balance: string;
   lessonCountLabel: string;
+  metaLabel: string;
   teacherName: string;
   isMine: boolean;
 };
@@ -143,6 +145,16 @@ function calendarRange() {
 
 function ratingLabel(rating?: number | null) {
   return rating && rating > 0 ? `${rating} 星` : '未评分';
+}
+
+function lessonCountLabel(balance?: number | null, totalLessons?: number | null) {
+  const balanceLabel = balance === null || balance === undefined ? '-' : String(balance);
+  const totalLabel = totalLessons === null || totalLessons === undefined ? '-' : String(totalLessons);
+  return `剩余${balanceLabel}/总计${totalLabel}`;
+}
+
+function compactStudentMeta(grade?: string, school?: string) {
+  return [grade, school].filter(Boolean).join(' · ');
 }
 
 function toWorkRow(item: StudentWork): WorkRow {
@@ -257,6 +269,9 @@ Page({
           const lessonAccount = classGroup.course?.id
             ? student?.lessonAccounts.find((item) => item.courseId === classGroup.course?.id)
             : null;
+          const metaLabel = [classGroup.course?.name || '课程', classGroup.teacher?.name || '']
+            .filter(Boolean)
+            .join(' · ');
           return {
             id: classGroup.id,
             courseId: classGroup.course?.id || '',
@@ -264,10 +279,8 @@ Page({
             courseName: classGroup.course?.name || '课程',
             classroomName: classGroup.classroom?.name || '教室待确认',
             balance: balance === null || balance === undefined ? '-' : String(balance),
-            lessonCountLabel:
-              balance === null || balance === undefined
-                ? '-/-'
-                : `${balance}/${lessonAccount?.totalLessons ?? '-'}`,
+            lessonCountLabel: lessonCountLabel(balance, lessonAccount?.totalLessons ?? null),
+            metaLabel,
             teacherName: classGroup.teacher?.name || '',
             isMine: classGroup.isMine !== false,
           };
@@ -368,6 +381,13 @@ Page({
         | NonNullable<typeof classOptionsPayload>['student'];
       const optionBalance =
         classOptionsPayload?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) ?? 0;
+      const totalBalance =
+        student?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) || optionBalance;
+      const totalLessons =
+        student?.lessonAccounts.reduce(
+          (sum, item) => sum + (item.totalLessons ?? item.balance),
+          0,
+        ) || optionBalance;
 
       this.setData({
         loading: false,
@@ -376,17 +396,12 @@ Page({
           name: profileStudent.name,
           grade: profileStudent.grade,
           school: profileStudent.school || '',
+          metaLabel: compactStudentMeta(profileStudent.grade, profileStudent.school || ''),
           classCount: classRows.length,
-          totalBalance:
-            student?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) || optionBalance,
-          totalLessons:
-            student?.lessonAccounts.reduce(
-              (sum, item) => sum + (item.totalLessons ?? item.balance),
-              0,
-            ) || optionBalance,
+          lessonCountLabel: lessonCountLabel(totalBalance, totalLessons),
+          totalBalance,
+          totalLessons,
           totalStars,
-          institutionName:
-            ('institution' in profileStudent && profileStudent.institution?.name) || '所属机构',
           isMyStudent: 'isMyStudent' in profileStudent ? profileStudent.isMyStudent : true,
         },
         classes: classRows,

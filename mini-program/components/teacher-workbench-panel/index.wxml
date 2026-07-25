@@ -9,15 +9,16 @@
             <view class="summary-eyebrow">老师工作台</view>
             <view class="summary-title">{{summaryTitle}}</view>
           </view>
-          <button
+          <view
             wx:if="{{canSwitchRole}}"
-            class="role-switch-button"
-            loading="{{switchingRole}}"
-            disabled="{{switchingRole}}"
+            class="role-switch-button {{switchingRole ? 'is-disabled' : ''}}"
+            aria-role="button"
+            aria-label="切到管理"
             bindtap="requestRoleSwitch"
           >
-            切到管理
-          </button>
+            <view wx:if="{{switchingRole}}" class="role-switch-spinner"></view>
+            <text>{{switchingRole ? '切换中' : '切到管理'}}</text>
+          </view>
         </view>
         <view class="scope-tabs">
           <view
@@ -226,11 +227,8 @@
 
     <block wx:elif="{{activeView == 'classes'}}">
       <view class="class-list-heading">
-        <view>
-          <view class="section-title">班级</view>
-          <view class="class-list-count">共 {{filteredClasses.length}} 个班级</view>
-        </view>
-        <button wx:if="{{canManageClasses}}" class="class-create-button" catchtap="openClassCreate">＋ 新建</button>
+        <view class="section-title">班级</view>
+        <button wx:if="{{canManageClasses}}" class="class-create-button" catchtap="openClassCreate">新建班级</button>
       </view>
 
       <view class="card class-filter-card">
@@ -244,18 +242,45 @@
             bindinput="onClassSearchInput"
           />
         </view>
-        <picker
-          mode="selector"
-          range="{{classStatusFilterOptions}}"
-          range-key="label"
-          value="{{classStatusFilterIndex}}"
-          bindchange="onClassStatusFilterChange"
-        >
-          <view class="class-status-picker">
-            <text>{{classStatusFilterOptions[classStatusFilterIndex].label}}</text>
-            <view class="student-filter-arrow"></view>
-          </view>
-        </picker>
+        <view class="class-filter-grid">
+          <picker
+            mode="selector"
+            range="{{classCampusFilterOptions}}"
+            range-key="label"
+            value="{{classCampusFilterIndex}}"
+            bindchange="onClassCampusFilterChange"
+          >
+            <view class="class-status-picker">
+              <text>{{classCampusFilterOptions[classCampusFilterIndex].label}}</text>
+              <view class="student-filter-arrow"></view>
+            </view>
+          </picker>
+          <picker
+            mode="selector"
+            range="{{classTeacherFilterOptions}}"
+            range-key="label"
+            value="{{classTeacherFilterIndex}}"
+            bindchange="onClassTeacherFilterChange"
+          >
+            <view class="class-status-picker">
+              <text>{{classTeacherFilterOptions[classTeacherFilterIndex].label}}</text>
+              <view class="student-filter-arrow"></view>
+            </view>
+          </picker>
+          <picker
+            mode="selector"
+            range="{{classStatusFilterOptions}}"
+            range-key="label"
+            value="{{classStatusFilterIndex}}"
+            bindchange="onClassStatusFilterChange"
+          >
+            <view class="class-status-picker">
+              <text>{{classStatusFilterOptions[classStatusFilterIndex].label}}</text>
+              <view class="student-filter-arrow"></view>
+            </view>
+          </picker>
+        </view>
+        <view class="class-filter-count">共 {{filteredClasses.length}} 个班级</view>
       </view>
 
       <view wx:if="{{classUnscheduledCount}}" class="class-warning">
@@ -298,8 +323,13 @@
 
     <block wx:elif="{{activeView == 'students'}}">
       <view class="student-list-heading">
-        <view class="section-title">学员</view>
-        <view class="student-result-count">共 {{studentFilteredCount}} 人</view>
+        <view>
+          <view class="section-title">学员</view>
+        </view>
+        <view wx:if="{{canCreateAcademicRecords}}" class="student-heading-actions">
+          <view class="student-create-action" bindtap="openStudentCreate">新增学员</view>
+          <view class="student-create-action primary" bindtap="openContractCreate">新增课程档案</view>
+        </view>
       </view>
       <view class="card student-filter-card">
         <view class="student-search">
@@ -321,9 +351,7 @@
             bindchange="onStudentCampusFilterChange"
           >
             <view class="student-filter-picker">
-              <text class="student-filter-value">
-                {{studentCampusFilterOptions[studentCampusFilterIndex].label}}
-              </text>
+              <text class="student-filter-value">{{studentCampusFilterOptions[studentCampusFilterIndex].label}}</text>
               <view class="student-filter-arrow"></view>
             </view>
           </picker>
@@ -335,9 +363,7 @@
             bindchange="onStudentClassFilterChange"
           >
             <view class="student-filter-picker">
-              <text class="student-filter-value">
-                {{studentClassFilterOptions[studentClassFilterIndex].label}}
-              </text>
+              <text class="student-filter-value">{{studentClassFilterOptions[studentClassFilterIndex].label}}</text>
               <view class="student-filter-arrow"></view>
             </view>
           </picker>
@@ -349,9 +375,7 @@
             bindchange="onStudentCourseFilterChange"
           >
             <view class="student-filter-picker">
-              <text class="student-filter-value">
-                {{studentCourseFilterOptions[studentCourseFilterIndex].label}}
-              </text>
+              <text class="student-filter-value">{{studentCourseFilterOptions[studentCourseFilterIndex].label}}</text>
               <view class="student-filter-arrow"></view>
             </view>
           </picker>
@@ -363,9 +387,7 @@
             bindchange="onStudentLessonFilterChange"
           >
             <view class="student-filter-picker">
-              <text class="student-filter-value">
-                {{studentLessonFilterOptions[studentLessonFilterIndex].label}}
-              </text>
+              <text class="student-filter-value">{{studentLessonFilterOptions[studentLessonFilterIndex].label}}</text>
               <view class="student-filter-arrow"></view>
             </view>
           </picker>
@@ -762,6 +784,112 @@
         bindtap="submitReview"
       >
         {{reviewSaving ? '保存中...' : '保存批阅'}}
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{studentCreateVisible}}" class="sheet-mask" bindtap="closeStudentCreate">
+    <view class="work-sheet academic-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-head">
+        <view>
+          <view class="sheet-title">新增学员档案</view>
+          <view class="sheet-meta">仅管理员、老师双重身份可创建</view>
+        </view>
+        <view class="sheet-close-icon" aria-role="button" aria-label="关闭" bindtap="closeStudentCreate">×</view>
+      </view>
+      <scroll-view class="sheet-scroll academic-scroll" scroll-y>
+        <view class="academic-form">
+          <view class="form-label">学员姓名</view>
+          <input class="academic-input" value="{{studentCreateForm.name}}" data-field="name" bindinput="onStudentCreateInput" placeholder="请输入学员姓名" />
+          <view class="form-label">年级</view>
+          <input class="academic-input" value="{{studentCreateForm.grade}}" data-field="grade" bindinput="onStudentCreateInput" placeholder="如：三年级" />
+          <view class="form-label">学校</view>
+          <input class="academic-input" value="{{studentCreateForm.school}}" data-field="school" bindinput="onStudentCreateInput" placeholder="可不填" />
+          <view class="form-label">家长姓名</view>
+          <input class="academic-input" value="{{studentCreateForm.guardianName}}" data-field="guardianName" bindinput="onStudentCreateInput" placeholder="可不填" />
+          <view class="form-label">家长手机号</view>
+          <input class="academic-input" type="number" value="{{studentCreateForm.guardianPhone}}" data-field="guardianPhone" bindinput="onStudentCreateInput" placeholder="可不填" />
+        </view>
+      </scroll-view>
+      <view wx:if="{{studentCreateError}}" class="sheet-error">{{studentCreateError}}</view>
+      <button
+        class="btn btn-primary sheet-submit"
+        loading="{{studentCreateSaving}}"
+        disabled="{{studentCreateSaving}}"
+        bindtap="submitStudentCreate"
+      >
+        {{studentCreateSaving ? '保存中...' : '保存学员档案'}}
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{contractCreateVisible}}" class="sheet-mask" bindtap="closeContractCreate">
+    <view class="work-sheet academic-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-head">
+        <view>
+          <view class="sheet-title">新增正式课程档案</view>
+          <view class="sheet-meta">创建后会生成线下已支付订单和课时余额</view>
+        </view>
+        <view class="sheet-close-icon" aria-role="button" aria-label="关闭" bindtap="closeContractCreate">×</view>
+      </view>
+      <scroll-view class="sheet-scroll academic-scroll" scroll-y>
+        <view class="academic-form">
+          <view class="form-label">学员</view>
+          <picker mode="selector" range="{{contractStudentOptions}}" range-key="label" value="{{contractStudentIndex}}" bindchange="onContractStudentChange">
+            <view class="academic-picker">{{contractStudentOptions[contractStudentIndex].label}}</view>
+          </picker>
+          <view class="form-label">正式课程</view>
+          <picker mode="selector" range="{{contractCourseOptions}}" range-key="label" value="{{contractCourseIndex}}" bindchange="onContractCourseChange">
+            <view class="academic-picker">{{contractCourseOptions[contractCourseIndex].label}}</view>
+          </picker>
+          <view class="form-label">课时包</view>
+          <picker mode="selector" range="{{contractPackageOptions}}" range-key="label" value="{{contractPackageIndex}}" bindchange="onContractPackageChange">
+            <view class="academic-picker">{{contractPackageOptions[contractPackageIndex].label}}</view>
+          </picker>
+          <view class="form-label">档案标题</view>
+          <input class="academic-input" value="{{contractForm.title}}" data-field="title" bindinput="onContractInput" placeholder="可不填，默认使用课程名" />
+          <view class="form-two-cols">
+            <view>
+              <view class="form-label">课时数</view>
+              <input class="academic-input" type="number" value="{{contractForm.lessonCount}}" data-field="lessonCount" bindinput="onContractInput" placeholder="必填" />
+            </view>
+            <view>
+              <view class="form-label">实收金额(元)</view>
+              <input class="academic-input" type="digit" value="{{contractForm.paidYuan}}" data-field="paidYuan" bindinput="onContractInput" placeholder="0" />
+            </view>
+          </view>
+          <view class="form-label">班级</view>
+          <picker mode="selector" range="{{contractClassOptions}}" range-key="label" value="{{contractClassIndex}}" bindchange="onContractClassChange">
+            <view class="academic-picker">{{contractClassOptions[contractClassIndex].label}}</view>
+          </picker>
+          <view class="form-label">支付方式</view>
+          <picker mode="selector" range="{{paymentMethodOptions}}" range-key="label" value="{{paymentMethodIndex}}" bindchange="onContractPaymentMethodChange">
+            <view class="academic-picker">{{paymentMethodOptions[paymentMethodIndex].label}}</view>
+          </picker>
+          <view class="form-two-cols">
+            <view>
+              <view class="form-label">开始日期</view>
+              <input class="academic-input" value="{{contractForm.startsAt}}" data-field="startsAt" bindinput="onContractInput" placeholder="YYYY-MM-DD" />
+            </view>
+            <view>
+              <view class="form-label">结束日期</view>
+              <input class="academic-input" value="{{contractForm.endsAt}}" data-field="endsAt" bindinput="onContractInput" placeholder="YYYY-MM-DD" />
+            </view>
+          </view>
+          <view class="form-label">备注</view>
+          <textarea class="academic-textarea" value="{{contractForm.note}}" data-field="note" bindinput="onContractInput" placeholder="可不填" maxlength="500" />
+        </view>
+      </scroll-view>
+      <view wx:if="{{contractCreateError}}" class="sheet-error">{{contractCreateError}}</view>
+      <button
+        class="btn btn-primary sheet-submit"
+        loading="{{contractCreateSaving}}"
+        disabled="{{contractCreateSaving}}"
+        bindtap="submitContractCreate"
+      >
+        {{contractCreateSaving ? '创建中...' : '创建课程档案'}}
       </button>
     </view>
   </view>

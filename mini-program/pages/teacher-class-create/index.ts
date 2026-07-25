@@ -13,6 +13,7 @@ type TapEvent = { currentTarget: { dataset: Record<string, string | undefined> }
 type StudentRow = TeacherStudentSearchItem & {
   selected: boolean;
   balanceLabel: string;
+  searchText: string;
 };
 
 const STATUS_OPTIONS = [
@@ -33,7 +34,9 @@ Page({
     capacity: 8,
     keyword: '',
     studentLoading: false,
+    allStudents: [] as StudentRow[],
     students: [] as StudentRow[],
+    selectedStudentIds: [] as string[],
     selectedCount: 0,
     totalStudents: 0,
     error: '',
@@ -83,8 +86,12 @@ Page({
     this.setData({
       courseIndex,
       name: course?.name ?? '',
+      keyword: '',
+      allStudents: [],
       students: [],
+      selectedStudentIds: [],
       selectedCount: 0,
+      totalStudents: 0,
     });
     await this.loadStudents();
   },
@@ -110,35 +117,68 @@ Page({
     this.setData({ keyword: event.detail.value });
   },
 
+  applyStudentSearch() {
+    const keyword = String(this.data.keyword || '').trim().toLocaleLowerCase('zh-CN');
+    const selectedIds = new Set(this.data.selectedStudentIds as string[]);
+    const allStudents = this.data.allStudents as StudentRow[];
+    const students = allStudents
+      .filter((student) => !keyword || student.searchText.includes(keyword))
+      .map((student) => ({
+        ...student,
+        selected: selectedIds.has(student.id),
+      }));
+    this.setData({
+      students,
+      selectedCount: selectedIds.size,
+    });
+  },
+
   async loadStudents() {
     const options = this.data.options;
     const courseId = this.currentCourseId();
-    if (!options || !courseId || !options.permissions.viewAllStudents) return;
+    if (
+      !options ||
+      !courseId ||
+      !options.permissions.viewAllStudents ||
+      !options.permissions.enrollStudents
+    ) {
+      return;
+    }
     this.setData({ studentLoading: true, error: '' });
     try {
-      const result = await searchTeacherStudents({
-        search: this.data.keyword,
-        courseId,
-        page: 1,
-        pageSize: 50,
-      });
-      const previous = new Set(
-        (this.data.students as StudentRow[])
-          .filter((student) => student.selected)
-          .map((student) => student.id),
-      );
-      const students = result.students.map((student) => ({
+      const pageSize = 50;
+      let page = 1;
+      let total = 0;
+      const fetched: TeacherStudentSearchItem[] = [];
+      do {
+        const result = await searchTeacherStudents({
+          courseId,
+          page,
+          pageSize,
+        });
+        total = result.total;
+        fetched.push(...result.students);
+        if (result.students.length === 0) break;
+        page += 1;
+      } while (fetched.length < total);
+
+      const selectedIds = new Set(this.data.selectedStudentIds as string[]);
+      const allStudents = fetched.map((student) => ({
         ...student,
-        selected: previous.has(student.id),
+        selected: selectedIds.has(student.id),
         balanceLabel: String(
           student.lessonAccounts.find((account) => account.courseId === courseId)?.balance ?? '-',
         ),
+        searchText: [student.name, student.grade, student.school]
+          .filter(Boolean)
+          .join(' ')
+          .toLocaleLowerCase('zh-CN'),
       }));
       this.setData({
-        students,
-        totalStudents: result.total,
-        selectedCount: students.filter((student) => student.selected).length,
+        allStudents,
+        totalStudents: total,
       });
+      this.applyStudentSearch();
     } catch (error) {
       this.setData({ error: error instanceof Error ? error.message : '学员加载失败' });
     } finally {
@@ -148,17 +188,31 @@ Page({
 
   toggleStudent(event: TapEvent) {
     const id = String(event.currentTarget.dataset.id || '');
-    const students = (this.data.students as StudentRow[]).map((student) => {
-      if (student.id !== id) return student;
-      if (!student.selected && this.data.selectedCount >= this.data.capacity) {
+    if (!id) return;
+    const selectedIds = new Set(this.data.selectedStudentIds as string[]);
+    if (selectedIds.has(id)) {
+      selectedIds.delete(id);
+    } else {
+      if (selectedIds.size >= this.data.capacity) {
         wx.showToast({ title: '已达到班级容量', icon: 'none' });
-        return student;
+        return;
       }
-      return { ...student, selected: !student.selected };
-    });
+      selectedIds.add(id);
+    }
+    const selectedStudentIds = Array.from(selectedIds);
+    const students = (this.data.students as StudentRow[]).map((student) => ({
+      ...student,
+      selected: selectedIds.has(student.id),
+    }));
+    const allStudents = (this.data.allStudents as StudentRow[]).map((student) => ({
+      ...student,
+      selected: selectedIds.has(student.id),
+    }));
     this.setData({
+      allStudents,
       students,
-      selectedCount: students.filter((student) => student.selected).length,
+      selectedStudentIds,
+      selectedCount: selectedStudentIds.length,
     });
   },
 
@@ -168,12 +222,12 @@ Page({
     if (!options) return;
     const course = options.courses[this.data.courseIndex];
     const classroom = options.classrooms[this.data.classroomIndex];
-    const selected = (this.data.students as StudentRow[]).filter((student) => student.selected);
+    const selectedStudentIds = this.data.selectedStudentIds as string[];
     if (!course || !classroom || !this.data.name.trim()) {
       wx.showToast({ title: '请完整填写班级信息', icon: 'none' });
       return;
     }
-    if (selected.length > this.data.capacity) {
+    if (selectedStudentIds.length > this.data.capacity) {
       wx.showToast({ title: '学员人数超过班级容量', icon: 'none' });
       return;
     }
@@ -185,7 +239,7 @@ Page({
         name: this.data.name.trim(),
         capacity: this.data.capacity,
         status: this.data.statusOptions[this.data.statusIndex].value,
-        studentIds: selected.map((student) => student.id),
+        studentIds: selectedStudentIds,
       });
       wx.showToast({ title: '班级已创建', icon: 'success' });
       setTimeout(() => wx.navigateBack(), 500);

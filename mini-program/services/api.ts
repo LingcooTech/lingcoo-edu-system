@@ -978,6 +978,7 @@ export interface TeacherSchedulingOptions {
     course?: Course | null;
   }>;
   courses: Course[];
+  coursePackages: CoursePackage[];
   classrooms: Array<
     PublicClassroom & { campus?: { id: string; name: string; address?: string | null } | null }
   >;
@@ -995,6 +996,33 @@ export interface TeacherStudentSearchItem {
     totalLessons?: number;
     courseName: string;
   }>;
+}
+
+export interface TeacherCreatedStudent {
+  id: string;
+  name: string;
+  grade: string;
+  school?: string | null;
+  status?: string;
+  guardian?: { id: string; name: string; phone: string } | null;
+  lessonAccounts: Array<{
+    id: string;
+    courseId: string;
+    balance: number;
+    course?: Course | null;
+  }>;
+}
+
+export interface TeacherCourseContract {
+  id: string;
+  studentId: string;
+  courseId: string;
+  classId?: string | null;
+  packageId?: string | null;
+  title: string;
+  lessonCount: number;
+  paidAmount: number;
+  status: string;
 }
 
 export interface TeacherHomeworkCheckIn extends ParentHomeworkCheckIn {
@@ -1513,6 +1541,38 @@ export function searchTeacherStudents(params: {
   total: number;
 }> {
   return request(`/public/teacher/students${buildQueryString(params)}`);
+}
+
+export function createTeacherStudent(input: {
+  name: string;
+  grade: string;
+  school?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+}): Promise<{ student: TeacherCreatedStudent }> {
+  return request('/public/teacher/students', {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export function createTeacherCourseContract(input: {
+  studentId: string;
+  courseId: string;
+  classId?: string | null;
+  packageId?: string | null;
+  title?: string | null;
+  lessonCount: number;
+  paidAmount: number;
+  paymentMethod: 'cash' | 'bank_transfer' | 'wechat_offline' | 'alipay_offline' | 'offline_other';
+  startsAt?: string | null;
+  endsAt?: string | null;
+  note?: string | null;
+}): Promise<{ courseContract: TeacherCourseContract }> {
+  return request('/public/teacher/course-contracts', {
+    method: 'POST',
+    data: input,
+  });
 }
 
 export function createTeacherClassSession(input: {

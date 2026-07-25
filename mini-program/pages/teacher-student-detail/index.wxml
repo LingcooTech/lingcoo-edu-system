@@ -6,10 +6,8 @@
       <view class="profile-info">
         <view class="profile-eyebrow">学员档案</view>
         <view class="profile-name">{{profile.name}}</view>
-        <view class="profile-meta">{{profile.grade}}{{profile.school ? ' · ' + profile.school : ''}}</view>
-        <view class="identity-pill">
-          {{profile.isMyStudent ? '我的学员' : profile.institutionName}}
-        </view>
+        <view class="profile-meta">{{profile.metaLabel}}</view>
+        <view wx:if="{{profile.isMyStudent}}" class="identity-pill">我的学员</view>
       </view>
       <view class="profile-stats">
         <view>
@@ -17,8 +15,8 @@
           <view class="stat-label">班级</view>
         </view>
         <view>
-          <view class="stat-value">{{profile.totalBalance}}/{{profile.totalLessons}}</view>
-          <view class="stat-label">剩余/总课时</view>
+          <view class="stat-value stat-value-lessons">{{profile.lessonCountLabel}}</view>
+          <view class="stat-label">课时</view>
         </view>
         <view>
           <view class="stat-value">{{profile.totalStars}}</view>
@@ -45,11 +43,9 @@
         <view wx:for="{{classes}}" wx:key="id" class="card row-card">
           <view>
             <view class="row-title">{{item.name}}</view>
-            <view class="row-meta">
-              {{item.courseName}} · {{item.classroomName}} · {{item.isMine ? '我的班级' : (item.teacherName || '机构班级')}}
-            </view>
+            <view class="row-meta">{{item.metaLabel}}</view>
           </view>
-          <view class="balance">{{item.lessonCountLabel}} 剩余/总课时</view>
+          <view class="balance">{{item.lessonCountLabel}}</view>
         </view>
       </view>
       <view wx:else class="card empty-card">暂无班级信息。</view>

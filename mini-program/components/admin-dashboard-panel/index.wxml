@@ -6,15 +6,16 @@
       <view class="admin-desc">数据展示、快速搜索和业务概览。</view>
     </view>
     <view class="admin-hero-actions">
-      <button
+      <view
         wx:if="{{canSwitchRole}}"
-        class="role-switch-button"
-        loading="{{switchingRole}}"
-        disabled="{{switchingRole}}"
+        class="role-switch-button {{switchingRole ? 'is-disabled' : ''}}"
+        aria-role="button"
+        aria-label="切到老师"
         bindtap="requestRoleSwitch"
       >
-        切到老师
-      </button>
+        <view wx:if="{{switchingRole}}" class="role-switch-spinner"></view>
+        <text>{{switchingRole ? '切换中' : '切到老师'}}</text>
+      </view>
       <view class="admin-badge">只读</view>
     </view>
   </view>

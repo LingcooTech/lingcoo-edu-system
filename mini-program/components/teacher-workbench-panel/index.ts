@@ -1,4 +1,6 @@
 import {
+  createTeacherCourseContract,
+  createTeacherStudent,
   fetchTeacherCalendar,
   fetchTeacherCapabilities,
   fetchTeacherDashboard,
@@ -6,12 +8,15 @@ import {
   fetchTeacherHomeworkCheckIns,
   fetchTeacherLessonFeedbacks,
   fetchTeacherNotifications,
+  fetchTeacherSchedulingOptions,
   fetchTeacherSessionAttendance,
   markTeacherNotificationRead,
   recordTeacherAttendance,
   reviewTeacherHomeworkCheckIn,
   saveTeacherSessionFeedbacks,
   type AttendanceStatus,
+  type Course,
+  type CoursePackage,
   type SessionAttendanceRecord,
   type TeacherCalendarEvent,
   type TeacherClass,
@@ -21,6 +26,7 @@ import {
   type TeacherHomeworkCheckIn,
   type TeacherLessonFeedback,
   type TeacherRosterStudent,
+  type TeacherSchedulingOptions,
 } from '../../services/api';
 import { TEACHER_WORKBENCH_ICONS } from '../../utils/icons';
 
@@ -67,6 +73,49 @@ interface StudentRow {
 interface StudentFilterOption {
   id: string;
   label: string;
+  campusId?: string;
+}
+
+interface ContractStudentOption {
+  id: string;
+  label: string;
+}
+
+interface ContractCourseOption {
+  id: string;
+  label: string;
+  courseSeriesId?: string | null;
+}
+
+interface ContractPackageOption {
+  id: string;
+  label: string;
+  lessonCount: number;
+  priceAmount: number;
+}
+
+interface ContractClassOption {
+  id: string;
+  label: string;
+  courseId?: string;
+}
+
+interface StudentCreateForm {
+  name: string;
+  grade: string;
+  school: string;
+  guardianName: string;
+  guardianPhone: string;
+}
+
+interface ContractCreateForm {
+  title: string;
+  lessonCount: string;
+  paidYuan: string;
+  paymentMethod: 'cash' | 'bank_transfer' | 'wechat_offline' | 'alipay_offline' | 'offline_other';
+  startsAt: string;
+  endsAt: string;
+  note: string;
 }
 
 interface DateStripRow {
@@ -179,6 +228,32 @@ const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
   absent: '缺勤',
   makeup: '补参与',
   trial: '试听',
+};
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'wechat_offline', label: '微信线下' },
+  { value: 'alipay_offline', label: '支付宝线下' },
+  { value: 'cash', label: '现金' },
+  { value: 'bank_transfer', label: '银行转账' },
+  { value: 'offline_other', label: '其他线下' },
+] as const;
+
+const EMPTY_STUDENT_CREATE_FORM: StudentCreateForm = {
+  name: '',
+  grade: '',
+  school: '',
+  guardianName: '',
+  guardianPhone: '',
+};
+
+const EMPTY_CONTRACT_CREATE_FORM: ContractCreateForm = {
+  title: '',
+  lessonCount: '',
+  paidYuan: '',
+  paymentMethod: 'wechat_offline',
+  startsAt: '',
+  endsAt: '',
+  note: '',
 };
 
 function addDays(date: Date, days: number) {
@@ -388,6 +463,100 @@ function normalizeClass(classGroup: TeacherClass) {
   };
 }
 
+function buildStudentClassFilterOptions(
+  classes: Array<ReturnType<typeof normalizeClass>>,
+  campusId = '',
+): StudentFilterOption[] {
+  return [
+    { id: '', label: '全部班级' },
+    ...classes
+      .filter((classGroup) => !campusId || classGroup.campus?.id === campusId)
+      .map((classGroup) => ({
+        id: classGroup.id,
+        label: classGroup.name,
+        campusId: classGroup.campus?.id || '',
+      })),
+  ];
+}
+
+function effectivePackagePrice(coursePackage: CoursePackage) {
+  return coursePackage.discountPriceAmount ?? coursePackage.priceAmount;
+}
+
+function effectivePackageLessonCount(coursePackage: CoursePackage) {
+  return (coursePackage.lessonCount ?? 0) + (coursePackage.giftedLessonCount ?? 0);
+}
+
+function moneyYuan(cents: number) {
+  return Number((cents / 100).toFixed(2));
+}
+
+function dateToApiDateTime(value: string) {
+  return value ? new Date(`${value}T00:00:00`).toISOString() : null;
+}
+
+function packageMatchesCourse(coursePackage: CoursePackage, course: Course | null) {
+  if (!course) return false;
+  if (coursePackage.courseId) return coursePackage.courseId === course.id;
+  return Boolean(coursePackage.courseSeriesId && coursePackage.courseSeriesId === course.courseSeriesId);
+}
+
+function buildContractStudentOptions(students: StudentRow[]): ContractStudentOption[] {
+  return [
+    { id: '', label: '选择学员' },
+    ...students.map((student) => ({ id: student.id, label: student.name })),
+  ];
+}
+
+function buildContractCourseOptions(courses: Course[]): ContractCourseOption[] {
+  return [
+    { id: '', label: '选择课程' },
+    ...courses.map((course) => ({
+      id: course.id,
+      label: course.name,
+      courseSeriesId: course.courseSeriesId,
+    })),
+  ];
+}
+
+function buildContractPackageOptions(
+  coursePackages: CoursePackage[],
+  selectedCourse: Course | null,
+): ContractPackageOption[] {
+  return [
+    { id: '', label: '自定义课时', lessonCount: 0, priceAmount: 0 },
+    ...coursePackages.filter((item) => packageMatchesCourse(item, selectedCourse)).map((item) => {
+      const lessonCount = effectivePackageLessonCount(item);
+      const priceAmount = effectivePackagePrice(item);
+      return {
+        id: item.id,
+        label: `${item.name} · ${lessonCount}课时 · ¥${moneyYuan(priceAmount)}`,
+        lessonCount,
+        priceAmount,
+      };
+    }),
+  ];
+}
+
+function buildContractClassOptions(
+  classes: TeacherSchedulingOptions['classes'],
+  selectedCourseId = '',
+): ContractClassOption[] {
+  if (!selectedCourseId) {
+    return [{ id: '', label: '暂不入班' }];
+  }
+  return [
+    { id: '', label: '暂不入班' },
+    ...classes
+      .filter((classGroup) => !selectedCourseId || classGroup.courseId === selectedCourseId)
+      .map((classGroup) => ({
+        id: classGroup.id,
+        label: classGroup.name,
+        courseId: classGroup.courseId,
+      })),
+  ];
+}
+
 function normalizeEvent(event: TeacherCalendarEvent) {
   const pending = isRollCallPending(event);
   return {
@@ -471,7 +640,11 @@ Component({
       upcomingSessionCount: number;
     }>,
     classSearchKeyword: '',
+    classCampusFilterIndex: 0,
+    classTeacherFilterIndex: 0,
     classStatusFilterIndex: 0,
+    classCampusFilterOptions: [{ id: '', label: '全部校区' }] as StudentFilterOption[],
+    classTeacherFilterOptions: [{ id: '', label: '全部老师' }] as StudentFilterOption[],
     classStatusFilterOptions: CLASS_FILTER_OPTIONS,
     classUnscheduledCount: 0,
     allStudents: [] as StudentRow[],
@@ -494,6 +667,28 @@ Component({
     studentPage: 1,
     studentPageSize: 15,
     studentTotalPages: 1,
+    canCreateAcademicRecords: false,
+    schedulingOptions: null as TeacherSchedulingOptions | null,
+    studentCreateVisible: false,
+    studentCreateSaving: false,
+    studentCreateError: '',
+    studentCreateForm: { ...EMPTY_STUDENT_CREATE_FORM } as StudentCreateForm,
+    contractCreateVisible: false,
+    contractCreateSaving: false,
+    contractCreateError: '',
+    contractForm: { ...EMPTY_CONTRACT_CREATE_FORM } as ContractCreateForm,
+    contractStudentOptions: [{ id: '', label: '选择学员' }] as ContractStudentOption[],
+    contractCourseOptions: [{ id: '', label: '选择课程' }] as ContractCourseOption[],
+    contractPackageOptions: [
+      { id: '', label: '自定义课时', lessonCount: 0, priceAmount: 0 },
+    ] as ContractPackageOption[],
+    contractClassOptions: [{ id: '', label: '暂不入班' }] as ContractClassOption[],
+    contractStudentIndex: 0,
+    contractCourseIndex: 0,
+    contractPackageIndex: 0,
+    contractClassIndex: 0,
+    paymentMethodOptions: PAYMENT_METHOD_OPTIONS,
+    paymentMethodIndex: 0,
     feedbackEvents: [] as Array<
       ReturnType<typeof normalizeEvent> & {
         feedbackCount: number;
@@ -557,6 +752,7 @@ Component({
 
   methods: {
     requestRoleSwitch() {
+      if (this.data.switchingRole) return;
       this.triggerEvent('switchrole');
     },
 
@@ -575,6 +771,7 @@ Component({
           homeworkAssignments,
           teacherNotifications,
           capabilities,
+          schedulingOptions,
         ] = await Promise.all([
           fetchTeacherDashboard(),
           fetchTeacherCalendar(calendarRange()),
@@ -583,6 +780,7 @@ Component({
           fetchTeacherHomeworkAssignments(),
           fetchTeacherNotifications({ status: 'unread', limit: 20 }),
           fetchTeacherCapabilities(),
+          fetchTeacherSchedulingOptions(),
         ]);
         const today = startOfDay(new Date());
         const selectedDateKey = this.data.selectedDateKey || dateKey(today);
@@ -610,13 +808,7 @@ Component({
           dashboard.students,
           dashboardClasses,
         ) as StudentRow[];
-        const classFilterOptions: StudentFilterOption[] = [
-          { id: '', label: '全部班级' },
-          ...normalizedClasses.map((classGroup) => ({
-            id: classGroup.id,
-            label: classGroup.name,
-          })),
-        ];
+        const classFilterOptions = buildStudentClassFilterOptions(normalizedClasses);
         const campusOptionMap = new Map<string, string>();
         for (const classGroup of normalizedClasses) {
           if (classGroup.campus?.id) {
@@ -626,6 +818,16 @@ Component({
         const campusFilterOptions: StudentFilterOption[] = [
           { id: '', label: '全部校区' },
           ...Array.from(campusOptionMap, ([id, label]) => ({ id, label })),
+        ];
+        const classTeacherOptionMap = new Map<string, string>();
+        for (const classGroup of normalizedClasses) {
+          if (classGroup.teacher?.id) {
+            classTeacherOptionMap.set(classGroup.teacher.id, classGroup.teacher.name);
+          }
+        }
+        const classTeacherFilterOptions: StudentFilterOption[] = [
+          { id: '', label: '全部老师' },
+          ...Array.from(classTeacherOptionMap, ([id, label]) => ({ id, label })),
         ];
         const courseOptionMap = new Map<string, string>();
         for (const student of studentRows) {
@@ -637,13 +839,20 @@ Component({
           { id: '', label: '全部课程' },
           ...Array.from(courseOptionMap, ([id, label]) => ({ id, label })),
         ];
+        const contractCourseOptions = buildContractCourseOptions(schedulingOptions.courses ?? []);
         this.setData({
           loading: false,
+          canCreateAcademicRecords: Boolean(capabilities.isAdminTeacher),
+          schedulingOptions,
           calendarEvents: calendarItems,
           classes: normalizedClasses,
           filteredClasses: normalizedClasses,
           classSearchKeyword: '',
+          classCampusFilterIndex: 0,
+          classTeacherFilterIndex: 0,
           classStatusFilterIndex: 0,
+          classCampusFilterOptions: campusFilterOptions,
+          classTeacherFilterOptions,
           classUnscheduledCount: normalizedClasses.filter(
             (item) =>
               ['recruiting', 'active'].includes(item.status) && item.upcomingSessionCount === 0,
@@ -660,6 +869,13 @@ Component({
           studentFilteredCount: studentRows.length,
           studentPage: 1,
           studentTotalPages: Math.max(1, Math.ceil(studentRows.length / this.data.studentPageSize)),
+          contractStudentOptions: buildContractStudentOptions(studentRows),
+          contractCourseOptions,
+          contractPackageOptions: buildContractPackageOptions(
+            schedulingOptions.coursePackages ?? [],
+            null,
+          ),
+          contractClassOptions: buildContractClassOptions(schedulingOptions.classes ?? []),
           lessonFeedbacks: feedbackItems,
           homeworkAssignments: assignmentItems,
           teacherNotifications: notificationItems.map(normalizeTeacherNotification),
@@ -819,12 +1035,52 @@ Component({
     },
 
     onStudentCampusFilterChange(event: MiniPickerEvent) {
-      this.setData({ studentCampusFilterIndex: Number(event.detail.value) || 0 });
+      const campusIndex = Number(event.detail.value) || 0;
+      const campusOptions = this.data.studentCampusFilterOptions as StudentFilterOption[];
+      const classes = this.data.classes as Array<ReturnType<typeof normalizeClass>>;
+      const currentClassOptions = this.data.studentClassFilterOptions as StudentFilterOption[];
+      const currentClassId = currentClassOptions[this.data.studentClassFilterIndex]?.id || '';
+      const campusId = campusOptions[campusIndex]?.id || '';
+      const nextClassOptions = buildStudentClassFilterOptions(classes, campusId);
+      const nextClassIndex = Math.max(
+        0,
+        nextClassOptions.findIndex((option) => option.id === currentClassId),
+      );
+      this.setData({
+        studentCampusFilterIndex: campusIndex,
+        studentClassFilterOptions: nextClassOptions,
+        studentClassFilterIndex: nextClassIndex,
+      });
       this.applyStudentFilters(true);
     },
 
     onStudentClassFilterChange(event: MiniPickerEvent) {
-      this.setData({ studentClassFilterIndex: Number(event.detail.value) || 0 });
+      const classIndex = Number(event.detail.value) || 0;
+      const classOptions = this.data.studentClassFilterOptions as StudentFilterOption[];
+      const selectedClass = classOptions[classIndex];
+      if (!selectedClass?.id) {
+        this.setData({ studentClassFilterIndex: 0 });
+        this.applyStudentFilters(true);
+        return;
+      }
+
+      const campusOptions = this.data.studentCampusFilterOptions as StudentFilterOption[];
+      const classes = this.data.classes as Array<ReturnType<typeof normalizeClass>>;
+      const campusId = selectedClass.campusId || '';
+      const campusIndex = Math.max(
+        0,
+        campusOptions.findIndex((option) => option.id === campusId),
+      );
+      const nextClassOptions = buildStudentClassFilterOptions(classes, campusId);
+      const nextClassIndex = Math.max(
+        0,
+        nextClassOptions.findIndex((option) => option.id === selectedClass.id),
+      );
+      this.setData({
+        studentCampusFilterIndex: campusIndex,
+        studentClassFilterOptions: nextClassOptions,
+        studentClassFilterIndex: nextClassIndex,
+      });
       this.applyStudentFilters(true);
     },
 
@@ -843,10 +1099,241 @@ Component({
         studentSearchKeyword: '',
         studentCampusFilterIndex: 0,
         studentClassFilterIndex: 0,
+        studentClassFilterOptions: buildStudentClassFilterOptions(
+          this.data.classes as Array<ReturnType<typeof normalizeClass>>,
+        ),
         studentCourseFilterIndex: 0,
         studentLessonFilterIndex: 0,
       });
       this.applyStudentFilters(true);
+    },
+
+    openStudentCreate() {
+      if (!this.data.canCreateAcademicRecords) return;
+      this.setData({
+        studentCreateVisible: true,
+        studentCreateSaving: false,
+        studentCreateError: '',
+        studentCreateForm: { ...EMPTY_STUDENT_CREATE_FORM },
+      });
+    },
+
+    closeStudentCreate() {
+      if (this.data.studentCreateSaving) return;
+      this.setData({
+        studentCreateVisible: false,
+        studentCreateError: '',
+      });
+    },
+
+    onStudentCreateInput(event: MiniInputEvent) {
+      const field = event.currentTarget.dataset.field as keyof StudentCreateForm;
+      if (!field) return;
+      this.setData({
+        studentCreateForm: {
+          ...(this.data.studentCreateForm as StudentCreateForm),
+          [field]: event.detail.value,
+        },
+      });
+    },
+
+    async submitStudentCreate() {
+      const form = this.data.studentCreateForm as StudentCreateForm;
+      const name = form.name.trim();
+      const grade = form.grade.trim();
+      const guardianName = form.guardianName.trim();
+      const guardianPhone = form.guardianPhone.trim();
+      if (!name || !grade) {
+        this.setData({ studentCreateError: '请填写学员姓名和年级' });
+        return;
+      }
+      if ((guardianName && !guardianPhone) || (!guardianName && guardianPhone)) {
+        this.setData({ studentCreateError: '家长姓名和手机号需同时填写' });
+        return;
+      }
+      this.setData({ studentCreateSaving: true, studentCreateError: '' });
+      try {
+        await createTeacherStudent({
+          name,
+          grade,
+          school: form.school.trim() || undefined,
+          guardianName: guardianName || undefined,
+          guardianPhone: guardianPhone || undefined,
+        });
+        wx.showToast({ title: '学员档案已新增', icon: 'success' });
+        this.setData({
+          studentCreateVisible: false,
+          studentCreateForm: { ...EMPTY_STUDENT_CREATE_FORM },
+        });
+        await this.reload();
+      } catch (error) {
+        this.setData({
+          studentCreateError: error instanceof Error ? error.message : '新增学员失败',
+        });
+      } finally {
+        this.setData({ studentCreateSaving: false });
+      }
+    },
+
+    openContractCreate() {
+      if (!this.data.canCreateAcademicRecords) return;
+      const schedulingOptions = this.data.schedulingOptions as TeacherSchedulingOptions | null;
+      const contractCourseOptions = buildContractCourseOptions(schedulingOptions?.courses ?? []);
+      this.setData({
+        contractCreateVisible: true,
+        contractCreateSaving: false,
+        contractCreateError: '',
+        contractForm: { ...EMPTY_CONTRACT_CREATE_FORM },
+        contractStudentOptions: buildContractStudentOptions(this.data.allStudents as StudentRow[]),
+        contractCourseOptions,
+        contractPackageOptions: buildContractPackageOptions(
+          schedulingOptions?.coursePackages ?? [],
+          null,
+        ),
+        contractClassOptions: buildContractClassOptions(schedulingOptions?.classes ?? []),
+        contractStudentIndex: 0,
+        contractCourseIndex: 0,
+        contractPackageIndex: 0,
+        contractClassIndex: 0,
+        paymentMethodIndex: 0,
+      });
+    },
+
+    closeContractCreate() {
+      if (this.data.contractCreateSaving) return;
+      this.setData({
+        contractCreateVisible: false,
+        contractCreateError: '',
+      });
+    },
+
+    onContractStudentChange(event: MiniPickerEvent) {
+      this.setData({ contractStudentIndex: Number(event.detail.value) || 0 });
+    },
+
+    onContractCourseChange(event: MiniPickerEvent) {
+      const courseIndex = Number(event.detail.value) || 0;
+      const schedulingOptions = this.data.schedulingOptions as TeacherSchedulingOptions | null;
+      const courseOptions = this.data.contractCourseOptions as ContractCourseOption[];
+      const selectedCourseId = courseOptions[courseIndex]?.id || '';
+      const selectedCourse =
+        schedulingOptions?.courses.find((course) => course.id === selectedCourseId) ?? null;
+      this.setData({
+        contractCourseIndex: courseIndex,
+        contractPackageOptions: buildContractPackageOptions(
+          schedulingOptions?.coursePackages ?? [],
+          selectedCourse,
+        ),
+        contractClassOptions: buildContractClassOptions(
+          schedulingOptions?.classes ?? [],
+          selectedCourseId,
+        ),
+        contractPackageIndex: 0,
+        contractClassIndex: 0,
+      });
+    },
+
+    onContractPackageChange(event: MiniPickerEvent) {
+      const packageIndex = Number(event.detail.value) || 0;
+      const packageOptions = this.data.contractPackageOptions as ContractPackageOption[];
+      const selectedPackage = packageOptions[packageIndex];
+      const patch: Partial<ContractCreateForm> = {};
+      if (selectedPackage?.id) {
+        patch.lessonCount = String(selectedPackage.lessonCount);
+        patch.paidYuan = String(moneyYuan(selectedPackage.priceAmount));
+        if (!((this.data.contractForm as ContractCreateForm).title || '').trim()) {
+          patch.title = selectedPackage.label.split(' · ')[0];
+        }
+      }
+      this.setData({
+        contractPackageIndex: packageIndex,
+        contractForm: {
+          ...(this.data.contractForm as ContractCreateForm),
+          ...patch,
+        },
+      });
+    },
+
+    onContractClassChange(event: MiniPickerEvent) {
+      this.setData({ contractClassIndex: Number(event.detail.value) || 0 });
+    },
+
+    onContractPaymentMethodChange(event: MiniPickerEvent) {
+      const paymentMethodIndex = Number(event.detail.value) || 0;
+      const method =
+        PAYMENT_METHOD_OPTIONS[paymentMethodIndex]?.value ?? EMPTY_CONTRACT_CREATE_FORM.paymentMethod;
+      this.setData({
+        paymentMethodIndex,
+        contractForm: {
+          ...(this.data.contractForm as ContractCreateForm),
+          paymentMethod: method,
+        },
+      });
+    },
+
+    onContractInput(event: MiniInputEvent) {
+      const field = event.currentTarget.dataset.field as keyof ContractCreateForm;
+      if (!field) return;
+      this.setData({
+        contractForm: {
+          ...(this.data.contractForm as ContractCreateForm),
+          [field]: event.detail.value,
+        },
+      });
+    },
+
+    async submitContractCreate() {
+      const studentOptions = this.data.contractStudentOptions as ContractStudentOption[];
+      const courseOptions = this.data.contractCourseOptions as ContractCourseOption[];
+      const packageOptions = this.data.contractPackageOptions as ContractPackageOption[];
+      const classOptions = this.data.contractClassOptions as ContractClassOption[];
+      const form = this.data.contractForm as ContractCreateForm;
+      const studentId = studentOptions[this.data.contractStudentIndex]?.id || '';
+      const courseId = courseOptions[this.data.contractCourseIndex]?.id || '';
+      const packageId = packageOptions[this.data.contractPackageIndex]?.id || '';
+      const classId = classOptions[this.data.contractClassIndex]?.id || '';
+      const lessonCount = Number(form.lessonCount);
+      const paidYuan = Number(form.paidYuan || 0);
+      if (!studentId || !courseId) {
+        this.setData({ contractCreateError: '请选择学员和课程' });
+        return;
+      }
+      if (!Number.isInteger(lessonCount) || lessonCount <= 0) {
+        this.setData({ contractCreateError: '课时数必须大于 0' });
+        return;
+      }
+      if (!Number.isFinite(paidYuan) || paidYuan < 0) {
+        this.setData({ contractCreateError: '实收金额不能小于 0' });
+        return;
+      }
+      this.setData({ contractCreateSaving: true, contractCreateError: '' });
+      try {
+        await createTeacherCourseContract({
+          studentId,
+          courseId,
+          classId: classId || null,
+          packageId: packageId || null,
+          title: form.title.trim() || null,
+          lessonCount,
+          paidAmount: Math.round(paidYuan * 100),
+          paymentMethod: form.paymentMethod,
+          startsAt: dateToApiDateTime(form.startsAt),
+          endsAt: dateToApiDateTime(form.endsAt),
+          note: form.note.trim() || null,
+        });
+        wx.showToast({ title: '课程档案已创建', icon: 'success' });
+        this.setData({
+          contractCreateVisible: false,
+          contractForm: { ...EMPTY_CONTRACT_CREATE_FORM },
+        });
+        await this.reload();
+      } catch (error) {
+        this.setData({
+          contractCreateError: error instanceof Error ? error.message : '创建课程档案失败',
+        });
+      } finally {
+        this.setData({ contractCreateSaving: false });
+      }
     },
 
     previousStudentPage() {
@@ -865,7 +1352,11 @@ Component({
       const keyword = String(this.data.classSearchKeyword || '')
         .trim()
         .toLocaleLowerCase('zh-CN');
+      const campusOptions = this.data.classCampusFilterOptions as StudentFilterOption[];
+      const teacherOptions = this.data.classTeacherFilterOptions as StudentFilterOption[];
       const statusOptions = this.data.classStatusFilterOptions as StudentFilterOption[];
+      const campusId = campusOptions[this.data.classCampusFilterIndex]?.id || '';
+      const teacherId = teacherOptions[this.data.classTeacherFilterIndex]?.id || '';
       const status = statusOptions[this.data.classStatusFilterIndex]?.id || '';
       const filtered = (
         this.data.classes as Array<
@@ -875,6 +1366,8 @@ Component({
           }
         >
       ).filter((classGroup) => {
+        if (campusId && classGroup.campus?.id !== campusId) return false;
+        if (teacherId && classGroup.teacher?.id !== teacherId) return false;
         if (status && classGroup.status !== status) return false;
         if (!keyword) return true;
         return [classGroup.name, classGroup.courseName, classGroup.teacherName]
@@ -886,6 +1379,16 @@ Component({
 
     onClassSearchInput(event: MiniInputEvent) {
       this.setData({ classSearchKeyword: event.detail.value });
+      this.applyClassFilters();
+    },
+
+    onClassCampusFilterChange(event: MiniPickerEvent) {
+      this.setData({ classCampusFilterIndex: Number(event.detail.value) || 0 });
+      this.applyClassFilters();
+    },
+
+    onClassTeacherFilterChange(event: MiniPickerEvent) {
+      this.setData({ classTeacherFilterIndex: Number(event.detail.value) || 0 });
       this.applyClassFilters();
     },
 

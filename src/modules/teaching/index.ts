@@ -4,12 +4,16 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
 import * as peopleRepo from '../../db/repositories/people.js';
+import * as packagesRepo from '../../db/repositories/packages.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as schema from '../../db/schema.js';
+import { readBusinessModel } from '../../lib/business-model.js';
 import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
+import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
 import { requireTeacherPermission, resolveTeacherAccess } from '../../lib/teacher-permissions.js';
 import { LearningNotificationService } from '../notifications/learning-notification-service.js';
@@ -148,6 +152,30 @@ const teacherStudentSearchSchema = z.object({
   courseId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+const teacherStudentCreateSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  grade: z.string().trim().min(1).max(80),
+  school: z.string().trim().max(160).optional(),
+  guardianName: z.string().trim().max(120).optional(),
+  guardianPhone: z.string().trim().max(40).optional(),
+});
+
+const teacherCourseContractCreateSchema = z.object({
+  studentId: z.string().uuid(),
+  courseId: z.string().uuid(),
+  classId: z.string().uuid().nullable().optional(),
+  packageId: z.string().uuid().nullable().optional(),
+  title: z.string().trim().max(200).nullable().optional(),
+  lessonCount: z.number().int().positive(),
+  paidAmount: z.number().int().nonnegative().default(0),
+  paymentMethod: z
+    .enum(['cash', 'bank_transfer', 'wechat_offline', 'alipay_offline', 'offline_other'])
+    .default('wechat_offline'),
+  startsAt: z.string().datetime({ offset: true }).nullable().optional(),
+  endsAt: z.string().datetime({ offset: true }).nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
 });
 
 const teacherSessionStudentSchema = z.object({
@@ -369,6 +397,79 @@ export const teachingModule: AppModule = {
       return course;
     }
 
+    function requireAdminTeacherAccess(
+      access: Awaited<ReturnType<typeof requireTeacherAccessForAccount>>,
+    ) {
+      if (!access.isAdminTeacher) {
+        throw Object.assign(new Error('仅管理老师可新增学员和正式档案'), { statusCode: 403 });
+      }
+    }
+
+    function normalizeDate(value?: string | null) {
+      return value ? new Date(value) : null;
+    }
+
+    async function resolveGuardianForTeacherStudent(input: {
+      guardianName?: string;
+      guardianPhone?: string;
+    }) {
+      const guardianName = input.guardianName?.trim();
+      const guardianPhone = input.guardianPhone?.trim();
+      if (!guardianName && !guardianPhone) return null;
+      if (!guardianName || !guardianPhone) {
+        throw Object.assign(new Error('家长姓名和手机号需同时填写'), { statusCode: 422 });
+      }
+
+      const existingByPhone = await peopleRepo.findGuardianByPhone(app.db, guardianPhone);
+      if (existingByPhone) {
+        if (existingByPhone.name !== guardianName) {
+          return peopleRepo.updateGuardian(app.db, existingByPhone.id, { name: guardianName });
+        }
+        return existingByPhone;
+      }
+
+      return peopleRepo.createGuardian(app.db, {
+        name: guardianName,
+        phone: guardianPhone,
+      });
+    }
+
+    async function resolveTeacherContractDefaults(
+      body: Pick<z.infer<typeof teacherCourseContractCreateSchema>, 'courseId'>,
+    ) {
+      const [organization, course] = await Promise.all([
+        organizationRepo.requireOrganization(app.db),
+        catalogRepo.requireCourse(app.db, body.courseId),
+      ]);
+      const businessModel = readBusinessModel(organization.settings);
+      if (!businessModel.manualPackageGrantEnabled) {
+        throw Object.assign(new Error('当前业务开关未开启后台手动添加课时包'), {
+          statusCode: 403,
+        });
+      }
+
+      const paymentReceiverInstitutionId = course.paymentReceiverInstitutionId ?? null;
+      const paymentReceiverType = course.paymentReceiverType;
+      const [paymentReceiverInstitution, providerInstitution] = await Promise.all([
+        teachingRepo.findInstitution(app.db, paymentReceiverInstitutionId),
+        teachingRepo.findInstitution(app.db, course.providerInstitutionId),
+      ]);
+
+      return {
+        course,
+        paymentReceiverType,
+        paymentReceiverInstitutionId,
+        paymentReceiverName: resolvePaymentReceiverName({
+          paymentReceiverType,
+          receiverInstitutionName: paymentReceiverInstitution?.name,
+          providerInstitutionName: providerInstitution?.name,
+          legacyDisplayName: course.paymentReceiverName,
+          organizationBrandName: organization.brandName,
+          organizationName: organization.name,
+        }),
+      };
+    }
+
     function consumedLessonsByAccountId(
       transactions: (typeof schema.lessonTransactions.$inferSelect)[],
     ) {
@@ -469,11 +570,12 @@ export const teachingModule: AppModule = {
       async (request) => {
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const dataScope = await resolveTeacherDataScope(access);
-        const [classes, courses, classrooms, campuses] = await Promise.all([
+        const [classes, courses, classrooms, campuses, coursePackages] = await Promise.all([
           schedulingRepo.listClasses(app.db),
           catalogRepo.listCourses(app.db),
           teachingRepo.listClassrooms(app.db),
           organizationRepo.listCampuses(app.db),
+          packagesRepo.listActivePackages(app.db),
         ]);
         const institutionCourses = courses.filter((course) =>
           courseBelongsToTeacherInstitution(course, dataScope.institutionId),
@@ -514,6 +616,14 @@ export const teachingModule: AppModule = {
             course: courseById.get(classGroup.courseId) ?? null,
           })),
           courses: selectableCourses,
+          coursePackages: coursePackages.filter(
+            (coursePackage) =>
+              (coursePackage.courseId && institutionCourseIds.has(coursePackage.courseId)) ||
+              (coursePackage.courseSeriesId &&
+                institutionCourses.some(
+                  (course) => course.courseSeriesId === coursePackage.courseSeriesId,
+                )),
+          ),
           classrooms: classrooms
             .filter(
               (classroom) =>
@@ -867,6 +977,34 @@ export const teachingModule: AppModule = {
       },
     );
 
+    app.post(
+      '/public/teacher/students',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        requireAdminTeacherAccess(access);
+        const body = teacherStudentCreateSchema.parse(request.body);
+        const guardian = await resolveGuardianForTeacherStudent({
+          guardianName: body.guardianName,
+          guardianPhone: body.guardianPhone,
+        });
+        const student = await peopleRepo.createStudent(app.db, {
+          guardianId: guardian?.id ?? null,
+          name: body.name,
+          grade: body.grade,
+          school: body.school || null,
+          status: 'active',
+        });
+        return {
+          student: {
+            ...student,
+            guardian: guardian ?? undefined,
+            lessonAccounts: [],
+          },
+        };
+      },
+    );
+
     app.get(
       '/public/teacher/students',
       { preHandler: app.requireRole('teacher') },
@@ -980,6 +1118,51 @@ export const teachingModule: AppModule = {
           pageSize: query.pageSize,
           total: filtered.length,
         };
+      },
+    );
+
+    app.post(
+      '/public/teacher/course-contracts',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        requireAdminTeacherAccess(access);
+        const dataScope = await resolveTeacherDataScope(access);
+        const body = teacherCourseContractCreateSchema.parse(request.body);
+        const defaults = await resolveTeacherContractDefaults(body);
+        requireCourseInTeacherInstitution(defaults.course, dataScope.institutionId);
+
+        if (body.classId) {
+          const classGroup = await schedulingRepo.findClass(app.db, body.classId);
+          if (!classGroup) throw notFound('Class not found');
+          if (classGroup.courseId !== body.courseId) {
+            throw Object.assign(new Error('班级与课程不匹配'), { statusCode: 422 });
+          }
+          if (
+            classGroup.teacherId !== access.teacherId &&
+            !(access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))
+          ) {
+            throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
+          }
+        }
+
+        return courseContractsRepo.createCourseContract(app.db, {
+          studentId: body.studentId,
+          courseId: body.courseId,
+          classId: body.classId ?? null,
+          packageId: body.packageId ?? null,
+          title: body.title ?? null,
+          lessonCount: body.lessonCount,
+          paidAmount: body.paidAmount,
+          paymentMethod: body.paymentMethod,
+          paymentReceiverType: defaults.paymentReceiverType,
+          paymentReceiverInstitutionId: defaults.paymentReceiverInstitutionId,
+          paymentReceiverName: defaults.paymentReceiverName,
+          startsAt: normalizeDate(body.startsAt),
+          endsAt: normalizeDate(body.endsAt),
+          note: body.note ?? null,
+          createdByAccountId: request.account!.id,
+        });
       },
     );
 
@@ -1542,6 +1725,11 @@ export const teachingModule: AppModule = {
             .map((enrollment) => enrollment.studentId),
         );
         if (access.isAdminTeacher) {
+          for (const student of students) {
+            if (student.status !== 'archived') {
+              visibleStudentIds.add(student.id);
+            }
+          }
           for (const lessonAccount of lessonAccounts) {
             if (visibleCourseIds.has(lessonAccount.courseId)) {
               visibleStudentIds.add(lessonAccount.studentId);

@@ -44,8 +44,12 @@
         </view>
       </view>
       <view wx:if="{{options.permissions.viewAllStudents && options.permissions.enrollStudents}}" class="search-row">
-        <input class="search-input" value="{{keyword}}" bindinput="changeKeyword" confirm-type="search" bindconfirm="loadStudents" placeholder="搜索姓名、年级或学校" />
-        <button class="search-button" loading="{{studentLoading}}" bindtap="loadStudents">搜索</button>
+        <input class="search-input" value="{{keyword}}" bindinput="changeKeyword" confirm-type="search" bindconfirm="applyStudentSearch" placeholder="搜索姓名、年级或学校" />
+        <button class="search-button" loading="{{studentLoading}}" bindtap="applyStudentSearch">搜索</button>
+      </view>
+      <view wx:if="{{options.permissions.viewAllStudents && options.permissions.enrollStudents}}" class="student-list-summary">
+        <text>显示 {{students.length}}/{{totalStudents}} 名学员</text>
+        <text>已选 {{selectedCount}} 名</text>
       </view>
       <view wx:if="{{!options.permissions.viewAllStudents || !options.permissions.enrollStudents}}" class="empty-card">
         当前仅可新建空班；选择学员还需要“查看全部学员”和“拉学员入班”权限。
