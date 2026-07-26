@@ -39,7 +39,7 @@
         </view>
         <view class="summary-item summary-action" data-action="rollcall" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.pendingRollCall}}</view>
-          <view class="summary-label">待签到</view>
+          <view class="summary-label">待点名</view>
         </view>
         <view class="summary-item summary-action" data-action="leave" bindtap="handleSummaryTap">
           <view class="summary-value">{{stats.leaveMessages}}</view>
@@ -173,9 +173,26 @@
             </view>
             <view class="session-foot">
               <view class="card-meta">
-                已签 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
+                已点 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
               </view>
-              <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">签到</button>
+              <view wx:if="{{item.canOperate}}" class="session-quick-actions">
+                <button
+                  wx:if="{{item.pending}}"
+                  class="mini-button session-attendance-button"
+                  data-id="{{item.id}}"
+                  catchtap="openRollCall"
+                >
+                  {{item.attendanceActionLabel}}
+                </button>
+                <button
+                  wx:if="{{item.showRosterAction}}"
+                  class="mini-button session-roster-button"
+                  data-id="{{item.id}}"
+                  catchtap="openSessionRoster"
+                >
+                  添加学员
+                </button>
+              </view>
               <view wx:else class="pill subtle">仅查看</view>
             </view>
           </view>
@@ -197,7 +214,7 @@
           </view>
           <view class="session-foot">
             <view class="card-meta">
-              已签 {{item.attendanceCount}}/{{item.rosterCount}} · {{item.classroomName}}
+              已点 {{item.attendanceCount}}/{{item.rosterCount}} · {{item.classroomName}}
             </view>
             <button class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">开始点名</button>
           </view>
@@ -221,7 +238,7 @@
           </view>
           <view class="session-foot">
             <view class="card-meta">
-              已签 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
+              已点 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
             </view>
             <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">查看点名</button>
             <view wx:else class="pill subtle">仅查看</view>
@@ -540,7 +557,7 @@
       <view class="sheet-handle"></view>
       <view class="sheet-head">
         <view>
-          <view class="sheet-title">签到</view>
+          <view class="sheet-title">点名</view>
           <view wx:if="{{rollCallSession}}" class="sheet-meta">
             {{rollCallSession.className}} · {{rollCallSession.courseName}}
           </view>
@@ -555,7 +572,7 @@
       <view class="roll-summary">
         <view>
           <view class="roll-num">{{rollCallSummary.present}}</view>
-          <view class="roll-label">到场</view>
+          <view class="roll-label">到课</view>
         </view>
         <view>
           <view class="roll-num">{{rollCallSummary.late}}</view>
@@ -567,7 +584,7 @@
         </view>
         <view>
           <view class="roll-num">{{rollCallSummary.absent}}</view>
-          <view class="roll-label">缺勤</view>
+          <view class="roll-label">未到</view>
         </view>
       </view>
       <scroll-view class="sheet-scroll" scroll-y>
@@ -606,7 +623,7 @@
         disabled="{{rollCallSaving || rollCallLoading}}"
         bindtap="submitRollCall"
       >
-        {{rollCallSaving ? '保存中...' : '完成签到'}}
+        {{rollCallSaving ? '保存中...' : '完成点名'}}
       </button>
     </view>
   </view>

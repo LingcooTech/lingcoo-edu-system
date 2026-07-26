@@ -959,9 +959,36 @@
   flex: 1;
 }
 
+.session-quick-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.session-quick-actions .mini-button {
+  width: auto;
+  min-width: 108rpx;
+  height: 54rpx;
+  box-sizing: border-box;
+  font-size: 20rpx;
+  line-height: 54rpx;
+  padding: 0 20rpx;
+}
+
+.session-attendance-button {
+  background: #9a6a4b;
+  color: #fff;
+}
+
+.session-roster-button {
+  background: #efe5dc;
+  color: #7c5138;
+}
+
 .class-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10rpx;
   margin-top: 24rpx;
   padding: 20rpx 0;

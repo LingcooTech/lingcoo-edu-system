@@ -70,7 +70,7 @@ export const adminSections = [
       { key: 'students', label: '学员档案', path: '/academic/students', icon: GraduationCap },
       { key: 'classes', label: '班级排课', path: '/academic/classes', icon: CalendarDays },
       { key: 'schedule', label: '排课总览', path: '/academic/schedule', icon: CalendarDays },
-      { key: 'attendance', label: '签到消课', path: '/academic/attendance', icon: ClipboardCheck },
+      { key: 'attendance', label: '点名消课', path: '/academic/attendance', icon: ClipboardCheck },
       { key: 'courseAttendance', label: '出勤总览', path: '/academic/course-attendance', icon: BarChart3 },
     ],
   },
@@ -173,7 +173,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   attendance: {
     eyebrow: 'Academic',
-    title: '签到消课总览',
+    title: '点名消课总览',
   },
   courseAttendance: {
     eyebrow: 'Academic',

@@ -98,6 +98,7 @@ Page({
     loading: true,
     saving: false,
     sessionId: '',
+    focusStudents: false,
     editing: false,
     editable: true,
     canEditStatus: false,
@@ -139,6 +140,7 @@ Page({
     this.setData({
       sessionId,
       editing: Boolean(sessionId),
+      focusStudents: query.focus === 'students',
       requestedClassId: String(query.classId || ''),
     });
     this.loadOptions();
@@ -247,6 +249,11 @@ Page({
       });
       if (!sessionDetail) this.applyModeDefaults();
       await this.loadStudents();
+      if (this.data.focusStudents) {
+        setTimeout(() => {
+          wx.pageScrollTo({ selector: '#student-section', duration: 260 });
+        }, 80);
+      }
     } catch (error) {
       this.setData({
         loading: false,

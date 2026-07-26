@@ -48,7 +48,7 @@ const statusLabels: Record<string, string> = {
   present: '到课',
   late: '迟到',
   leave: '请假',
-  absent: '缺勤',
+  absent: '未到',
   makeup: '补课',
   trial: '试听',
   checked_in: '已签到',

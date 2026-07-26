@@ -231,17 +231,26 @@
 }
 
 .mode-button {
+  display: flex;
+  width: 116rpx;
   align-self: flex-end;
-  min-width: 112rpx;
+  min-width: 116rpx;
+  max-width: 116rpx;
   height: 44rpx;
+  box-sizing: border-box;
+  flex: 0 0 116rpx;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 999rpx;
   background: #f3f0ec;
   color: #6b6258;
   font-size: 18rpx;
-  line-height: 44rpx;
+  line-height: 1;
   margin: 0;
-  padding: 0 14rpx;
+  overflow: hidden;
+  padding: 0;
+  white-space: nowrap;
 }
 
 .mode-button-active {

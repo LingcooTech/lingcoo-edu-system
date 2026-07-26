@@ -24,19 +24,21 @@ const STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
   { value: 'present', label: '到课' },
   { value: 'late', label: '迟到' },
   { value: 'leave', label: '请假' },
-  { value: 'absent', label: '缺勤' },
-  { value: 'makeup', label: '补课' },
-  { value: 'trial', label: '试听' },
+  { value: 'absent', label: '未到' },
 ];
 
 const STATUS_LABEL: Record<AttendanceStatus, string> = {
   present: '到课',
   late: '迟到',
   leave: '请假',
-  absent: '缺勤',
-  makeup: '补课',
-  trial: '试听',
+  absent: '未到',
+  makeup: '到课',
+  trial: '到课',
 };
+
+function editableAttendanceStatus(status: AttendanceStatus): AttendanceStatus {
+  return status === 'makeup' || status === 'trial' ? 'present' : status;
+}
 
 function defaultDraft(): AttendanceDraft {
   return { status: 'present', note: '', deductLesson: true };
@@ -77,7 +79,7 @@ export function AttendancePage() {
       trial: 0,
     };
     records.forEach((record) => {
-      statuses[record.status]++;
+      statuses[editableAttendanceStatus(record.status)]++;
     });
     const lessonDeducted = records.reduce(
       (sum, record) => sum + (record.lessonDelta < 0 ? -record.lessonDelta : 0),
@@ -118,7 +120,7 @@ export function AttendancePage() {
           );
           nextDrafts[entry.studentId] = existing
             ? {
-                status: existing.status,
+                status: editableAttendanceStatus(existing.status),
                 note: existing.note ?? '',
                 deductLesson: existing.lessonDelta < 0,
               }
@@ -130,7 +132,7 @@ export function AttendancePage() {
         setRoster([]);
         setRecords([]);
         setDrafts({});
-        toast.error(err instanceof Error ? err.message : '加载签到数据失败');
+        toast.error(err instanceof Error ? err.message : '加载点名数据失败');
       })
       .finally(() => setLoading(false));
   }, [selectedSession, toast]);
@@ -190,7 +192,7 @@ export function AttendancePage() {
         }
         return nextRecords;
       });
-      toast.success('补签/核销已提交，课时流水已更新');
+      toast.success('补点/核销已提交，课时流水已更新');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '提交失败');
     } finally {
@@ -229,13 +231,13 @@ export function AttendancePage() {
       </div>
 
       {selectedSession && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <div className="resource-card p-4">
             <div className="text-muted-foreground text-xs">总学员数</div>
             <div className="mt-2 text-2xl font-semibold">{attendanceSummary.total}</div>
           </div>
           <div className="resource-card p-4">
-            <div className="text-muted-foreground text-xs">已签到</div>
+            <div className="text-muted-foreground text-xs">已点名</div>
             <div className="mt-2 text-2xl font-semibold text-blue-600">
               {attendanceSummary.signed}
             </div>
@@ -247,17 +249,21 @@ export function AttendancePage() {
             </div>
           </div>
           <div className="resource-card p-4">
-            <div className="text-muted-foreground text-xs">缺勤</div>
-            <div className="mt-2 text-2xl font-semibold text-red-600">
-              {attendanceSummary.statuses.absent}
+            <div className="text-muted-foreground text-xs">迟到</div>
+            <div className="mt-2 text-2xl font-semibold text-orange-600">
+              {attendanceSummary.statuses.late}
             </div>
           </div>
           <div className="resource-card p-4">
-            <div className="text-muted-foreground text-xs">请假 / 补课 / 试听</div>
+            <div className="text-muted-foreground text-xs">请假</div>
             <div className="mt-2 text-2xl font-semibold text-amber-600">
-              {attendanceSummary.statuses.leave +
-                attendanceSummary.statuses.makeup +
-                attendanceSummary.statuses.trial}
+              {attendanceSummary.statuses.leave}
+            </div>
+          </div>
+          <div className="resource-card p-4">
+            <div className="text-muted-foreground text-xs">未到</div>
+            <div className="mt-2 text-2xl font-semibold text-red-600">
+              {attendanceSummary.statuses.absent}
             </div>
           </div>
         </div>
@@ -265,10 +271,10 @@ export function AttendancePage() {
 
       <div className="resource-card">
         <div className="border-b px-4 py-3">
-          <div className="text-sm font-semibold">后台补签与核销</div>
+          <div className="text-sm font-semibold">后台点名与消课</div>
           <div className="text-muted-foreground mt-1 text-xs">
-            老师端用于老师到岗打卡，家长端用于学员到课确认；后台用于总览、补签和异常核销。到课、迟到、补课固定扣
-            1 课时；缺勤可单独选择是否扣课；请假和试听不扣课时。
+            后台用于查看和修正点名结果。到课、迟到固定扣 1
+            课时；未到可单独选择是否扣课；请假不扣课时。历史补课、试听记录按到课兼容统计。
           </div>
         </div>
         {loading ? (
@@ -343,14 +349,14 @@ export function AttendancePage() {
                             })
                           }
                         />
-                        缺勤扣 1 课时
+                        未到扣 1 课时
                       </label>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
                     {record ? (
                       <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
-                        已签到 · {STATUS_LABEL[record.status]}
+                        已点名 · {STATUS_LABEL[record.status]}
                         {record.status === 'absent' && record.lessonDelta === 0 ? ' · 未扣课' : ''}
                       </span>
                     ) : null}
@@ -365,7 +371,7 @@ export function AttendancePage() {
                       ) : (
                         <CheckCircle2 className="h-3.5 w-3.5" />
                       )}
-                      {record ? '保存修改' : '补签/核销'}
+                      {record ? '保存修改' : '补点/核销'}
                     </button>
                   </div>
                 </div>

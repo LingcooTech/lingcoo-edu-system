@@ -86,7 +86,7 @@
       </view>
     </view>
 
-    <view wx:if="{{options}}" class="student-card">
+    <view id="student-section" wx:if="{{options}}" class="student-card">
       <view class="student-head">
         <view>
           <view class="section-title">

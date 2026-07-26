@@ -130,6 +130,11 @@ interface DateStripRow {
   className: string;
 }
 
+type WorkbenchCalendarEvent = TeacherCalendarEvent & {
+  canOperate: boolean;
+  canManageRoster: boolean;
+};
+
 interface RollCallRow extends TeacherRosterStudent {
   recorded: boolean;
   recordedStatus: AttendanceStatus | '';
@@ -217,19 +222,17 @@ const HOMEWORK_STATUS_LABEL: Record<string, string> = {
 };
 
 const ATTENDANCE_STATUS_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
-  { value: 'present', label: '到场' },
+  { value: 'present', label: '到课' },
   { value: 'late', label: '迟到' },
   { value: 'leave', label: '请假' },
-  { value: 'absent', label: '缺勤' },
-  { value: 'makeup', label: '补参与' },
-  { value: 'trial', label: '试听' },
+  { value: 'absent', label: '未到' },
 ];
 
 const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
-  present: '到场',
+  present: '到课',
   late: '迟到',
   leave: '请假',
-  absent: '缺勤',
+  absent: '未到',
   makeup: '补参与',
   trial: '试听',
 };
@@ -405,7 +408,8 @@ function countStatuses(rows: RollCallRow[]) {
   return rows.reduce(
     (acc, row) => {
       const status = row.recordedStatus || row.draftStatus;
-      acc[status] = (acc[status] ?? 0) + 1;
+      const displayStatus = status === 'makeup' || status === 'trial' ? 'present' : status;
+      acc[displayStatus] = (acc[displayStatus] ?? 0) + 1;
       return acc;
     },
     { present: 0, late: 0, leave: 0, absent: 0, makeup: 0, trial: 0 } as Record<
@@ -584,7 +588,7 @@ function buildContractClassOptions(
   ];
 }
 
-function normalizeEvent(event: TeacherCalendarEvent) {
+function normalizeEvent(event: WorkbenchCalendarEvent) {
   const pending = isRollCallPending(event);
   return {
     ...event,
@@ -596,9 +600,11 @@ function normalizeEvent(event: TeacherCalendarEvent) {
     className: event.class?.name || '班级',
     courseName: event.course?.name || '课程',
     classroomName: event.classroom?.name || '空间待确认',
-    statusLabel: pending ? '未签到' : event.status === 'completed' ? '已完成' : '已排课',
+    statusLabel: pending ? '未点名' : event.status === 'completed' ? '已完成' : '已排课',
     leaveCount: event.attendanceSummary?.leave ?? 0,
     pending,
+    attendanceActionLabel: event.attendanceCount > 0 ? '继续点名' : '点名',
+    showRosterAction: event.canManageRoster && event.status === 'scheduled',
   };
 }
 
@@ -736,7 +742,7 @@ Component({
         className: string;
       }
     >,
-    calendarEvents: [] as TeacherCalendarEvent[],
+    calendarEvents: [] as WorkbenchCalendarEvent[],
     lessonFeedbacks: [] as TeacherLessonFeedback[],
     homeworkAssignments: [] as HomeworkAssignment[],
     attendanceStatusOptions: ATTENDANCE_STATUS_OPTIONS,
@@ -816,7 +822,15 @@ Component({
         const today = startOfDay(new Date());
         const selectedDateKey = this.data.selectedDateKey || dateKey(today);
         const dashboardClasses = Array.isArray(dashboard.classes) ? dashboard.classes : [];
-        const calendarItems = Array.isArray(calendarEvents) ? calendarEvents : [];
+        const calendarItems: WorkbenchCalendarEvent[] = Array.isArray(calendarEvents)
+          ? calendarEvents.map((event) => ({
+              ...event,
+              canOperate: event.isMine !== false || capabilities.isAdminTeacher,
+              canManageRoster:
+                (event.isMine !== false || capabilities.isAdminTeacher) &&
+                capabilities.permissions.manageSessionRoster,
+            }))
+          : [];
         const homeworkItems = Array.isArray(homeworkCheckIns) ? homeworkCheckIns : [];
         const feedbackItems = Array.isArray(lessonFeedbacks) ? lessonFeedbacks : [];
         const assignmentItems = Array.isArray(homeworkAssignments) ? homeworkAssignments : [];
@@ -1519,7 +1533,7 @@ Component({
       const weekEnd = addDays(currentWeekDays[6], 1);
       const monthStart = startOfMonth(today);
       const monthEnd = addMonths(monthStart, 1);
-      const calendarEvents = this.data.calendarEvents as TeacherCalendarEvent[];
+      const calendarEvents = this.data.calendarEvents as WorkbenchCalendarEvent[];
       const homeworkCheckIns = this.data.homeworkCheckIns as TeacherHomeworkCheckIn[];
       const lessonFeedbacks = this.data.lessonFeedbacks as TeacherLessonFeedback[];
       let metricEvents = calendarEvents.filter((event) =>
@@ -1543,7 +1557,7 @@ Component({
         )
         .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
       const todayPendingEvents = todayEvents.filter(
-        (event) => event.isMine !== false && isRollCallPending(event),
+        (event) => event.canOperate && isRollCallPending(event),
       );
       const pendingHomeworkCount = homeworkCheckIns.filter(
         (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
@@ -1637,7 +1651,7 @@ Component({
         stats: {
           courseCount: metricEvents.filter((event) => event.status !== 'cancelled').length,
           pendingRollCall: metricEvents.filter(
-            (event) => event.isMine !== false && isRollCallPending(event),
+            (event) => event.canOperate && isRollCallPending(event),
           ).length,
           leaveMessages: metricEvents.reduce(
             (sum, event) => sum + (event.attendanceSummary?.leave ?? 0),
@@ -1863,7 +1877,7 @@ Component({
             recorded: Boolean(record),
             recordedStatus,
             draftStatus,
-            statusLabel: record ? ATTENDANCE_STATUS_LABEL[record.status] : '待签到',
+            statusLabel: record ? ATTENDANCE_STATUS_LABEL[record.status] : '待点名',
           };
         });
         this.setData({
@@ -1898,17 +1912,17 @@ Component({
         .filter((row) => !row.recorded)
         .map((row) => ({ studentId: row.id, status: row.draftStatus }));
       if (records.length === 0) {
-        wx.showToast({ title: '已完成签到', icon: 'none' });
+        wx.showToast({ title: '已完成点名', icon: 'none' });
         return;
       }
       this.setData({ rollCallSaving: true, rollCallError: '' });
       try {
         await recordTeacherAttendance(session.id, records);
-        wx.showToast({ title: '签到已保存', icon: 'success' });
+        wx.showToast({ title: '点名已保存', icon: 'success' });
         this.setData({ rollCallVisible: false });
         await this.reload();
       } catch (error) {
-        this.setData({ rollCallError: error instanceof Error ? error.message : '签到保存失败' });
+        this.setData({ rollCallError: error instanceof Error ? error.message : '点名保存失败' });
       } finally {
         this.setData({ rollCallSaving: false });
       }
@@ -2093,6 +2107,16 @@ Component({
       if (!sessionId) return;
       wx.navigateTo({
         url: `/pages/teacher-schedule-create/index?sessionId=${encodeURIComponent(sessionId)}`,
+      });
+    },
+
+    openSessionRoster(event: MiniTapEvent) {
+      const sessionId = String(event.currentTarget.dataset.id || '');
+      if (!sessionId) return;
+      wx.navigateTo({
+        url: `/pages/teacher-schedule-create/index?sessionId=${encodeURIComponent(
+          sessionId,
+        )}&focus=students`,
       });
     },
 

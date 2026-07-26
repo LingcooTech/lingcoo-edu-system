@@ -46,6 +46,10 @@ interface CourseAttendanceSummary {
 
 type TabType = 'sessions' | 'students';
 
+function displayedPresent(row: Pick<StudentAttendanceStat, 'present' | 'makeup' | 'trial'>) {
+  return row.present + row.makeup + row.trial;
+}
+
 export function CourseAttendanceSummaryPage() {
   const toast = useToast();
   const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
@@ -96,7 +100,8 @@ export function CourseAttendanceSummaryPage() {
         <>
           <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
             <strong>统计说明：</strong>仅统计有出勤记录的课次和学员。共有{' '}
-            <strong>{summaryData.summary.totalSessions}</strong> 次课完成了签到。
+            <strong>{summaryData.summary.totalSessions}</strong>{' '}
+            次课完成了点名。历史补课、试听记录按到课统计。
           </div>
 
           <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -111,7 +116,7 @@ export function CourseAttendanceSummaryPage() {
               </div>
             </div>
             <div className="resource-card p-4">
-              <div className="text-muted-foreground text-xs">总签到</div>
+              <div className="text-muted-foreground text-xs">总点名</div>
               <div className="mt-2 text-2xl font-semibold text-green-600">
                 {summaryData.summary.totalRecords}
               </div>
@@ -185,7 +190,9 @@ export function CourseAttendanceSummaryPage() {
                     header: '到课人数',
                     cell: (row: SessionRecord) => (
                       <div className="text-center">
-                        <span className="text-lg font-semibold text-green-600">{row.present}</span>
+                        <span className="text-lg font-semibold text-green-600">
+                          {displayedPresent(row)}
+                        </span>
                         <span className="text-muted-foreground text-xs">/ {row.total}</span>
                       </div>
                     ),
@@ -198,13 +205,6 @@ export function CourseAttendanceSummaryPage() {
                     ),
                   },
                   {
-                    key: 'absent',
-                    header: '缺勤',
-                    cell: (row: SessionRecord) => (
-                      <span className="font-medium text-red-600">{row.absent}</span>
-                    ),
-                  },
-                  {
                     key: 'leave',
                     header: '请假',
                     cell: (row: SessionRecord) => (
@@ -212,17 +212,10 @@ export function CourseAttendanceSummaryPage() {
                     ),
                   },
                   {
-                    key: 'makeup',
-                    header: '补课',
+                    key: 'absent',
+                    header: '未到',
                     cell: (row: SessionRecord) => (
-                      <span className="font-medium text-purple-600">{row.makeup}</span>
-                    ),
-                  },
-                  {
-                    key: 'trial',
-                    header: '试听',
-                    cell: (row: SessionRecord) => (
-                      <span className="font-medium text-gray-600">{row.trial}</span>
+                      <span className="font-medium text-red-600">{row.absent}</span>
                     ),
                   },
                   {
@@ -230,7 +223,10 @@ export function CourseAttendanceSummaryPage() {
                     header: '出勤率',
                     cell: (row: SessionRecord) => (
                       <span className="font-medium">
-                        {row.total > 0 ? (((row.present + row.late) / row.total) * 100) | 0 : 0}%
+                        {row.total > 0
+                          ? (((displayedPresent(row) + row.late) / row.total) * 100) | 0
+                          : 0}
+                        %
                       </span>
                     ),
                   },
@@ -249,7 +245,7 @@ export function CourseAttendanceSummaryPage() {
                   },
                   {
                     key: 'total',
-                    header: '总签到',
+                    header: '总点名',
                     cell: (row: StudentAttendanceStat) => (
                       <div className="text-center">
                         <span className="text-lg font-semibold text-blue-600">{row.total}</span>
@@ -263,7 +259,7 @@ export function CourseAttendanceSummaryPage() {
                     key: 'present',
                     header: '到课',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="font-medium text-green-600">{row.present}</span>
+                      <span className="font-medium text-green-600">{displayedPresent(row)}</span>
                     ),
                   },
                   {
@@ -274,13 +270,6 @@ export function CourseAttendanceSummaryPage() {
                     ),
                   },
                   {
-                    key: 'absent',
-                    header: '缺勤',
-                    cell: (row: StudentAttendanceStat) => (
-                      <span className="font-medium text-red-600">{row.absent}</span>
-                    ),
-                  },
-                  {
                     key: 'leave',
                     header: '请假',
                     cell: (row: StudentAttendanceStat) => (
@@ -288,17 +277,10 @@ export function CourseAttendanceSummaryPage() {
                     ),
                   },
                   {
-                    key: 'makeup',
-                    header: '补课',
+                    key: 'absent',
+                    header: '未到',
                     cell: (row: StudentAttendanceStat) => (
-                      <span className="font-medium text-purple-600">{row.makeup}</span>
-                    ),
-                  },
-                  {
-                    key: 'trial',
-                    header: '试听',
-                    cell: (row: StudentAttendanceStat) => (
-                      <span className="font-medium text-gray-600">{row.trial}</span>
+                      <span className="font-medium text-red-600">{row.absent}</span>
                     ),
                   },
                   {
@@ -323,11 +305,11 @@ export function CourseAttendanceSummaryPage() {
 
       {!loading && !summaryData && courseId && (
         <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
-          该课程没有已完成签到的课次。请检查：
+          该课程没有已完成点名的课次。请检查：
           <div className="mt-2 space-y-1 text-xs">
             <div>• 该课程是否已排课</div>
             <div>• 已排课次是否已标记为"已完成"</div>
-            <div>• 已完成课次是否已进行签到</div>
+            <div>• 已完成课次是否已进行点名</div>
           </div>
         </div>
       )}
