@@ -28,6 +28,7 @@ interface Enrollment {
   id: string;
   studentId: string;
   billingCourseId: string;
+  joinedAt: string;
   student?: Student;
   billingCourse?: Course | null;
   lessonAccount?: { balance: number; courseId: string; course?: Course | null } | null;
@@ -42,6 +43,14 @@ const emptyClassForm: ClassForm = {
   capacity: '8',
   status: 'recruiting',
 };
+
+function toDateTimeLocal(value: string | Date = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const normalized = Number.isNaN(date.getTime()) ? new Date() : date;
+  return new Date(normalized.getTime() - normalized.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
 
 export function ClassesPage() {
   const toast = useToast();
@@ -62,7 +71,9 @@ export function ClassesPage() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [studentId, setStudentId] = useState('');
   const [billingCourseId, setBillingCourseId] = useState('');
+  const [joinedAt, setJoinedAt] = useState(toDateTimeLocal());
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
+  const [updatingEnrollmentId, setUpdatingEnrollmentId] = useState('');
 
   useEffect(() => {
     if (!enrollmentClass) return;
@@ -157,6 +168,13 @@ export function ClassesPage() {
     setOpen(true);
   }
 
+  function openEnrollments(item: ClassGroup) {
+    setStudentId('');
+    setBillingCourseId('');
+    setJoinedAt(toDateTimeLocal());
+    setEnrollmentClass(item);
+  }
+
   async function submit() {
     if (
       !form.campusId ||
@@ -209,11 +227,11 @@ export function ClassesPage() {
   }
 
   async function addEnrollment() {
-    if (!enrollmentClass || !studentId || !billingCourseId) return;
+    if (!enrollmentClass || !studentId || !billingCourseId || !joinedAt) return;
     try {
       const { enrollment } = await apiPost<{ enrollment: Enrollment }>(
         `${CLASSES()}/${enrollmentClass.id}/enrollments`,
-        { studentId, billingCourseId },
+        { studentId, billingCourseId, joinedAt: new Date(joinedAt).toISOString() },
       );
       setEnrollments([hydrateEnrollment(enrollment), ...enrollments]);
       setData(
@@ -225,9 +243,31 @@ export function ClassesPage() {
       );
       setStudentId('');
       setBillingCourseId('');
+      setJoinedAt(toDateTimeLocal());
       toast.success('已加入班级');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '入班失败');
+    }
+  }
+
+  async function updateEnrollmentJoinedAt(enrollment: Enrollment, nextJoinedAt: string) {
+    if (!enrollmentClass || !nextJoinedAt || updatingEnrollmentId) return;
+    const normalizedJoinedAt = new Date(nextJoinedAt).toISOString();
+    if (normalizedJoinedAt === enrollment.joinedAt) return;
+    setUpdatingEnrollmentId(enrollment.id);
+    try {
+      const { enrollment: updated } = await apiPatch<{ enrollment: Enrollment }>(
+        `${CLASSES()}/${enrollmentClass.id}/enrollments/${enrollment.id}`,
+        { joinedAt: normalizedJoinedAt },
+      );
+      setEnrollments((current) =>
+        current.map((item) => (item.id === updated.id ? hydrateEnrollment(updated) : item)),
+      );
+      toast.success('入班生效时间已更新');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '入班生效时间更新失败');
+    } finally {
+      setUpdatingEnrollmentId('');
     }
   }
 
@@ -316,7 +356,7 @@ export function ClassesPage() {
                 <button
                   type="button"
                   className="btn btn-ghost px-2 py-1"
-                  onClick={() => setEnrollmentClass(row)}
+                  onClick={() => openEnrollments(row)}
                 >
                   <Users className="h-3.5 w-3.5" />
                   入班
@@ -460,7 +500,7 @@ export function ClassesPage() {
         onClose={() => setEnrollmentClass(null)}
         title={enrollmentClass ? `管理入班 - ${enrollmentClass.name}` : '管理入班'}
       >
-        <div className="mb-4 grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        <div className="mb-4 grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
           <Field label="选择学员">
             <select
               className="form-input"
@@ -490,6 +530,15 @@ export function ClassesPage() {
               ))}
             </select>
           </Field>
+          <Field label="入班生效时间">
+            <input
+              className="form-input"
+              type="datetime-local"
+              step="60"
+              value={joinedAt}
+              onChange={(event) => setJoinedAt(event.target.value)}
+            />
+          </Field>
           <button type="button" className="btn btn-primary mb-3.5 shrink-0" onClick={addEnrollment}>
             加入
           </button>
@@ -501,7 +550,7 @@ export function ClassesPage() {
             {enrollments.map((enrollment) => (
               <div
                 key={enrollment.id}
-                className="resource-card flex items-center justify-between gap-3 p-3"
+                className="resource-card grid gap-3 p-3 md:grid-cols-[minmax(8rem,1fr)_minmax(12rem,1.3fr)_minmax(12rem,1fr)_auto] md:items-end"
               >
                 <div className="cell-stack">
                   <span className="cell-title">
@@ -522,9 +571,20 @@ export function ClassesPage() {
                     </option>
                   ))}
                 </select>
+                <label className="cell-stack min-w-52">
+                  <span className="cell-subtitle">入班生效时间</span>
+                  <input
+                    className="form-input"
+                    type="datetime-local"
+                    step="60"
+                    disabled={updatingEnrollmentId === enrollment.id}
+                    value={toDateTimeLocal(enrollment.joinedAt)}
+                    onChange={(event) => updateEnrollmentJoinedAt(enrollment, event.target.value)}
+                  />
+                </label>
                 <button
                   type="button"
-                  className="btn btn-ghost px-2 py-1 text-red-600"
+                  className="btn btn-ghost px-2 py-1 text-red-600 md:mb-1"
                   onClick={() => removeEnrollment(enrollment)}
                 >
                   退班

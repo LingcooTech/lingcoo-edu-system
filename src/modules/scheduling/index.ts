@@ -71,11 +71,15 @@ const publicCalendarQuerySchema = z.object({
 const enrollmentSchema = z.object({
   studentId: z.string(),
   billingCourseId: z.string().uuid().optional(),
+  joinedAt: z.string().datetime({ offset: true }).optional(),
 });
 
-const enrollmentBillingSchema = z.object({
-  billingCourseId: z.string().uuid(),
-});
+const enrollmentUpdateSchema = z
+  .object({
+    billingCourseId: z.string().uuid().optional(),
+    joinedAt: z.string().datetime({ offset: true }).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, { message: 'No changes supplied' });
 
 const temporaryStudentSchema = z.object({
   studentId: z.string().uuid(),
@@ -885,6 +889,8 @@ export const schedulingModule: AppModule = {
           studentId: body.studentId,
           billingCourseId,
           active: true,
+          joinedAt: body.joinedAt ? new Date(body.joinedAt) : new Date(),
+          leftAt: null,
         });
         return { enrollment };
       },
@@ -900,21 +906,33 @@ export const schedulingModule: AppModule = {
         };
         const classGroup = await schedulingRepo.findClass(app.db, classId);
         if (!classGroup) throw notFound('Class not found');
-        const body = enrollmentBillingSchema.parse(request.body);
-        await catalogRepo.requireCourse(app.db, body.billingCourseId);
+        const body = enrollmentUpdateSchema.parse(request.body);
         const current = (await schedulingRepo.listEnrollments(app.db, classId)).find(
           (item) => item.id === enrollmentId,
         );
         if (!current) throw notFound('Enrollment not found');
-        await requireStudentLessonAccount({
-          studentId: current.studentId,
-          courseId: body.billingCourseId,
-        });
-        const enrollment = await schedulingRepo.updateEnrollmentBillingCourse(app.db, {
-          classId,
-          enrollmentId,
-          billingCourseId: body.billingCourseId,
-        });
+        let enrollment = current;
+        if (body.billingCourseId && body.billingCourseId !== current.billingCourseId) {
+          await catalogRepo.requireCourse(app.db, body.billingCourseId);
+          await requireStudentLessonAccount({
+            studentId: current.studentId,
+            courseId: body.billingCourseId,
+          });
+          enrollment =
+            (await schedulingRepo.updateEnrollmentBillingCourse(app.db, {
+              classId,
+              enrollmentId,
+              billingCourseId: body.billingCourseId,
+            })) ?? enrollment;
+        }
+        if (body.joinedAt) {
+          enrollment =
+            (await schedulingRepo.updateEnrollmentJoinedAt(app.db, {
+              classId,
+              enrollmentId,
+              joinedAt: new Date(body.joinedAt),
+            })) ?? enrollment;
+        }
         if (!enrollment) throw notFound('Enrollment not found');
         return { enrollment };
       },

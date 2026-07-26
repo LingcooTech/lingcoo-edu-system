@@ -622,6 +622,9 @@ export async function updateEnrollmentBillingCourse(
       ),
     )
     .returning();
+  if (enrollment) {
+    await syncEnrollmentToScheduledSessions(db, enrollment);
+  }
   return enrollment ?? null;
 }
 
@@ -639,6 +642,38 @@ export async function updateEnrollmentJoinedAt(
       ),
     )
     .returning();
+  if (enrollment) {
+    const sessions = await listClassSessionsForClass(db, input.classId);
+    for (const session of sessions) {
+      if (session.status === 'scheduled' && session.startsAt >= input.joinedAt) {
+        await upsertSessionStudent(db, {
+          classSessionId: session.id,
+          studentId: enrollment.studentId,
+          billingCourseId: enrollment.billingCourseId,
+          source: 'enrollment',
+          active: true,
+        });
+        continue;
+      }
+      if (session.startsAt >= input.joinedAt) continue;
+      const [attendance] = await db
+        .select({ id: schema.attendanceRecords.id })
+        .from(schema.attendanceRecords)
+        .where(
+          and(
+            eq(schema.attendanceRecords.classSessionId, session.id),
+            eq(schema.attendanceRecords.studentId, enrollment.studentId),
+          ),
+        )
+        .limit(1);
+      if (!attendance) {
+        await removeSessionStudent(db, {
+          sessionId: session.id,
+          studentId: enrollment.studentId,
+        });
+      }
+    }
+  }
   return enrollment ?? null;
 }
 
