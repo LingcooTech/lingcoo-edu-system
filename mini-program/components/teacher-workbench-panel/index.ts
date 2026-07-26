@@ -506,7 +506,9 @@ function dateToApiDateTime(value: string) {
 function packageMatchesCourse(coursePackage: CoursePackage, course: Course | null) {
   if (!course) return false;
   if (coursePackage.courseId) return coursePackage.courseId === course.id;
-  return Boolean(coursePackage.courseSeriesId && coursePackage.courseSeriesId === course.courseSeriesId);
+  return Boolean(
+    coursePackage.courseSeriesId && coursePackage.courseSeriesId === course.courseSeriesId,
+  );
 }
 
 function buildContractStudentOptions(students: StudentRow[]): ContractStudentOption[] {
@@ -541,16 +543,18 @@ function buildContractPackageOptions(
 ): ContractPackageOption[] {
   return [
     { id: '', label: '自定义课时', lessonCount: 0, priceAmount: 0 },
-    ...coursePackages.filter((item) => packageMatchesCourse(item, selectedCourse)).map((item) => {
-      const lessonCount = effectivePackageLessonCount(item);
-      const priceAmount = effectivePackagePrice(item);
-      return {
-        id: item.id,
-        label: `${item.name} · ${lessonCount}课时 · ¥${moneyYuan(priceAmount)}`,
-        lessonCount,
-        priceAmount,
-      };
-    }),
+    ...coursePackages
+      .filter((item) => packageMatchesCourse(item, selectedCourse))
+      .map((item) => {
+        const lessonCount = effectivePackageLessonCount(item);
+        const priceAmount = effectivePackagePrice(item);
+        return {
+          id: item.id,
+          label: `${item.name} · ${lessonCount}课时 · ¥${moneyYuan(priceAmount)}`,
+          lessonCount,
+          priceAmount,
+        };
+      }),
   ];
 }
 
@@ -604,6 +608,12 @@ function normalizeEvent(event: WorkbenchCalendarEvent) {
     leaveCount: event.attendanceSummary?.leave ?? 0,
     pending,
     attendanceActionLabel: event.attendanceCount > 0 ? '继续点名' : '点名',
+    rollCallActionLabel:
+      event.attendanceCount >= event.rosterCount && event.rosterCount > 0
+        ? '查看点名'
+        : event.attendanceCount > 0
+          ? '继续点名'
+          : '开始点名',
     showRosterAction: event.canManageRoster && event.status === 'scheduled',
   };
 }
@@ -655,8 +665,13 @@ Component({
     todayPendingEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
     selectedEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
     rollCallEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
+    rollCallDisplayEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
+    pendingRollCall30Count: 0,
+    showPendingRollCalls: false,
+    rollCallReminderVisible: true,
     recordEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
     dateStripDays: [] as DateStripRow[],
+    rollCallDateStripDays: [] as DateStripRow[],
     selectedDateAnchor: '',
     visibleDateKey: dateKey(startOfDay(new Date())),
     dateStripExtending: false,
@@ -668,10 +683,12 @@ Component({
     }>,
     selectedDateKey: dateKey(startOfDay(new Date())),
     classes: [] as Array<ReturnType<typeof normalizeClass>>,
-    filteredClasses: [] as Array<ReturnType<typeof normalizeClass> & {
-      sessionCount: number;
-      upcomingSessionCount: number;
-    }>,
+    filteredClasses: [] as Array<
+      ReturnType<typeof normalizeClass> & {
+        sessionCount: number;
+        upcomingSessionCount: number;
+      }
+    >,
     classSearchKeyword: '',
     classCampusFilterIndex: 0,
     classTeacherFilterIndex: 0,
@@ -778,6 +795,7 @@ Component({
     teacherFeedback: '',
     reviewRating: 0,
     canSchedule: false,
+    canCreateAdHocSession: false,
     canManageClasses: false,
   },
 
@@ -933,6 +951,7 @@ Component({
           canSchedule:
             capabilities.permissions.createClassSession ||
             capabilities.permissions.createAdHocSession,
+          canCreateAdHocSession: capabilities.permissions.createAdHocSession,
           canManageClasses: capabilities.permissions.manageClasses,
           homeworkCheckIns: homeworkItems.map((item) => ({
             ...item,
@@ -1045,10 +1064,7 @@ Component({
         if (keyword && !student.name.toLocaleLowerCase('zh-CN').includes(keyword)) {
           return false;
         }
-        if (
-          campusId &&
-          !student.classes.some((classGroup) => classGroup.campusId === campusId)
-        ) {
+        if (campusId && !student.classes.some((classGroup) => classGroup.campusId === campusId)) {
           return false;
         }
         if (classId && !student.classes.some((classGroup) => classGroup.id === classId)) {
@@ -1228,7 +1244,9 @@ Component({
       if (!this.data.canCreateAcademicRecords) return;
       const schedulingOptions = this.data.schedulingOptions as TeacherSchedulingOptions | null;
       const contractCourseOptions = buildContractCourseOptions(schedulingOptions?.courses ?? []);
-      const contractStudentOptions = buildContractStudentOptions(this.data.allStudents as StudentRow[]);
+      const contractStudentOptions = buildContractStudentOptions(
+        this.data.allStudents as StudentRow[],
+      );
       const contractCourseIndex = contractCourseOptions.length > 1 ? 1 : 0;
       const selectedCourseId = contractCourseOptions[contractCourseIndex]?.id || '';
       const selectedCourse =
@@ -1240,7 +1258,10 @@ Component({
       const contractPackageIndex = contractPackageOptions.length > 1 ? 1 : 0;
       const contractForm = {
         ...EMPTY_CONTRACT_CREATE_FORM,
-        ...packageFormPatch(contractPackageOptions[contractPackageIndex], EMPTY_CONTRACT_CREATE_FORM),
+        ...packageFormPatch(
+          contractPackageOptions[contractPackageIndex],
+          EMPTY_CONTRACT_CREATE_FORM,
+        ),
       };
       this.setData({
         contractCreateVisible: true,
@@ -1285,7 +1306,9 @@ Component({
     },
 
     filterContractStudents(keywordValue = this.data.contractStudentKeyword) {
-      const keyword = String(keywordValue || '').trim().toLocaleLowerCase('zh-CN');
+      const keyword = String(keywordValue || '')
+        .trim()
+        .toLocaleLowerCase('zh-CN');
       const options = this.data.contractStudentOptions as ContractStudentOption[];
       this.setData({
         contractFilteredStudentOptions: options.filter(
@@ -1321,7 +1344,10 @@ Component({
       );
       const packageIndex = packageOptions.length > 1 ? 1 : 0;
       const formPatch = packageOptions[packageIndex]?.id
-        ? packageFormPatch(packageOptions[packageIndex], this.data.contractForm as ContractCreateForm)
+        ? packageFormPatch(
+            packageOptions[packageIndex],
+            this.data.contractForm as ContractCreateForm,
+          )
         : { title: '', lessonCount: '', paidYuan: '' };
       this.setData({
         contractCourseIndex: courseIndex,
@@ -1378,7 +1404,8 @@ Component({
     onContractPaymentMethodChange(event: MiniPickerEvent) {
       const paymentMethodIndex = Number(event.detail.value) || 0;
       const method =
-        PAYMENT_METHOD_OPTIONS[paymentMethodIndex]?.value ?? EMPTY_CONTRACT_CREATE_FORM.paymentMethod;
+        PAYMENT_METHOD_OPTIONS[paymentMethodIndex]?.value ??
+        EMPTY_CONTRACT_CREATE_FORM.paymentMethod;
       this.setData({
         paymentMethodIndex,
         contractForm: {
@@ -1533,6 +1560,7 @@ Component({
       const weekEnd = addDays(currentWeekDays[6], 1);
       const monthStart = startOfMonth(today);
       const monthEnd = addMonths(monthStart, 1);
+      const now = new Date();
       const calendarEvents = this.data.calendarEvents as WorkbenchCalendarEvent[];
       const homeworkCheckIns = this.data.homeworkCheckIns as TeacherHomeworkCheckIn[];
       const lessonFeedbacks = this.data.lessonFeedbacks as TeacherLessonFeedback[];
@@ -1559,6 +1587,30 @@ Component({
       const todayPendingEvents = todayEvents.filter(
         (event) => event.canOperate && isRollCallPending(event),
       );
+      const pendingRollCallStart = addDays(today, -30);
+      const pendingRollCallEvents = calendarEvents
+        .filter((event) => {
+          const startsAt = new Date(event.startsAt);
+          return (
+            event.canOperate &&
+            event.status !== 'cancelled' &&
+            event.rosterCount > event.attendanceCount &&
+            startsAt >= pendingRollCallStart &&
+            startsAt <= now
+          );
+        })
+        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+        .map(normalizeEvent);
+      const pendingRollCall30Count = pendingRollCallEvents.length;
+      const dailyRollCallEvents = calendarEvents
+        .filter(
+          (event) =>
+            event.canOperate &&
+            event.status !== 'cancelled' &&
+            dateKey(new Date(event.startsAt)) === this.data.selectedDateKey,
+        )
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+        .map(normalizeEvent);
       const pendingHomeworkCount = homeworkCheckIns.filter(
         (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
       ).length;
@@ -1577,7 +1629,6 @@ Component({
           (feedbackCountBySession.get(feedback.classSessionId) ?? 0) + 1,
         );
       }
-      const now = new Date();
       const pendingStart = addDays(today, -14);
       const historyStart = addDays(today, -30);
       const feedbackRows = calendarEvents
@@ -1665,13 +1716,22 @@ Component({
           ? `今天共有 ${todayEvents.length} 场课程`
           : '今天暂无课程',
         todayPendingEvents: todayPendingEvents.map(normalizeEvent),
-        rollCallEvents: todayPendingEvents.map(normalizeEvent),
+        rollCallEvents: dailyRollCallEvents,
+        rollCallDisplayEvents: this.data.showPendingRollCalls
+          ? pendingRollCallEvents
+          : dailyRollCallEvents,
+        pendingRollCall30Count,
         recordEvents: recordEvents.map(normalizeEvent),
         selectedEvents: calendarEvents
           .filter((event) => dateKey(new Date(event.startsAt)) === this.data.selectedDateKey)
           .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
           .map(normalizeEvent),
         dateStripDays: buildDateStripRows(dateStripDays, calendarEvents, this.data.selectedDateKey),
+        rollCallDateStripDays: buildDateStripRows(
+          dateStripDays,
+          calendarEvents.filter((event) => event.canOperate && event.status !== 'cancelled'),
+          this.data.selectedDateKey,
+        ),
         selectedDateAnchor: `schedule-date-${dateKey(addDays(selectedDate, -3))}`,
         monthLabel: `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月`,
         monthDays: monthDays.map((day) => {
@@ -1699,7 +1759,41 @@ Component({
 
     switchView(event: MiniTapEvent) {
       const key = event.currentTarget.dataset.key as ActiveView;
-      this.setData({ activeView: key });
+      this.setData({
+        activeView: key,
+        ...(key === 'rollcall'
+          ? {
+              selectedDateKey: dateKey(startOfDay(new Date())),
+              visibleDateKey: dateKey(startOfDay(new Date())),
+              calendarExpanded: false,
+              showPendingRollCalls: false,
+            }
+          : {}),
+      });
+      this.recompute();
+    },
+
+    dismissRollCallReminder() {
+      this.setData({ rollCallReminderVisible: false });
+    },
+
+    showPendingRollCallList() {
+      this.setData({ showPendingRollCalls: true });
+      this.recompute();
+    },
+
+    showRollCallCalendar() {
+      this.setData({ showPendingRollCalls: false });
+      this.recompute();
+    },
+
+    goToTodayRollCall() {
+      const todayKey = dateKey(startOfDay(new Date()));
+      this.setData({
+        selectedDateKey: todayKey,
+        visibleDateKey: todayKey,
+        showPendingRollCalls: false,
+      });
       this.recompute();
     },
 
@@ -1716,7 +1810,19 @@ Component({
         this.recompute();
         return;
       }
-      if (action === 'leave' || action === 'rollcall' || action === 'schedule') {
+      if (action === 'rollcall') {
+        const todayKey = dateKey(startOfDay(new Date()));
+        this.setData({
+          activeView: 'rollcall',
+          selectedDateKey: todayKey,
+          visibleDateKey: todayKey,
+          calendarExpanded: false,
+          showPendingRollCalls: false,
+        });
+        this.recompute();
+        return;
+      }
+      if (action === 'leave' || action === 'schedule') {
         this.setData({
           activeView: 'schedule',
           selectedDateKey: dateKey(startOfDay(new Date())),
@@ -2117,6 +2223,20 @@ Component({
         url: `/pages/teacher-schedule-create/index?sessionId=${encodeURIComponent(
           sessionId,
         )}&focus=students`,
+      });
+    },
+
+    openRollCallDetail(event: MiniTapEvent) {
+      const sessionId = String(event.currentTarget.dataset.id || '');
+      if (!sessionId) return;
+      wx.navigateTo({
+        url: `/pages/teacher-roll-call/index?sessionId=${encodeURIComponent(sessionId)}`,
+      });
+    },
+
+    openDirectRollCall() {
+      wx.navigateTo({
+        url: '/pages/teacher-schedule-create/index?mode=ad_hoc&afterCreate=attendance',
       });
     },
 

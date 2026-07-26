@@ -1535,6 +1535,7 @@ export const teachingModule: AppModule = {
           classGroup,
           course,
           classroom,
+          teacher,
           roster,
           students,
           courses,
@@ -1546,6 +1547,7 @@ export const teachingModule: AppModule = {
             : Promise.resolve(null),
           catalogRepo.requireCourse(app.db, owned.session.courseId),
           teachingRepo.findClassroom(app.db, owned.session.classroomId),
+          teachingRepo.findTeacher(app.db, owned.session.teacherId),
           schedulingRepo.listSessionRoster(app.db, sessionId),
           peopleRepo.listStudents(app.db, { scope: 'all' }),
           catalogRepo.listCourses(app.db),
@@ -1560,7 +1562,10 @@ export const teachingModule: AppModule = {
         const studentById = new Map(students.map((item) => [item.id, item]));
         const attendedStudentIds = new Set(attendance.map((item) => item.studentId));
         return {
-          session: owned.session,
+          session: {
+            ...owned.session,
+            teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+          },
           class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
           course: { id: course.id, name: course.name },
           classroom: classroom ? { id: classroom.id, name: classroom.name } : null,

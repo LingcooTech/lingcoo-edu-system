@@ -202,25 +202,96 @@
     </block>
 
     <block wx:elif="{{activeView == 'rollcall'}}">
-      <view class="section-title">今日待点名</view>
-      <view wx:if="{{rollCallEvents.length}}" class="list">
-        <view wx:for="{{rollCallEvents}}" wx:key="id" class="card compact-card">
-          <view class="row-between">
-            <view>
-              <view class="card-title">{{item.className}} · {{item.title}}</view>
-              <view class="card-meta">{{item.timeLabel}} · {{item.courseName}} · {{item.scopeLabel}}</view>
-            </view>
-            <view class="pill">{{item.statusLabel}}</view>
+      <view
+        wx:if="{{rollCallReminderVisible && pendingRollCall30Count}}"
+        class="rollcall-reminder"
+        bindtap="showPendingRollCallList"
+      >
+        <view class="rollcall-reminder-mark">!</view>
+        <view class="rollcall-reminder-text">
+          近30天有 {{pendingRollCall30Count}} 个课次未点名，请及时处理
+        </view>
+        <view class="rollcall-reminder-close" catchtap="dismissRollCallReminder">×</view>
+      </view>
+
+      <view class="card rollcall-calendar-card">
+        <view class="rollcall-calendar-head">
+          <view class="rollcall-month">
+            {{showPendingRollCalls ? '近30天未点名' : monthLabel}}
           </view>
-          <view class="session-foot">
-            <view class="card-meta">
-              已点 {{item.attendanceCount}}/{{item.rosterCount}} · {{item.classroomName}}
+          <view
+            wx:if="{{showPendingRollCalls}}"
+            class="rollcall-today"
+            bindtap="showRollCallCalendar"
+          >
+            返回日历
+          </view>
+          <view wx:else class="rollcall-today" bindtap="goToTodayRollCall">回到今天</view>
+        </view>
+        <scroll-view
+          wx:if="{{!showPendingRollCalls}}"
+          class="date-strip rollcall-date-strip"
+          scroll-x
+          enhanced
+          enable-flex
+          show-scrollbar="{{false}}"
+          scroll-with-animation
+          scroll-into-view="{{selectedDateAnchor}}"
+          bindscroll="onDateStripScroll"
+        >
+          <view class="date-strip-track">
+            <view
+              wx:for="{{rollCallDateStripDays}}"
+              wx:key="key"
+              id="{{item.anchorId}}"
+              class="{{item.className}}"
+              data-key="{{item.key}}"
+              bindtap="selectDay"
+            >
+              <view class="day-label">{{item.label}}</view>
+              <view class="day-num">{{item.day}}</view>
             </view>
-            <button class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">开始点名</button>
+          </view>
+        </scroll-view>
+
+        <view wx:if="{{rollCallDisplayEvents.length}}" class="rollcall-session-list">
+          <view wx:for="{{rollCallDisplayEvents}}" wx:key="id" class="rollcall-session-row">
+            <view class="rollcall-session-main">
+              <view class="rollcall-session-time">{{item.timeLabel}}</view>
+              <view class="rollcall-session-info">
+                <view class="rollcall-session-title">{{item.className}} · {{item.title}}</view>
+                <view class="card-meta">
+                  {{item.courseName}} · {{item.classroomName}} · 已点 {{item.attendanceCount}}/{{item.rosterCount}}
+                </view>
+              </view>
+              <view class="rollcall-session-status">{{item.statusLabel}}</view>
+            </view>
+            <button
+              wx:if="{{item.rosterCount}}"
+              class="rollcall-start-button"
+              data-id="{{item.id}}"
+              bindtap="openRollCallDetail"
+            >
+              {{item.rollCallActionLabel}}
+            </button>
+            <view wx:else class="rollcall-no-roster">本课次暂无学员，请先在课表中添加学员</view>
+          </view>
+        </view>
+        <view wx:else class="rollcall-empty">
+          <view class="rollcall-empty-mark">· · ·</view>
+          <view>
+            {{showPendingRollCalls ? '近30天暂无未点名课次' : '当天暂无需要点名的课次'}}
           </view>
         </view>
       </view>
-      <view wx:else class="card empty-card">今天没有待点名课次。</view>
+
+      <button
+        wx:if="{{canCreateAdHocSession}}"
+        class="direct-rollcall-button"
+        bindtap="openDirectRollCall"
+      >
+        没有排课？未排课直接点名
+      </button>
     </block>
 
     <block wx:elif="{{activeView == 'records'}}">

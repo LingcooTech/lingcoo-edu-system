@@ -69,6 +69,17 @@ function defaultTime() {
   };
 }
 
+function directPointTime() {
+  const start = new Date();
+  start.setMinutes(Math.floor(start.getMinutes() / 5) * 5, 0, 0);
+  const end = new Date(start.getTime() + 80 * 60 * 1000);
+  return {
+    date: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+    startTime: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
+    endTime: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
+  };
+}
+
 function toIso(date: string, time: string) {
   return new Date(`${date}T${time}:00+08:00`).toISOString();
 }
@@ -99,6 +110,8 @@ Page({
     saving: false,
     sessionId: '',
     focusStudents: false,
+    afterCreateAttendance: false,
+    requestedMode: '' as '' | 'class' | 'ad_hoc',
     editing: false,
     editable: true,
     canEditStatus: false,
@@ -137,11 +150,15 @@ Page({
 
   onLoad(query: Record<string, string | undefined>) {
     const sessionId = String(query.sessionId || '');
+    const afterCreateAttendance = query.afterCreate === 'attendance';
     this.setData({
       sessionId,
       editing: Boolean(sessionId),
       focusStudents: query.focus === 'students',
+      afterCreateAttendance,
+      requestedMode: query.mode === 'ad_hoc' || query.mode === 'class' ? query.mode : '',
       requestedClassId: String(query.classId || ''),
+      ...(afterCreateAttendance ? directPointTime() : {}),
     });
     this.loadOptions();
   },
@@ -179,6 +196,9 @@ Page({
       );
       const classModeIndex = modeOptions.findIndex((mode) => mode.key === 'class');
       const adHocModeIndex = modeOptions.findIndex((mode) => mode.key === 'ad_hoc');
+      const requestedModeIndex = modeOptions.findIndex(
+        (mode) => mode.key === this.data.requestedMode,
+      );
       const courseIndex = sessionDetail
         ? Math.max(
             options.courses.findIndex((course) => course.id === sessionDetail.course.id),
@@ -213,7 +233,9 @@ Page({
             : Math.max(adHocModeIndex, 0)
           : requestedClassIndex >= 0 && classModeIndex >= 0
             ? classModeIndex
-            : 0,
+            : requestedModeIndex >= 0
+              ? requestedModeIndex
+              : 0,
         classIndex: requestedClassIndex >= 0 ? requestedClassIndex : 0,
         courseIndex,
         classDisplayName: sessionDetail?.class?.name ?? '',
@@ -738,7 +760,7 @@ Page({
         setTimeout(() => wx.navigateBack(), 500);
         return;
       }
-      await createTeacherClassSession({
+      const { classSession } = await createTeacherClassSession({
         classId:
           this.currentMode() === 'class'
             ? (options.classes[this.data.classIndex]?.id ?? null)
@@ -752,6 +774,14 @@ Page({
         students: rosterInputs,
       });
       wx.showToast({ title: '课次已添加', icon: 'success' });
+      if (this.data.afterCreateAttendance) {
+        setTimeout(() => {
+          wx.redirectTo({
+            url: `/pages/teacher-roll-call/index?sessionId=${encodeURIComponent(classSession.id)}`,
+          });
+        }, 500);
+        return;
+      }
       setTimeout(() => wx.navigateBack(), 500);
     } catch (error) {
       this.setData({ error: error instanceof Error ? error.message : '排课失败' });

@@ -79,22 +79,24 @@ const CLASS_TABS: Array<{ key: ClassTab; label: string }> = [
 ];
 
 const ATTENDANCE_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
-  { value: 'present', label: '到场' },
+  { value: 'present', label: '到课' },
   { value: 'late', label: '迟到' },
   { value: 'leave', label: '请假' },
-  { value: 'absent', label: '缺勤' },
-  { value: 'makeup', label: '补课' },
-  { value: 'trial', label: '试听' },
+  { value: 'absent', label: '未到' },
 ];
 
 const ATTENDANCE_LABEL: Record<AttendanceStatus, string> = {
-  present: '到场',
+  present: '到课',
   late: '迟到',
   leave: '请假',
-  absent: '缺勤',
-  makeup: '补课',
-  trial: '试听',
+  absent: '未到',
+  makeup: '到课',
+  trial: '到课',
 };
+
+function displayAttendanceStatus(status: AttendanceStatus): AttendanceStatus {
+  return status === 'makeup' || status === 'trial' ? 'present' : status;
+}
 
 function pad(value: number) {
   return String(value).padStart(2, '0');
@@ -666,7 +668,9 @@ Page({
       );
       const attendanceRows = payload.roster.map((student) => {
         const record = recordByStudentId.get(student.id);
-        const recordedStatus: AttendanceStatus | '' = record?.status ?? '';
+        const recordedStatus: AttendanceStatus | '' = record
+          ? displayAttendanceStatus(record.status)
+          : '';
         return {
           ...student,
           recorded: Boolean(record),

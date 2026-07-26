@@ -1,4 +1,4 @@
-<custom-navbar title="{{editing ? '编辑课次' : '添加课次'}}" show-back="{{true}}" />
+<custom-navbar title="{{editing ? '编辑课次' : afterCreateAttendance ? '未排课点名' : '添加课次'}}" show-back="{{true}}" />
 <view class="page schedule-create-page {{editing ? 'schedule-edit-page' : ''}}">
   <skeleton wx:if="{{loading}}" variant="hub" />
   <block wx:else>
@@ -221,7 +221,7 @@
           loading="{{saving}}"
           disabled="{{saving}}"
           bindtap="submit"
-        >{{editing ? '保存修改' : '确认排课'}}</button>
+        >{{editing ? '保存修改' : afterCreateAttendance ? '创建并点名' : '确认排课'}}</button>
         <view wx:else class="readonly-label">当前课次仅可查看</view>
       </view>
     </view>
