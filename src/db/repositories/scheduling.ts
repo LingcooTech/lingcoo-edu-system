@@ -47,6 +47,14 @@ export async function listClassSessions(db: Database) {
   return db.select().from(schema.classSessions).orderBy(asc(schema.classSessions.startsAt));
 }
 
+export async function listClassSessionsForClass(db: Database, classId: string) {
+  return db
+    .select()
+    .from(schema.classSessions)
+    .where(eq(schema.classSessions.classId, classId))
+    .orderBy(asc(schema.classSessions.startsAt));
+}
+
 export async function listClassSessionTeachers(db: Database, sessionIds: string[]) {
   if (sessionIds.length === 0) {
     return [];
@@ -138,6 +146,7 @@ export async function listUpcomingLessonNotificationTargets(
       and(
         eq(schema.classEnrollments.classId, schema.classes.id),
         eq(schema.classEnrollments.active, true),
+        lte(schema.classEnrollments.joinedAt, schema.classSessions.startsAt),
       ),
     )
     .innerJoin(schema.students, eq(schema.classEnrollments.studentId, schema.students.id))
@@ -178,6 +187,33 @@ export async function createClassSession(
   values: typeof schema.classSessions.$inferInsert,
 ) {
   const [session] = await db.insert(schema.classSessions).values(values).returning();
+  if (session.classId) {
+    const enrollments = await listEnrollmentHistory(db, session.classId);
+    const roster = enrollments
+      .filter(
+        (enrollment) =>
+          enrollment.joinedAt <= session.startsAt &&
+          (!enrollment.leftAt || enrollment.leftAt > session.startsAt),
+      )
+      .map((enrollment) => ({
+        classSessionId: session.id,
+        studentId: enrollment.studentId,
+        billingCourseId: enrollment.billingCourseId,
+        source: 'enrollment',
+        active: true,
+      }));
+    if (roster.length > 0) {
+      await db
+        .insert(schema.classSessionStudents)
+        .values(roster)
+        .onConflictDoNothing({
+          target: [
+            schema.classSessionStudents.classSessionId,
+            schema.classSessionStudents.studentId,
+          ],
+        });
+    }
+  }
   return session;
 }
 
@@ -294,6 +330,14 @@ export async function listEnrollments(db: Database, classId: string) {
     .orderBy(asc(schema.classEnrollments.createdAt));
 }
 
+export async function listEnrollmentHistory(db: Database, classId: string) {
+  return db
+    .select()
+    .from(schema.classEnrollments)
+    .where(eq(schema.classEnrollments.classId, classId))
+    .orderBy(asc(schema.classEnrollments.joinedAt));
+}
+
 export async function listTemporaryStudents(db: Database, sessionId: string) {
   return db
     .select()
@@ -404,7 +448,7 @@ export async function listSessionRoster(db: Database, sessionId: string) {
   }
   const [classGroup, enrollments, temporaryStudents] = await Promise.all([
     findClass(db, session.classId),
-    listEnrollments(db, session.classId),
+    listEnrollmentHistory(db, session.classId),
     listTemporaryStudents(db, sessionId),
   ]);
   if (!classGroup) {
@@ -413,6 +457,12 @@ export async function listSessionRoster(db: Database, sessionId: string) {
 
   const roster = new Map<string, SessionRosterEntry>();
   for (const enrollment of enrollments) {
+    if (
+      enrollment.joinedAt > session.startsAt ||
+      (enrollment.leftAt && enrollment.leftAt <= session.startsAt)
+    ) {
+      continue;
+    }
     roster.set(enrollment.studentId, {
       id: enrollment.id,
       source: 'enrollment',
@@ -523,14 +573,39 @@ export async function createEnrollment(
   if (existing) {
     const [enrollment] = await db
       .update(schema.classEnrollments)
-      .set({ active: true, billingCourseId: values.billingCourseId })
+      .set({
+        active: true,
+        billingCourseId: values.billingCourseId,
+        joinedAt: values.joinedAt ?? new Date(),
+        leftAt: null,
+      })
       .where(eq(schema.classEnrollments.id, existing.id))
       .returning();
+    await syncEnrollmentToScheduledSessions(db, enrollment);
     return enrollment;
   }
 
   const [enrollment] = await db.insert(schema.classEnrollments).values(values).returning();
+  await syncEnrollmentToScheduledSessions(db, enrollment);
   return enrollment;
+}
+
+async function syncEnrollmentToScheduledSessions(
+  db: Database,
+  enrollment: typeof schema.classEnrollments.$inferSelect,
+) {
+  const sessions = (await listClassSessionsForClass(db, enrollment.classId)).filter(
+    (session) => session.status === 'scheduled' && session.startsAt >= enrollment.joinedAt,
+  );
+  for (const session of sessions) {
+    await upsertSessionStudent(db, {
+      classSessionId: session.id,
+      studentId: enrollment.studentId,
+      billingCourseId: enrollment.billingCourseId,
+      source: 'enrollment',
+      active: true,
+    });
+  }
 }
 
 export async function updateEnrollmentBillingCourse(
@@ -550,10 +625,43 @@ export async function updateEnrollmentBillingCourse(
   return enrollment ?? null;
 }
 
-export async function removeEnrollment(db: Database, classId: string, enrollmentId: string) {
+export async function updateEnrollmentJoinedAt(
+  db: Database,
+  input: { classId: string; enrollmentId: string; joinedAt: Date },
+) {
   const [enrollment] = await db
     .update(schema.classEnrollments)
-    .set({ active: false })
+    .set({ joinedAt: input.joinedAt })
+    .where(
+      and(
+        eq(schema.classEnrollments.classId, input.classId),
+        eq(schema.classEnrollments.id, input.enrollmentId),
+      ),
+    )
+    .returning();
+  return enrollment ?? null;
+}
+
+export async function removeEnrollment(
+  db: Database,
+  classId: string,
+  enrollmentId: string,
+  leftAt = new Date(),
+) {
+  const [current] = await db
+    .select()
+    .from(schema.classEnrollments)
+    .where(
+      and(
+        eq(schema.classEnrollments.classId, classId),
+        eq(schema.classEnrollments.id, enrollmentId),
+      ),
+    )
+    .limit(1);
+  if (!current) return null;
+  const [enrollment] = await db
+    .update(schema.classEnrollments)
+    .set({ active: false, leftAt })
     .where(
       and(
         eq(schema.classEnrollments.classId, classId),
@@ -561,5 +669,26 @@ export async function removeEnrollment(db: Database, classId: string, enrollment
       ),
     )
     .returning();
+  const futureSessions = (await listClassSessionsForClass(db, classId)).filter(
+    (session) => session.status === 'scheduled' && session.startsAt >= leftAt,
+  );
+  for (const session of futureSessions) {
+    const [attendance] = await db
+      .select({ id: schema.attendanceRecords.id })
+      .from(schema.attendanceRecords)
+      .where(
+        and(
+          eq(schema.attendanceRecords.classSessionId, session.id),
+          eq(schema.attendanceRecords.studentId, current.studentId),
+        ),
+      )
+      .limit(1);
+    if (!attendance) {
+      await removeSessionStudent(db, {
+        sessionId: session.id,
+        studentId: current.studentId,
+      });
+    }
+  }
   return enrollment ?? null;
 }

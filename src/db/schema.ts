@@ -627,6 +627,8 @@ export const classEnrollments = pgTable(
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
     active: boolean('active').notNull().default(true),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp('left_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
@@ -635,6 +637,7 @@ export const classEnrollments = pgTable(
       table.studentId,
     ),
     billingCourseIdx: index('class_enrollments_billing_course_idx').on(table.billingCourseId),
+    joinedAtIdx: index('class_enrollments_joined_at_idx').on(table.classId, table.joinedAt),
   }),
 );
 

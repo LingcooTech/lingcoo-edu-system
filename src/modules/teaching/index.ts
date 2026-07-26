@@ -202,7 +202,7 @@ const teacherSessionUpdateSchema = z.object({
   endsAt: z.string().datetime({ offset: true }).optional(),
   topic: z.string().trim().min(1).max(200).optional(),
   lessonUnits: z.number().int().min(0).max(10).optional(),
-  status: z.enum(['scheduled', 'cancelled']).optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled']).optional(),
 });
 
 const teacherClassCreateSchema = z.object({
@@ -226,6 +226,11 @@ const teacherClassUpdateSchema = z
 const teacherClassStudentSchema = z.object({
   studentId: z.string().uuid(),
   billingCourseId: z.string().uuid().optional(),
+  joinedAt: z.string().datetime({ offset: true }).optional(),
+});
+
+const teacherClassStudentEffectiveTimeSchema = z.object({
+  joinedAt: z.string().datetime({ offset: true }),
 });
 
 function overlapsRange(session: { startsAt: Date; endsAt: Date }, from?: Date, to?: Date) {
@@ -510,6 +515,62 @@ export const teachingModule: AppModule = {
       );
     }
 
+    async function reconcileEnrollmentSessions(input: {
+      classId: string;
+      studentId: string;
+      billingCourseId: string;
+      joinedAt: Date;
+    }) {
+      const sessions = await schedulingRepo.listClassSessionsForClass(app.db, input.classId);
+      let syncedCount = 0;
+      for (const session of sessions) {
+        await ensureSessionRosterSnapshot(session.id);
+        if (session.status === 'scheduled' && session.startsAt >= input.joinedAt) {
+          await schedulingRepo.upsertSessionStudent(app.db, {
+            classSessionId: session.id,
+            studentId: input.studentId,
+            billingCourseId: input.billingCourseId,
+            source: 'enrollment',
+            active: true,
+          });
+          syncedCount += 1;
+          continue;
+        }
+        if (session.startsAt >= input.joinedAt) continue;
+        const attendance = await attendanceRepo.listAttendanceForSession(app.db, session.id);
+        if (!attendance.some((record) => record.studentId === input.studentId)) {
+          const removed = await schedulingRepo.removeSessionStudent(app.db, {
+            sessionId: session.id,
+            studentId: input.studentId,
+          });
+          if (removed) syncedCount += 1;
+        }
+      }
+      return syncedCount;
+    }
+
+    async function removeEnrollmentFromFutureSessions(input: {
+      classId: string;
+      studentId: string;
+      leftAt: Date;
+    }) {
+      const sessions = (
+        await schedulingRepo.listClassSessionsForClass(app.db, input.classId)
+      ).filter((session) => session.status === 'scheduled' && session.startsAt >= input.leftAt);
+      for (const session of sessions) {
+        await ensureSessionRosterSnapshot(session.id);
+        const attendance = await attendanceRepo.listAttendanceForSession(app.db, session.id);
+        if (attendance.some((record) => record.studentId === input.studentId)) {
+          continue;
+        }
+        await schedulingRepo.removeSessionStudent(app.db, {
+          sessionId: session.id,
+          studentId: input.studentId,
+        });
+      }
+      return sessions.length;
+    }
+
     app.get(
       '/public/teacher/capabilities',
       { preHandler: app.requireRole('teacher') },
@@ -593,7 +654,9 @@ export const teachingModule: AppModule = {
               (access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))) &&
             ['recruiting', 'active'].includes(classGroup.status),
         );
-        const allowedCourseIds = new Set(manageableClasses.map((classGroup) => classGroup.courseId));
+        const allowedCourseIds = new Set(
+          manageableClasses.map((classGroup) => classGroup.courseId),
+        );
         const selectableCourses =
           access.permissions.createAdHocSession || access.permissions.manageClasses
             ? institutionCourses.filter((course) => course.status === 'published')
@@ -812,6 +875,7 @@ export const teachingModule: AppModule = {
                       billingCourseId: enrollment.billingCourseId,
                       billingCourseName:
                         courseById.get(enrollment.billingCourseId)?.name ?? '课时档案',
+                      joinedAt: enrollment.joinedAt,
                       lessonBalance:
                         lessonAccountByStudentCourse.get(
                           `${student.id}:${enrollment.billingCourseId}`,
@@ -948,13 +1012,65 @@ export const teachingModule: AppModule = {
         if (enrolledCount >= classGroup.capacity) {
           throw Object.assign(new Error('班级已满'), { statusCode: 409 });
         }
+        const joinedAt = body.joinedAt ? new Date(body.joinedAt) : new Date();
         const enrollment = await schedulingRepo.createEnrollment(app.db, {
           classId,
           studentId: body.studentId,
           billingCourseId,
           active: true,
+          joinedAt,
+          leftAt: null,
         });
-        return { enrollment };
+        const syncedSessionCount = await reconcileEnrollmentSessions({
+          classId,
+          studentId: body.studentId,
+          billingCourseId,
+          joinedAt,
+        });
+        return { enrollment, syncedSessionCount };
+      },
+    );
+
+    app.patch(
+      '/public/teacher/classes/:classId/students/:studentId',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const { classId, studentId } = request.params as {
+          classId: string;
+          studentId: string;
+        };
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const dataScope = await resolveTeacherDataScope(access);
+        requireTeacherPermission(access.permissions, 'manageClasses');
+        requireTeacherPermission(access.permissions, 'enrollStudents');
+        const body = teacherClassStudentEffectiveTimeSchema.parse(request.body);
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup) throw notFound('Class not found');
+        if (
+          classGroup.teacherId !== access.teacherId &&
+          !(access.isAdminTeacher && dataScope.visibleTeacherIds.has(classGroup.teacherId))
+        ) {
+          throw Object.assign(new Error('无权操作该班级'), { statusCode: 403 });
+        }
+        const course = await catalogRepo.requireCourse(app.db, classGroup.courseId);
+        requireCourseInTeacherInstitution(course, dataScope.institutionId);
+        const enrollment = (await schedulingRepo.listEnrollments(app.db, classId)).find(
+          (item) => item.studentId === studentId,
+        );
+        if (!enrollment) throw notFound('Enrollment not found');
+        const joinedAt = new Date(body.joinedAt);
+        const updated = await schedulingRepo.updateEnrollmentJoinedAt(app.db, {
+          classId,
+          enrollmentId: enrollment.id,
+          joinedAt,
+        });
+        const syncedSessionCount = await reconcileEnrollmentSessions({
+          classId,
+          studentId,
+          billingCourseId: enrollment.billingCourseId,
+          joinedAt,
+        });
+        return { enrollment: updated, syncedSessionCount };
       },
     );
 
@@ -983,8 +1099,19 @@ export const teachingModule: AppModule = {
         const enrollments = await schedulingRepo.listEnrollments(app.db, classId);
         const enrollment = enrollments.find((item) => item.studentId === studentId);
         if (!enrollment) throw notFound('Enrollment not found');
-        const removed = await schedulingRepo.removeEnrollment(app.db, classId, enrollment.id);
-        return { enrollment: removed };
+        const leftAt = new Date();
+        const syncedSessionCount = await removeEnrollmentFromFutureSessions({
+          classId,
+          studentId,
+          leftAt,
+        });
+        const removed = await schedulingRepo.removeEnrollment(
+          app.db,
+          classId,
+          enrollment.id,
+          leftAt,
+        );
+        return { enrollment: removed, syncedSessionCount };
       },
     );
 
@@ -1404,19 +1531,27 @@ export const teachingModule: AppModule = {
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const dataScope = await resolveTeacherDataScope(access);
         const owned = await requireOwnedSession(request.account!.id, sessionId);
-        const [classGroup, course, classroom, roster, students, courses, lessonAccounts, attendance] =
-          await Promise.all([
-            owned.session.classId
-              ? schedulingRepo.findClass(app.db, owned.session.classId)
-              : Promise.resolve(null),
-            catalogRepo.requireCourse(app.db, owned.session.courseId),
-            teachingRepo.findClassroom(app.db, owned.session.classroomId),
-            schedulingRepo.listSessionRoster(app.db, sessionId),
-            peopleRepo.listStudents(app.db, { scope: 'all' }),
-            catalogRepo.listCourses(app.db),
-            app.db.select().from(schema.lessonAccounts),
-            attendanceRepo.listAttendanceForSession(app.db, sessionId),
-          ]);
+        const [
+          classGroup,
+          course,
+          classroom,
+          roster,
+          students,
+          courses,
+          lessonAccounts,
+          attendance,
+        ] = await Promise.all([
+          owned.session.classId
+            ? schedulingRepo.findClass(app.db, owned.session.classId)
+            : Promise.resolve(null),
+          catalogRepo.requireCourse(app.db, owned.session.courseId),
+          teachingRepo.findClassroom(app.db, owned.session.classroomId),
+          schedulingRepo.listSessionRoster(app.db, sessionId),
+          peopleRepo.listStudents(app.db, { scope: 'all' }),
+          catalogRepo.listCourses(app.db),
+          app.db.select().from(schema.lessonAccounts),
+          attendanceRepo.listAttendanceForSession(app.db, sessionId),
+        ]);
         const visibleCourses = courses.filter((item) =>
           courseBelongsToTeacherInstitution(item, dataScope.institutionId),
         );
@@ -1433,6 +1568,7 @@ export const teachingModule: AppModule = {
             owned.session.status === 'scheduled' &&
             attendance.length === 0 &&
             (owned.isMine || access.isAdminTeacher),
+          canEditStatus: owned.isMine || access.isAdminTeacher,
           roster: roster.flatMap((entry) => {
             const student = studentById.get(entry.studentId);
             if (!student) return [];
@@ -1444,14 +1580,12 @@ export const teachingModule: AppModule = {
                 school: student.school,
                 source: entry.source,
                 billingCourseId: entry.billingCourseId,
-                billingCourseName:
-                  courseById.get(entry.billingCourseId)?.name ?? '课时档案',
+                billingCourseName: courseById.get(entry.billingCourseId)?.name ?? '课时档案',
                 canRemove: !attendedStudentIds.has(student.id),
                 lessonAccounts: lessonAccounts
                   .filter(
                     (account) =>
-                      account.studentId === student.id &&
-                      visibleCourseIds.has(account.courseId),
+                      account.studentId === student.id && visibleCourseIds.has(account.courseId),
                   )
                   .map((account) => ({
                     id: account.id,
@@ -1484,19 +1618,31 @@ export const teachingModule: AppModule = {
           access.permissions,
           session.sessionType === 'ad_hoc' ? 'createAdHocSession' : 'createClassSession',
         );
-        if (session.status === 'completed') {
-          throw Object.assign(new Error('已完成课次不能修改'), { statusCode: 422 });
-        }
+        const body = teacherSessionUpdateSchema.parse(request.body);
         const existingAttendance = await attendanceRepo.listAttendanceForSession(
           app.db,
           session.id,
         );
-        if (existingAttendance.length > 0) {
+        const hasScheduleChanges =
+          body.classroomId !== undefined ||
+          body.startsAt !== undefined ||
+          body.endsAt !== undefined ||
+          body.topic !== undefined ||
+          body.lessonUnits !== undefined;
+        if (hasScheduleChanges && session.status !== 'scheduled') {
+          throw Object.assign(new Error('已完成或已取消课次只能修改状态'), { statusCode: 422 });
+        }
+        if (hasScheduleChanges && existingAttendance.length > 0) {
           throw Object.assign(new Error('已开始点名的课次不能修改'), { statusCode: 422 });
         }
-        const body = teacherSessionUpdateSchema.parse(request.body);
         if (body.lessonUnits !== undefined && body.lessonUnits !== session.lessonUnits) {
           requireTeacherPermission(access.permissions, 'setLessonUnits');
+        }
+        if (!hasScheduleChanges && body.status && body.status !== 'scheduled') {
+          const updated = await schedulingRepo.updateClassSession(app.db, session.id, {
+            status: body.status,
+          });
+          return { classSession: updated };
         }
         const startsAt = body.startsAt ? new Date(body.startsAt) : session.startsAt;
         const endsAt = body.endsAt ? new Date(body.endsAt) : session.endsAt;
@@ -1520,7 +1666,7 @@ export const teachingModule: AppModule = {
         if (!classroomAllowed) {
           throw Object.assign(new Error('无权选择其他机构课程使用的教室'), { statusCode: 403 });
         }
-        if (body.status !== 'cancelled') {
+        if (hasScheduleChanges || body.status === 'scheduled') {
           const overlap = await schedulingRepo.findScheduleConflict(app.db, {
             startsAt,
             endsAt,
@@ -1788,19 +1934,26 @@ export const teachingModule: AppModule = {
               course: courseById.get(classGroup.courseId),
               classroom: classroomById.get(classGroup.classroomId),
               campus: campusById.get(classGroup.campusId) ?? null,
-              students: enrollments
-                .map((enrollment) => studentById.get(enrollment.studentId))
-                .filter(Boolean)
-                .map((student) => ({
-                  id: student!.id,
-                  name: student!.name,
-                  grade: student!.grade,
-                  school: student!.school,
-                  status: student!.status,
-                  lessonBalance:
-                    lessonAccountByStudentCourse.get(`${student!.id}:${classGroup.courseId}`)
-                      ?.balance ?? null,
-                })),
+              students: enrollments.flatMap((enrollment) => {
+                const student = studentById.get(enrollment.studentId);
+                if (!student) return [];
+                return [
+                  {
+                    id: student.id,
+                    name: student.name,
+                    grade: student.grade,
+                    school: student.school,
+                    status: student.status,
+                    billingCourseId: enrollment.billingCourseId,
+                    billingCourseName:
+                      courseById.get(enrollment.billingCourseId)?.name ?? '课时档案',
+                    lessonBalance:
+                      lessonAccountByStudentCourse.get(
+                        `${student.id}:${enrollment.billingCourseId}`,
+                      )?.balance ?? null,
+                  },
+                ];
+              }),
             };
           }),
         );
@@ -2683,20 +2836,55 @@ export const teachingModule: AppModule = {
           throw Object.assign(new Error('只能为本班学员点名'), { statusCode: 400 });
         }
         const existingRecords = await attendanceRepo.listAttendanceForSession(app.db, sessionId);
-        const existingStudentIds = new Set(existingRecords.map((record) => record.studentId));
-        const attendanceRecords = await attendanceRepo.recordAttendance(app.db, {
-          sessionId,
-          courseId: session.courseId,
-          records: body.records.map((record) => ({
-            ...record,
-            courseId: billingCourseMap.get(record.studentId),
+        const existingByStudentId = new Map(
+          existingRecords.map((record) => [record.studentId, record]),
+        );
+        const newRecords = body.records.filter(
+          (record) => !existingByStudentId.has(record.studentId),
+        );
+        const correctionRecords = body.records.filter((record) =>
+          existingByStudentId.has(record.studentId),
+        );
+        const createdRecords =
+          newRecords.length > 0
+            ? await attendanceRepo.recordAttendance(app.db, {
+                sessionId,
+                courseId: session.courseId,
+                records: newRecords.map((record) => ({
+                  ...record,
+                  courseId: billingCourseMap.get(record.studentId),
+                  lessonUnits: session.lessonUnits,
+                })),
+                completeSession: false,
+              })
+            : [];
+        const correctedResults: NonNullable<
+          Awaited<ReturnType<typeof attendanceRepo.updateAttendanceRecord>>
+        >[] = [];
+        for (const record of correctionRecords) {
+          const billingCourseId = billingCourseMap.get(record.studentId);
+          if (!billingCourseId) continue;
+          const result = await attendanceRepo.updateAttendanceRecord(app.db, {
+            sessionId,
+            studentId: record.studentId,
+            status: record.status,
+            note: record.note?.trim() || null,
+            deductLesson: record.deductLesson,
             lessonUnits: session.lessonUnits,
-          })),
-          completeSession: false,
-        });
+            courseId: billingCourseId,
+          });
+          if (result) correctedResults.push(result);
+        }
+        const correctedRecords = correctedResults.map((result) => result.attendanceRecord);
+        const attendanceRecords = [...createdRecords, ...correctedRecords];
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
-          records: attendanceRecords.filter((record) => !existingStudentIds.has(record.studentId)),
+          records: [
+            ...createdRecords,
+            ...correctedResults
+              .filter((result) => result.lessonDeltaAdjustment < 0)
+              .map((result) => result.attendanceRecord),
+          ],
           billingCourseIdByStudentId: billingCourseMap,
         });
         const latestAttendanceRecords = await attendanceRepo.listAttendanceForSession(

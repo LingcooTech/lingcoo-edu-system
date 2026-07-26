@@ -47,6 +47,12 @@ type BillingOption = {
   balance: number;
 };
 
+const SESSION_STATUS_OPTIONS = [
+  { value: 'scheduled' as const, label: '待上课' },
+  { value: 'completed' as const, label: '已完成' },
+  { value: 'cancelled' as const, label: '已取消' },
+];
+
 function pad(value: number) {
   return String(value).padStart(2, '0');
 }
@@ -83,8 +89,7 @@ function resolveBillingSelection(options: BillingOption[], preferredCourseId = '
   return {
     billingIndex,
     billingCourseId: options[billingIndex]?.id ?? '',
-    balanceLabel:
-      options.length > 0 ? String(options[billingIndex]?.balance ?? '-') : '无可用档案',
+    balanceLabel: options.length > 0 ? String(options[billingIndex]?.balance ?? '-') : '无可用档案',
   };
 }
 
@@ -95,7 +100,10 @@ Page({
     sessionId: '',
     editing: false,
     editable: true,
+    canEditStatus: false,
     sessionDetail: null as TeacherSessionDetail | null,
+    sessionStatusOptions: SESSION_STATUS_OPTIONS,
+    sessionStatusIndex: 0,
     initialRosterStudentIds: [] as string[],
     initialBillingCourseByStudentId: {} as Record<string, string>,
     initialEnrollmentModeByStudentId: {} as Record<string, 'class' | 'session_only'>,
@@ -141,9 +149,7 @@ Page({
     try {
       const [options, sessionDetail] = await Promise.all([
         fetchTeacherSchedulingOptions(),
-        this.data.sessionId
-          ? fetchTeacherClassSession(this.data.sessionId)
-          : Promise.resolve(null),
+        this.data.sessionId ? fetchTeacherClassSession(this.data.sessionId) : Promise.resolve(null),
       ]);
       const modeOptions: Array<{ key: 'class' | 'ad_hoc'; label: string }> = [];
       if (options.permissions.createClassSession && options.classes.length > 0) {
@@ -188,10 +194,7 @@ Page({
       const sessionStart = sessionDetail ? new Date(sessionDetail.session.startsAt) : null;
       const sessionEnd = sessionDetail ? new Date(sessionDetail.session.endsAt) : null;
       const initialBillingCourseByStudentId = Object.fromEntries(
-        (sessionDetail?.roster ?? []).map((student) => [
-          student.id,
-          student.billingCourseId,
-        ]),
+        (sessionDetail?.roster ?? []).map((student) => [student.id, student.billingCourseId]),
       );
       const initialEnrollmentModeByStudentId = Object.fromEntries(
         (sessionDetail?.roster ?? []).map((student) => [
@@ -217,6 +220,15 @@ Page({
         classroomIndex,
         sessionDetail,
         editable: sessionDetail?.canEdit ?? true,
+        canEditStatus: sessionDetail?.canEditStatus ?? false,
+        sessionStatusIndex: sessionDetail
+          ? Math.max(
+              SESSION_STATUS_OPTIONS.findIndex(
+                (option) => option.value === sessionDetail.session.status,
+              ),
+              0,
+            )
+          : 0,
         initialRosterStudentIds: (sessionDetail?.roster ?? []).map((student) => student.id),
         initialBillingCourseByStudentId,
         initialEnrollmentModeByStudentId,
@@ -351,7 +363,9 @@ Page({
   },
 
   applyStudentSearch() {
-    const keyword = String(this.data.keyword || '').trim().toLocaleLowerCase('zh-CN');
+    const keyword = String(this.data.keyword || '')
+      .trim()
+      .toLocaleLowerCase('zh-CN');
     const selectedIds = new Set(this.data.selectedOtherStudentIds as string[]);
     const students = (this.data.allOtherStudents as StudentRow[])
       .filter((student) => !keyword || student.searchText.includes(keyword))
@@ -470,18 +484,14 @@ Page({
     if (!id) return;
     const selectedIds = new Set(this.data.selectedClassStudentIds as string[]);
     if (selectedIds.has(id)) {
-      const student = (this.data.classStudents as ClassStudentRow[]).find(
-        (item) => item.id === id,
-      );
+      const student = (this.data.classStudents as ClassStudentRow[]).find((item) => item.id === id);
       if (this.data.editing && student && !student.canRemove) {
         wx.showToast({ title: '该学员已点名，不能移出课次', icon: 'none' });
         return;
       }
       selectedIds.delete(id);
     } else {
-      const student = (this.data.classStudents as ClassStudentRow[]).find(
-        (item) => item.id === id,
-      );
+      const student = (this.data.classStudents as ClassStudentRow[]).find((item) => item.id === id);
       if (!student?.billingCourseId) {
         wx.showToast({ title: '该学员暂无可扣课档案', icon: 'none' });
         return;
@@ -599,10 +609,40 @@ Page({
     });
   },
 
+  changeSessionStatus(event: PickerEvent) {
+    this.setData({ sessionStatusIndex: Number(event.detail.value) });
+  },
+
   async submit() {
     if (this.data.saving) return;
     const options = this.data.options;
     if (!options) return;
+    const selectedSessionStatus =
+      this.data.sessionStatusOptions[this.data.sessionStatusIndex]?.value ?? 'scheduled';
+    const sessionDetail = this.data.sessionDetail as TeacherSessionDetail | null;
+    if (this.data.editing && this.data.sessionId && !this.data.editable) {
+      if (!this.data.canEditStatus) {
+        wx.showToast({ title: '该课次当前不可修改', icon: 'none' });
+        return;
+      }
+      if (selectedSessionStatus === sessionDetail?.session.status) {
+        wx.showToast({ title: '课次状态没有修改', icon: 'none' });
+        return;
+      }
+      this.setData({ saving: true, error: '' });
+      try {
+        await updateTeacherClassSession(this.data.sessionId, {
+          status: selectedSessionStatus,
+        });
+        wx.showToast({ title: '课次状态已更新', icon: 'success' });
+        setTimeout(() => wx.navigateBack(), 500);
+      } catch (error) {
+        this.setData({ error: error instanceof Error ? error.message : '状态修改失败' });
+      } finally {
+        this.setData({ saving: false });
+      }
+      return;
+    }
     const courseId = this.currentCourseId();
     const classroom = options.classrooms[this.data.classroomIndex];
     const selectedClassStudentIds = new Set(this.data.selectedClassStudentIds as string[]);
@@ -670,7 +710,8 @@ Page({
           await removeTeacherClassSessionStudent(this.data.sessionId, studentId);
         }
         for (const student of rosterInputs) {
-          const initialBillingCourseId = this.data.initialBillingCourseByStudentId[student.studentId];
+          const initialBillingCourseId =
+            this.data.initialBillingCourseByStudentId[student.studentId];
           const initialEnrollmentMode =
             this.data.initialEnrollmentModeByStudentId[student.studentId];
           if (
@@ -680,6 +721,11 @@ Page({
           ) {
             await addTeacherClassSessionStudent(this.data.sessionId, student);
           }
+        }
+        if (selectedSessionStatus !== sessionDetail?.session.status) {
+          await updateTeacherClassSession(this.data.sessionId, {
+            status: selectedSessionStatus,
+          });
         }
         wx.showToast({ title: '课次已更新', icon: 'success' });
         setTimeout(() => wx.navigateBack(), 500);

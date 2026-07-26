@@ -861,6 +861,9 @@ export interface TeacherClass {
     billingCourseId?: string;
     billingCourseName?: string;
     lessonBalance?: number | null;
+    joinedAt?: string;
+    joinedDate?: string;
+    joinedTime?: string;
   }>;
 }
 
@@ -887,6 +890,7 @@ export interface TeacherSessionDetail {
   course: { id: string; name: string };
   classroom: { id: string; name: string } | null;
   canEdit: boolean;
+  canEditStatus: boolean;
   roster: TeacherSessionDetailRosterStudent[];
 }
 
@@ -1665,10 +1669,28 @@ export function addTeacherClassStudent(
   classId: string,
   studentId: string,
   billingCourseId: string,
-): Promise<{ enrollment: { id: string; studentId: string } }> {
+  joinedAt: string,
+): Promise<{
+  enrollment: { id: string; studentId: string; joinedAt: string };
+  syncedSessionCount: number;
+}> {
   return request(`/public/teacher/classes/${classId}/students`, {
     method: 'POST',
-    data: { studentId, billingCourseId },
+    data: { studentId, billingCourseId, joinedAt },
+  });
+}
+
+export function updateTeacherClassStudentJoinedAt(
+  classId: string,
+  studentId: string,
+  joinedAt: string,
+): Promise<{
+  enrollment: { id: string; studentId: string; joinedAt: string };
+  syncedSessionCount: number;
+}> {
+  return request(`/public/teacher/classes/${classId}/students/${studentId}`, {
+    method: 'PATCH',
+    data: { joinedAt },
   });
 }
 
@@ -1684,7 +1706,7 @@ export function updateTeacherClassSession(
     endsAt?: string;
     topic?: string;
     lessonUnits?: number;
-    status?: 'scheduled' | 'cancelled';
+    status?: 'scheduled' | 'completed' | 'cancelled';
   },
 ): Promise<{ classSession: TeacherClassSession }> {
   return request(`/public/teacher/class-sessions/${encodeURIComponent(sessionId)}`, {
@@ -1701,13 +1723,10 @@ export function addTeacherClassSessionStudent(
     billingCourseId: string;
   },
 ): Promise<{ rosterStudent: unknown }> {
-  return request(
-    `/public/teacher/class-sessions/${encodeURIComponent(sessionId)}/students`,
-    {
-      method: 'POST',
-      data: input,
-    },
-  );
+  return request(`/public/teacher/class-sessions/${encodeURIComponent(sessionId)}/students`, {
+    method: 'POST',
+    data: input,
+  });
 }
 
 export function removeTeacherClassSessionStudent(

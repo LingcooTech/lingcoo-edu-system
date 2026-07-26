@@ -256,9 +256,15 @@ async function upsertClassEnrollment(
   if (existing) {
     const [enrollment] = await tx
       .update(schema.classEnrollments)
-      .set({ active: true, billingCourseId: input.billingCourseId })
+      .set({
+        active: true,
+        billingCourseId: input.billingCourseId,
+        joinedAt: new Date(),
+        leftAt: null,
+      })
       .where(eq(schema.classEnrollments.id, existing.id))
       .returning();
+    await syncEnrollmentToScheduledSessions(tx, enrollment);
     return enrollment;
   }
 
@@ -271,7 +277,41 @@ async function upsertClassEnrollment(
       active: true,
     })
     .returning();
+  await syncEnrollmentToScheduledSessions(tx, enrollment);
   return enrollment;
+}
+
+async function syncEnrollmentToScheduledSessions(
+  tx: Tx,
+  enrollment: typeof schema.classEnrollments.$inferSelect,
+) {
+  const sessions = await tx
+    .select()
+    .from(schema.classSessions)
+    .where(eq(schema.classSessions.classId, enrollment.classId));
+  const eligibleSessions = sessions.filter(
+    (session) => session.status === 'scheduled' && session.startsAt >= enrollment.joinedAt,
+  );
+  for (const session of eligibleSessions) {
+    await tx
+      .insert(schema.classSessionStudents)
+      .values({
+        classSessionId: session.id,
+        studentId: enrollment.studentId,
+        billingCourseId: enrollment.billingCourseId,
+        source: 'enrollment',
+        active: true,
+      })
+      .onConflictDoUpdate({
+        target: [schema.classSessionStudents.classSessionId, schema.classSessionStudents.studentId],
+        set: {
+          billingCourseId: enrollment.billingCourseId,
+          source: 'enrollment',
+          active: true,
+          updatedAt: new Date(),
+        },
+      });
+  }
 }
 
 async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {

@@ -9,6 +9,7 @@ import {
   removeTeacherClassStudent,
   searchTeacherStudents,
   updateTeacherClass,
+  updateTeacherClassStudentJoinedAt,
   type AttendanceStatus,
   type SessionAttendanceRecord,
   type TeacherCalendarEvent,
@@ -20,6 +21,9 @@ import {
 
 type ClassTab = 'schedule' | 'students' | 'attendance';
 type PickerEvent = { detail: { value: string | number } };
+type MemberPickerEvent = PickerEvent & {
+  currentTarget: { dataset: { id?: string; date?: string; time?: string } };
+};
 type InputEvent = { detail: { value: string } };
 type TapEvent = { currentTarget: { dataset: Record<string, string | undefined> } };
 
@@ -30,6 +34,7 @@ type ClassSessionRow = TeacherCalendarEvent & {
   attendanceLabel: string;
   isPast: boolean;
   dateChipClass: string;
+  statusClass: string;
 };
 
 type AttendanceRow = TeacherRosterStudent & {
@@ -37,6 +42,14 @@ type AttendanceRow = TeacherRosterStudent & {
   recordedStatus: AttendanceStatus | '';
   draftStatus: AttendanceStatus;
   statusLabel: string;
+  dirty: boolean;
+};
+
+type ScheduleGroup = {
+  key: 'scheduled' | 'completed' | 'cancelled';
+  label: string;
+  className: string;
+  sessions: ClassSessionRow[];
 };
 
 type CandidateBillingOption = {
@@ -87,6 +100,21 @@ function pad(value: number) {
   return String(value).padStart(2, '0');
 }
 
+function dateTimeParts(value: string | Date = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const normalized = Number.isNaN(date.getTime()) ? new Date() : date;
+  return {
+    date: `${normalized.getFullYear()}-${pad(normalized.getMonth() + 1)}-${pad(
+      normalized.getDate(),
+    )}`,
+    time: `${pad(normalized.getHours())}:${pad(normalized.getMinutes())}`,
+  };
+}
+
+function effectiveTimeIso(date: string, time: string) {
+  return new Date(`${date}T${time}:00+08:00`).toISOString();
+}
+
 function sessionDateLabel(value: string) {
   const date = new Date(value);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} 周${
@@ -115,11 +143,7 @@ function normalizeSession(
   selectedAttendanceSessionId = '',
 ): ClassSessionRow {
   const statusLabel =
-    event.status === 'completed'
-      ? '已完成'
-      : event.status === 'cancelled'
-        ? '已取消'
-        : '待上课';
+    event.status === 'completed' ? '已完成' : event.status === 'cancelled' ? '已取消' : '待上课';
   const attendanceLabel = event.rosterCount
     ? `已点 ${event.attendanceCount}/${event.rosterCount}`
     : '暂无学员';
@@ -130,6 +154,12 @@ function normalizeSession(
     statusLabel,
     attendanceLabel,
     isPast: new Date(event.endsAt).getTime() < Date.now(),
+    statusClass:
+      event.status === 'completed'
+        ? 'session-status session-status-completed'
+        : event.status === 'cancelled'
+          ? 'session-status session-status-muted'
+          : 'session-status session-status-scheduled',
     dateChipClass:
       event.id === selectedAttendanceSessionId
         ? 'attendance-date-chip attendance-date-chip-active'
@@ -158,7 +188,9 @@ Page({
     classroomName: '',
     locationName: '',
     sessions: [] as ClassSessionRow[],
-    attendanceSessions: [] as ClassSessionRow[],
+    scheduleGroups: [] as ScheduleGroup[],
+    pendingAttendanceSessions: [] as ClassSessionRow[],
+    historicalAttendanceSessions: [] as ClassSessionRow[],
     upcomingSessionCount: 0,
     completedSessionCount: 0,
     classroomIndex: 0,
@@ -169,6 +201,8 @@ Page({
     settingsVisible: false,
     addStudentVisible: false,
     keyword: '',
+    joinDate: dateTimeParts().date,
+    joinTime: dateTimeParts().time,
     allCandidates: [] as CandidateRow[],
     candidates: [] as CandidateRow[],
     studentLoading: false,
@@ -178,6 +212,7 @@ Page({
     attendanceSessionId: '',
     attendanceSessionTitle: '',
     attendanceRows: [] as AttendanceRow[],
+    attendanceSaveLabel: '保存点名',
     attendanceError: '',
     error: '',
   },
@@ -203,7 +238,17 @@ Page({
         fetchTeacherCalendar(calendarRange()),
         fetchTeacherCapabilities(),
       ]);
-      const classGroup = payload.class;
+      const classGroup = {
+        ...payload.class,
+        students: payload.class.students.map((student) => {
+          const joinedAt = dateTimeParts(student.joinedAt);
+          return {
+            ...student,
+            joinedDate: joinedAt.date,
+            joinedTime: joinedAt.time,
+          };
+        }),
+      };
       const classroomIndex = Math.max(
         options.classrooms.findIndex((item) => item.id === classGroup.classroomId),
         0,
@@ -227,6 +272,43 @@ Page({
       const canEditClass =
         options.permissions.manageClasses &&
         (classGroup.teacherId === capabilities.teacherId || capabilities.isAdminTeacher);
+      const scheduledSessions = sessions.filter((session) => session.status === 'scheduled');
+      const completedSessions = sessions.filter((session) => session.status === 'completed');
+      const cancelledSessions = sessions.filter((session) => session.status === 'cancelled');
+      const scheduleGroups: ScheduleGroup[] = [
+        {
+          key: 'scheduled',
+          label: '待上课',
+          className: 'session-group session-group-scheduled',
+          sessions: scheduledSessions,
+        },
+        {
+          key: 'completed',
+          label: '已完成',
+          className: 'session-group session-group-completed',
+          sessions: completedSessions,
+        },
+        {
+          key: 'cancelled',
+          label: '已取消',
+          className: 'session-group session-group-cancelled',
+          sessions: cancelledSessions,
+        },
+      ].filter((group) => group.sessions.length > 0) as ScheduleGroup[];
+      const pendingAttendanceSessions = sessions.filter(
+        (session) => session.status === 'scheduled' && session.attendanceCount === 0,
+      );
+      const historicalAttendanceSessions = sessions.filter(
+        (session) => session.status === 'completed' || session.attendanceCount > 0,
+      );
+      const selectableAttendanceIds = new Set(
+        [...pendingAttendanceSessions, ...historicalAttendanceSessions].map(
+          (session) => session.id,
+        ),
+      );
+      const attendanceSessionId = selectableAttendanceIds.has(this.data.attendanceSessionId)
+        ? this.data.attendanceSessionId
+        : '';
       this.setData({
         options,
         classGroup,
@@ -244,16 +326,23 @@ Page({
         teacherName: classGroup.teacher?.name || '未指定老师',
         campusName: classGroup.campus?.name || '未设置校区',
         classroomName: classGroup.classroom?.name || '未分配教室',
-        locationName:
-          classGroup.classroom?.name || classGroup.campus?.name || '未设置上课地点',
+        locationName: classGroup.classroom?.name || classGroup.campus?.name || '未设置上课地点',
         sessions,
-        attendanceSessions: sessions.filter((session) => session.status !== 'cancelled'),
+        scheduleGroups,
+        pendingAttendanceSessions,
+        historicalAttendanceSessions,
+        attendanceSessionId,
+        ...(!attendanceSessionId
+          ? {
+              attendanceSessionTitle: '',
+              attendanceRows: [],
+              attendanceError: '',
+            }
+          : {}),
         upcomingSessionCount: sessions.filter(
-          (session) => !session.isPast && session.status !== 'cancelled',
+          (session) => !session.isPast && session.status === 'scheduled',
         ).length,
-        completedSessionCount: sessions.filter(
-          (session) => session.status === 'completed' || session.attendanceCount > 0,
-        ).length,
+        completedSessionCount: completedSessions.length,
         loading: false,
       });
       if (this.data.addStudentVisible) await this.searchCandidates();
@@ -283,7 +372,11 @@ Page({
 
   toggleAddStudent() {
     const addStudentVisible = !this.data.addStudentVisible;
-    this.setData({ addStudentVisible });
+    const now = dateTimeParts();
+    this.setData({
+      addStudentVisible,
+      ...(addStudentVisible ? { joinDate: now.date, joinTime: now.time } : {}),
+    });
     if (addStudentVisible) void this.searchCandidates();
   },
 
@@ -307,8 +400,18 @@ Page({
     this.setData({ keyword: event.detail.value });
   },
 
+  changeJoinDate(event: PickerEvent) {
+    this.setData({ joinDate: String(event.detail.value) });
+  },
+
+  changeJoinTime(event: PickerEvent) {
+    this.setData({ joinTime: String(event.detail.value) });
+  },
+
   applyCandidateSearch() {
-    const keyword = String(this.data.keyword || '').trim().toLocaleLowerCase('zh-CN');
+    const keyword = String(this.data.keyword || '')
+      .trim()
+      .toLocaleLowerCase('zh-CN');
     this.setData({
       candidates: (this.data.allCandidates as CandidateRow[]).filter(
         (student) => !keyword || student.searchText.includes(keyword),
@@ -440,11 +543,58 @@ Page({
     }
     this.setData({ memberSavingId: studentId, error: '' });
     try {
-      await addTeacherClassStudent(this.data.classId, studentId, student.billingCourseId);
-      wx.showToast({ title: '学员已入班', icon: 'success' });
+      const result = await addTeacherClassStudent(
+        this.data.classId,
+        studentId,
+        student.billingCourseId,
+        effectiveTimeIso(this.data.joinDate, this.data.joinTime),
+      );
+      wx.showToast({
+        title:
+          result.syncedSessionCount > 0 ? `已同步${result.syncedSessionCount}个课次` : '学员已入班',
+        icon: 'success',
+      });
       await this.load();
     } catch (error) {
       this.setData({ error: error instanceof Error ? error.message : '添加学员失败' });
+    } finally {
+      this.setData({ memberSavingId: '' });
+    }
+  },
+
+  changeMemberJoinDate(event: MemberPickerEvent) {
+    const studentId = String(event.currentTarget.dataset.id || '');
+    const time = String(event.currentTarget.dataset.time || '');
+    const date = String(event.detail.value || '');
+    if (studentId && date && time) void this.saveMemberJoinedAt(studentId, date, time);
+  },
+
+  changeMemberJoinTime(event: MemberPickerEvent) {
+    const studentId = String(event.currentTarget.dataset.id || '');
+    const date = String(event.currentTarget.dataset.date || '');
+    const time = String(event.detail.value || '');
+    if (studentId && date && time) void this.saveMemberJoinedAt(studentId, date, time);
+  },
+
+  async saveMemberJoinedAt(studentId: string, date: string, time: string) {
+    if (this.data.memberSavingId) return;
+    this.setData({ memberSavingId: studentId, error: '' });
+    try {
+      const result = await updateTeacherClassStudentJoinedAt(
+        this.data.classId,
+        studentId,
+        effectiveTimeIso(date, time),
+      );
+      wx.showToast({
+        title:
+          result.syncedSessionCount > 0
+            ? `已更新${result.syncedSessionCount}个课次`
+            : '入班时间已更新',
+        icon: 'success',
+      });
+      await this.load();
+    } catch (error) {
+      this.setData({ error: error instanceof Error ? error.message : '入班时间修改失败' });
     } finally {
       this.setData({ memberSavingId: '' });
     }
@@ -502,9 +652,12 @@ Page({
       attendanceSessionTitle: `${session.dateLabel} ${session.timeLabel}`,
       attendanceLoading: true,
       attendanceError: '',
-      attendanceSessions: (this.data.attendanceSessions as ClassSessionRow[]).map((item) =>
-        normalizeSession(item, sessionId),
+      pendingAttendanceSessions: (this.data.pendingAttendanceSessions as ClassSessionRow[]).map(
+        (item) => normalizeSession(item, sessionId),
       ),
+      historicalAttendanceSessions: (
+        this.data.historicalAttendanceSessions as ClassSessionRow[]
+      ).map((item) => normalizeSession(item, sessionId)),
     });
     try {
       const payload = await fetchTeacherSessionAttendance(sessionId);
@@ -520,9 +673,13 @@ Page({
           recordedStatus,
           draftStatus: (recordedStatus || 'present') as AttendanceStatus,
           statusLabel: record ? ATTENDANCE_LABEL[record.status] : '待点名',
+          dirty: false,
         };
       });
-      this.setData({ attendanceRows });
+      this.setData({
+        attendanceRows,
+        attendanceSaveLabel: attendanceRows.some((row) => !row.recorded) ? '保存点名' : '保存修改',
+      });
     } catch (error) {
       this.setData({
         attendanceError: error instanceof Error ? error.message : '点名名单加载失败',
@@ -537,7 +694,14 @@ Page({
     const status = event.currentTarget.dataset.status as AttendanceStatus;
     if (!studentId || !status) return;
     const attendanceRows = (this.data.attendanceRows as AttendanceRow[]).map((row) =>
-      row.id === studentId && !row.recorded ? { ...row, draftStatus: status } : row,
+      row.id === studentId
+        ? {
+            ...row,
+            draftStatus: status,
+            statusLabel: ATTENDANCE_LABEL[status],
+            dirty: row.recordedStatus !== status,
+          }
+        : row,
     );
     this.setData({ attendanceRows });
   },
@@ -545,10 +709,10 @@ Page({
   async saveAttendance() {
     if (!this.data.attendanceSessionId || this.data.attendanceSaving) return;
     const records = (this.data.attendanceRows as AttendanceRow[])
-      .filter((row) => !row.recorded)
+      .filter((row) => !row.recorded || row.dirty)
       .map((row) => ({ studentId: row.id, status: row.draftStatus }));
     if (!records.length) {
-      wx.showToast({ title: '本课次已完成点名', icon: 'none' });
+      wx.showToast({ title: '点名记录没有修改', icon: 'none' });
       return;
     }
     this.setData({ attendanceSaving: true, attendanceError: '' });

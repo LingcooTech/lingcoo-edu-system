@@ -263,18 +263,20 @@ Page({
         .filter((classGroup) => classGroup.students.some((item) => item.id === studentId))
         .map((classGroup) => {
           const classStudent = classGroup.students.find((item) => item.id === studentId);
+          const billingCourseId =
+            classStudent?.billingCourseId || classGroup.course?.id || '';
           const balance =
-            (classGroup.course?.id ? balanceByCourseId.get(classGroup.course.id) : undefined) ??
+            (billingCourseId ? balanceByCourseId.get(billingCourseId) : undefined) ??
             classStudent?.lessonBalance;
-          const lessonAccount = classGroup.course?.id
-            ? student?.lessonAccounts.find((item) => item.courseId === classGroup.course?.id)
+          const lessonAccount = billingCourseId
+            ? student?.lessonAccounts.find((item) => item.courseId === billingCourseId)
             : null;
           const metaLabel = [classGroup.course?.name || '课程', classGroup.teacher?.name || '']
             .filter(Boolean)
             .join(' · ');
           return {
             id: classGroup.id,
-            courseId: classGroup.course?.id || '',
+            courseId: billingCourseId,
             name: classGroup.name,
             courseName: classGroup.course?.name || '课程',
             classroomName: classGroup.classroom?.name || '教室待确认',
