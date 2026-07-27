@@ -103,6 +103,11 @@ export const TEACHER_WORKBENCH_ICONS = {
     <circle cx="32" cy="23" r="11" fill="none" stroke="#9A6A4B" stroke-width="6"/>
     <path d="M14 54c3-12 10-18 18-18s15 6 18 18" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
   </svg>`),
+  trials: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <path d="M18 11h28v14c0 10-6 15-14 15S18 35 18 25V11Z" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M24 40v8M40 40v8M17 54h30" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>
+    <path d="m32 18 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6Z" fill="#9A6A4B"/>
+  </svg>`),
   rollcall: svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
     <circle cx="25" cy="22" r="10" fill="none" stroke="#9A6A4B" stroke-width="6"/>
     <path d="M9 52c3-11 9-17 16-17 5 0 10 3 13 8" fill="none" stroke="#9A6A4B" stroke-width="6" stroke-linecap="round"/>

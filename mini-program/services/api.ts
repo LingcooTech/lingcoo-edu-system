@@ -62,6 +62,8 @@ export interface TrialSession {
   id: string;
   campusId: string;
   courseId: string;
+  teacherId?: string | null;
+  sessionMode?: 'public_event' | 'private_invite' | 'lead_scheduled' | string;
   title: string;
   startsAt: string;
   endsAt: string;
@@ -976,7 +978,7 @@ export interface TeacherSessionAttendance {
 
 export interface TeacherCalendarEvent {
   id: string;
-  type: 'class_session';
+  type: 'class_session' | 'trial_session';
   title: string;
   startsAt: string;
   endsAt: string;
@@ -991,6 +993,47 @@ export interface TeacherCalendarEvent {
   attendanceSummary?: AttendanceSummary;
   lessonUnits?: number;
   sessionType?: 'class' | 'ad_hoc' | string;
+}
+
+export interface TeacherTrialLead {
+  id: string;
+  guardianName: string;
+  phone: string;
+  studentName: string;
+  grade: string;
+  status: string;
+  source: string;
+  campusId?: string | null;
+  courseId?: string | null;
+  trialSessionId?: string | null;
+  preferredTeacherId?: string | null;
+  createdAt: string;
+}
+
+export interface TeacherTrialSession extends TrialSession {
+  status: string;
+  teacher?: { id: string; name: string } | null;
+  course?: { id: string; name: string } | null;
+  campus?: { id: string; name: string } | null;
+}
+
+export interface TeacherTrialWorkbench {
+  isAdminTeacher: boolean;
+  teacherId: string;
+  sessions: TeacherTrialSession[];
+  leads: TeacherTrialLead[];
+  courses: Course[];
+  campuses: PublicCampus[];
+  teachers: Array<{ id: string; name: string; title?: string | null }>;
+}
+
+export interface TeacherTrialSessionInput {
+  campusId: string;
+  courseId: string;
+  teacherId: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface TeacherPermissions {
@@ -1534,6 +1577,29 @@ export function fetchTeacherCapabilities(): Promise<{
   permissions: TeacherPermissions;
 }> {
   return request('/public/teacher/capabilities');
+}
+
+export function fetchTeacherTrialWorkbench(): Promise<TeacherTrialWorkbench> {
+  return request('/public/teacher/trials');
+}
+
+export function scheduleTeacherTrialLead(
+  leadId: string,
+  input: TeacherTrialSessionInput,
+): Promise<{ lead: TeacherTrialLead; trialSession: TrialSession }> {
+  return request(`/public/teacher/trial-leads/${encodeURIComponent(leadId)}/schedule`, {
+    method: 'POST',
+    data: input,
+  });
+}
+
+export function createTeacherTrialInvitation(
+  input: TeacherTrialSessionInput,
+): Promise<{ trialSession: TrialSession; sharePath: string }> {
+  return request('/public/teacher/trial-invitations', {
+    method: 'POST',
+    data: input,
+  });
 }
 
 export function fetchTeacherProfile(): Promise<TeacherOwnProfile> {

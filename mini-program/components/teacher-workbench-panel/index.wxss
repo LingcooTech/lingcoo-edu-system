@@ -2091,3 +2091,227 @@
   display: inline-flex;
   margin-top: 16rpx;
 }
+
+.trial-workbench-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin: 4rpx 0 30rpx;
+}
+
+.trial-workbench-subtitle {
+  max-width: 450rpx;
+  margin-top: 8rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.trial-create-button {
+  flex-shrink: 0;
+  min-width: 190rpx;
+  height: 72rpx;
+  margin: 0;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 72rpx;
+  padding: 0 24rpx;
+}
+
+.trial-create-button::after,
+.trial-lead-button::after {
+  border: 0;
+}
+
+.trial-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.trial-lead-section-head {
+  margin-top: 38rpx;
+}
+
+.trial-section-title {
+  color: #211f1c;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.trial-section-note,
+.trial-section-count {
+  color: #8b857c;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.trial-section-note {
+  margin-top: 6rpx;
+}
+
+.trial-section-count {
+  flex-shrink: 0;
+}
+
+.teacher-trial-list,
+.teacher-trial-leads {
+  display: grid;
+  gap: 16rpx;
+}
+
+.teacher-trial-card {
+  display: grid;
+  grid-template-columns: 160rpx minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20rpx;
+  padding: 26rpx;
+}
+
+.teacher-trial-date {
+  padding-right: 20rpx;
+  border-right: 1rpx solid rgba(33, 31, 28, 0.08);
+}
+
+.teacher-trial-date-label {
+  color: #9a6a4b;
+  font-size: 24rpx;
+  font-weight: 850;
+}
+
+.teacher-trial-time {
+  margin-top: 6rpx;
+  color: #211f1c;
+  font-size: 28rpx;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.teacher-trial-main {
+  min-width: 0;
+}
+
+.teacher-trial-title {
+  overflow: hidden;
+  color: #211f1c;
+  font-size: 27rpx;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-trial-meta {
+  overflow: hidden;
+  margin-top: 6rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-trial-status,
+.trial-lead-status {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #f1e9e1;
+  color: #9a6a4b;
+  font-size: 21rpx;
+  font-weight: 850;
+  padding: 10rpx 16rpx;
+}
+
+.trial-empty-card {
+  color: #8b857c;
+  font-size: 25rpx;
+  line-height: 1.55;
+  padding: 36rpx 28rpx;
+  text-align: center;
+}
+
+.teacher-trial-lead {
+  padding: 26rpx;
+}
+
+.trial-lead-top,
+.trial-lead-person,
+.trial-lead-foot,
+.trial-lead-actions {
+  display: flex;
+  align-items: center;
+}
+
+.trial-lead-top,
+.trial-lead-foot {
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.trial-lead-person {
+  min-width: 0;
+  gap: 12rpx;
+}
+
+.trial-lead-name {
+  color: #211f1c;
+  font-size: 29rpx;
+  font-weight: 900;
+}
+
+.trial-lead-grade {
+  border-radius: 999rpx;
+  background: #f6f4f0;
+  color: #8b857c;
+  font-size: 20rpx;
+  padding: 7rpx 12rpx;
+}
+
+.trial-lead-meta {
+  margin-top: 10rpx;
+  color: #57534e;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.trial-lead-foot {
+  margin-top: 20rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid rgba(33, 31, 28, 0.07);
+}
+
+.trial-lead-created {
+  color: #9a948c;
+  font-size: 20rpx;
+}
+
+.trial-lead-actions {
+  flex-shrink: 0;
+  gap: 10rpx;
+}
+
+.trial-lead-button {
+  height: 58rpx;
+  margin: 0;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 21rpx;
+  font-weight: 850;
+  line-height: 58rpx;
+  padding: 0 22rpx;
+}
+
+.trial-lead-button.secondary {
+  background: #f1e9e1;
+  color: #9a6a4b;
+}
+
+.trial-schedule-sheet {
+  max-height: 90vh;
+}

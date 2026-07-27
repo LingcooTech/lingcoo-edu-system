@@ -1,335 +1,263 @@
 import {
+  fetchCourses,
   fetchTrialSessions,
-  fetchPublicInstitutions,
   loadHome,
+  submitTrialRegistration,
   type Course,
   type PublicCampus,
-  type PublicInstitution,
+  type PublicTeacher,
   type TrialSession,
 } from '../../services/api';
-import { formatDateTime, money } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import { configuredShareTitle, enableShareMenu, shareCard, timelineCard } from '../../utils/share';
+import { toUserFacingMessage } from '../../utils/user-facing-message';
 
-type TimeFilter = 'next_14' | 'this_week' | 'next_week' | 'all';
-
-type TrialListItem = TrialSession & {
-  startsAtLabel: string;
-  endsAtLabel: string;
-  capacityLabel: string;
-  reservationFeeLabel: string;
-  providerInstitutionId: string;
-  providerLabel: string;
+type TapEvent = { currentTarget: { dataset: Record<string, string | undefined> } };
+type InputEvent = {
+  currentTarget: { dataset: Record<string, string | undefined> };
+  detail: { value: string };
+};
+type PickerEvent = { detail: { value: string | number } };
+type PhoneWx = typeof wx & {
+  makePhoneCall(options: { phoneNumber: string; fail?: () => void }): void;
 };
 
-interface FilterOption {
-  label: string;
-  value: string;
+type CourseCard = Course & {
+  locationLabel: string;
+  coverUrl: string;
+};
+
+type PublicTrialCard = TrialSession & {
+  startsAtLabel: string;
+  courseName: string;
+  campusName: string;
+};
+
+function preferredConsultant(teachers: PublicTeacher[]) {
+  return (
+    teachers.find((teacher) => teacher.isPinned && (teacher.wechatQrUrl || teacher.phone)) ??
+    teachers.find((teacher) => teacher.wechatQrUrl || teacher.phone) ??
+    teachers[0] ??
+    null
+  );
 }
 
-const TIME_FILTERS: Array<{ key: TimeFilter; label: string }> = [
-  { key: 'next_14', label: '近14天' },
-  { key: 'this_week', label: '本周' },
-  { key: 'next_week', label: '下周' },
-  { key: 'all', label: '全部' },
-];
-
-function providerName(course: Course | undefined, institutions: PublicInstitution[]): string {
-  if (!course) return '合作机构待确认';
-  const institution = institutions.find((item) => item.id === course.providerInstitutionId);
-  return institution?.name || course.paymentReceiverName || '合作机构待确认';
-}
-
-function toTrialItem(
-  item: TrialSession,
-  coursesById: Map<string, Course>,
-  institutions: PublicInstitution[],
-): TrialListItem {
-  const course = coursesById.get(item.courseId);
-  return {
-    ...item,
-    startsAtLabel: formatDateTime(item.startsAt),
-    endsAtLabel: formatDateTime(item.endsAt),
-    capacityLabel: `${item.bookedCount}/${item.capacity}`,
-    reservationFeeLabel:
-      item.reservationFeeAmount > 0 ? `${money(item.reservationFeeAmount)} 试听席位保留费` : '免费试听',
-    providerInstitutionId: course?.providerInstitutionId || '',
-    providerLabel: providerName(course, institutions),
-  };
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
-  return next;
-}
-
-function startOfWeek(date: Date) {
-  const next = startOfDay(date);
-  const day = next.getDay();
-  const offset = day === 0 ? -6 : 1 - day;
-  next.setDate(next.getDate() + offset);
-  return next;
-}
-
-function endOfWeek(date: Date) {
-  return endOfDay(addDays(startOfWeek(date), 6));
-}
-
-function timeRangeForFilter(filter: TimeFilter, now = new Date()) {
-  if (filter === 'this_week') {
-    return { from: now, to: endOfWeek(now) };
+function courseLocation(course: Course, campuses: PublicCampus[]) {
+  if (course.teachingLocationLabel?.trim()) return course.teachingLocationLabel.trim();
+  if (course.campusId) {
+    return campuses.find((campus) => campus.id === course.campusId)?.name || '到店确认';
   }
-  if (filter === 'next_week') {
-    const from = addDays(startOfWeek(now), 7);
-    return { from, to: endOfWeek(from) };
-  }
-  if (filter === 'next_14') {
-    return { from: now, to: endOfDay(addDays(now, 13)) };
-  }
-  return { from: now, to: null };
-}
-
-function courseOptions(courses: Course[]): FilterOption[] {
-  return [
-    { label: '课程', value: '' },
-    ...courses.map((course) => ({ label: course.name, value: course.id })),
-  ];
-}
-
-function campusOptions(campuses: PublicCampus[]): FilterOption[] {
-  return [
-    { label: '空间', value: '' },
-    ...campuses.map((campus) => ({ label: campus.name, value: campus.id })),
-  ];
-}
-
-function institutionOptions(institutions: PublicInstitution[]): FilterOption[] {
-  return [
-    { label: '机构', value: '' },
-    ...institutions.map((institution) => ({ label: institution.name, value: institution.id })),
-  ];
-}
-
-function filterTrials(
-  trials: TrialListItem[],
-  filter: {
-    timeFilter: TimeFilter;
-    institutionId: string;
-    courseId: string;
-    campusId: string;
-    showFull: boolean;
-  },
-) {
-  const range = timeRangeForFilter(filter.timeFilter);
-  return trials
-    .filter((trial) => {
-      const startsAt = new Date(trial.startsAt);
-      if (startsAt < range.from) return false;
-      if (range.to && startsAt > range.to) return false;
-      if (filter.institutionId && trial.providerInstitutionId !== filter.institutionId) return false;
-      if (filter.courseId && trial.courseId !== filter.courseId) return false;
-      if (filter.campusId && trial.campusId !== filter.campusId) return false;
-      if (!filter.showFull && trial.bookedCount >= trial.capacity) return false;
-      return true;
-    })
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  return campuses.length === 1 ? campuses[0].name : '提交后确认校区';
 }
 
 Page({
   data: {
     loading: true,
     navSolid: false,
-    allTrials: [] as TrialListItem[],
-    trials: [] as TrialListItem[],
-    timeFilters: TIME_FILTERS,
-    activeTimeFilter: 'next_14' as TimeFilter,
-    institutionOptions: [{ label: '机构', value: '' }] as FilterOption[],
-    courseOptions: [{ label: '课程', value: '' }] as FilterOption[],
-    campusOptions: [{ label: '空间', value: '' }] as FilterOption[],
-    selectedInstitutionIndex: 0,
-    selectedCourseIndex: 0,
+    courses: [] as CourseCard[],
+    publicTrials: [] as PublicTrialCard[],
+    campuses: [] as PublicCampus[],
+    consultant: null as PublicTeacher | null,
+    showTrialForm: false,
+    selectedCourse: null as CourseCard | null,
+    campusOptions: [] as Array<{ id: string; label: string }>,
     selectedCampusIndex: 0,
-    showFull: false,
+    preferredTeacherId: '',
+    source: 'mini_trial_page',
+    form: {
+      guardianName: '',
+      phone: '',
+      studentName: '',
+      grade: '',
+    },
+    submitting: false,
   },
 
-  onLoad() {
+  onLoad(query: Record<string, string | undefined>) {
     enableShareMenu();
-    this.load();
+    this.setData({
+      source: query.source || 'mini_trial_page',
+      preferredTeacherId: query.teacherId || '',
+    });
+    void this.load(query.courseId || '');
   },
 
   onShareAppMessage() {
-    return shareCard(configuredShareTitle('trials', '预约试听 · 成长空间'), '/pages/trials/index');
+    return shareCard(
+      configuredShareTitle('trials', '预约试听 · 填写孩子资料'),
+      '/pages/trials/index',
+    );
   },
 
   onShareTimeline() {
-    return timelineCard(configuredShareTitle('trials', '预约试听 · 成长空间'), '');
+    return timelineCard(configuredShareTitle('trials', '预约试听 · 填写孩子资料'), '');
   },
 
   async onPullDownRefresh() {
-    await this.load();
+    await this.load('');
     wx.stopPullDownRefresh();
   },
 
   onPageScroll(event: { scrollTop: number }) {
     const navSolid = event.scrollTop > 24;
-    if (navSolid !== this.data.navSolid) {
-      this.setData({ navSolid });
-    }
+    if (navSolid !== this.data.navSolid) this.setData({ navSolid });
   },
 
-  async load() {
+  async load(autoCourseId: string) {
     this.setData({ loading: true });
     try {
-      const [trialSessions, home] = await Promise.all([
+      const [courses, trialSessions, home] = await Promise.all([
+        fetchCourses(),
         fetchTrialSessions(),
-        loadHome().catch(() => null),
+        loadHome(),
       ]);
-      const institutions = await fetchPublicInstitutions().catch(() => []);
-      const courses = home?.featuredCourses ?? [];
-      const coursesById = new Map(courses.map((course) => [course.id, course]));
-      const campuses = home?.campuses ?? [];
-      const allTrials = trialSessions.map((item) => toTrialItem(item, coursesById, institutions));
-      const nextInstitutionOptions = institutionOptions(institutions);
-      const nextCourseOptions = courseOptions(courses);
-      const nextCampusOptions = campusOptions(campuses);
-      const selectedInstitutionIndex = Math.min(
-        this.data.selectedInstitutionIndex,
-        nextInstitutionOptions.length - 1,
-      );
-      const selectedCourseIndex = Math.min(
-        this.data.selectedCourseIndex,
-        nextCourseOptions.length - 1,
-      );
-      const selectedCampusIndex = Math.min(
-        this.data.selectedCampusIndex,
-        nextCampusOptions.length - 1,
-      );
-      const filter = {
-        timeFilter: this.data.activeTimeFilter,
-        institutionId: nextInstitutionOptions[selectedInstitutionIndex]?.value ?? '',
-        courseId: nextCourseOptions[selectedCourseIndex]?.value ?? '',
-        campusId: nextCampusOptions[selectedCampusIndex]?.value ?? '',
-        showFull: this.data.showFull,
-      };
+      const campuses = (home.campuses ?? []) as PublicCampus[];
+      const courseCards = courses.map((course) => ({
+        ...course,
+        locationLabel: courseLocation(course, campuses),
+        coverUrl: course.coverThumbUrl || course.coverImageUrl || '',
+      }));
+      const courseById = new Map(courseCards.map((course) => [course.id, course]));
+      const campusById = new Map(campuses.map((campus) => [campus.id, campus]));
       this.setData({
         loading: false,
-        allTrials,
-        institutionOptions: nextInstitutionOptions,
-        courseOptions: nextCourseOptions,
-        campusOptions: nextCampusOptions,
-        selectedInstitutionIndex,
-        selectedCourseIndex,
-        selectedCampusIndex,
-        trials: filterTrials(allTrials, filter),
+        courses: courseCards,
+        campuses,
+        consultant: preferredConsultant(home.teachers ?? []),
+        publicTrials: trialSessions.map((session) => ({
+          ...session,
+          startsAtLabel: formatDateTime(session.startsAt),
+          courseName: courseById.get(session.courseId)?.name || '公开体验课',
+          campusName: campusById.get(session.campusId)?.name || '到店确认',
+        })),
       });
+      if (autoCourseId) {
+        const selected = courseCards.find((course) => course.id === autoCourseId);
+        if (selected) this.openCourseForm(selected);
+      }
     } catch (error) {
-      this.setData({ loading: false, allTrials: [], trials: [] });
+      this.setData({ loading: false, courses: [], publicTrials: [] });
       wx.showToast({
-        title: error instanceof Error ? error.message : '加载失败',
+        title: error instanceof Error ? error.message : '试听课程加载失败',
         icon: 'none',
       });
     }
   },
 
-  goCourses() {
-    wx.switchTab({ url: '/pages/courses/index' });
+  openTrialForm(event: TapEvent) {
+    const courseId = String(event.currentTarget.dataset.id || '');
+    const selected = (this.data.courses as CourseCard[]).find((course) => course.id === courseId);
+    if (selected) this.openCourseForm(selected);
   },
 
-  onTimeFilterTap(event: { currentTarget: { dataset: { key?: TimeFilter } } }) {
-    const key = event.currentTarget.dataset.key;
-    if (!key) return;
-    const institutionOptions = this.data.institutionOptions as FilterOption[];
-    const courseOptions = this.data.courseOptions as FilterOption[];
-    const campusOptions = this.data.campusOptions as FilterOption[];
+  openCourseForm(course: CourseCard) {
+    const campuses = this.data.campuses as PublicCampus[];
+    const allowedCampuses = course.campusId
+      ? campuses.filter((campus) => campus.id === course.campusId)
+      : campuses;
+    const campusOptions = allowedCampuses.map((campus) => ({
+      id: campus.id,
+      label: campus.name,
+    }));
     this.setData({
-      activeTimeFilter: key,
-      trials: filterTrials(this.data.allTrials as TrialListItem[], {
-        timeFilter: key,
-        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
-        courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
-        campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
-        showFull: Boolean(this.data.showFull),
-      }),
+      selectedCourse: course,
+      campusOptions,
+      selectedCampusIndex: 0,
+      preferredTeacherId: this.data.preferredTeacherId || course.defaultTeacherId || '',
+      showTrialForm: true,
     });
   },
 
-  onInstitutionChange(event: { detail: { value: string } }) {
-    const selectedInstitutionIndex = Number(event.detail.value) || 0;
-    const institutionOptions = this.data.institutionOptions as FilterOption[];
-    const courseOptions = this.data.courseOptions as FilterOption[];
-    const campusOptions = this.data.campusOptions as FilterOption[];
-    this.setData({
-      selectedInstitutionIndex,
-      trials: filterTrials(this.data.allTrials as TrialListItem[], {
-        timeFilter: this.data.activeTimeFilter as TimeFilter,
-        institutionId: institutionOptions[selectedInstitutionIndex]?.value ?? '',
-        courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
-        campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
-        showFull: Boolean(this.data.showFull),
-      }),
+  closeTrialForm() {
+    if (this.data.submitting) return;
+    this.setData({ showTrialForm: false });
+  },
+
+  noop() {},
+
+  onCampusChange(event: PickerEvent) {
+    this.setData({ selectedCampusIndex: Number(event.detail.value) || 0 });
+  },
+
+  onFormInput(event: InputEvent) {
+    const field = String(event.currentTarget.dataset.field || '');
+    if (!['guardianName', 'phone', 'studentName', 'grade'].includes(field)) return;
+    this.setData({ [`form.${field}`]: event.detail.value });
+  },
+
+  async submitTrial() {
+    if (this.data.submitting || !this.data.selectedCourse) return;
+    const form = this.data.form;
+    if (
+      !form.guardianName.trim() ||
+      !form.phone.trim() ||
+      !form.studentName.trim() ||
+      !form.grade.trim()
+    ) {
+      wx.showToast({ title: '请完整填写家长、孩子和手机号', icon: 'none' });
+      return;
+    }
+    const campus = this.data.campusOptions[this.data.selectedCampusIndex];
+    this.setData({ submitting: true });
+    try {
+      const result = await submitTrialRegistration({
+        guardianName: form.guardianName.trim(),
+        phone: form.phone.trim(),
+        studentName: form.studentName.trim(),
+        grade: form.grade.trim(),
+        campusId: campus?.id,
+        courseId: this.data.selectedCourse.id,
+        preferredTeacherId: this.data.preferredTeacherId || undefined,
+        source: this.data.source,
+        medium: 'mini_program',
+      });
+      this.setData({
+        showTrialForm: false,
+        form: { guardianName: '', phone: '', studentName: '', grade: '' },
+      });
+      wx.showModal({
+        title: '试听意向已提交',
+        content: result.message || '老师会尽快联系您确认试听时间。',
+        showCancel: false,
+        confirmText: '知道了',
+      });
+    } catch (error) {
+      wx.showToast({
+        title: toUserFacingMessage(
+          error instanceof Error ? error.message : error,
+          '提交失败，请稍后重试',
+        ),
+        icon: 'none',
+      });
+    } finally {
+      this.setData({ submitting: false });
+    }
+  },
+
+  previewConsultantQr() {
+    const qr = this.data.consultant?.wechatQrUrl;
+    if (!qr) {
+      wx.showToast({ title: '老师暂未上传微信二维码', icon: 'none' });
+      return;
+    }
+    wx.previewImage({ current: qr, urls: [qr] });
+  },
+
+  callConsultant() {
+    const phone = this.data.consultant?.phone?.trim();
+    if (!phone) {
+      wx.showToast({ title: '老师暂未设置联系电话', icon: 'none' });
+      return;
+    }
+    (wx as PhoneWx).makePhoneCall({
+      phoneNumber: phone,
+      fail: () => wx.showToast({ title: '未能发起电话', icon: 'none' }),
     });
   },
 
-  onCourseChange(event: { detail: { value: string } }) {
-    const selectedCourseIndex = Number(event.detail.value) || 0;
-    const institutionOptions = this.data.institutionOptions as FilterOption[];
-    const courseOptions = this.data.courseOptions as FilterOption[];
-    const campusOptions = this.data.campusOptions as FilterOption[];
-    this.setData({
-      selectedCourseIndex,
-      trials: filterTrials(this.data.allTrials as TrialListItem[], {
-        timeFilter: this.data.activeTimeFilter as TimeFilter,
-        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
-        courseId: courseOptions[selectedCourseIndex]?.value ?? '',
-        campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
-        showFull: Boolean(this.data.showFull),
-      }),
-    });
-  },
-
-  onCampusChange(event: { detail: { value: string } }) {
-    const selectedCampusIndex = Number(event.detail.value) || 0;
-    const institutionOptions = this.data.institutionOptions as FilterOption[];
-    const courseOptions = this.data.courseOptions as FilterOption[];
-    const campusOptions = this.data.campusOptions as FilterOption[];
-    this.setData({
-      selectedCampusIndex,
-      trials: filterTrials(this.data.allTrials as TrialListItem[], {
-        timeFilter: this.data.activeTimeFilter as TimeFilter,
-        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
-        courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
-        campusId: campusOptions[selectedCampusIndex]?.value ?? '',
-        showFull: Boolean(this.data.showFull),
-      }),
-    });
-  },
-
-  onToggleFull() {
-    const showFull = !this.data.showFull;
-    const institutionOptions = this.data.institutionOptions as FilterOption[];
-    const courseOptions = this.data.courseOptions as FilterOption[];
-    const campusOptions = this.data.campusOptions as FilterOption[];
-    this.setData({
-      showFull,
-      trials: filterTrials(this.data.allTrials as TrialListItem[], {
-        timeFilter: this.data.activeTimeFilter as TimeFilter,
-        institutionId: institutionOptions[this.data.selectedInstitutionIndex]?.value ?? '',
-        courseId: courseOptions[this.data.selectedCourseIndex]?.value ?? '',
-        campusId: campusOptions[this.data.selectedCampusIndex]?.value ?? '',
-        showFull,
-      }),
-    });
+  openPublicTrial(event: TapEvent) {
+    const id = String(event.currentTarget.dataset.id || '');
+    if (!id) return;
+    wx.navigateTo({ url: `/pages/trial-detail/index?id=${encodeURIComponent(id)}` });
   },
 });

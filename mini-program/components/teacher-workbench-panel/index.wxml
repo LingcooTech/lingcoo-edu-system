@@ -161,6 +161,7 @@
             wx:key="id"
             class="session-row"
             data-id="{{item.id}}"
+            data-type="{{item.type}}"
             bindtap="openSessionEdit"
           >
             <view class="row-between">
@@ -172,10 +173,13 @@
               <view class="status-text">{{item.statusLabel}}</view>
             </view>
             <view class="session-foot">
-              <view class="card-meta">
+              <view wx:if="{{item.type == 'trial_session'}}" class="card-meta">
+                试听安排 · {{item.teacherName}}
+              </view>
+              <view wx:else class="card-meta">
                 已点 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
               </view>
-              <view wx:if="{{item.canOperate}}" class="session-quick-actions">
+              <view wx:if="{{item.type == 'class_session' && item.canOperate}}" class="session-quick-actions">
                 <button
                   wx:if="{{item.pending}}"
                   class="mini-button session-attendance-button"
@@ -193,12 +197,99 @@
                   添加学员
                 </button>
               </view>
-              <view wx:else class="pill subtle">仅查看</view>
+              <view wx:elif="{{item.type == 'class_session'}}" class="pill subtle">仅查看</view>
             </view>
           </view>
         </view>
         <view wx:else class="empty-card">当天暂无课程。</view>
       </view>
+    </block>
+
+    <block wx:elif="{{activeView == 'trials'}}">
+      <view class="trial-workbench-heading">
+        <view>
+          <view class="section-title">{{isTrialAdmin ? '试听管理' : '我的试听安排'}}</view>
+          <view class="trial-workbench-subtitle">
+            {{isTrialAdmin ? '统一处理预约线索并安排试听老师与时间' : '这里只显示已经确定时间、且安排给你的试听'}}
+          </view>
+        </view>
+        <button
+          wx:if="{{isTrialAdmin}}"
+          class="trial-create-button"
+          bindtap="openTrialInviteEditor"
+        >
+          创建分享卡片
+        </button>
+      </view>
+
+      <view class="trial-section-head">
+        <view class="trial-section-title">{{isTrialAdmin ? '试听课次' : '已确认试听'}}</view>
+        <view class="trial-section-count">共 {{teacherTrialSessions.length}} 场</view>
+      </view>
+      <view wx:if="{{teacherTrialSessions.length}}" class="teacher-trial-list">
+        <view wx:for="{{teacherTrialSessions}}" wx:key="id" class="card teacher-trial-card">
+          <view class="teacher-trial-date">
+            <view class="teacher-trial-date-label">{{item.dateLabel}}</view>
+            <view class="teacher-trial-time">{{item.timeLabel}}</view>
+          </view>
+          <view class="teacher-trial-main">
+            <view class="teacher-trial-title">{{item.title}}</view>
+            <view class="teacher-trial-meta">{{item.courseName}} · {{item.campusName}}</view>
+            <view class="teacher-trial-meta">授课：{{item.teacherName}} · 已留资 {{item.bookedCount}} 人</view>
+          </view>
+          <view class="teacher-trial-status">{{item.statusLabel}}</view>
+        </view>
+      </view>
+      <view wx:else class="card trial-empty-card">
+        {{isTrialAdmin ? '暂无试听课次，可从预约线索安排，或创建分享卡片。' : '暂时没有安排给你的试听课次。'}}
+      </view>
+
+      <block wx:if="{{isTrialAdmin}}">
+        <view class="trial-section-head trial-lead-section-head">
+          <view>
+            <view class="trial-section-title">全部预约线索</view>
+            <view class="trial-section-note">自主预约与老师分享后提交的资料都会汇总在这里</view>
+          </view>
+          <view class="trial-section-count">共 {{teacherTrialLeads.length}} 条</view>
+        </view>
+        <view wx:if="{{teacherTrialLeads.length}}" class="teacher-trial-leads">
+          <view wx:for="{{teacherTrialLeads}}" wx:key="id" class="card teacher-trial-lead">
+            <view class="trial-lead-top">
+              <view class="trial-lead-person">
+                <view class="trial-lead-name">{{item.studentName}}</view>
+                <view wx:if="{{item.grade}}" class="trial-lead-grade">{{item.grade}}</view>
+              </view>
+              <view class="trial-lead-status">{{item.statusLabel}}</view>
+            </view>
+            <view class="trial-lead-meta">
+              {{item.guardianName || '家长未署名'}} · {{item.phone}}
+            </view>
+            <view class="trial-lead-meta">
+              {{item.courseName}} · {{item.campusName}} · {{item.teacherName}}
+            </view>
+            <view class="trial-lead-foot">
+              <view class="trial-lead-created">{{item.createdLabel}} 提交</view>
+              <view class="trial-lead-actions">
+                <button
+                  class="trial-lead-button secondary"
+                  data-phone="{{item.phone}}"
+                  bindtap="callTrialLead"
+                >
+                  电话联系
+                </button>
+                <button
+                  class="trial-lead-button"
+                  data-id="{{item.id}}"
+                  bindtap="openTrialLeadSchedule"
+                >
+                  {{item.trialSessionId ? '调整试听' : '安排试听'}}
+                </button>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view wx:else class="card trial-empty-card">暂无预约线索。</view>
+      </block>
     </block>
 
     <block wx:elif="{{activeView == 'rollcall'}}">
@@ -622,6 +713,109 @@
       <view wx:else class="card empty-card">暂无任务打卡。</view>
     </block>
   </block>
+
+  <view wx:if="{{trialScheduleVisible}}" class="sheet-mask" bindtap="closeTrialSchedule">
+    <view class="work-sheet academic-sheet trial-schedule-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-head">
+        <view>
+          <view class="sheet-title">安排试听</view>
+          <view class="sheet-meta">指定试听课程、老师和确定时间</view>
+        </view>
+        <view class="sheet-close-icon" aria-role="button" aria-label="关闭" bindtap="closeTrialSchedule">×</view>
+      </view>
+      <scroll-view class="sheet-scroll academic-scroll" scroll-y>
+        <view class="academic-form">
+          <view class="form-label">试听标题</view>
+          <input
+            class="academic-input"
+            value="{{trialScheduleForm.title}}"
+            data-field="title"
+            bindinput="onTrialScheduleInput"
+            placeholder="请输入试听标题"
+          />
+          <view class="form-label">课程</view>
+          <picker
+            mode="selector"
+            range="{{trialCourses}}"
+            range-key="name"
+            value="{{trialScheduleCourseIndex}}"
+            bindchange="onTrialScheduleCourseChange"
+          >
+            <view class="academic-picker">{{trialCourses[trialScheduleCourseIndex].name || '选择课程'}}</view>
+          </picker>
+          <view class="form-two-cols">
+            <view>
+              <view class="form-label">校区</view>
+              <picker
+                mode="selector"
+                range="{{trialCampuses}}"
+                range-key="name"
+                value="{{trialScheduleCampusIndex}}"
+                bindchange="onTrialScheduleCampusChange"
+              >
+                <view class="academic-picker">{{trialCampuses[trialScheduleCampusIndex].name || '选择校区'}}</view>
+              </picker>
+            </view>
+            <view>
+              <view class="form-label">授课老师</view>
+              <picker
+                mode="selector"
+                range="{{trialTeachers}}"
+                range-key="name"
+                value="{{trialScheduleTeacherIndex}}"
+                bindchange="onTrialScheduleTeacherChange"
+              >
+                <view class="academic-picker">{{trialTeachers[trialScheduleTeacherIndex].name || '选择老师'}}</view>
+              </picker>
+            </view>
+          </view>
+          <view class="form-label">试听日期</view>
+          <picker
+            mode="date"
+            value="{{trialScheduleForm.date}}"
+            data-field="date"
+            bindchange="onTrialScheduleInput"
+          >
+            <view class="academic-picker">{{trialScheduleForm.date || '选择日期'}}</view>
+          </picker>
+          <view class="form-two-cols">
+            <view>
+              <view class="form-label">开始时间</view>
+              <picker
+                mode="time"
+                value="{{trialScheduleForm.startsAt}}"
+                data-field="startsAt"
+                bindchange="onTrialScheduleInput"
+              >
+                <view class="academic-picker">{{trialScheduleForm.startsAt || '开始时间'}}</view>
+              </picker>
+            </view>
+            <view>
+              <view class="form-label">结束时间</view>
+              <picker
+                mode="time"
+                value="{{trialScheduleForm.endsAt}}"
+                data-field="endsAt"
+                bindchange="onTrialScheduleInput"
+              >
+                <view class="academic-picker">{{trialScheduleForm.endsAt || '结束时间'}}</view>
+              </picker>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view wx:if="{{trialScheduleError}}" class="sheet-error">{{trialScheduleError}}</view>
+      <button
+        class="btn btn-primary sheet-submit"
+        loading="{{trialScheduleSaving}}"
+        disabled="{{trialScheduleSaving}}"
+        bindtap="submitTrialSchedule"
+      >
+        {{trialScheduleSaving ? '创建中...' : '确认并创建试听课次'}}
+      </button>
+    </view>
+  </view>
 
   <view wx:if="{{rollCallVisible}}" class="sheet-mask" bindtap="closeRollCall">
     <view class="work-sheet" catchtap="noop">

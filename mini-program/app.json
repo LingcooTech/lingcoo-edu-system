@@ -29,6 +29,7 @@
     "pages/teacher-workbench/index",
     "pages/teacher-schedule-create/index",
     "pages/teacher-roll-call/index",
+    "pages/teacher-trial-invite/index",
     "pages/teacher-class-create/index",
     "pages/teacher-class-manage/index",
     "pages/teacher-profile-edit/index",

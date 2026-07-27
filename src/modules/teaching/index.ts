@@ -5,10 +5,12 @@ import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
+import * as crmRepo from '../../db/repositories/crm.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
+import * as trialRepo from '../../db/repositories/trial.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as schema from '../../db/schema.js';
 import { readBusinessModel } from '../../lib/business-model.js';
@@ -132,6 +134,17 @@ const teacherCalendarQuerySchema = z.object({
   from: z.string().datetime({ offset: true }).optional(),
   to: z.string().datetime({ offset: true }).optional(),
 });
+
+const teacherTrialSessionSchema = z.object({
+  campusId: z.string().uuid(),
+  courseId: z.string().uuid(),
+  teacherId: z.string().uuid(),
+  title: z.string().trim().min(1).max(160),
+  startsAt: z.string().datetime({ offset: true }),
+  endsAt: z.string().datetime({ offset: true }),
+});
+
+const teacherTrialLeadScheduleSchema = teacherTrialSessionSchema;
 
 const teacherNotificationQuerySchema = z.object({
   status: z.enum(['unread', 'read', 'archived']).optional(),
@@ -608,6 +621,233 @@ export const teachingModule: AppModule = {
                 logoUrl: institution.logoUrl,
               }
             : null,
+        };
+      },
+    );
+
+    function normalizeTrialStatus(status: string, endsAt?: Date) {
+      if (status === 'cancelled') return 'cancelled';
+      if (status === 'closed' || (endsAt && endsAt <= new Date())) return 'completed';
+      return 'scheduled';
+    }
+
+    async function resolveTeacherTrialInput(
+      access: Awaited<ReturnType<typeof requireTeacherAccessForAccount>>,
+      body: z.infer<typeof teacherTrialSessionSchema>,
+      ignoreTrialSessionId?: string,
+    ) {
+      requireAdminTeacherAccess(access);
+      const dataScope = await resolveTeacherDataScope(access);
+      const [course, campuses, teacher, classSessions, trialSessions] = await Promise.all([
+        catalogRepo.requireCourse(app.db, body.courseId),
+        organizationRepo.listCampuses(app.db),
+        teachingRepo.findTeacher(app.db, body.teacherId),
+        schedulingRepo.listClassSessions(app.db),
+        trialRepo.listTrialSessions(app.db),
+      ]);
+      requireCourseInTeacherInstitution(course, dataScope.institutionId);
+      const campus = campuses.find((item) => item.id === body.campusId);
+      if (!campus) throw notFound('Campus not found');
+      if (!teacher || !dataScope.visibleTeacherIds.has(teacher.id) || teacher.status !== 'active') {
+        throw Object.assign(new Error('授课老师不属于当前机构或已停用'), { statusCode: 422 });
+      }
+      const startsAt = new Date(body.startsAt);
+      const endsAt = new Date(body.endsAt);
+      if (startsAt <= new Date()) {
+        throw Object.assign(new Error('试听时间必须晚于当前时间'), { statusCode: 422 });
+      }
+      if (endsAt <= startsAt) {
+        throw Object.assign(new Error('结束时间必须晚于开始时间'), { statusCode: 422 });
+      }
+      const classConflict = classSessions.find(
+        (session) =>
+          session.status !== 'cancelled' &&
+          session.teacherId === teacher.id &&
+          startsAt < session.endsAt &&
+          session.startsAt < endsAt,
+      );
+      const trialConflict = trialSessions.find(
+        (session) =>
+          session.id !== ignoreTrialSessionId &&
+          session.status !== 'cancelled' &&
+          session.teacherId === teacher.id &&
+          startsAt < session.endsAt &&
+          session.startsAt < endsAt,
+      );
+      if (classConflict || trialConflict) {
+        throw Object.assign(new Error('该老师在所选时间已有课程或试听安排'), {
+          statusCode: 409,
+        });
+      }
+      return { course, campus, teacher, startsAt, endsAt, dataScope };
+    }
+
+    app.get(
+      '/public/teacher/trials',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const dataScope = await resolveTeacherDataScope(access);
+        const [trialSessions, courses, campuses, leads] = await Promise.all([
+          trialRepo.listTrialSessions(app.db),
+          catalogRepo.listCourses(app.db),
+          organizationRepo.listCampuses(app.db),
+          access.isAdminTeacher ? crmRepo.listLeads(app.db) : Promise.resolve([]),
+        ]);
+        const institutionCourses = courses.filter((course) =>
+          courseBelongsToTeacherInstitution(course, dataScope.institutionId),
+        );
+        const courseById = new Map(institutionCourses.map((course) => [course.id, course]));
+        const campusById = new Map(campuses.map((campus) => [campus.id, campus]));
+        const now = Date.now();
+        const visibleSessions = trialSessions
+          .filter(
+            (session) =>
+              courseById.has(session.courseId) &&
+              (access.isAdminTeacher
+                ? !session.teacherId || dataScope.visibleTeacherIds.has(session.teacherId)
+                : session.teacherId === access.teacherId),
+          )
+          .sort((left, right) => {
+            const leftUpcoming = left.status === 'open' && left.endsAt.getTime() > now;
+            const rightUpcoming = right.status === 'open' && right.endsAt.getTime() > now;
+            if (leftUpcoming !== rightUpcoming) return leftUpcoming ? -1 : 1;
+            return leftUpcoming
+              ? left.startsAt.getTime() - right.startsAt.getTime()
+              : right.startsAt.getTime() - left.startsAt.getTime();
+          })
+          .map((session) => {
+            const teacher = session.teacherId ? dataScope.teacherById.get(session.teacherId) : null;
+            return {
+              ...session,
+              status: normalizeTrialStatus(session.status, session.endsAt),
+              teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+              course: courseById.get(session.courseId)
+                ? {
+                    id: session.courseId,
+                    name: courseById.get(session.courseId)!.name,
+                  }
+                : null,
+              campus: campusById.get(session.campusId)
+                ? {
+                    id: session.campusId,
+                    name: campusById.get(session.campusId)!.name,
+                  }
+                : null,
+            };
+          });
+        const visibleCourseIds = new Set(institutionCourses.map((course) => course.id));
+        return {
+          isAdminTeacher: access.isAdminTeacher,
+          teacherId: access.teacherId,
+          sessions: visibleSessions,
+          leads: access.isAdminTeacher
+            ? leads
+                .filter((lead) => !lead.courseId || visibleCourseIds.has(lead.courseId))
+                .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+            : [],
+          courses: institutionCourses.filter((course) => course.status === 'published'),
+          campuses,
+          teachers: access.isAdminTeacher
+            ? dataScope.teachers
+                .filter(
+                  (teacher) =>
+                    teacher.status === 'active' && dataScope.visibleTeacherIds.has(teacher.id),
+                )
+                .map((teacher) => ({
+                  id: teacher.id,
+                  name: teacher.name,
+                  title: teacher.title,
+                }))
+            : [],
+        };
+      },
+    );
+
+    app.post(
+      '/public/teacher/trial-leads/:leadId/schedule',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const { leadId } = request.params as { leadId: string };
+        const body = teacherTrialLeadScheduleSchema.parse(request.body);
+        const lead = await crmRepo.requireLead(app.db, leadId);
+        const existingTrial = lead.trialSessionId
+          ? await trialRepo.requireTrialSession(app.db, lead.trialSessionId).catch(() => null)
+          : null;
+        const editableTrial =
+          existingTrial && existingTrial.sessionMode !== 'public_event' ? existingTrial : null;
+        const resolved = await resolveTeacherTrialInput(access, body, editableTrial?.id);
+        if (lead.courseId && lead.courseId !== resolved.course.id) {
+          throw Object.assign(new Error('试听课程与线索意向课程不一致'), { statusCode: 422 });
+        }
+        const trialSession = editableTrial
+          ? await trialRepo.updateTrialSession(app.db, editableTrial.id, {
+              campusId: resolved.campus.id,
+              courseId: resolved.course.id,
+              teacherId: resolved.teacher.id,
+              sessionMode: 'lead_scheduled',
+              title: body.title,
+              startsAt: resolved.startsAt,
+              endsAt: resolved.endsAt,
+              capacity: Math.max(editableTrial.capacity, 1),
+              bookedCount: Math.max(editableTrial.bookedCount, 1),
+              reservationFeeAmount: 0,
+              status: 'open',
+            })
+          : await trialRepo.createTrialSession(app.db, {
+              campusId: resolved.campus.id,
+              courseId: resolved.course.id,
+              teacherId: resolved.teacher.id,
+              sessionMode: 'lead_scheduled',
+              title: body.title,
+              startsAt: resolved.startsAt,
+              endsAt: resolved.endsAt,
+              capacity: 1,
+              bookedCount: 1,
+              reservationFeeAmount: 0,
+              reservationNotice: '',
+              status: 'open',
+            });
+        if (!trialSession) throw notFound('Trial session not found');
+        if (existingTrial?.sessionMode === 'public_event') {
+          await trialRepo.decrementBookedCount(app.db, existingTrial.id);
+        }
+        const updatedLead = await crmRepo.updateLead(app.db, lead.id, {
+          campusId: resolved.campus.id,
+          courseId: resolved.course.id,
+          trialSessionId: trialSession.id,
+          preferredTeacherId: resolved.teacher.id,
+          status: 'trial_booked',
+        });
+        return { lead: updatedLead, trialSession };
+      },
+    );
+
+    app.post(
+      '/public/teacher/trial-invitations',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const body = teacherTrialSessionSchema.parse(request.body);
+        const resolved = await resolveTeacherTrialInput(access, body);
+        const trialSession = await trialRepo.createTrialSession(app.db, {
+          campusId: resolved.campus.id,
+          courseId: resolved.course.id,
+          teacherId: resolved.teacher.id,
+          sessionMode: 'private_invite',
+          title: body.title,
+          startsAt: resolved.startsAt,
+          endsAt: resolved.endsAt,
+          capacity: 1,
+          bookedCount: 0,
+          reservationFeeAmount: 0,
+          reservationNotice: '本试听时间已与老师确认，请填写孩子资料完成登记。',
+          status: 'open',
+        });
+        return {
+          trialSession,
+          sharePath: `/pages/trial-detail/index?id=${encodeURIComponent(trialSession.id)}&invite=1`,
         };
       },
     );
@@ -2288,16 +2528,20 @@ export const teachingModule: AppModule = {
         const from = query.from ? new Date(query.from) : undefined;
         const to = query.to ? new Date(query.to) : undefined;
 
-        const [sessions, classes, courses, classrooms, attendanceRecords] = await Promise.all([
-          schedulingRepo.listClassSessions(app.db),
-          schedulingRepo.listClasses(app.db),
-          catalogRepo.listCourses(app.db),
-          teachingRepo.listClassrooms(app.db),
-          app.db.select().from(schema.attendanceRecords),
-        ]);
+        const [sessions, trialSessions, classes, courses, classrooms, campuses, attendanceRecords] =
+          await Promise.all([
+            schedulingRepo.listClassSessions(app.db),
+            trialRepo.listTrialSessions(app.db),
+            schedulingRepo.listClasses(app.db),
+            catalogRepo.listCourses(app.db),
+            teachingRepo.listClassrooms(app.db),
+            organizationRepo.listCampuses(app.db),
+            app.db.select().from(schema.attendanceRecords),
+          ]);
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+        const campusById = new Map(campuses.map((item) => [item.id, item]));
         const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
         const institutionCourseIds = new Set(
           courses
@@ -2330,43 +2574,79 @@ export const teachingModule: AppModule = {
         const rosterCountBySessionId = new Map(
           rosterCounts.map((item) => [item.sessionId, item.count]),
         );
+        const visibleTrialSessions = trialSessions.filter(
+          (session) =>
+            institutionCourseIds.has(session.courseId) &&
+            Boolean(session.teacherId) &&
+            (session.teacherId === access.teacherId ||
+              (access.isAdminTeacher && dataScope.visibleTeacherIds.has(session.teacherId!))),
+        );
 
         return {
-          events: visibleSessions
-            .filter((session) => overlapsRange(session, from, to))
-            .map((session) => {
-              const classGroup = session.classId ? classById.get(session.classId) : null;
-              const course = courseById.get(session.courseId);
-              const classroom = classroomById.get(session.classroomId);
-              const teacher = dataScope.teacherById.get(session.teacherId);
-              const sessionAttendance = attendanceRecords.filter(
-                (record) => record.classSessionId === session.id,
-              );
-              return {
-                id: session.id,
-                type: 'class_session',
-                title: session.topic,
-                startsAt: session.startsAt,
-                endsAt: session.endsAt,
-                status: session.status,
-                isMine: isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds),
-                teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
-                class: classGroup
-                  ? {
-                      id: classGroup.id,
-                      name: classGroup.name,
-                      isMine: classGroup.teacherId === access.teacherId,
-                    }
-                  : null,
-                course: course ? { id: course.id, name: course.name } : null,
-                classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
-                lessonUnits: session.lessonUnits,
-                sessionType: session.sessionType,
-                rosterCount: rosterCountBySessionId.get(session.id) ?? 0,
-                attendanceCount: sessionAttendance.length,
-                attendanceSummary: summarizeAttendance(sessionAttendance),
-              };
-            }),
+          events: [
+            ...visibleSessions
+              .filter((session) => overlapsRange(session, from, to))
+              .map((session) => {
+                const classGroup = session.classId ? classById.get(session.classId) : null;
+                const course = courseById.get(session.courseId);
+                const classroom = classroomById.get(session.classroomId);
+                const teacher = dataScope.teacherById.get(session.teacherId);
+                const sessionAttendance = attendanceRecords.filter(
+                  (record) => record.classSessionId === session.id,
+                );
+                return {
+                  id: session.id,
+                  type: 'class_session',
+                  title: session.topic,
+                  startsAt: session.startsAt,
+                  endsAt: session.endsAt,
+                  status: session.status,
+                  isMine: isTeacherAssignedToSession(session, access.teacherId, assignedSessionIds),
+                  teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+                  class: classGroup
+                    ? {
+                        id: classGroup.id,
+                        name: classGroup.name,
+                        isMine: classGroup.teacherId === access.teacherId,
+                      }
+                    : null,
+                  course: course ? { id: course.id, name: course.name } : null,
+                  classroom: classroom ? { id: classroom.id, name: classroom.name } : null,
+                  lessonUnits: session.lessonUnits,
+                  sessionType: session.sessionType,
+                  rosterCount: rosterCountBySessionId.get(session.id) ?? 0,
+                  attendanceCount: sessionAttendance.length,
+                  attendanceSummary: summarizeAttendance(sessionAttendance),
+                };
+              }),
+            ...visibleTrialSessions
+              .filter((session) => overlapsRange(session, from, to))
+              .map((session) => {
+                const course = courseById.get(session.courseId);
+                const campus = campusById.get(session.campusId);
+                const teacher = session.teacherId
+                  ? dataScope.teacherById.get(session.teacherId)
+                  : null;
+                return {
+                  id: session.id,
+                  type: 'trial_session',
+                  title: session.title,
+                  startsAt: session.startsAt,
+                  endsAt: session.endsAt,
+                  status: normalizeTrialStatus(session.status, session.endsAt),
+                  isMine: session.teacherId === access.teacherId,
+                  teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+                  class: null,
+                  course: course ? { id: course.id, name: course.name } : null,
+                  classroom: campus ? { id: campus.id, name: campus.name } : null,
+                  lessonUnits: 0,
+                  sessionType: 'trial',
+                  rosterCount: session.bookedCount,
+                  attendanceCount: 0,
+                  attendanceSummary: summarizeAttendance([]),
+                };
+              }),
+          ].sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime()),
         };
       },
     );

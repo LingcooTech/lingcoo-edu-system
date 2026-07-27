@@ -125,10 +125,10 @@
 }
 
 .roster-toolbar {
-  display: flex;
+  display: grid;
   min-height: 72rpx;
+  grid-template-columns: minmax(0, 1fr) 190rpx;
   align-items: center;
-  justify-content: space-between;
   gap: 18rpx;
   padding: 22rpx 18rpx 10rpx;
 }
@@ -148,10 +148,14 @@
 .roster-manage-button {
   display: flex;
   width: 190rpx;
+  min-width: 0;
+  max-width: 190rpx;
   height: 52rpx;
-  flex: 0 0 190rpx;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
+  justify-self: end;
+  overflow: hidden;
   border: 0;
   border-radius: 999rpx;
   background: #9a6a4b;
@@ -159,12 +163,13 @@
   font-size: 20rpx;
   font-weight: 850;
   line-height: 1;
-  margin: 0 0 0 auto;
+  margin: 0;
   padding: 0;
+  white-space: nowrap;
 }
 
-.roster-manage-button::after {
-  border: 0;
+.roster-manage-button:active {
+  opacity: 0.82;
 }
 
 .roster-head,

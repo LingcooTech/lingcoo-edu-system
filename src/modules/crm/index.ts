@@ -205,6 +205,8 @@ async function createLeadFromRegistration(
     campaign,
     trialSessionId: input.trialSessionId,
   });
+  const assignedTeacherId =
+    input.preferredTeacherId ?? courseResolution.trialSession?.teacherId ?? null;
 
   if (
     courseResolution.trialSession &&
@@ -222,14 +224,14 @@ async function createLeadFromRegistration(
   await validateLeadPreferences(app.db, {
     campusId: courseResolution.campusId,
     courseId: courseResolution.courseId,
-    preferredTeacherId: input.preferredTeacherId,
+    preferredTeacherId: assignedTeacherId ?? undefined,
   });
 
   const lead = await crmRepo.createLead(app.db, {
     campusId: courseResolution.campusId,
     courseId: courseResolution.courseId ?? undefined,
     trialSessionId: input.trialSessionId,
-    preferredTeacherId: input.preferredTeacherId ?? null,
+    preferredTeacherId: assignedTeacherId,
     guardianName: input.guardianName,
     phone: input.phone,
     studentName: input.studentName,

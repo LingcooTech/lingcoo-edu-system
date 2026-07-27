@@ -17,7 +17,12 @@ export async function listOpenTrialSessions(db: Database) {
   return db
     .select()
     .from(schema.trialSessions)
-    .where(eq(schema.trialSessions.status, 'open'))
+    .where(
+      and(
+        eq(schema.trialSessions.status, 'open'),
+        eq(schema.trialSessions.sessionMode, 'public_event'),
+      ),
+    )
     .orderBy(asc(schema.trialSessions.startsAt));
 }
 
@@ -27,6 +32,7 @@ export async function listOpenFutureTrialSessions(
 ) {
   const conditions = [
     eq(schema.trialSessions.status, 'open'),
+    eq(schema.trialSessions.sessionMode, 'public_event'),
     gt(schema.trialSessions.startsAt, input.from),
   ];
   if (input.to) {

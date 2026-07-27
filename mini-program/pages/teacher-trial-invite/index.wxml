@@ -1,0 +1,83 @@
+<custom-navbar title="试听分享卡片" show-back="{{true}}" />
+<view class="page trial-invite-page">
+  <skeleton wx:if="{{loading}}" variant="hub" />
+  <block wx:else>
+    <view wx:if="{{error}}" class="error-card">{{error}}</view>
+
+    <block wx:if="{{workbench && !created}}">
+      <view class="intro-card">
+        <view class="intro-title">把已确认的试听信息发给家长</view>
+        <view class="intro-copy">
+          先选定课程、授课老师和时间，再分享小程序卡片。家长只需填写孩子与手机号，提交后线索会自动关联到本次试听。
+        </view>
+      </view>
+
+      <view class="form-card">
+        <view class="section-title">试听信息</view>
+        <view class="field">
+          <view class="field-label">课程</view>
+          <picker range="{{workbench.courses}}" range-key="name" value="{{courseIndex}}" bindchange="changeCourse">
+            <view class="picker-value">{{workbench.courses[courseIndex].name}} ›</view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">分享卡片标题</view>
+          <input class="text-input" value="{{title}}" data-field="title" bindinput="changeInput" maxlength="160" />
+        </view>
+        <view class="two-columns">
+          <view class="field">
+            <view class="field-label">校区</view>
+            <picker range="{{workbench.campuses}}" range-key="name" value="{{campusIndex}}" bindchange="changeCampus">
+              <view class="picker-value">{{workbench.campuses[campusIndex].name}} ›</view>
+            </picker>
+          </view>
+          <view class="field">
+            <view class="field-label">授课老师</view>
+            <picker range="{{workbench.teachers}}" range-key="name" value="{{teacherIndex}}" bindchange="changeTeacher">
+              <view class="picker-value">{{workbench.teachers[teacherIndex].name}} ›</view>
+            </picker>
+          </view>
+        </view>
+        <view class="field">
+          <view class="field-label">确定日期</view>
+          <picker mode="date" value="{{date}}" data-field="date" bindchange="changeInput">
+            <view class="picker-value">{{date}} ›</view>
+          </picker>
+        </view>
+        <view class="two-columns">
+          <view class="field">
+            <view class="field-label">开始时间</view>
+            <picker mode="time" value="{{startsAt}}" data-field="startsAt" bindchange="changeInput">
+              <view class="picker-value">{{startsAt}} ›</view>
+            </picker>
+          </view>
+          <view class="field">
+            <view class="field-label">结束时间</view>
+            <picker mode="time" value="{{endsAt}}" data-field="endsAt" bindchange="changeInput">
+              <view class="picker-value">{{endsAt}} ›</view>
+            </picker>
+          </view>
+        </view>
+      </view>
+
+      <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">
+        {{saving ? '创建中...' : '创建分享卡片'}}
+      </button>
+    </block>
+
+    <view wx:if="{{created}}" class="result-card">
+      <view class="result-mark">✓</view>
+      <view class="result-title">试听卡片已准备好</view>
+      <view class="share-preview">
+        <view class="share-preview-eyebrow">试听信息确认</view>
+        <view class="share-preview-title">{{shareTitle}}</view>
+        <view class="share-preview-meta">{{date}} · {{startsAt}}–{{endsAt}}</view>
+        <view class="share-preview-meta">{{createdCourseName}} · {{createdCampusName}}</view>
+        <view class="share-preview-meta">授课老师：{{createdTeacherName}}</view>
+      </view>
+      <view class="result-copy">点击下方按钮发给家长，家长填写资料后会自动形成预约线索。</view>
+      <button class="primary-button" open-type="share">分享给家长</button>
+      <button class="secondary-button" bindtap="createAnother">再创建一张</button>
+    </view>
+  </block>
+</view>

@@ -453,6 +453,7 @@ export const trialModule: AppModule = {
       // Prefer the explicit form selection; fall back to the course slug carried
       // in the QR attribution when the form had no course picker.
       let courseId = body.courseId ?? null;
+      let assignedTeacherId = body.preferredTeacherId ?? null;
       if (!courseId && body.course) {
         const course = await catalogRepo.findPublishedCourseBySlug(app.db, body.course);
         courseId = course?.id ?? null;
@@ -475,12 +476,13 @@ export const trialModule: AppModule = {
         }
         courseId = trialSession.courseId;
         campusId = trialSession.campusId;
+        assignedTeacherId = assignedTeacherId ?? trialSession.teacherId;
       }
 
       await validateLeadPreferences(app.db, {
         campusId,
         courseId,
-        preferredTeacherId: body.preferredTeacherId,
+        preferredTeacherId: assignedTeacherId ?? undefined,
       });
 
       const { channelId, campaignId } = await crmRepo.resolveAttribution(app.db, {
@@ -496,7 +498,7 @@ export const trialModule: AppModule = {
         phone: body.phone,
         studentName: body.studentName,
         grade: body.grade,
-        preferredTeacherId: body.preferredTeacherId ?? null,
+        preferredTeacherId: assignedTeacherId,
         source: body.source,
         channelId,
         campaignId,
@@ -518,7 +520,12 @@ export const trialModule: AppModule = {
         courseName: course?.name ?? null,
       });
 
-      return { lead, message: '预约成功，我们会尽快联系您确认上课时间。' };
+      return {
+        lead,
+        message: body.trialSessionId
+          ? '资料已提交，试听时间已确认。'
+          : '试听意向已提交，老师会尽快联系您确认时间。',
+      };
     });
 
     app.post('/public/seat-reservations', async (request, reply) => {

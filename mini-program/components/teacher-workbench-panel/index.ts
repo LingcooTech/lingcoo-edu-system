@@ -1,6 +1,7 @@
 import {
   createTeacherCourseContract,
   createTeacherStudent,
+  fetchTeacherTrialWorkbench,
   fetchTeacherCalendar,
   fetchTeacherCapabilities,
   fetchTeacherDashboard,
@@ -14,6 +15,7 @@ import {
   recordTeacherAttendance,
   reviewTeacherHomeworkCheckIn,
   saveTeacherSessionFeedbacks,
+  scheduleTeacherTrialLead,
   type AttendanceStatus,
   type Course,
   type CoursePackage,
@@ -27,6 +29,8 @@ import {
   type TeacherLessonFeedback,
   type TeacherRosterStudent,
   type TeacherSchedulingOptions,
+  type TeacherTrialLead,
+  type TeacherTrialSession,
 } from '../../services/api';
 import { TEACHER_WORKBENCH_ICONS } from '../../utils/icons';
 
@@ -34,6 +38,7 @@ type ActiveView =
   | 'students'
   | 'classes'
   | 'schedule'
+  | 'trials'
   | 'rollcall'
   | 'records'
   | 'feedbacks'
@@ -49,6 +54,9 @@ type MiniInputEvent = {
 type MiniPickerEvent = {
   currentTarget: { dataset: Record<string, string | undefined> };
   detail: { value: string | number };
+};
+type PhoneWx = typeof wx & {
+  makePhoneCall(options: { phoneNumber: string; fail?: () => void }): void;
 };
 
 interface StudentRow {
@@ -164,6 +172,23 @@ type SheetSession = {
   lessonUnits: number;
 };
 
+type TeacherTrialSessionRow = TeacherTrialSession & {
+  dateLabel: string;
+  timeLabel: string;
+  courseName: string;
+  campusName: string;
+  teacherName: string;
+  statusLabel: string;
+};
+
+type TeacherTrialLeadRow = TeacherTrialLead & {
+  courseName: string;
+  campusName: string;
+  teacherName: string;
+  statusLabel: string;
+  createdLabel: string;
+};
+
 type TeacherNoticeItem = {
   id: string;
   category: string;
@@ -181,6 +206,7 @@ const VIEW_TABS: Array<{ key: ActiveView; label: string; iconSrc: string }> = [
   { key: 'students', label: '学员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
   { key: 'classes', label: '班级', iconSrc: TEACHER_WORKBENCH_ICONS.classes },
   { key: 'schedule', label: '课表', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
+  { key: 'trials', label: '试听', iconSrc: TEACHER_WORKBENCH_ICONS.trials },
   { key: 'rollcall', label: '点名', iconSrc: TEACHER_WORKBENCH_ICONS.rollcall },
   { key: 'records', label: '上课记录', iconSrc: TEACHER_WORKBENCH_ICONS.records },
   { key: 'feedbacks', label: '互动', iconSrc: TEACHER_WORKBENCH_ICONS.feedbacks },
@@ -235,6 +261,23 @@ const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
   absent: '未到',
   makeup: '补参与',
   trial: '试听',
+};
+
+const TRIAL_LEAD_STATUS_LABEL: Record<string, string> = {
+  new: '待联系',
+  contacted: '已联系',
+  follow_up: '跟进中',
+  trial_booked: '已约试听',
+  trial_attended: '已试听',
+  paid: '已转正式',
+  course_delivery: '课程交付',
+  invalid: '无效',
+};
+
+const TRIAL_SESSION_STATUS_LABEL: Record<string, string> = {
+  scheduled: '待试听',
+  completed: '已结束',
+  cancelled: '已取消',
 };
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -344,6 +387,14 @@ function dateKey(value: Date) {
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
 }
 
+function dateInputValue(value: Date) {
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+function localDateTime(date: string, time: string) {
+  return new Date(`${date}T${time}:00`).toISOString();
+}
+
 function dateLabel(value: string) {
   const date = new Date(value);
   return `${date.getMonth() + 1}月${date.getDate()}日 周${'日一二三四五六'[date.getDay()]}`;
@@ -428,6 +479,7 @@ function calendarRange() {
 
 function isRollCallPending(event: TeacherCalendarEvent) {
   return (
+    event.type === 'class_session' &&
     event.status !== 'cancelled' &&
     event.status !== 'completed' &&
     event.rosterCount > 0 &&
@@ -594,17 +646,30 @@ function buildContractClassOptions(
 
 function normalizeEvent(event: WorkbenchCalendarEvent) {
   const pending = isRollCallPending(event);
+  const isTrial = event.type === 'trial_session';
   return {
     ...event,
     isMine: event.isMine !== false,
     teacherName: event.teacher?.name || '',
-    scopeLabel: event.isMine !== false ? '我的课次' : event.teacher?.name || '机构课次',
+    scopeLabel: isTrial
+      ? event.isMine !== false
+        ? '我的试听'
+        : event.teacher?.name || '机构试听'
+      : event.isMine !== false
+        ? '我的课次'
+        : event.teacher?.name || '机构课次',
     dateLabel: dateLabel(event.startsAt),
     timeLabel: timeRange(event.startsAt, event.endsAt),
-    className: event.class?.name || '班级',
+    className: isTrial ? '试听课' : event.class?.name || '班级',
     courseName: event.course?.name || '课程',
     classroomName: event.classroom?.name || '空间待确认',
-    statusLabel: pending ? '未点名' : event.status === 'completed' ? '已完成' : '已排课',
+    statusLabel: isTrial
+      ? TRIAL_SESSION_STATUS_LABEL[event.status] || '试听安排'
+      : pending
+        ? '未点名'
+        : event.status === 'completed'
+          ? '已完成'
+          : '已排课',
     leaveCount: event.attendanceSummary?.leave ?? 0,
     pending,
     attendanceActionLabel: event.attendanceCount > 0 ? '继续点名' : '点名',
@@ -614,7 +679,8 @@ function normalizeEvent(event: WorkbenchCalendarEvent) {
         : event.attendanceCount > 0
           ? '继续点名'
           : '开始点名',
-    showRosterAction: event.canManageRoster && event.status === 'scheduled',
+    showRosterAction:
+      event.type === 'class_session' && event.canManageRoster && event.status === 'scheduled',
   };
 }
 
@@ -670,6 +736,25 @@ Component({
     showPendingRollCalls: false,
     rollCallReminderVisible: true,
     recordEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
+    isTrialAdmin: false,
+    teacherTrialSessions: [] as TeacherTrialSessionRow[],
+    teacherTrialLeads: [] as TeacherTrialLeadRow[],
+    trialCourses: [] as Course[],
+    trialCampuses: [] as Array<{ id: string; name: string }>,
+    trialTeachers: [] as Array<{ id: string; name: string; title?: string | null }>,
+    trialScheduleVisible: false,
+    trialScheduleSaving: false,
+    trialScheduleError: '',
+    trialScheduleLeadId: '',
+    trialScheduleCourseIndex: 0,
+    trialScheduleCampusIndex: 0,
+    trialScheduleTeacherIndex: 0,
+    trialScheduleForm: {
+      title: '',
+      date: dateInputValue(addDays(new Date(), 1)),
+      startsAt: '16:00',
+      endsAt: '17:00',
+    },
     dateStripDays: [] as DateStripRow[],
     rollCallDateStripDays: [] as DateStripRow[],
     selectedDateAnchor: '',
@@ -827,6 +912,7 @@ Component({
           teacherNotifications,
           capabilities,
           schedulingOptions,
+          trialWorkbench,
         ] = await Promise.all([
           fetchTeacherDashboard(),
           fetchTeacherCalendar(calendarRange()),
@@ -836,6 +922,7 @@ Component({
           fetchTeacherNotifications({ status: 'unread', limit: 20 }),
           fetchTeacherCapabilities(),
           fetchTeacherSchedulingOptions(),
+          fetchTeacherTrialWorkbench(),
         ]);
         const today = startOfDay(new Date());
         const selectedDateKey = this.data.selectedDateKey || dateKey(today);
@@ -853,6 +940,43 @@ Component({
         const feedbackItems = Array.isArray(lessonFeedbacks) ? lessonFeedbacks : [];
         const assignmentItems = Array.isArray(homeworkAssignments) ? homeworkAssignments : [];
         const notificationItems = Array.isArray(teacherNotifications) ? teacherNotifications : [];
+        const trialCourseById = new Map(
+          (trialWorkbench.courses ?? []).map((course) => [course.id, course]),
+        );
+        const trialCampusById = new Map(
+          (trialWorkbench.campuses ?? []).map((campus) => [campus.id, campus]),
+        );
+        const trialTeacherById = new Map(
+          (trialWorkbench.teachers ?? []).map((teacher) => [teacher.id, teacher]),
+        );
+        const teacherTrialSessions = (trialWorkbench.sessions ?? []).map((session) => ({
+          ...session,
+          dateLabel: dateLabel(session.startsAt),
+          timeLabel: timeRange(session.startsAt, session.endsAt),
+          courseName:
+            session.course?.name || trialCourseById.get(session.courseId)?.name || '试听课程',
+          campusName:
+            session.campus?.name || trialCampusById.get(session.campusId)?.name || '校区待确认',
+          teacherName:
+            session.teacher?.name ||
+            (session.teacherId ? trialTeacherById.get(session.teacherId)?.name : '') ||
+            '老师待安排',
+          statusLabel: TRIAL_SESSION_STATUS_LABEL[session.status] || '试听安排',
+        }));
+        const teacherTrialLeads = (trialWorkbench.leads ?? []).map((lead) => ({
+          ...lead,
+          courseName: lead.courseId
+            ? trialCourseById.get(lead.courseId)?.name || '课程待确认'
+            : '课程待确认',
+          campusName: lead.campusId
+            ? trialCampusById.get(lead.campusId)?.name || '校区待确认'
+            : '校区待确认',
+          teacherName: lead.preferredTeacherId
+            ? trialTeacherById.get(lead.preferredTeacherId)?.name || '老师待安排'
+            : '老师待安排',
+          statusLabel: TRIAL_LEAD_STATUS_LABEL[lead.status] || lead.status,
+          createdLabel: formatDateTime(lead.createdAt),
+        }));
         const now = Date.now();
         const normalizedClasses = dashboardClasses.map((classGroup) => {
           const normalized = normalizeClass(classGroup);
@@ -907,6 +1031,12 @@ Component({
           loading: false,
           canCreateAcademicRecords: Boolean(capabilities.isAdminTeacher),
           schedulingOptions,
+          isTrialAdmin: Boolean(trialWorkbench.isAdminTeacher),
+          teacherTrialSessions,
+          teacherTrialLeads,
+          trialCourses: trialWorkbench.courses ?? [],
+          trialCampuses: trialWorkbench.campuses ?? [],
+          trialTeachers: trialWorkbench.teachers ?? [],
           calendarEvents: calendarItems,
           classes: normalizedClasses,
           filteredClasses: normalizedClasses,
@@ -1592,6 +1722,7 @@ Component({
         .filter((event) => {
           const startsAt = new Date(event.startsAt);
           return (
+            event.type === 'class_session' &&
             event.canOperate &&
             event.status !== 'cancelled' &&
             event.rosterCount > event.attendanceCount &&
@@ -1605,6 +1736,7 @@ Component({
       const dailyRollCallEvents = calendarEvents
         .filter(
           (event) =>
+            event.type === 'class_session' &&
             event.canOperate &&
             event.status !== 'cancelled' &&
             dateKey(new Date(event.startsAt)) === this.data.selectedDateKey,
@@ -1617,6 +1749,7 @@ Component({
       const recordEvents = calendarEvents
         .filter(
           (event) =>
+            event.type === 'class_session' &&
             event.status !== 'cancelled' &&
             (event.status === 'completed' || event.attendanceCount > 0),
         )
@@ -1632,7 +1765,12 @@ Component({
       const pendingStart = addDays(today, -14);
       const historyStart = addDays(today, -30);
       const feedbackRows = calendarEvents
-        .filter((event) => event.status !== 'cancelled' && new Date(event.startsAt) <= now)
+        .filter(
+          (event) =>
+            event.type === 'class_session' &&
+            event.status !== 'cancelled' &&
+            new Date(event.startsAt) <= now,
+        )
         .map((event) => {
           const feedbackCount = feedbackCountBySession.get(event.id) ?? 0;
           const complete = event.rosterCount > 0 && feedbackCount >= event.rosterCount;
@@ -1729,7 +1867,10 @@ Component({
         dateStripDays: buildDateStripRows(dateStripDays, calendarEvents, this.data.selectedDateKey),
         rollCallDateStripDays: buildDateStripRows(
           dateStripDays,
-          calendarEvents.filter((event) => event.canOperate && event.status !== 'cancelled'),
+          calendarEvents.filter(
+            (event) =>
+              event.type === 'class_session' && event.canOperate && event.status !== 'cancelled',
+          ),
           this.data.selectedDateKey,
         ),
         selectedDateAnchor: `schedule-date-${dateKey(addDays(selectedDate, -3))}`,
@@ -2204,13 +2345,159 @@ Component({
       });
     },
 
+    openTrialInviteEditor() {
+      if (!this.data.isTrialAdmin) return;
+      wx.navigateTo({ url: '/pages/teacher-trial-invite/index' });
+    },
+
+    openTrialLeadSchedule(event: MiniTapEvent) {
+      if (!this.data.isTrialAdmin) return;
+      const leadId = String(event.currentTarget.dataset.id || '');
+      const lead = (this.data.teacherTrialLeads as TeacherTrialLeadRow[]).find(
+        (item) => item.id === leadId,
+      );
+      if (!lead) return;
+      const courses = this.data.trialCourses as Course[];
+      const campuses = this.data.trialCampuses as Array<{ id: string; name: string }>;
+      const teachers = this.data.trialTeachers as Array<{ id: string; name: string }>;
+      if (!courses.length || !campuses.length || !teachers.length) {
+        wx.showToast({ title: '请先配置课程、校区和授课老师', icon: 'none' });
+        return;
+      }
+      const courseIndex = Math.max(
+        0,
+        courses.findIndex((course) => course.id === lead.courseId),
+      );
+      const campusIndex = Math.max(
+        0,
+        campuses.findIndex((campus) => campus.id === lead.campusId),
+      );
+      const teacherIndex = Math.max(
+        0,
+        teachers.findIndex((teacher) => teacher.id === lead.preferredTeacherId),
+      );
+      const selectedCourse = courses[courseIndex];
+      this.setData({
+        trialScheduleVisible: true,
+        trialScheduleError: '',
+        trialScheduleLeadId: lead.id,
+        trialScheduleCourseIndex: courseIndex,
+        trialScheduleCampusIndex: campusIndex,
+        trialScheduleTeacherIndex: teacherIndex,
+        trialScheduleForm: {
+          title: `${lead.studentName}试听 · ${selectedCourse?.name || '试听课程'}`,
+          date: dateInputValue(addDays(new Date(), 1)),
+          startsAt: '16:00',
+          endsAt: '17:00',
+        },
+      });
+    },
+
+    closeTrialSchedule() {
+      if (this.data.trialScheduleSaving) return;
+      this.setData({
+        trialScheduleVisible: false,
+        trialScheduleError: '',
+        trialScheduleLeadId: '',
+      });
+    },
+
+    onTrialScheduleInput(event: MiniInputEvent) {
+      const field = String(event.currentTarget.dataset.field || '');
+      if (!['title', 'date', 'startsAt', 'endsAt'].includes(field)) return;
+      this.setData({ [`trialScheduleForm.${field}`]: event.detail.value });
+    },
+
+    onTrialScheduleCourseChange(event: MiniPickerEvent) {
+      const index = Number(event.detail.value) || 0;
+      const courses = this.data.trialCourses as Course[];
+      const lead = (this.data.teacherTrialLeads as TeacherTrialLeadRow[]).find(
+        (item) => item.id === this.data.trialScheduleLeadId,
+      );
+      this.setData({
+        trialScheduleCourseIndex: index,
+        'trialScheduleForm.title': `${lead?.studentName || '学员'}试听 · ${
+          courses[index]?.name || '试听课程'
+        }`,
+      });
+    },
+
+    onTrialScheduleCampusChange(event: MiniPickerEvent) {
+      this.setData({ trialScheduleCampusIndex: Number(event.detail.value) || 0 });
+    },
+
+    onTrialScheduleTeacherChange(event: MiniPickerEvent) {
+      this.setData({ trialScheduleTeacherIndex: Number(event.detail.value) || 0 });
+    },
+
+    async submitTrialSchedule() {
+      if (this.data.trialScheduleSaving || !this.data.trialScheduleLeadId) return;
+      const courses = this.data.trialCourses as Course[];
+      const campuses = this.data.trialCampuses as Array<{ id: string; name: string }>;
+      const teachers = this.data.trialTeachers as Array<{ id: string; name: string }>;
+      const course = courses[this.data.trialScheduleCourseIndex];
+      const campus = campuses[this.data.trialScheduleCampusIndex];
+      const teacher = teachers[this.data.trialScheduleTeacherIndex];
+      const form = this.data.trialScheduleForm;
+      if (
+        !course ||
+        !campus ||
+        !teacher ||
+        !form.title.trim() ||
+        !form.date ||
+        !form.startsAt ||
+        !form.endsAt
+      ) {
+        this.setData({ trialScheduleError: '请完整选择课程、校区、老师和试听时间' });
+        return;
+      }
+      this.setData({ trialScheduleSaving: true, trialScheduleError: '' });
+      try {
+        await scheduleTeacherTrialLead(this.data.trialScheduleLeadId, {
+          courseId: course.id,
+          campusId: campus.id,
+          teacherId: teacher.id,
+          title: form.title.trim(),
+          startsAt: localDateTime(form.date, form.startsAt),
+          endsAt: localDateTime(form.date, form.endsAt),
+        });
+        this.setData({
+          trialScheduleVisible: false,
+          trialScheduleLeadId: '',
+        });
+        wx.showToast({ title: '试听课次已创建', icon: 'success' });
+        await this.reload();
+      } catch (error) {
+        this.setData({
+          trialScheduleError: error instanceof Error ? error.message : '创建试听课次失败',
+        });
+      } finally {
+        this.setData({ trialScheduleSaving: false });
+      }
+    },
+
+    callTrialLead(event: MiniTapEvent) {
+      const phone = String(event.currentTarget.dataset.phone || '');
+      if (!phone) return;
+      (wx as PhoneWx).makePhoneCall({
+        phoneNumber: phone,
+        fail: () => wx.showToast({ title: '未能发起电话', icon: 'none' }),
+      });
+    },
+
     openScheduleCreate() {
       wx.navigateTo({ url: '/pages/teacher-schedule-create/index' });
     },
 
     openSessionEdit(event: MiniTapEvent) {
       const sessionId = String(event.currentTarget.dataset.id || '');
+      const eventType = String(event.currentTarget.dataset.type || 'class_session');
       if (!sessionId) return;
+      if (eventType === 'trial_session') {
+        this.setData({ activeView: 'trials' });
+        this.recompute();
+        return;
+      }
       wx.navigateTo({
         url: `/pages/teacher-schedule-create/index?sessionId=${encodeURIComponent(sessionId)}`,
       });

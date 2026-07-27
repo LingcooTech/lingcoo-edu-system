@@ -389,6 +389,8 @@ export const trialSessions = pgTable(
     courseId: uuid('course_id')
       .notNull()
       .references(() => courses.id, { onDelete: 'cascade' }),
+    teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
+    sessionMode: varchar('session_mode', { length: 40 }).notNull().default('public_event'),
     title: varchar('title', { length: 160 }).notNull(),
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
@@ -404,6 +406,10 @@ export const trialSessions = pgTable(
   },
   (table) => ({
     startsIdx: index('trial_sessions_starts_idx').on(table.startsAt),
+    teacherStartsIdx: index('trial_sessions_teacher_starts_idx').on(
+      table.teacherId,
+      table.startsAt,
+    ),
   }),
 );
 
