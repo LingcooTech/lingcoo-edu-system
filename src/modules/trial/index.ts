@@ -340,10 +340,11 @@ export const trialModule: AppModule = {
       if (trialSession.status !== 'open' || trialSession.startsAt <= new Date()) {
         throw notFound('Trial session not found');
       }
-      const [course, campuses, organization] = await Promise.all([
+      const [course, campuses, organization, teacher] = await Promise.all([
         catalogRepo.requireCourse(app.db, trialSession.courseId),
         organizationRepo.listCampuses(app.db),
         organizationRepo.requireOrganization(app.db),
+        teachingRepo.findTeacher(app.db, trialSession.teacherId),
       ]);
       const providerInstitution = await teachingRepo.findInstitution(
         app.db,
@@ -354,6 +355,7 @@ export const trialModule: AppModule = {
         course,
         providerInstitution: providerInstitution ? toPublicInstitution(providerInstitution) : null,
         campus: campuses.find((item) => item.id === trialSession.campusId) ?? null,
+        teacher: teacher ? toPublicTeacher(teacher) : null,
         organization: {
           id: organization.id,
           name: organization.name,

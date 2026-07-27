@@ -25,6 +25,159 @@
   font-weight: 900;
 }
 
+.section-desc {
+  max-width: 410rpx;
+  margin-top: 10rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+  line-height: 1.55;
+}
+
+.photo-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 26rpx;
+}
+
+.photo-card-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.avatar-preview {
+  position: relative;
+  width: 176rpx;
+  height: 210rpx;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 2rpx solid #e7ded6;
+  border-radius: 24rpx;
+  background: #f6f1ec;
+}
+
+.avatar-preview image {
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8rpx;
+  color: #9a6a4b;
+  font-size: 21rpx;
+  font-weight: 750;
+}
+
+.avatar-placeholder-icon {
+  color: #a87350;
+  font-size: 48rpx;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.avatar-preview-hint {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(58, 39, 28, 0.68);
+  color: #fff;
+  font-size: 19rpx;
+  line-height: 42rpx;
+  text-align: center;
+}
+
+.photo-upload-button {
+  width: 212rpx;
+  height: 62rpx;
+  border: 0;
+  border-radius: 999rpx;
+  margin: 22rpx 0 0;
+  background: #a87350;
+  color: #fff;
+  font-size: 23rpx;
+  font-weight: 800;
+  line-height: 62rpx;
+  padding: 0;
+}
+
+.photo-upload-button::after {
+  border: 0;
+}
+
+.qr-editor {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-top: 24rpx;
+}
+
+.qr-preview {
+  display: flex;
+  width: 168rpx;
+  height: 168rpx;
+  overflow: hidden;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid #e3ded7;
+  border-radius: 22rpx;
+  background: #faf8f5;
+}
+
+.qr-preview image {
+  width: 100%;
+  height: 100%;
+}
+
+.qr-placeholder {
+  color: #9a9389;
+  font-size: 21rpx;
+}
+
+.qr-actions {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.compact-action {
+  width: 190rpx;
+  height: 62rpx;
+  border: 0;
+  border-radius: 999rpx;
+  margin: 0;
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 62rpx;
+  padding: 0;
+}
+
+.compact-action.primary {
+  background: #a87350;
+  color: #fff;
+}
+
+.compact-action.secondary {
+  background: #f2ece6;
+  color: #8c5d41;
+}
+
+.compact-action::after,
+.gallery-add-button::after {
+  border: 0;
+}
+
 .field {
   min-width: 0;
   margin-top: 24rpx;
@@ -69,6 +222,97 @@
 
 .text-area.compact {
   min-height: 150rpx;
+}
+
+.gallery-section {
+  margin-top: 34rpx;
+  border-top: 1rpx solid #eeeae5;
+  padding-top: 28rpx;
+}
+
+.gallery-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.gallery-label {
+  margin-bottom: 4rpx;
+}
+
+.gallery-count {
+  color: #9a9389;
+  font-size: 20rpx;
+}
+
+.gallery-add-button {
+  width: 176rpx;
+  height: 58rpx;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999rpx;
+  margin: 0;
+  background: #a87350;
+  color: #fff;
+  font-size: 21rpx;
+  font-weight: 800;
+  line-height: 58rpx;
+  padding: 0;
+}
+
+.profile-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.profile-gallery-item {
+  position: relative;
+  height: 166rpx;
+  overflow: hidden;
+  border-radius: 16rpx;
+  background: #f2eee9;
+}
+
+.profile-gallery-item image {
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-remove {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  display: flex;
+  width: 40rpx;
+  height: 40rpx;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid rgba(255, 255, 255, 0.78);
+  border-radius: 999rpx;
+  background: rgba(57, 39, 29, 0.72);
+  color: #fff;
+  font-size: 29rpx;
+  line-height: 1;
+}
+
+.gallery-empty {
+  margin-top: 18rpx;
+  border-radius: 18rpx;
+  background: #faf8f5;
+  color: #9a9389;
+  font-size: 22rpx;
+  padding: 28rpx;
+  text-align: center;
+}
+
+.testimonial-field {
+  margin-top: 34rpx;
+  border-top: 1rpx solid #eeeae5;
+  padding-top: 28rpx;
 }
 
 .submit-bar {

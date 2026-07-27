@@ -257,7 +257,7 @@
 }
 
 .teacher-account-status,
-.teacher-profile-edit {
+.teacher-profile-completeness {
   flex-shrink: 0;
   border-radius: 999rpx;
   font-size: 22rpx;
@@ -270,7 +270,7 @@
   color: #3f7547;
 }
 
-.teacher-profile-edit {
+.teacher-profile-completeness {
   background: #f4ede7;
   color: #9a6a4b;
 }
@@ -296,22 +296,76 @@
   white-space: nowrap;
 }
 
-.teacher-profile-copy {
+.teacher-profile-overview {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 22rpx;
   margin-top: 24rpx;
+  border-radius: 22rpx;
+  background: #faf8f5;
+  padding: 20rpx;
+}
+
+.teacher-profile-card-avatar {
+  display: flex;
+  width: 112rpx;
+  height: 132rpx;
+  overflow: hidden;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  background: #eadfd6;
+  color: #9a6a4b;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.teacher-profile-card-avatar image {
+  width: 100%;
+  height: 100%;
+}
+
+.teacher-profile-overview-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-profile-overview-name {
+  overflow: hidden;
+  color: #27231f;
+  font-size: 27rpx;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-profile-overview-name text {
+  margin-left: 12rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+  font-weight: 650;
+}
+
+.teacher-profile-copy {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 10rpx;
   color: #57534e;
-  font-size: 25rpx;
-  line-height: 1.7;
+  font-size: 23rpx;
+  line-height: 1.55;
+  text-align: left;
   white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .teacher-profile-empty {
-  margin-top: 24rpx;
-  border-radius: 20rpx;
-  background: #f8f6f2;
+  margin-top: 10rpx;
   color: #9a9389;
-  font-size: 24rpx;
-  padding: 28rpx;
-  text-align: center;
+  font-size: 22rpx;
+  line-height: 1.55;
 }
 
 .teacher-specialties {
@@ -356,6 +410,34 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.teacher-profile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  border-top: 1rpx solid #eeeae5;
+  padding-top: 22rpx;
+}
+
+.teacher-profile-action {
+  height: 68rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 68rpx;
+  text-align: center;
+}
+
+.teacher-profile-action.secondary {
+  background: #f2ece6;
+  color: #8c5d41;
+}
+
+.teacher-profile-action.primary {
+  background: #a87350;
+  color: #fff;
 }
 
 .teacher-role-button {

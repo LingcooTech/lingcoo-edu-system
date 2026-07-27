@@ -87,6 +87,7 @@
 
 .consultant-main {
   min-width: 0;
+  padding-top: 2rpx;
 }
 
 .consultant-eyebrow {
@@ -96,18 +97,24 @@
 }
 
 .consultant-name {
+  height: 44rpx;
   margin-top: 2rpx;
+  overflow: hidden;
   color: #211f1c;
   font-size: 28rpx;
   font-weight: 900;
+  line-height: 44rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .consultant-copy {
   overflow: hidden;
-  margin-top: 5rpx;
+  height: 34rpx;
+  margin-top: 2rpx;
   color: #8b857c;
   font-size: 21rpx;
-  line-height: 1.4;
+  line-height: 34rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -121,8 +128,9 @@
 
 .consultant-button {
   display: flex;
-  min-width: 146rpx;
+  width: 160rpx;
   height: 54rpx;
+  flex: 0 0 160rpx;
   align-items: center;
   justify-content: center;
   border-radius: 999rpx;
@@ -167,6 +175,22 @@
   font-weight: 850;
 }
 
+.course-section-heading {
+  display: block;
+}
+
+.course-section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.course-section-title-row .section-count {
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 .course-list {
   display: grid;
   gap: 16rpx;
@@ -200,7 +224,11 @@
 }
 
 .course-main {
+  display: grid;
   min-width: 0;
+  min-height: 214rpx;
+  grid-template-rows: 40rpx 54rpx 28rpx 26rpx 50rpx;
+  row-gap: 4rpx;
 }
 
 .course-name {
@@ -208,6 +236,7 @@
   color: #211f1c;
   font-size: 28rpx;
   font-weight: 900;
+  line-height: 40rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -215,29 +244,28 @@
 .course-summary {
   display: -webkit-box;
   overflow: hidden;
-  margin-top: 6rpx;
   color: #696159;
   font-size: 21rpx;
-  line-height: 1.45;
+  line-height: 27rpx;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .course-meta {
   overflow: hidden;
-  margin-top: 8rpx;
   color: #9a948b;
   font-size: 19rpx;
+  line-height: 28rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .course-provider {
   overflow: hidden;
-  margin-top: 6rpx;
   color: #81583f;
   font-size: 19rpx;
   font-weight: 750;
+  line-height: 26rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -247,13 +275,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 14rpx;
-  margin-top: 12rpx;
 }
 
 .course-category {
   color: #9a6a4b;
   font-size: 20rpx;
   font-weight: 800;
+  line-height: 1;
 }
 
 .course-reserve {

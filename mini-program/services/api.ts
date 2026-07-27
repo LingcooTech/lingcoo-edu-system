@@ -292,6 +292,7 @@ export interface TrialDetail {
   course: Course;
   providerInstitution?: PublicInstitution | null;
   campus: { id: string; name: string; address: string | null } | null;
+  teacher?: PublicTeacher | null;
   organization: Organization;
 }
 
@@ -1604,6 +1605,16 @@ export function createTeacherTrialInvitation(
   });
 }
 
+export function updateTeacherTrialSession(
+  trialSessionId: string,
+  input: TeacherTrialSessionInput,
+): Promise<{ trialSession: TrialSession; sharePath: string }> {
+  return request(`/public/teacher/trials/${encodeURIComponent(trialSessionId)}`, {
+    method: 'PATCH',
+    data: input,
+  });
+}
+
 export function fetchTeacherProfile(): Promise<TeacherOwnProfile> {
   return request('/public/teacher/profile');
 }
@@ -1613,6 +1624,7 @@ export function updateTeacherProfile(input: {
   title?: string;
   avatarUrl?: string;
   tagline?: string;
+  wechatQrUrl?: string;
   education?: string;
   teachingExperience?: string;
   teachingStyle?: string;
@@ -1621,6 +1633,9 @@ export function updateTeacherProfile(input: {
   studentCount?: string;
   practiceDuration?: string;
   teachingPhilosophy?: string;
+  classPhotoUrls?: string[];
+  studentWorkUrls?: string[];
+  parentTestimonials?: string[];
   bio?: string;
   specialties?: string[];
 }): Promise<{ teacher: PublicTeacher }> {
@@ -1942,6 +1957,8 @@ export function saveTeacherSessionFeedbacks(
     items: Array<{ studentId: string; content: string; rating: number; imageUrls?: string[] }>;
     classAssignmentContent?: string;
     studentAssignments?: Array<{ studentId: string; content: string }>;
+    notifyGuardians?: boolean;
+    removedStudentIds?: string[];
   },
 ): Promise<{
   lessonFeedbacks: TeacherLessonFeedback[];

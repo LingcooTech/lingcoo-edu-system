@@ -61,16 +61,30 @@
         <view class="teacher-profile-card-head">
           <view>
             <view class="teacher-profile-card-title">个人介绍</view>
-            <view class="teacher-profile-card-desc">这些内容会用于老师公开介绍</view>
+            <view class="teacher-profile-card-desc">家长看到的老师公开资料</view>
           </view>
-          <navigator class="teacher-profile-edit" url="/pages/teacher-profile-edit/index">
-            编辑
-          </navigator>
+          <view class="teacher-profile-completeness">
+            {{teacherProfile.teacher.avatarUrl && teacherProfile.teacher.bio ? '已完善' : '待完善'}}
+          </view>
         </view>
-        <view wx:if="{{teacherProfile.teacher.bio}}" class="teacher-profile-copy">
-          {{teacherProfile.teacher.bio}}
+        <view class="teacher-profile-overview">
+          <view class="teacher-profile-card-avatar">
+            <image
+              wx:if="{{teacherProfile.teacher.avatarUrl}}"
+              src="{{teacherProfile.teacher.avatarUrl}}"
+              mode="aspectFill"
+            />
+            <text wx:else>{{avatarText}}</text>
+          </view>
+          <view class="teacher-profile-overview-copy">
+            <view class="teacher-profile-overview-name">
+              {{teacherProfile.teacher.name || '老师'}}
+              <text>{{teacherProfile.teacher.title || '授课老师'}}</text>
+            </view>
+            <view wx:if="{{teacherProfile.teacher.bio}}" class="teacher-profile-copy">{{teacherProfile.teacher.bio}}</view>
+            <view wx:else class="teacher-profile-empty">上传照片并填写介绍，让家长更快了解你</view>
+          </view>
         </view>
-        <view wx:else class="teacher-profile-empty">还没有填写个人介绍</view>
         <view wx:if="{{teacherProfile.teacher.specialties.length}}" class="teacher-specialties">
           <view
             wx:for="{{teacherProfile.teacher.specialties}}"
@@ -91,6 +105,17 @@
               {{teacherProfile.teacher.teachingExperience || '待完善'}}
             </view>
           </view>
+        </view>
+        <view class="teacher-profile-actions">
+          <navigator class="teacher-profile-action secondary" url="/pages/teacher-profile-edit/index">
+            编辑资料
+          </navigator>
+          <navigator
+            class="teacher-profile-action primary"
+            url="/pages/teacher-detail/index?id={{teacherProfile.teacher.id}}"
+          >
+            预览详情
+          </navigator>
         </view>
       </view>
     </block>

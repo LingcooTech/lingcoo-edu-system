@@ -45,12 +45,12 @@
       </view>
     </view>
 
-    <view class="section-heading">
-      <view>
+    <view class="section-heading course-section-heading">
+      <view class="course-section-title-row">
         <view class="section-title">选择试听课程</view>
-        <view class="section-subtitle">提交的是试听意向，不需要现在选择固定场次</view>
+        <view class="section-count">共 {{courses.length}} 门</view>
       </view>
-      <view class="section-count">共 {{courses.length}} 门</view>
+      <view class="section-subtitle">提交的是试听意向，不需要现在选择固定场次</view>
     </view>
 
     <view wx:if="{{courses.length}}" class="course-list">
@@ -68,7 +68,7 @@
           <view class="course-meta">
             {{item.ageRange}} · {{item.durationMinutes}}分钟 · {{item.locationLabel}}
           </view>
-          <view class="course-provider">{{item.providerLabel}}</view>
+          <view class="course-provider">机构 · {{item.providerLabel}}</view>
           <view class="course-foot">
             <view class="course-category">{{item.category}}</view>
             <view class="course-reserve" data-id="{{item.id}}" bindtap="openTrialForm">

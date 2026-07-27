@@ -185,6 +185,10 @@
   padding: 28rpx;
 }
 
+.teacher-bio {
+  white-space: pre-wrap;
+}
+
 .profile-list {
   display: grid;
   gap: 16rpx;

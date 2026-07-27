@@ -1,0 +1,252 @@
+.trial-confirm-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: 88rpx;
+  background: radial-gradient(circle at 100% 0, rgba(154, 106, 75, 0.12), transparent 34%), #f6f4f0;
+}
+
+.course-card,
+.session-card,
+.form-card,
+.success-card,
+.state-card {
+  margin-bottom: 22rpx;
+  border: 1rpx solid rgba(33, 31, 28, 0.07);
+  border-radius: 30rpx;
+  background: #fff;
+  box-shadow: 0 12rpx 34rpx rgba(65, 45, 31, 0.06);
+}
+
+.course-card {
+  display: grid;
+  grid-template-columns: 190rpx minmax(0, 1fr);
+  gap: 26rpx;
+  align-items: center;
+  padding: 22rpx;
+}
+
+.course-cover {
+  display: flex;
+  width: 190rpx;
+  height: 190rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24rpx;
+  background: #eadfd5;
+  color: #9a6a4b;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+
+.course-content {
+  min-width: 0;
+}
+
+.course-eyebrow {
+  overflow: hidden;
+  color: #9a6a4b;
+  font-size: 22rpx;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-title {
+  margin-top: 10rpx;
+  color: #211f1c;
+  font-size: 31rpx;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.course-name {
+  overflow: hidden;
+  margin-top: 10rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-card,
+.form-card {
+  padding: 30rpx;
+}
+
+.session-heading,
+.form-title {
+  color: #211f1c;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.time-block {
+  margin: 20rpx 0 10rpx;
+  border-radius: 24rpx;
+  background: #f7f2ed;
+  padding: 24rpx;
+  text-align: center;
+}
+
+.session-date {
+  color: #9a6a4b;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.session-time {
+  margin-top: 6rpx;
+  color: #211f1c;
+  font-size: 40rpx;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.session-info-row {
+  display: grid;
+  grid-template-columns: 140rpx minmax(0, 1fr);
+  gap: 18rpx;
+  padding: 20rpx 4rpx;
+  border-bottom: 1rpx solid rgba(33, 31, 28, 0.06);
+}
+
+.session-info-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 2rpx;
+}
+
+.session-info-label {
+  color: #8b857c;
+  font-size: 23rpx;
+}
+
+.session-info-value {
+  color: #211f1c;
+  font-size: 24rpx;
+  font-weight: 800;
+  text-align: right;
+}
+
+.session-info-sub {
+  margin-top: 4rpx;
+  color: #8b857c;
+  font-size: 21rpx;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.form-hint {
+  margin-top: 6rpx;
+  color: #8b857c;
+  font-size: 22rpx;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+  margin-top: 24rpx;
+}
+
+.field {
+  min-width: 0;
+}
+
+.field-label {
+  margin-bottom: 8rpx;
+  color: #625b53;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.field-input {
+  width: 100%;
+  height: 78rpx;
+  border: 1rpx solid #e4ded7;
+  border-radius: 18rpx;
+  background: #fbfaf8;
+  color: #211f1c;
+  font-size: 23rpx;
+  line-height: 78rpx;
+  padding: 0 18rpx;
+}
+
+.form-error {
+  margin-top: 20rpx;
+  border-radius: 16rpx;
+  background: #fff0ed;
+  color: #a9453b;
+  font-size: 22rpx;
+  line-height: 1.45;
+  padding: 14rpx 18rpx;
+}
+
+.confirm-button {
+  width: 100%;
+  height: 84rpx;
+  margin-top: 28rpx;
+  border-radius: 999rpx;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 27rpx;
+  font-weight: 850;
+  line-height: 84rpx;
+}
+
+.confirm-button::after {
+  border: 0;
+}
+
+.privacy-note {
+  margin-top: 16rpx;
+  color: #aaa39b;
+  font-size: 19rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.success-card,
+.state-card {
+  padding: 54rpx 30rpx;
+  text-align: center;
+}
+
+.success-mark,
+.state-mark {
+  display: flex;
+  width: 76rpx;
+  height: 76rpx;
+  margin: 0 auto 18rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #9a6a4b;
+  color: #fff;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.success-title,
+.state-title {
+  color: #211f1c;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.success-copy {
+  margin-top: 10rpx;
+  color: #9a6a4b;
+  font-size: 27rpx;
+  font-weight: 800;
+}
+
+.success-tip,
+.state-copy {
+  margin-top: 10rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+}
+
+.state-card.compact {
+  padding: 38rpx 30rpx;
+}

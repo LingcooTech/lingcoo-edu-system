@@ -45,6 +45,8 @@ type ActiveView =
   | 'homework';
 type MetricScope = 'today' | 'week' | 'month';
 type FeedbackScope = 'today' | 'pending' | 'history';
+type RecordScope = 'pending' | 'history';
+type TrialSessionScope = 'pending' | 'history';
 type MiniTapEvent = { currentTarget: { dataset: Record<string, string | undefined> } };
 type MiniScrollEvent = { detail: { scrollLeft: number } };
 type MiniInputEvent = {
@@ -206,8 +208,8 @@ const VIEW_TABS: Array<{ key: ActiveView; label: string; iconSrc: string }> = [
   { key: 'students', label: '学员', iconSrc: TEACHER_WORKBENCH_ICONS.students },
   { key: 'classes', label: '班级', iconSrc: TEACHER_WORKBENCH_ICONS.classes },
   { key: 'schedule', label: '课表', iconSrc: TEACHER_WORKBENCH_ICONS.schedule },
-  { key: 'trials', label: '试听', iconSrc: TEACHER_WORKBENCH_ICONS.trials },
   { key: 'rollcall', label: '点名', iconSrc: TEACHER_WORKBENCH_ICONS.rollcall },
+  { key: 'trials', label: '试听', iconSrc: TEACHER_WORKBENCH_ICONS.trials },
   { key: 'records', label: '上课记录', iconSrc: TEACHER_WORKBENCH_ICONS.records },
   { key: 'feedbacks', label: '互动', iconSrc: TEACHER_WORKBENCH_ICONS.feedbacks },
   { key: 'homework', label: '批阅', iconSrc: TEACHER_WORKBENCH_ICONS.homework },
@@ -223,6 +225,11 @@ const FEEDBACK_SCOPE_TABS: Array<{ key: FeedbackScope; label: string }> = [
   { key: 'today', label: '今日' },
   { key: 'pending', label: '待互动' },
   { key: 'history', label: '历史' },
+];
+
+const RECORD_SCOPE_TABS: Array<{ key: RecordScope; label: string }> = [
+  { key: 'pending', label: '待完善' },
+  { key: 'history', label: '历史记录' },
 ];
 
 const CLASS_STATUS_LABEL: Record<string, string> = {
@@ -705,6 +712,7 @@ Component({
     activeView: 'schedule' as ActiveView,
     metricScope: 'today' as MetricScope,
     activeFeedbackScope: 'today' as FeedbackScope,
+    activeRecordScope: 'pending' as RecordScope,
     summaryTitle: summaryTitle('today'),
     viewTabs: VIEW_TABS.map((item) => ({
       ...item,
@@ -718,6 +726,11 @@ Component({
       ...item,
       count: 0,
       className: feedbackScopeClassName('today', item.key),
+    })),
+    recordScopeTabs: RECORD_SCOPE_TABS.map((item) => ({
+      ...item,
+      count: 0,
+      className: feedbackScopeClassName('pending', item.key),
     })),
     stats: { courseCount: 0, pendingRollCall: 0, leaveMessages: 0, pendingHomework: 0 },
     teacherNotifications: [] as TeacherNoticeItem[],
@@ -735,9 +748,18 @@ Component({
     pendingRollCall30Count: 0,
     showPendingRollCalls: false,
     rollCallReminderVisible: true,
-    recordEvents: [] as Array<ReturnType<typeof normalizeEvent>>,
+    recordEvents: [] as Array<
+      ReturnType<typeof normalizeEvent> & {
+        recordActionLabel: string;
+        recordStatusLabel: string;
+      }
+    >,
     isTrialAdmin: false,
     teacherTrialSessions: [] as TeacherTrialSessionRow[],
+    pendingTeacherTrialSessions: [] as TeacherTrialSessionRow[],
+    historyTeacherTrialSessions: [] as TeacherTrialSessionRow[],
+    displayedTeacherTrialSessions: [] as TeacherTrialSessionRow[],
+    activeTrialSessionScope: 'pending' as TrialSessionScope,
     teacherTrialLeads: [] as TeacherTrialLeadRow[],
     trialCourses: [] as Course[],
     trialCampuses: [] as Array<{ id: string; name: string }>,
@@ -831,6 +853,7 @@ Component({
     feedbackEvents: [] as Array<
       ReturnType<typeof normalizeEvent> & {
         feedbackCount: number;
+        interactionActionLabel: string;
         interactionStatusLabel: string;
       }
     >,
@@ -963,6 +986,12 @@ Component({
             '老师待安排',
           statusLabel: TRIAL_SESSION_STATUS_LABEL[session.status] || '试听安排',
         }));
+        const pendingTeacherTrialSessions = teacherTrialSessions.filter(
+          (session) => session.status === 'scheduled',
+        );
+        const historyTeacherTrialSessions = teacherTrialSessions.filter(
+          (session) => session.status !== 'scheduled',
+        );
         const teacherTrialLeads = (trialWorkbench.leads ?? []).map((lead) => ({
           ...lead,
           courseName: lead.courseId
@@ -1033,6 +1062,12 @@ Component({
           schedulingOptions,
           isTrialAdmin: Boolean(trialWorkbench.isAdminTeacher),
           teacherTrialSessions,
+          pendingTeacherTrialSessions,
+          historyTeacherTrialSessions,
+          displayedTeacherTrialSessions:
+            this.data.activeTrialSessionScope === 'history'
+              ? historyTeacherTrialSessions
+              : pendingTeacherTrialSessions,
           teacherTrialLeads,
           trialCourses: trialWorkbench.courses ?? [],
           trialCampuses: trialWorkbench.campuses ?? [],
@@ -1746,15 +1781,29 @@ Component({
       const pendingHomeworkCount = homeworkCheckIns.filter(
         (item) => item.reviewStatus === 'submitted' || item.reviewStatus === 'needs_revision',
       ).length;
-      const recordEvents = calendarEvents
+      const recordRows = calendarEvents
         .filter(
           (event) =>
             event.type === 'class_session' &&
             event.status !== 'cancelled' &&
-            (event.status === 'completed' || event.attendanceCount > 0),
+            (event.status === 'completed' ||
+              event.attendanceCount > 0 ||
+              new Date(event.endsAt) <= now),
         )
         .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-        .slice(0, 60);
+        .slice(0, 60)
+        .map((event) => {
+          const pending = event.rosterCount > event.attendanceCount;
+          return {
+            ...normalizeEvent(event),
+            recordActionLabel: pending ? '补充点名' : '修改记录',
+            recordStatusLabel: pending ? '待完善' : '已完成',
+          };
+        });
+      const recordBuckets: Record<RecordScope, typeof recordRows> = {
+        pending: recordRows.filter((event) => event.rosterCount > event.attendanceCount),
+        history: recordRows.filter((event) => event.rosterCount <= event.attendanceCount),
+      };
       const feedbackCountBySession = new Map<string, number>();
       for (const feedback of lessonFeedbacks) {
         feedbackCountBySession.set(
@@ -1777,6 +1826,11 @@ Component({
           return {
             ...normalizeEvent(event),
             feedbackCount,
+            interactionActionLabel: complete
+              ? '修改互动'
+              : feedbackCount > 0
+                ? '继续互动'
+                : '开始互动',
             interactionStatusLabel: complete
               ? '已完成'
               : feedbackCount > 0
@@ -1802,7 +1856,13 @@ Component({
       const historyFeedbackEvents = feedbackRows
         .filter((event) => {
           const startsAt = new Date(event.startsAt);
-          return startsAt >= historyStart && startsAt <= now && !sameDate(startsAt, today);
+          return (
+            startsAt >= historyStart &&
+            startsAt <= now &&
+            !sameDate(startsAt, today) &&
+            event.rosterCount > 0 &&
+            event.feedbackCount >= event.rosterCount
+          );
         })
         .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
       const feedbackBuckets: Record<FeedbackScope, typeof feedbackRows> = {
@@ -1816,6 +1876,7 @@ Component({
         history: '近30天暂无历史互动场次。',
       };
       const activeFeedbackScope = this.data.activeFeedbackScope as FeedbackScope;
+      const activeRecordScope = this.data.activeRecordScope as RecordScope;
       this.setData({
         viewTabs: VIEW_TABS.map((item) => ({
           ...item,
@@ -1835,6 +1896,11 @@ Component({
           ...item,
           count: feedbackBuckets[item.key].length,
           className: feedbackScopeClassName(activeFeedbackScope, item.key),
+        })),
+        recordScopeTabs: RECORD_SCOPE_TABS.map((item) => ({
+          ...item,
+          count: recordBuckets[item.key].length,
+          className: feedbackScopeClassName(activeRecordScope, item.key),
         })),
         summaryTitle: summaryTitle(this.data.metricScope),
         stats: {
@@ -1859,7 +1925,7 @@ Component({
           ? pendingRollCallEvents
           : dailyRollCallEvents,
         pendingRollCall30Count,
-        recordEvents: recordEvents.map(normalizeEvent),
+        recordEvents: recordBuckets[activeRecordScope],
         selectedEvents: calendarEvents
           .filter((event) => dateKey(new Date(event.startsAt)) === this.data.selectedDateKey)
           .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
@@ -2002,6 +2068,13 @@ Component({
       const key = event.currentTarget.dataset.key as FeedbackScope;
       if (!key) return;
       this.setData({ activeFeedbackScope: key });
+      this.recompute();
+    },
+
+    switchRecordScope(event: MiniTapEvent) {
+      const key = event.currentTarget.dataset.key as RecordScope;
+      if (key !== 'pending' && key !== 'history') return;
+      this.setData({ activeRecordScope: key });
       this.recompute();
     },
 
@@ -2175,52 +2248,13 @@ Component({
       }
     },
 
-    async openFeedback(event: MiniTapEvent) {
+    openFeedback(event: MiniTapEvent) {
       const sessionId = String(event.currentTarget.dataset.id || '');
       const calendarEvent = this.findCalendarEvent(sessionId);
-      if (!calendarEvent) return;
-      this.setData({
-        feedbackVisible: true,
-        feedbackLoading: true,
-        feedbackSaving: false,
-        feedbackError: '',
-        feedbackSession: formatSheetSession(calendarEvent),
-        feedbackRows: [],
+      if (!sessionId || !calendarEvent?.canOperate) return;
+      wx.navigateTo({
+        url: `/pages/teacher-feedback/index?sessionId=${encodeURIComponent(sessionId)}`,
       });
-      try {
-        const payload = await fetchTeacherSessionAttendance(sessionId);
-        const feedbackByStudentId = new Map(
-          (this.data.lessonFeedbacks as TeacherLessonFeedback[])
-            .filter((item) => item.classSessionId === sessionId)
-            .map((item) => [item.studentId, item]),
-        );
-        const assignments = (this.data.homeworkAssignments as HomeworkAssignment[]).filter(
-          (item) => item.classSessionId === sessionId,
-        );
-        const classAssignment = assignments.find((item) => !item.studentId)?.content ?? '';
-        const assignmentByStudentId = new Map(
-          assignments
-            .filter((item) => item.studentId)
-            .map((item) => [String(item.studentId), item.content]),
-        );
-        this.setData({
-          classAssignmentContent: classAssignment,
-          feedbackRows: payload.roster.map((student) => ({
-            ...student,
-            content: feedbackByStudentId.get(student.id)?.content ?? '',
-            rating: feedbackByStudentId.get(student.id)?.rating ?? 0,
-            imageUrls: feedbackByStudentId.get(student.id)?.imageUrls ?? [],
-            assignmentContent: assignmentByStudentId.get(student.id) ?? '',
-            personalAssignmentEnabled: assignmentByStudentId.has(student.id),
-          })),
-        });
-      } catch (error) {
-        this.setData({
-          feedbackError: error instanceof Error ? error.message : '互动名单加载失败',
-        });
-      } finally {
-        this.setData({ feedbackLoading: false });
-      }
     },
 
     updateFeedbackContent(event: MiniInputEvent) {
@@ -2348,6 +2382,27 @@ Component({
     openTrialInviteEditor() {
       if (!this.data.isTrialAdmin) return;
       wx.navigateTo({ url: '/pages/teacher-trial-invite/index' });
+    },
+
+    switchTrialSessionScope(event: MiniTapEvent) {
+      const scope = String(event.currentTarget.dataset.scope || '');
+      if (scope !== 'pending' && scope !== 'history') return;
+      this.setData({
+        activeTrialSessionScope: scope,
+        displayedTeacherTrialSessions:
+          scope === 'history'
+            ? this.data.historyTeacherTrialSessions
+            : this.data.pendingTeacherTrialSessions,
+      });
+    },
+
+    openTrialSessionEditor(event: MiniTapEvent) {
+      if (!this.data.isTrialAdmin || this.data.activeTrialSessionScope !== 'pending') return;
+      const sessionId = String(event.currentTarget.dataset.id || '');
+      if (!sessionId) return;
+      wx.navigateTo({
+        url: `/pages/teacher-trial-invite/index?sessionId=${encodeURIComponent(sessionId)}`,
+      });
     },
 
     openTrialLeadSchedule(event: MiniTapEvent) {
@@ -2519,6 +2574,13 @@ Component({
       wx.navigateTo({
         url: `/pages/teacher-roll-call/index?sessionId=${encodeURIComponent(sessionId)}`,
       });
+    },
+
+    openRecordDetail(event: MiniTapEvent) {
+      const sessionId = String(event.currentTarget.dataset.id || '');
+      const calendarEvent = this.findCalendarEvent(sessionId);
+      if (!sessionId || !calendarEvent?.canOperate) return;
+      this.openRollCallDetail(event);
     },
 
     openDirectRollCall() {

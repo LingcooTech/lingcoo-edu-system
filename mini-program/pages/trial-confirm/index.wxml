@@ -1,0 +1,117 @@
+<custom-navbar title="确认试听" show-back="{{true}}" />
+<view class="page trial-confirm-page">
+  <skeleton wx:if="{{loading}}" variant="detail" />
+
+  <view wx:elif="{{notFound}}" class="state-card">
+    <view class="state-mark">!</view>
+    <view class="state-title">试听课不存在或已结束</view>
+    <view class="state-copy">请联系老师重新确认试听时间。</view>
+  </view>
+
+  <block wx:else>
+    <view class="course-card">
+      <image
+        wx:if="{{coverImageUrl}}"
+        class="course-cover"
+        src="{{coverImageUrl}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="course-cover course-cover-placeholder">试听</view>
+      <view class="course-content">
+        <view class="course-eyebrow">{{organizationName}}</view>
+        <view class="course-title">{{detail.trialSession.title}}</view>
+        <view class="course-name">{{detail.course.name}}</view>
+      </view>
+    </view>
+
+    <view class="session-card">
+      <view class="session-heading">试听安排</view>
+      <view class="time-block">
+        <view class="session-date">{{dateLabel}}</view>
+        <view class="session-time">{{timeLabel}}</view>
+      </view>
+      <view class="session-info-row">
+        <view class="session-info-label">上课地点</view>
+        <view class="session-info-value">
+          <view>{{campusName}}</view>
+          <view wx:if="{{campusAddress}}" class="session-info-sub">{{campusAddress}}</view>
+        </view>
+      </view>
+      <view class="session-info-row">
+        <view class="session-info-label">授课老师</view>
+        <view class="session-info-value">{{teacherName}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{confirmed}}" class="success-card">
+      <view class="success-mark">✓</view>
+      <view class="success-title">试听已确认</view>
+      <view class="success-copy">感谢确认，请按时上课哦</view>
+      <view class="success-tip">如需调整时间，请直接联系老师。</view>
+    </view>
+
+    <view wx:elif="{{full}}" class="state-card compact">
+      <view class="state-title">本次试听名额已满</view>
+      <view class="state-copy">请联系老师调整试听时间。</view>
+    </view>
+
+    <view wx:else class="form-card">
+      <view class="form-title">填写孩子信息并确认</view>
+      <view class="form-hint">用于老师登记试听和联系，请填写真实信息。</view>
+      <view class="field-grid">
+        <view class="field">
+          <view class="field-label">孩子姓名</view>
+          <input
+            class="field-input"
+            value="{{studentName}}"
+            data-field="studentName"
+            bindinput="changeInput"
+            placeholder="请输入孩子姓名"
+          />
+        </view>
+        <view class="field">
+          <view class="field-label">年级 / 年龄</view>
+          <input
+            class="field-input"
+            value="{{grade}}"
+            data-field="grade"
+            bindinput="changeInput"
+            placeholder="如：二年级 / 8岁"
+          />
+        </view>
+        <view class="field">
+          <view class="field-label">家长姓名</view>
+          <input
+            class="field-input"
+            value="{{guardianName}}"
+            data-field="guardianName"
+            bindinput="changeInput"
+            placeholder="请输入家长姓名"
+          />
+        </view>
+        <view class="field">
+          <view class="field-label">联系电话</view>
+          <input
+            class="field-input"
+            value="{{phone}}"
+            data-field="phone"
+            bindinput="changeInput"
+            type="number"
+            maxlength="11"
+            placeholder="请输入手机号"
+          />
+        </view>
+      </view>
+      <view wx:if="{{error}}" class="form-error">{{error}}</view>
+      <button
+        class="confirm-button"
+        loading="{{submitting}}"
+        disabled="{{submitting}}"
+        bindtap="submit"
+      >
+        {{submitting ? '确认中...' : '预约确认'}}
+      </button>
+      <view class="privacy-note">点击确认即表示同意老师使用以上信息联系并安排本次试听。</view>
+    </view>
+  </block>
+</view>

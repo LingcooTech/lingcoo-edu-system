@@ -44,6 +44,11 @@
       </view>
     </view>
 
+    <view wx:if="{{teacher.bio}}" class="card profile-card">
+      <view class="section-title">个人简介</view>
+      <view class="profile-text teacher-bio">{{teacher.bio}}</view>
+    </view>
+
     <view wx:if="{{teacher.teachingPhilosophy}}" class="card profile-card">
       <view class="section-title">教学理念</view>
       <view class="profile-text profile-quote">{{teacher.teachingPhilosophy}}</view>

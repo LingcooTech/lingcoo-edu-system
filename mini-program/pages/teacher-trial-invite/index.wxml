@@ -1,17 +1,10 @@
-<custom-navbar title="试听分享卡片" show-back="{{true}}" />
+<custom-navbar title="{{pageTitle}}" show-back="{{true}}" />
 <view class="page trial-invite-page">
   <skeleton wx:if="{{loading}}" variant="hub" />
   <block wx:else>
     <view wx:if="{{error}}" class="error-card">{{error}}</view>
 
     <block wx:if="{{workbench && !created}}">
-      <view class="intro-card">
-        <view class="intro-title">把已确认的试听信息发给家长</view>
-        <view class="intro-copy">
-          先选定课程、授课老师和时间，再分享小程序卡片。家长只需填写孩子与手机号，提交后线索会自动关联到本次试听。
-        </view>
-      </view>
-
       <view class="form-card">
         <view class="section-title">试听信息</view>
         <view class="field">
@@ -21,7 +14,7 @@
           </picker>
         </view>
         <view class="field">
-          <view class="field-label">分享卡片标题</view>
+          <view class="field-label">试听课标题</view>
           <input class="text-input" value="{{title}}" data-field="title" bindinput="changeInput" maxlength="160" />
         </view>
         <view class="two-columns">
@@ -61,13 +54,13 @@
       </view>
 
       <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">
-        {{saving ? '创建中...' : '创建分享卡片'}}
+        {{saving ? '保存中...' : (editing ? '保存试听课' : '添加试听课')}}
       </button>
     </block>
 
     <view wx:if="{{created}}" class="result-card">
       <view class="result-mark">✓</view>
-      <view class="result-title">试听卡片已准备好</view>
+      <view class="result-title">试听课已保存</view>
       <view class="share-preview">
         <view class="share-preview-eyebrow">试听信息确认</view>
         <view class="share-preview-title">{{shareTitle}}</view>
@@ -75,9 +68,10 @@
         <view class="share-preview-meta">{{createdCourseName}} · {{createdCampusName}}</view>
         <view class="share-preview-meta">授课老师：{{createdTeacherName}}</view>
       </view>
-      <view class="result-copy">点击下方按钮发给家长，家长填写资料后会自动形成预约线索。</view>
+      <view class="result-copy">点击下方按钮发给家长，家长打开后可直接填写孩子资料并确认试听。</view>
       <button class="primary-button" open-type="share">分享给家长</button>
-      <button class="secondary-button" bindtap="createAnother">再创建一张</button>
+      <button wx:if="{{!editing}}" class="secondary-button" bindtap="createAnother">继续添加试听课</button>
+      <button wx:else class="secondary-button" bindtap="goBack">返回试听管理</button>
     </view>
   </block>
 </view>

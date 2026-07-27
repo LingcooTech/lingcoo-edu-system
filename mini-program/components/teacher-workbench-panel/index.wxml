@@ -207,49 +207,19 @@
 
     <block wx:elif="{{activeView == 'trials'}}">
       <view class="trial-workbench-heading">
-        <view>
-          <view class="section-title">{{isTrialAdmin ? '试听管理' : '我的试听安排'}}</view>
-          <view class="trial-workbench-subtitle">
-            {{isTrialAdmin ? '统一处理预约线索并安排试听老师与时间' : '这里只显示已经确定时间、且安排给你的试听'}}
-          </view>
-        </view>
+        <view class="section-title">{{isTrialAdmin ? '试听管理' : '我的试听安排'}}</view>
         <button
           wx:if="{{isTrialAdmin}}"
           class="trial-create-button"
           bindtap="openTrialInviteEditor"
         >
-          创建分享卡片
+          添加试听课
         </button>
       </view>
 
-      <view class="trial-section-head">
-        <view class="trial-section-title">{{isTrialAdmin ? '试听课次' : '已确认试听'}}</view>
-        <view class="trial-section-count">共 {{teacherTrialSessions.length}} 场</view>
-      </view>
-      <view wx:if="{{teacherTrialSessions.length}}" class="teacher-trial-list">
-        <view wx:for="{{teacherTrialSessions}}" wx:key="id" class="card teacher-trial-card">
-          <view class="teacher-trial-date">
-            <view class="teacher-trial-date-label">{{item.dateLabel}}</view>
-            <view class="teacher-trial-time">{{item.timeLabel}}</view>
-          </view>
-          <view class="teacher-trial-main">
-            <view class="teacher-trial-title">{{item.title}}</view>
-            <view class="teacher-trial-meta">{{item.courseName}} · {{item.campusName}}</view>
-            <view class="teacher-trial-meta">授课：{{item.teacherName}} · 已留资 {{item.bookedCount}} 人</view>
-          </view>
-          <view class="teacher-trial-status">{{item.statusLabel}}</view>
-        </view>
-      </view>
-      <view wx:else class="card trial-empty-card">
-        {{isTrialAdmin ? '暂无试听课次，可从预约线索安排，或创建分享卡片。' : '暂时没有安排给你的试听课次。'}}
-      </view>
-
       <block wx:if="{{isTrialAdmin}}">
-        <view class="trial-section-head trial-lead-section-head">
-          <view>
-            <view class="trial-section-title">全部预约线索</view>
-            <view class="trial-section-note">自主预约与老师分享后提交的资料都会汇总在这里</view>
-          </view>
+        <view class="trial-section-head">
+          <view class="trial-section-title">预约线索</view>
           <view class="trial-section-count">共 {{teacherTrialLeads.length}} 条</view>
         </view>
         <view wx:if="{{teacherTrialLeads.length}}" class="teacher-trial-leads">
@@ -259,37 +229,84 @@
                 <view class="trial-lead-name">{{item.studentName}}</view>
                 <view wx:if="{{item.grade}}" class="trial-lead-grade">{{item.grade}}</view>
               </view>
-              <view class="trial-lead-status">{{item.statusLabel}}</view>
-            </view>
-            <view class="trial-lead-meta">
-              {{item.guardianName || '家长未署名'}} · {{item.phone}}
-            </view>
-            <view class="trial-lead-meta">
-              {{item.courseName}} · {{item.campusName}} · {{item.teacherName}}
-            </view>
-            <view class="trial-lead-foot">
-              <view class="trial-lead-created">{{item.createdLabel}} 提交</view>
-              <view class="trial-lead-actions">
-                <button
-                  class="trial-lead-button secondary"
-                  data-phone="{{item.phone}}"
-                  bindtap="callTrialLead"
-                >
-                  电话联系
-                </button>
-                <button
-                  class="trial-lead-button"
+              <view class="trial-lead-top-actions">
+                <view class="trial-lead-status">{{item.statusLabel}}</view>
+                <view
+                  class="trial-lead-inline-button"
                   data-id="{{item.id}}"
                   bindtap="openTrialLeadSchedule"
                 >
                   {{item.trialSessionId ? '调整试听' : '安排试听'}}
-                </button>
+                </view>
               </view>
             </view>
+            <view class="trial-lead-meta trial-lead-contact">
+              <text class="trial-lead-guardian">{{item.guardianName || '家长未署名'}}</text>
+              <text class="trial-lead-contact-separator">·</text>
+              <text
+                class="trial-lead-phone"
+                data-phone="{{item.phone}}"
+                bindtap="callTrialLead"
+              >{{item.phone}}</text>
+            </view>
+            <view class="trial-lead-meta">
+              {{item.courseName}} · {{item.campusName}} · {{item.teacherName}}
+            </view>
+            <view class="trial-lead-created">{{item.createdLabel}} 提交</view>
           </view>
         </view>
         <view wx:else class="card trial-empty-card">暂无预约线索。</view>
       </block>
+
+      <view class="trial-section-head trial-session-section-head">
+        <view>
+          <view class="trial-section-title">试听课</view>
+          <view class="trial-section-note">
+            {{activeTrialSessionScope == 'pending' ? '只显示待试听的课次，点击可编辑' : '已结束或已取消的试听记录'}}
+          </view>
+        </view>
+        <view class="trial-session-scopes">
+          <view
+            class="trial-session-scope {{activeTrialSessionScope == 'pending' ? 'active' : ''}}"
+            data-scope="pending"
+            bindtap="switchTrialSessionScope"
+          >
+            待试听 {{pendingTeacherTrialSessions.length}}
+          </view>
+          <view
+            class="trial-session-scope {{activeTrialSessionScope == 'history' ? 'active' : ''}}"
+            data-scope="history"
+            bindtap="switchTrialSessionScope"
+          >
+            历史试听 {{historyTeacherTrialSessions.length}}
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{displayedTeacherTrialSessions.length}}" class="teacher-trial-list">
+        <view
+          wx:for="{{displayedTeacherTrialSessions}}"
+          wx:key="id"
+          class="card teacher-trial-card {{isTrialAdmin && activeTrialSessionScope == 'pending' ? 'is-editable' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="openTrialSessionEditor"
+        >
+          <view class="teacher-trial-date">
+            <view class="teacher-trial-date-label">{{item.dateLabel}}</view>
+            <view class="teacher-trial-time">{{item.timeLabel}}</view>
+          </view>
+          <view class="teacher-trial-main">
+            <view class="teacher-trial-title">{{item.title}}</view>
+            <view class="teacher-trial-meta">{{item.courseName}} · {{item.campusName}}</view>
+            <view class="teacher-trial-meta">授课：{{item.teacherName}} · 已确认 {{item.bookedCount}} 人</view>
+          </view>
+          <view class="teacher-trial-card-side">
+            <view class="teacher-trial-status">{{item.statusLabel}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="card trial-empty-card">
+        {{activeTrialSessionScope == 'history' ? '暂无历史试听。' : (isTrialAdmin ? '暂无待试听课次，可从预约线索安排，或直接添加试听课。' : '暂时没有安排给你的待试听课次。')}}
+      </view>
     </block>
 
     <block wx:elif="{{activeView == 'rollcall'}}">
@@ -347,8 +364,13 @@
 
         <view wx:if="{{rollCallDisplayEvents.length}}" class="rollcall-session-list">
           <view wx:for="{{rollCallDisplayEvents}}" wx:key="id" class="rollcall-session-row">
-            <view class="rollcall-session-main">
-              <view class="rollcall-session-time">{{item.timeLabel}}</view>
+            <view class="rollcall-session-main {{showPendingRollCalls ? 'show-date' : ''}}">
+              <view class="rollcall-session-when">
+                <view wx:if="{{showPendingRollCalls}}" class="rollcall-session-date">
+                  {{item.dateLabel}}
+                </view>
+                <view class="rollcall-session-time">{{item.timeLabel}}</view>
+              </view>
               <view class="rollcall-session-info">
                 <view class="rollcall-session-title">{{item.className}} · {{item.title}}</view>
                 <view class="card-meta">
@@ -386,9 +408,26 @@
     </block>
 
     <block wx:elif="{{activeView == 'records'}}">
-      <view class="section-title">上课记录</view>
+      <view class="feedback-filter record-filter">
+        <view
+          wx:for="{{recordScopeTabs}}"
+          wx:key="key"
+          class="{{item.className}}"
+          data-key="{{item.key}}"
+          bindtap="switchRecordScope"
+        >
+          <view class="feedback-scope-label">{{item.label}}</view>
+          <view class="feedback-scope-count">{{item.count}}</view>
+        </view>
+      </view>
       <view wx:if="{{recordEvents.length}}" class="list">
-        <view wx:for="{{recordEvents}}" wx:key="id" class="card compact-card">
+        <view
+          wx:for="{{recordEvents}}"
+          wx:key="id"
+          class="card compact-card record-card {{item.canOperate ? 'is-operable' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="openRecordDetail"
+        >
           <view class="row-between">
             <view>
               <view class="card-title">{{item.className}} · {{item.title}}</view>
@@ -396,13 +435,20 @@
                 {{item.dateLabel}} · {{item.timeLabel}} · {{item.courseName}} · {{item.scopeLabel}}
               </view>
             </view>
-            <view class="pill subtle">{{item.statusLabel}}</view>
+            <view class="pill subtle">{{item.recordStatusLabel}}</view>
           </view>
           <view class="session-foot">
             <view class="card-meta">
               已点 {{item.attendanceCount}}/{{item.rosterCount}}{{item.leaveCount ? ' · 请假 ' + item.leaveCount : ''}}
             </view>
-            <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openRollCall">查看点名</button>
+            <button
+              wx:if="{{item.canOperate}}"
+              class="mini-button"
+              data-id="{{item.id}}"
+              catchtap="openRecordDetail"
+            >
+              {{item.recordActionLabel}}
+            </button>
             <view wx:else class="pill subtle">仅查看</view>
           </view>
         </view>
@@ -662,7 +708,13 @@
         </view>
       </view>
       <view wx:if="{{feedbackEvents.length}}" class="list">
-        <view wx:for="{{feedbackEvents}}" wx:key="id" class="card compact-card">
+        <view
+          wx:for="{{feedbackEvents}}"
+          wx:key="id"
+          class="card compact-card feedback-event-card {{item.canOperate ? 'is-operable' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="openFeedback"
+        >
           <view class="row-between">
             <view>
               <view class="card-title">{{item.className}} · {{item.title}}</view>
@@ -672,7 +724,14 @@
           </view>
           <view class="session-foot">
             <view class="card-meta">{{item.classroomName}}</view>
-            <button wx:if="{{item.isMine}}" class="mini-button" data-id="{{item.id}}" catchtap="openFeedback">做互动</button>
+            <button
+              wx:if="{{item.canOperate}}"
+              class="mini-button"
+              data-id="{{item.id}}"
+              catchtap="openFeedback"
+            >
+              {{item.interactionActionLabel}}
+            </button>
             <view wx:else class="pill subtle">仅查看</view>
           </view>
         </view>

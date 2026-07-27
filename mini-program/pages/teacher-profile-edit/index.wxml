@@ -4,6 +4,27 @@
   <block wx:else>
     <view wx:if="{{error}}" class="error-card">{{error}}</view>
 
+    <view class="edit-card photo-card">
+      <view class="photo-card-copy">
+        <view class="section-title">个人照片</view>
+        <view class="section-desc">将展示在个人介绍和老师主页，建议使用清晰的正面照片</view>
+        <button
+          class="photo-upload-button"
+          loading="{{avatarUploading}}"
+          disabled="{{avatarUploading}}"
+          bindtap="chooseAvatar"
+        >{{avatarUrl ? '更换个人照片' : '上传个人照片'}}</button>
+      </view>
+      <view class="avatar-preview" bindtap="previewAvatar">
+        <image wx:if="{{avatarUrl}}" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar-placeholder">
+          <text class="avatar-placeholder-icon">师</text>
+          <text>照片预览</text>
+        </view>
+        <view wx:if="{{avatarUrl}}" class="avatar-preview-hint">点击预览</view>
+      </view>
+    </view>
+
     <view class="edit-card">
       <view class="section-title">基础介绍</view>
       <view class="field">
@@ -29,8 +50,36 @@
         </view>
       </view>
       <view class="field">
+        <view class="field-label">专业积累</view>
+        <input class="text-input" value="{{practiceDuration}}" maxlength="40" data-field="practiceDuration" bindinput="changeField" placeholder="例如：专业研习 12 年 / 3000 小时" />
+      </view>
+      <view class="field">
         <view class="field-label">擅长方向</view>
         <input class="text-input" value="{{specialtiesText}}" data-field="specialtiesText" bindinput="changeField" placeholder="用逗号或顿号分隔，例如：素描、色彩、创意画" />
+      </view>
+    </view>
+
+    <view class="edit-card">
+      <view class="section-title">联系方式</view>
+      <view class="section-desc">家长可在老师详情页查看并扫码添加微信</view>
+      <view class="qr-editor">
+        <view class="qr-preview" bindtap="previewWechatQr">
+          <image wx:if="{{wechatQrUrl}}" src="{{wechatQrUrl}}" mode="aspectFill" />
+          <view wx:else class="qr-placeholder">微信二维码</view>
+        </view>
+        <view class="qr-actions">
+          <button
+            class="compact-action primary"
+            loading="{{mediaUploading}}"
+            disabled="{{mediaUploading}}"
+            bindtap="chooseWechatQr"
+          >{{wechatQrUrl ? '更换二维码' : '上传二维码'}}</button>
+          <button
+            wx:if="{{wechatQrUrl}}"
+            class="compact-action secondary"
+            bindtap="removeWechatQr"
+          >移除</button>
+        </view>
       </view>
     </view>
 
@@ -62,9 +111,97 @@
       </view>
     </view>
 
+    <view class="edit-card">
+      <view class="section-title">主页展示素材</view>
+      <view class="section-desc">这些内容会展示在个人介绍详情页，上传前请确认已获得展示授权</view>
+
+      <view class="field">
+        <view class="gallery-head">
+          <view>
+            <view class="field-label gallery-label">课堂照片</view>
+            <view class="gallery-count">已上传 {{classPhotoUrls.length}}/24 张</view>
+          </view>
+          <button
+            class="gallery-add-button"
+            data-field="classPhotoUrls"
+            disabled="{{mediaUploading}}"
+            bindtap="chooseGalleryImages"
+          >＋ 添加照片</button>
+        </view>
+        <view wx:if="{{classPhotoUrls.length}}" class="profile-gallery">
+          <view wx:for="{{classPhotoUrls}}" wx:key="*this" class="profile-gallery-item">
+            <image
+              src="{{item}}"
+              mode="aspectFill"
+              data-field="classPhotoUrls"
+              data-url="{{item}}"
+              bindtap="previewGalleryImage"
+            />
+            <view
+              class="gallery-remove"
+              data-field="classPhotoUrls"
+              data-index="{{index}}"
+              catchtap="removeGalleryImage"
+            >×</view>
+          </view>
+        </view>
+        <view wx:else class="gallery-empty">还没有上传课堂照片</view>
+      </view>
+
+      <view class="field gallery-section">
+        <view class="gallery-head">
+          <view>
+            <view class="field-label gallery-label">学员作品</view>
+            <view class="gallery-count">已上传 {{studentWorkUrls.length}}/24 张</view>
+          </view>
+          <button
+            class="gallery-add-button"
+            data-field="studentWorkUrls"
+            disabled="{{mediaUploading}}"
+            bindtap="chooseGalleryImages"
+          >＋ 添加作品</button>
+        </view>
+        <view wx:if="{{studentWorkUrls.length}}" class="profile-gallery">
+          <view wx:for="{{studentWorkUrls}}" wx:key="*this" class="profile-gallery-item">
+            <image
+              src="{{item}}"
+              mode="aspectFill"
+              data-field="studentWorkUrls"
+              data-url="{{item}}"
+              bindtap="previewGalleryImage"
+            />
+            <view
+              class="gallery-remove"
+              data-field="studentWorkUrls"
+              data-index="{{index}}"
+              catchtap="removeGalleryImage"
+            >×</view>
+          </view>
+        </view>
+        <view wx:else class="gallery-empty">还没有上传学员作品</view>
+      </view>
+
+      <view class="field testimonial-field">
+        <view class="field-label">家长评价</view>
+        <textarea
+          class="text-area"
+          value="{{parentTestimonialsText}}"
+          maxlength="3000"
+          data-field="parentTestimonialsText"
+          bindinput="changeField"
+          placeholder="每行填写一条，最多 12 条"
+        />
+      </view>
+    </view>
+
     <view class="submit-bar">
       <view class="submit-hint">保存后同步更新老师公开介绍</view>
-      <button class="submit-button" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">保存</button>
+      <button
+        class="submit-button"
+        loading="{{saving}}"
+        disabled="{{saving || avatarUploading || mediaUploading}}"
+        bindtap="submit"
+      >保存</button>
     </view>
   </block>
 </view>

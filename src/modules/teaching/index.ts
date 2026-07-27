@@ -58,6 +58,7 @@ const teacherSelfProfileUpdateSchema = z
     title: z.string().trim().max(120).optional(),
     avatarUrl: z.string().trim().max(500).optional(),
     tagline: z.string().trim().max(200).optional(),
+    wechatQrUrl: z.string().trim().max(500).optional(),
     education: z.string().trim().max(2000).optional(),
     teachingExperience: z.string().trim().max(4000).optional(),
     teachingStyle: z.string().trim().max(4000).optional(),
@@ -66,6 +67,9 @@ const teacherSelfProfileUpdateSchema = z
     studentCount: z.string().trim().max(40).optional(),
     practiceDuration: z.string().trim().max(40).optional(),
     teachingPhilosophy: z.string().trim().max(4000).optional(),
+    classPhotoUrls: z.array(z.string().trim().min(1).max(500)).max(24).optional(),
+    studentWorkUrls: z.array(z.string().trim().min(1).max(500)).max(24).optional(),
+    parentTestimonials: z.array(z.string().trim().min(1).max(240)).max(12).optional(),
     bio: z.string().trim().max(4000).optional(),
     specialties: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   })
@@ -289,6 +293,8 @@ const teacherStudentWorkSchema = z
   });
 
 const teacherLessonFeedbackSchema = z.object({
+  notifyGuardians: z.boolean().default(true),
+  removedStudentIds: z.array(z.string().uuid()).default([]),
   classAssignmentContent: z.string().trim().max(2000).default(''),
   studentAssignments: z
     .array(
@@ -848,7 +854,39 @@ export const teachingModule: AppModule = {
         });
         return {
           trialSession,
-          sharePath: `/pages/trial-detail/index?id=${encodeURIComponent(trialSession.id)}&invite=1`,
+          sharePath: `/pages/trial-confirm/index?sessionId=${encodeURIComponent(trialSession.id)}`,
+        };
+      },
+    );
+
+    app.patch(
+      '/public/teacher/trials/:trialSessionId',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const { trialSessionId } = request.params as { trialSessionId: string };
+        const body = teacherTrialSessionSchema.parse(request.body);
+        const existing = await trialRepo.requireTrialSession(app.db, trialSessionId);
+        if (normalizeTrialStatus(existing.status, existing.endsAt) !== 'scheduled') {
+          throw Object.assign(new Error('历史试听仅供查看，不能再修改'), { statusCode: 422 });
+        }
+        const existingCourse = await catalogRepo.requireCourse(app.db, existing.courseId);
+        const dataScope = await resolveTeacherDataScope(access);
+        requireAdminTeacherAccess(access);
+        requireCourseInTeacherInstitution(existingCourse, dataScope.institutionId);
+        const resolved = await resolveTeacherTrialInput(access, body, existing.id);
+        const trialSession = await trialRepo.updateTrialSession(app.db, existing.id, {
+          campusId: resolved.campus.id,
+          courseId: resolved.course.id,
+          teacherId: resolved.teacher.id,
+          title: body.title,
+          startsAt: resolved.startsAt,
+          endsAt: resolved.endsAt,
+        });
+        if (!trialSession) throw notFound('Trial session not found');
+        return {
+          trialSession,
+          sharePath: `/pages/trial-confirm/index?sessionId=${encodeURIComponent(trialSession.id)}`,
         };
       },
     );
@@ -3231,11 +3269,24 @@ export const teachingModule: AppModule = {
         const body = teacherLessonFeedbackSchema.parse(request.body);
         const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
         const rosterStudentIds = new Set(rosterEntries.map((entry) => entry.studentId));
-        const invalidItem = [...body.items, ...body.studentAssignments].find(
-          (item) => !rosterStudentIds.has(item.studentId),
-        );
+        const invalidItem = [
+          ...body.items.map((item) => item.studentId),
+          ...body.studentAssignments.map((item) => item.studentId),
+          ...body.removedStudentIds,
+        ].find((studentId) => !rosterStudentIds.has(studentId));
         if (invalidItem) {
           throw Object.assign(new Error('只能操作本班正式学员'), { statusCode: 400 });
+        }
+
+        for (const studentId of body.removedStudentIds) {
+          await app.db
+            .delete(schema.lessonFeedbacks)
+            .where(
+              and(
+                eq(schema.lessonFeedbacks.classSessionId, sessionId),
+                eq(schema.lessonFeedbacks.studentId, studentId),
+              ),
+            );
         }
 
         const updatedItems = [];
@@ -3340,6 +3391,22 @@ export const teachingModule: AppModule = {
               );
           }
         }
+        const submittedAssignmentStudentIds = new Set(
+          body.studentAssignments
+            .filter((assignment) => assignment.content)
+            .map((assignment) => assignment.studentId),
+        );
+        for (const entry of rosterEntries) {
+          if (submittedAssignmentStudentIds.has(entry.studentId)) continue;
+          await app.db
+            .delete(schema.homeworkAssignments)
+            .where(
+              and(
+                eq(schema.homeworkAssignments.classSessionId, sessionId),
+                eq(schema.homeworkAssignments.studentId, entry.studentId),
+              ),
+            );
+        }
 
         const scope = await loadTeacherHomeworkScope(request.account!.id);
         const assignments = await app.db
@@ -3349,75 +3416,77 @@ export const teachingModule: AppModule = {
           .orderBy(desc(schema.homeworkAssignments.updatedAt));
         const notificationStamp = Date.now();
         const lessonLabel = classCourseLabel(scope, classGroup.id, classGroup.courseId);
-        await Promise.all([
-          ...updatedItems.map((item) => {
-            const ratingText = item.rating > 0 ? `，获得 ${item.rating} 星` : '';
-            return notifyLearningSafely({
-              studentId: item.studentId,
-              studentName: studentName(scope, item.studentId),
-              title: '课堂互动已更新',
-              body: compactText(
-                item.content ||
-                  `${studentName(scope, item.studentId)} 的课堂表现已更新${ratingText}`,
-                '课堂表现已更新',
-              ),
-              updateType: '课堂互动',
-              page: '/pages/account-interactions/index',
-              sourceEventName: 'learning.feedback',
-              dedupeKey: `learning.feedback:${sessionId}:${item.studentId}:${notificationStamp}`,
-              meta: {
-                sessionId,
+        if (body.notifyGuardians) {
+          await Promise.all([
+            ...updatedItems.map((item) => {
+              const ratingText = item.rating > 0 ? `，获得 ${item.rating} 星` : '';
+              return notifyLearningSafely({
                 studentId: item.studentId,
-                courseId: classGroup.courseId,
-                classId: classGroup.id,
-              },
-            });
-          }),
-          ...(body.classAssignmentContent
-            ? rosterEntries.map((entry) =>
+                studentName: studentName(scope, item.studentId),
+                title: '课堂互动已更新',
+                body: compactText(
+                  item.content ||
+                    `${studentName(scope, item.studentId)} 的课堂表现已更新${ratingText}`,
+                  '课堂表现已更新',
+                ),
+                updateType: '课堂互动',
+                page: '/pages/account-interactions/index',
+                sourceEventName: 'learning.feedback',
+                dedupeKey: `learning.feedback:${sessionId}:${item.studentId}:${notificationStamp}`,
+                meta: {
+                  sessionId,
+                  studentId: item.studentId,
+                  courseId: classGroup.courseId,
+                  classId: classGroup.id,
+                },
+              });
+            }),
+            ...(body.classAssignmentContent
+              ? rosterEntries.map((entry) =>
+                  notifyLearningSafely({
+                    studentId: entry.studentId,
+                    studentName: studentName(scope, entry.studentId),
+                    title: '活动任务已布置',
+                    body: compactText(body.classAssignmentContent, '有新的活动任务'),
+                    updateType: '任务布置',
+                    page: '/pages/account-homework/index',
+                    sourceEventName: 'homework.assignment',
+                    dedupeKey:
+                      `homework.assignment:${sessionId}:class:` +
+                      `${entry.studentId}:${notificationStamp}`,
+                    meta: {
+                      sessionId,
+                      studentId: entry.studentId,
+                      courseId: classGroup.courseId,
+                      classId: classGroup.id,
+                      scope: 'class',
+                    },
+                  }),
+                )
+              : []),
+            ...body.studentAssignments
+              .filter((assignment) => assignment.content)
+              .map((assignment) =>
                 notifyLearningSafely({
-                  studentId: entry.studentId,
-                  studentName: studentName(scope, entry.studentId),
-                  title: '活动任务已布置',
-                  body: compactText(body.classAssignmentContent, '有新的活动任务'),
+                  studentId: assignment.studentId,
+                  studentName: studentName(scope, assignment.studentId),
+                  title: '个人任务已布置',
+                  body: compactText(assignment.content, `${lessonLabel} 有新的个人任务`),
                   updateType: '任务布置',
                   page: '/pages/account-homework/index',
                   sourceEventName: 'homework.assignment',
-                  dedupeKey:
-                    `homework.assignment:${sessionId}:class:` +
-                    `${entry.studentId}:${notificationStamp}`,
+                  dedupeKey: `homework.assignment:${sessionId}:${assignment.studentId}:${notificationStamp}`,
                   meta: {
                     sessionId,
-                    studentId: entry.studentId,
+                    studentId: assignment.studentId,
                     courseId: classGroup.courseId,
                     classId: classGroup.id,
-                    scope: 'class',
+                    scope: 'student',
                   },
                 }),
-              )
-            : []),
-          ...body.studentAssignments
-            .filter((assignment) => assignment.content)
-            .map((assignment) =>
-              notifyLearningSafely({
-                studentId: assignment.studentId,
-                studentName: studentName(scope, assignment.studentId),
-                title: '个人任务已布置',
-                body: compactText(assignment.content, `${lessonLabel} 有新的个人任务`),
-                updateType: '任务布置',
-                page: '/pages/account-homework/index',
-                sourceEventName: 'homework.assignment',
-                dedupeKey: `homework.assignment:${sessionId}:${assignment.studentId}:${notificationStamp}`,
-                meta: {
-                  sessionId,
-                  studentId: assignment.studentId,
-                  courseId: classGroup.courseId,
-                  classId: classGroup.id,
-                  scope: 'student',
-                },
-              }),
-            ),
-        ]);
+              ),
+          ]);
+        }
         return {
           lessonFeedbacks: enrichTeacherLessonFeedbacks(scope, updatedItems),
           homeworkAssignments: enrichTeacherHomeworkAssignments(scope, assignments),
