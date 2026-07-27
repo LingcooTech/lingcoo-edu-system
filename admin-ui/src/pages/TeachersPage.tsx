@@ -43,6 +43,7 @@ interface TeacherForm {
   parentTestimonialsText: string;
   specialties: string;
   isPinned: boolean;
+  isTrialConsultant: boolean;
   status: 'active' | 'archived';
 }
 
@@ -78,6 +79,7 @@ const emptyTeacherForm: TeacherForm = {
   parentTestimonialsText: '',
   specialties: '',
   isPinned: false,
+  isTrialConsultant: false,
   status: 'active',
 };
 
@@ -129,6 +131,7 @@ export function TeachersPage({
             parentTestimonialsText: listToLines(teacher.parentTestimonials),
             specialties: teacher.specialties.join('、'),
             isPinned: Boolean(teacher.isPinned),
+            isTrialConsultant: Boolean(teacher.isTrialConsultant),
             status: teacher.status as TeacherForm['status'],
           }
         : emptyTeacherForm,
@@ -173,17 +176,29 @@ export function TeachersPage({
           .map((item) => item.trim())
           .filter(Boolean),
         isPinned: form.isPinned,
+        isTrialConsultant: form.isTrialConsultant,
         status: form.status,
       };
       if (editing) {
         const result = await apiPatch<TeacherSaveResponse>(`${TEACHERS()}/${editing.id}`, payload);
         setTeachers(
-          teachers.map((item) => (item.id === result.teacher.id ? result.teacher : item)),
+          teachers.map((item) =>
+            item.id === result.teacher.id
+              ? result.teacher
+              : result.teacher.isTrialConsultant
+                ? { ...item, isTrialConsultant: false }
+                : item,
+          ),
         );
         surfaceSave(result);
       } else {
         const result = await apiPost<TeacherSaveResponse>(TEACHERS(), payload);
-        setTeachers([result.teacher, ...teachers]);
+        setTeachers([
+          result.teacher,
+          ...teachers.map((item) =>
+            result.teacher.isTrialConsultant ? { ...item, isTrialConsultant: false } : item,
+          ),
+        ]);
         surfaceSave(result);
       }
       setOpen(false);
@@ -240,6 +255,7 @@ export function TeachersPage({
             cell: (row) => (
               <div className="flex flex-wrap gap-1">
                 {row.isPinned ? <StatusPill tone="warn" label="置顶" /> : null}
+                {row.isTrialConsultant ? <StatusPill tone="ok" label="试听咨询老师" /> : null}
                 <StatusPill tone={statusToTone(row.status)} label={row.status} />
               </div>
             ),
@@ -359,6 +375,20 @@ export function TeachersPage({
             onChange={(event) => setForm({ ...form, isPinned: event.target.checked })}
           />
           <span>首页师资团队置顶展示</span>
+        </label>
+        <label className="border-border/70 bg-muted/20 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm">
+          <input
+            className="mt-0.5"
+            type="checkbox"
+            checked={form.isTrialConsultant}
+            onChange={(event) => setForm({ ...form, isTrialConsultant: event.target.checked })}
+          />
+          <span>
+            <span className="block font-medium">设为试听咨询老师</span>
+            <span className="text-muted-foreground mt-0.5 block text-xs">
+              全局只会保留一位，试听页优先展示其微信二维码和电话；必须启用并填写至少一种联系方式。
+            </span>
+          </span>
         </label>
         <div className="grid grid-cols-3 gap-3">
           <Field label="教学年限">

@@ -370,12 +370,17 @@ export const courses = pgTable(
     summary: text('summary').notNull().default(''),
     content: text('content').notNull().default(''),
     status: courseStatusEnum('status').notNull().default('draft'),
+    sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     slugUnique: uniqueIndex('courses_slug_idx').on(table.slug),
     statusIdx: index('courses_status_idx').on(table.status),
+    providerSortIdx: index('courses_provider_sort_idx').on(
+      table.providerInstitutionId,
+      table.sortOrder,
+    ),
   }),
 );
 
@@ -563,6 +568,7 @@ export const teachers = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
     isPinned: boolean('is_pinned').notNull().default(false),
+    isTrialConsultant: boolean('is_trial_consultant').notNull().default(false),
     status: teachingResourceStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -570,6 +576,9 @@ export const teachers = pgTable(
   (table) => ({
     statusIdx: index('teachers_status_idx').on(table.status),
     institutionIdx: index('teachers_institution_idx').on(table.institutionId),
+    trialConsultantUnique: uniqueIndex('teachers_trial_consultant_unique_idx')
+      .on(table.isTrialConsultant)
+      .where(sql`${table.isTrialConsultant} = true`),
   }),
 );
 

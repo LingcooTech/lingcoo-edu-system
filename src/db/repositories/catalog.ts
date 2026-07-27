@@ -8,7 +8,16 @@ function notFound(message: string): Error {
 }
 
 export async function listCourses(db: Database) {
-  return db.select().from(schema.courses).orderBy(desc(schema.courses.createdAt));
+  const rows = await db
+    .select({ course: schema.courses })
+    .from(schema.courses)
+    .leftJoin(schema.institutions, eq(schema.courses.providerInstitutionId, schema.institutions.id))
+    .orderBy(
+      asc(schema.institutions.sortOrder),
+      asc(schema.courses.sortOrder),
+      asc(schema.courses.createdAt),
+    );
+  return rows.map((row) => row.course);
 }
 
 export type CourseSeries = typeof schema.courseSeries.$inferSelect;
@@ -61,11 +70,17 @@ export async function deleteCourseSeries(db: Database, courseSeriesId: string) {
 }
 
 export async function listPublishedCourses(db: Database) {
-  return db
-    .select()
+  const rows = await db
+    .select({ course: schema.courses })
     .from(schema.courses)
+    .leftJoin(schema.institutions, eq(schema.courses.providerInstitutionId, schema.institutions.id))
     .where(eq(schema.courses.status, 'published'))
-    .orderBy(desc(schema.courses.createdAt));
+    .orderBy(
+      asc(schema.institutions.sortOrder),
+      asc(schema.courses.sortOrder),
+      asc(schema.courses.createdAt),
+    );
+  return rows.map((row) => row.course);
 }
 
 export type NewCourse = typeof schema.courses.$inferInsert;
@@ -104,6 +119,21 @@ export async function updateCourse(db: Database, courseId: string, patch: Partia
     .where(eq(schema.courses.id, courseId))
     .returning();
   return course ?? null;
+}
+
+export async function reorderCourses(db: Database, courseIds: string[]) {
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await Promise.all(
+      courseIds.map((courseId, index) =>
+        tx
+          .update(schema.courses)
+          .set({ sortOrder: index * 10, updatedAt: now })
+          .where(eq(schema.courses.id, courseId)),
+      ),
+    );
+  });
+  return listCourses(db);
 }
 
 export async function deleteCourse(db: Database, courseId: string) {

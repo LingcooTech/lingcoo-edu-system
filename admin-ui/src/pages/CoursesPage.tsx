@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
 import type {
@@ -271,6 +271,7 @@ export function CoursesPage({
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CourseForm>(emptyCourseForm);
   const [saving, setSaving] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [studentWorks, setStudentWorks] = useState<StudentWork[]>([]);
@@ -328,15 +329,17 @@ export function CoursesPage({
     try {
       const payload = courseFormToPayload(form, { classrooms, campusName, institutions });
       if (editing) {
-        const { course } = await apiPatch<{ course: Course }>(
+        await apiPatch<{ course: Course }>(
           `${COURSE_BASE()}/${editing.id}`,
           payload,
         );
-        setCourses(courses.map((item) => (item.id === course.id ? course : item)));
+        const refreshed = await api<{ courses: Course[] }>(COURSE_BASE());
+        setCourses(refreshed.courses);
         toast.success('课程已更新');
       } else {
-        const { course } = await apiPost<{ course: Course }>(COURSE_BASE(), payload);
-        setCourses([course, ...courses]);
+        await apiPost<{ course: Course }>(COURSE_BASE(), payload);
+        const refreshed = await api<{ courses: Course[] }>(COURSE_BASE());
+        setCourses(refreshed.courses);
         toast.success('课程已创建');
       }
       setOpen(false);
@@ -436,8 +439,35 @@ export function CoursesPage({
     }
   }
 
+  async function moveCourse(course: Course, direction: -1 | 1) {
+    const providerId = course.providerInstitutionId ?? '';
+    const siblings = courses.filter((item) => (item.providerInstitutionId ?? '') === providerId);
+    const index = siblings.findIndex((item) => item.id === course.id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+
+    const nextSiblings = [...siblings];
+    const [moved] = nextSiblings.splice(index, 1);
+    nextSiblings.splice(targetIndex, 0, moved);
+    setSavingOrder(true);
+    try {
+      const result = await apiPatch<{ courses: Course[] }>('/v1/courses/order', {
+        ids: nextSiblings.map((item) => item.id),
+      });
+      setCourses(result.courses);
+      toast.success('课程排序已保存');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '课程排序保存失败');
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
   const content = (
     <>
+      <div className="text-muted-foreground mb-3 rounded-xl border border-dashed px-4 py-3 text-sm">
+        家长端先按“机构管理”中的机构顺序展示，再按下方同一机构内的课程顺序展示；课程页与试听页共用此顺序。
+      </div>
       <DataTable
         columns={[
           {
@@ -461,6 +491,41 @@ export function CoursesPage({
               row.providerInstitutionId
                 ? (institutionName.get(row.providerInstitutionId) ?? '-')
                 : '-',
+          },
+          {
+            key: 'order',
+            header: '机构内排序',
+            cell: (row) => {
+              const siblings = courses.filter(
+                (item) => (item.providerInstitutionId ?? '') === (row.providerInstitutionId ?? ''),
+              );
+              const index = siblings.findIndex((item) => item.id === row.id);
+              return (
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground mr-1 text-xs">{index + 1}</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    disabled={savingOrder || index <= 0}
+                    title="在当前机构内上移"
+                    onClick={() => moveCourse(row, -1)}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    <span className="sr-only">上移</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2 py-1"
+                    disabled={savingOrder || index < 0 || index >= siblings.length - 1}
+                    title="在当前机构内下移"
+                    onClick={() => moveCourse(row, 1)}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                    <span className="sr-only">下移</span>
+                  </button>
+                </div>
+              );
+            },
           },
           { key: 'duration', header: '单节时长', cell: (row) => `${row.durationMinutes} 分钟` },
           {

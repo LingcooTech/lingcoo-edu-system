@@ -7,7 +7,11 @@ export async function listTeachers(db: Database) {
   return db
     .select()
     .from(schema.teachers)
-    .orderBy(desc(schema.teachers.isPinned), desc(schema.teachers.createdAt));
+    .orderBy(
+      desc(schema.teachers.isTrialConsultant),
+      desc(schema.teachers.isPinned),
+      desc(schema.teachers.createdAt),
+    );
 }
 
 export async function findTeacher(db: Database, teacherId: string | null) {
@@ -52,6 +56,21 @@ export async function updateTeacher(
   return teacher ?? null;
 }
 
+export async function setTrialConsultant(db: Database, teacherId: string) {
+  return db.transaction(async (tx) => {
+    await tx
+      .update(schema.teachers)
+      .set({ isTrialConsultant: false, updatedAt: new Date() })
+      .where(eq(schema.teachers.isTrialConsultant, true));
+    const [teacher] = await tx
+      .update(schema.teachers)
+      .set({ isTrialConsultant: true, updatedAt: new Date() })
+      .where(eq(schema.teachers.id, teacherId))
+      .returning();
+    return teacher ?? null;
+  });
+}
+
 export async function deleteTeacher(db: Database, teacherId: string) {
   const [teacher] = await db
     .delete(schema.teachers)
@@ -64,7 +83,7 @@ export async function listInstitutions(db: Database) {
   return db
     .select()
     .from(schema.institutions)
-    .orderBy(asc(schema.institutions.sortOrder), desc(schema.institutions.createdAt));
+    .orderBy(asc(schema.institutions.sortOrder), asc(schema.institutions.createdAt));
 }
 
 export async function findInstitution(db: Database, institutionId: string | null) {

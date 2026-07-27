@@ -175,6 +175,9 @@ export function InstitutionsPage({
 
   const content = (
     <>
+      <div className="text-muted-foreground mb-3 rounded-xl border border-dashed px-4 py-3 text-sm">
+        此处的机构顺序会同步用于家长端课程页和试听页；机构内的课程顺序请到“课程管理”调整。
+      </div>
       <DataTable
         columns={[
           {

@@ -36,6 +36,7 @@ const courseShape = {
   summary: z.string(),
   content: z.string(),
   status: z.enum(['draft', 'published', 'archived']),
+  sortOrder: z.number().int().min(0).optional(),
 };
 
 const courseSchema = z.object({
@@ -122,6 +123,10 @@ const courseSeriesSchema = z.object({
 });
 
 const courseSeriesUpdateSchema = courseSeriesSchema.partial();
+
+const courseOrderSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1),
+});
 
 function uniqueTeacherIds(ids: string[]) {
   return Array.from(new Set(ids.filter(Boolean)));
@@ -296,8 +301,36 @@ export const catalogModule: AppModule = {
 
     app.post('/v1/courses', { preHandler: app.requireAdmin }, async (request) => {
       const body = courseSchema.parse(request.body);
-      const course = await catalogRepo.createCourse(app.db, normalizeCourseCreate(body));
+      const existing = await catalogRepo.listCourses(app.db);
+      const siblingSortOrders = existing
+        .filter(
+          (course) =>
+            (course.providerInstitutionId ?? null) === (body.providerInstitutionId ?? null),
+        )
+        .map((course) => course.sortOrder);
+      const course = await catalogRepo.createCourse(app.db, {
+        ...normalizeCourseCreate(body),
+        sortOrder:
+          body.sortOrder ??
+          (siblingSortOrders.length > 0 ? Math.max(...siblingSortOrders) + 10 : 0),
+      });
       return { course };
+    });
+
+    app.patch('/v1/courses/order', { preHandler: app.requireAdmin }, async (request) => {
+      const body = courseOrderSchema.parse(request.body);
+      const courses = await catalogRepo.listCourses(app.db);
+      const selected = courses.filter((course) => body.ids.includes(course.id));
+      if (selected.length !== body.ids.length) {
+        throw Object.assign(new Error('Course not found'), { statusCode: 404 });
+      }
+      const providerIds = new Set(
+        selected.map((course) => course.providerInstitutionId ?? '__platform__'),
+      );
+      if (providerIds.size !== 1) {
+        throw Object.assign(new Error('只能在同一机构内调整课程顺序'), { statusCode: 422 });
+      }
+      return { courses: await catalogRepo.reorderCourses(app.db, body.ids) };
     });
 
     app.patch('/v1/courses/:courseId', { preHandler: app.requireAdmin }, async (request) => {

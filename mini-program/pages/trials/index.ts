@@ -1,10 +1,12 @@
 import {
   fetchCourses,
+  fetchPublicInstitutions,
   fetchTrialSessions,
   loadHome,
   submitTrialRegistration,
   type Course,
   type PublicCampus,
+  type PublicInstitution,
   type PublicTeacher,
   type TrialSession,
 } from '../../services/api';
@@ -25,6 +27,7 @@ type PhoneWx = typeof wx & {
 type CourseCard = Course & {
   locationLabel: string;
   coverUrl: string;
+  providerLabel: string;
 };
 
 type PublicTrialCard = TrialSession & {
@@ -35,6 +38,12 @@ type PublicTrialCard = TrialSession & {
 
 function preferredConsultant(teachers: PublicTeacher[]) {
   return (
+    teachers.find(
+      (teacher) =>
+        teacher.isTrialConsultant &&
+        teacher.status === 'active' &&
+        (teacher.wechatQrUrl || teacher.phone),
+    ) ??
     teachers.find((teacher) => teacher.isPinned && (teacher.wechatQrUrl || teacher.phone)) ??
     teachers.find((teacher) => teacher.wechatQrUrl || teacher.phone) ??
     teachers[0] ??
@@ -106,16 +115,23 @@ Page({
   async load(autoCourseId: string) {
     this.setData({ loading: true });
     try {
-      const [courses, trialSessions, home] = await Promise.all([
+      const [courses, trialSessions, home, institutions] = await Promise.all([
         fetchCourses(),
         fetchTrialSessions(),
         loadHome(),
+        fetchPublicInstitutions(),
       ]);
       const campuses = (home.campuses ?? []) as PublicCampus[];
       const courseCards = courses.map((course) => ({
         ...course,
         locationLabel: courseLocation(course, campuses),
         coverUrl: course.coverThumbUrl || course.coverImageUrl || '',
+        providerLabel:
+          institutions.find(
+            (institution: PublicInstitution) => institution.id === course.providerInstitutionId,
+          )?.name ||
+          course.paymentReceiverName ||
+          '机构待确认',
       }));
       const courseById = new Map(courseCards.map((course) => [course.id, course]));
       const campusById = new Map(campuses.map((campus) => [campus.id, campus]));

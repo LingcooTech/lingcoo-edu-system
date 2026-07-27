@@ -36,6 +36,7 @@ export interface Course {
   status: string;
   summary: string;
   content?: string;
+  sortOrder: number;
 }
 
 export interface StudentWork {
@@ -146,6 +147,7 @@ export interface Teacher {
   bio?: string | null;
   specialties: string[];
   isPinned: boolean;
+  isTrialConsultant: boolean;
   status: string;
 }
 

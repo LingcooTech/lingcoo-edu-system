@@ -29,6 +29,7 @@ export interface Course {
   startingPriceAmount?: number | null;
   summary: string;
   content?: string;
+  sortOrder?: number;
 }
 
 export interface CoursePackage {
@@ -394,6 +395,7 @@ export interface PublicTeacher {
   bio?: string | null;
   specialties: string[];
   isPinned?: boolean;
+  isTrialConsultant?: boolean;
   status: string;
 }
 

@@ -1,6 +1,6 @@
 .trials-page {
   min-height: 100vh;
-  padding-bottom: 150rpx;
+  padding-bottom: calc(210rpx + env(safe-area-inset-bottom));
   background: #f6f4f0;
 }
 
@@ -228,6 +228,16 @@
   margin-top: 8rpx;
   color: #9a948b;
   font-size: 19rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-provider {
+  overflow: hidden;
+  margin-top: 6rpx;
+  color: #81583f;
+  font-size: 19rpx;
+  font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -68,6 +68,7 @@
           <view class="course-meta">
             {{item.ageRange}} · {{item.durationMinutes}}分钟 · {{item.locationLabel}}
           </view>
+          <view class="course-provider">{{item.providerLabel}}</view>
           <view class="course-foot">
             <view class="course-category">{{item.category}}</view>
             <view class="course-reserve" data-id="{{item.id}}" bindtap="openTrialForm">

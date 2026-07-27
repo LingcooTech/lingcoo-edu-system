@@ -46,6 +46,7 @@ const teacherSchema = z.object({
   bio: z.string().default(''),
   specialties: z.array(z.string()).default([]),
   isPinned: z.boolean().default(false),
+  isTrialConsultant: z.boolean().default(false),
   status: z.enum(['active', 'archived']).default('active'),
 });
 
@@ -3727,7 +3728,21 @@ export const teachingModule: AppModule = {
 
     app.post('/v1/teachers', { preHandler: app.requireAdmin }, async (request) => {
       const body = teacherSchema.parse(request.body);
-      const teacher = await teachingRepo.createTeacher(app.db, normalizeTeacherBody(body));
+      if (
+        body.isTrialConsultant &&
+        (body.status !== 'active' || (!body.phone.trim() && !body.wechatQrUrl?.trim()))
+      ) {
+        throw Object.assign(new Error('试听咨询老师必须启用，并设置电话或微信二维码'), {
+          statusCode: 422,
+        });
+      }
+      let teacher = await teachingRepo.createTeacher(app.db, {
+        ...normalizeTeacherBody(body),
+        isTrialConsultant: false,
+      });
+      if (body.isTrialConsultant) {
+        teacher = (await teachingRepo.setTrialConsultant(app.db, teacher.id)) ?? teacher;
+      }
       const account = await ensureTeacherAccount(teacher);
       return { teacher: toTeacherDto(teacher), ...account };
     });
@@ -3735,12 +3750,33 @@ export const teachingModule: AppModule = {
     app.patch('/v1/teachers/:teacherId', { preHandler: app.requireAdmin }, async (request) => {
       const { teacherId } = request.params as { teacherId: string };
       const body = teacherUpdateSchema.parse(request.body);
-      const teacher = await teachingRepo.updateTeacher(
-        app.db,
-        teacherId,
-        normalizeTeacherBody(body),
-      );
+      const current = await teachingRepo.findTeacher(app.db, teacherId);
+      if (!current) throw notFound('Teacher not found');
+      const nextStatus = body.status ?? current.status;
+      const nextPhone = body.phone ?? current.phone ?? '';
+      const nextWechatQrUrl = body.wechatQrUrl ?? current.wechatQrUrl ?? '';
+      if (
+        body.isTrialConsultant &&
+        (nextStatus !== 'active' || (!nextPhone.trim() && !nextWechatQrUrl.trim()))
+      ) {
+        throw Object.assign(new Error('试听咨询老师必须启用，并设置电话或微信二维码'), {
+          statusCode: 422,
+        });
+      }
+      const patch = normalizeTeacherBody(body);
+      if (body.isTrialConsultant) {
+        delete patch.isTrialConsultant;
+      } else if (
+        current.isTrialConsultant &&
+        (nextStatus !== 'active' || (!nextPhone.trim() && !nextWechatQrUrl.trim()))
+      ) {
+        patch.isTrialConsultant = false;
+      }
+      let teacher = await teachingRepo.updateTeacher(app.db, teacherId, patch);
       if (!teacher) throw notFound('Teacher not found');
+      if (body.isTrialConsultant) {
+        teacher = (await teachingRepo.setTrialConsultant(app.db, teacherId)) ?? teacher;
+      }
       const account = await ensureTeacherAccount(teacher);
       return { teacher: toTeacherDto(teacher), ...account };
     });
