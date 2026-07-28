@@ -1,4 +1,4 @@
-# fd-edu-system
+# lingcoo-edu-system
 
 独立的社区教室 / 小型培训机构招生、排课、签到、消课与运营系统。
 
