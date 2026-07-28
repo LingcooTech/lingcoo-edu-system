@@ -13,8 +13,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: fd-edu-system
-  GHCR_IMAGE: ghcr.io/futuredecade/fd-edu-system
+  IMAGE_NAME: lingcoo-edu-system
+  GHCR_IMAGE: ghcr.io/lingcootech/lingcoo-edu-system
 
 jobs:
   build-and-push-acr:

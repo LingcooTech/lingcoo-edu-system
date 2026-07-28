@@ -1,7 +1,0 @@
-{
-  "navigationBarTitleText": "成长故事",
-  "navigationStyle": "custom",
-  "usingComponents": {
-    "block-renderer": "../../components/block-renderer/index"
-  }
-}

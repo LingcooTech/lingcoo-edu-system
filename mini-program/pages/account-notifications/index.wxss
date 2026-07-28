@@ -1,8 +1,0 @@
-.subscribe-hint {
-  margin-top: 10rpx;
-}
-
-.subscribe-btn {
-  margin-top: 22rpx;
-  width: 100%;
-}

@@ -1,6 +1,0 @@
-.teacher-workbench-page {
-  min-height: 100vh;
-  box-sizing: border-box;
-  padding-bottom: 130rpx;
-  background: #f6f4f0;
-}

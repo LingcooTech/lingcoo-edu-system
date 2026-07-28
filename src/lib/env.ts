@@ -11,7 +11,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6381'),
   LOG_LEVEL: z.string().default('info'),
 
-  // FD Stack deployment binding. The delivery installer injects these values
+  // Lingcoo Stack deployment binding. The delivery installer injects these values
   // after the entitlement's primary domain is locked.
   FD_DOMAIN_BINDING_SOURCE: z.string().default('none'),
   FD_BOUND_HOST: z.string().optional(),

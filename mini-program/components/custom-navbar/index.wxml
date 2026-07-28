@@ -1,9 +1,0 @@
-<view class="custom-navbar {{transparent ? 'transparent' : ''}}" style="{{navStyle}}">
-  <view class="custom-navbar-inner" style="{{navInnerStyle}}">
-    <button wx:if="{{showBack}}" class="navbar-back" bindtap="onBack">
-      <view class="navbar-back-icon"></view>
-    </button>
-    <view wx:else class="navbar-title">{{title}}</view>
-  </view>
-  <view wx:if="{{showBack}}" class="navbar-title centered" style="{{navTitleStyle}}">{{title}}</view>
-</view>

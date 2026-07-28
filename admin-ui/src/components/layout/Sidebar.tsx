@@ -44,7 +44,7 @@ export function Sidebar({
   showCollapseToggle?: boolean;
 }) {
   const location = useLocation();
-  const brandName = organization?.brandName || organization?.name || 'fd-edu-system';
+  const brandName = organization?.brandName || organization?.name || 'lingcoo-edu-system';
   const fullLogoUrl = organization?.branding.fullLogoUrl || organization?.branding.logoUrl || '';
   const squareLogoUrl =
     organization?.branding.squareLogoUrl || organization?.branding.logoUrl || fullLogoUrl;

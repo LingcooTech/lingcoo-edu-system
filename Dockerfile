@@ -42,8 +42,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV APP_VERSION=${APP_VERSION}
 
-LABEL org.opencontainers.image.title="fd-edu-system"
-LABEL org.opencontainers.image.source="https://github.com/FutureDecade/fd-edu-system"
+LABEL org.opencontainers.image.title="lingcoo-edu-system"
+LABEL org.opencontainers.image.source="https://github.com/LingcooTech/lingcoo-edu-system"
 LABEL org.opencontainers.image.version="${APP_VERSION}"
 
 COPY --from=build /app/package*.json ./

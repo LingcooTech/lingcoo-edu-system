@@ -1,8 +1,8 @@
-# FutureDecade 教育系统 · 业务逻辑
+# Lingcoo 教育系统 · 业务逻辑
 
 > 版本:v1 · 2026/05/30
 > 适用范围:本文档定义**目标业务逻辑**,作为后续"后台界面调整方案"的依据。
-> 它**取代**旧文档(`fd-edu-stack-architecture-and-roadmap.md`、`docs/mvp-implementation.md`)中所有"多租户 / tenant"相关假设——多租户已彻底拆除,本系统为**单机构自部署**形态。
+> 它**取代**旧文档(`lingcoo-edu-stack-architecture-and-roadmap.md`、`docs/mvp-implementation.md`)中所有"多租户 / tenant"相关假设——多租户已彻底拆除,本系统为**单机构自部署**形态。
 
 ---
 

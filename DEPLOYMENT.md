@@ -10,7 +10,7 @@ Production server must not build images locally.
 
 - Host: `82.157.22.93`
 - Domain: `edu.lingcoo.com`
-- Suggested path: `/opt/fd-edu-system`
+- Suggested path: `/opt/lingcoo-edu-system`
 - Health check: `https://edu.lingcoo.com/ready`
 
 ## Required GitHub Secrets
@@ -30,17 +30,17 @@ Expected values for this project:
 
 ```text
 DEPLOY_HOST=82.157.22.93
-DEPLOY_PATH=/opt/fd-edu-system
+DEPLOY_PATH=/opt/lingcoo-edu-system
 DEPLOY_HEALTHCHECK_URL=https://edu.lingcoo.com/ready
 ```
 
 ## Server bootstrap
 
 ```bash
-sudo mkdir -p /opt/fd-edu-system
-sudo chown -R "$USER":"$USER" /opt/fd-edu-system
-git clone git@github.com:FutureDecade/fd-edu-system.git /opt/fd-edu-system
-cd /opt/fd-edu-system
+sudo mkdir -p /opt/lingcoo-edu-system
+sudo chown -R "$USER":"$USER" /opt/lingcoo-edu-system
+git clone git@github.com:LingcooTech/lingcoo-edu-system.git /opt/lingcoo-edu-system
+cd /opt/lingcoo-edu-system
 cp .env.example .env
 ```
 

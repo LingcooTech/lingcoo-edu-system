@@ -12,7 +12,7 @@
 
 `fd-edu-stack` 是一套独立的社区教室 / 小型培训机构招生、排课、消课和运营系统。
 
-它不依赖 `fd-core-stack`，也不复用 `fd-core-stack` 的数据库和 API。`fd-core-stack` 只作为工程架构参考：模块化单体、Fastify API、PostgreSQL、Drizzle、Redis、React 管理后台、Docker Compose 部署、资源式后台。
+它不依赖 `lingcoo-core-stack`，也不复用 `lingcoo-core-stack` 的数据库和 API。`lingcoo-core-stack` 只作为工程架构参考：模块化单体、Fastify API、PostgreSQL、Drizzle、Redis、React 管理后台、Docker Compose 部署、资源式后台。
 
 目标不是只做美智优品内部工具，而是从第一天按可商业化产品设计，未来可以卖给多个培训机构使用。
 
@@ -36,7 +36,7 @@ fd-edu-stack
 └── docker-compose.prod.yml
 ```
 
-如果希望更接近 `fd-core-stack` 的当前形态，也可以让 `api` 位于根目录，`admin-ui` 和 `public-web` 作为子项目。但长期商业化更建议显式拆出 `api` 目录，边界更清楚。
+如果希望更接近 `lingcoo-core-stack` 的当前形态，也可以让 `api` 位于根目录，`admin-ui` 和 `public-web` 作为子项目。但长期商业化更建议显式拆出 `api` 目录，边界更清楚。
 
 ### 2.2 Web 版本优先
 
@@ -119,7 +119,7 @@ MVP 可以只创建一个默认机构和一个默认校区，但数据库和 API
 
 - Admin UI：React + Vite + TypeScript
 - Public Web：React + Vite + TypeScript
-- UI 结构：参考 `fd-core-stack` 的资源式后台
+- UI 结构：参考 `lingcoo-core-stack` 的资源式后台
 - 页面策略：后台 table-first，表单和详情作为抽屉 / 独立详情页
 - 移动端：`public-web` 必须优先适配手机扫码场景
 
@@ -543,7 +543,7 @@ POST /v1/tenants/:tenantId/orders
 
 ## 8. Admin UI 信息架构
 
-参考 `fd-core-stack` 的资源式后台，而不是做成大设置页。
+参考 `lingcoo-core-stack` 的资源式后台，而不是做成大设置页。
 
 建议导航：
 
@@ -824,8 +824,8 @@ MVP 完成不以页面数量判断，而以下列闭环判断：
 
 ## 14. 不建议的做法
 
-- 不要把它做成 `fd-core-stack` 的一个 app。
-- 不要共用 `fd-core-stack` 的用户、订单、授权表。
+- 不要把它做成 `lingcoo-core-stack` 的一个 app。
+- 不要共用 `lingcoo-core-stack` 的用户、订单、授权表。
 - 不要第一版就做小程序。
 - 不要第一版就接支付。
 - 不要只做表单 CRUD，忽略线索转化、课时流水和排课冲突。
@@ -837,7 +837,7 @@ MVP 完成不以页面数量判断，而以下列闭环判断：
 下一步可以直接进入工程落地：
 
 1. 新建 `fd-edu-stack` repo。
-2. 从 `fd-core-stack` 复制工程思想，不复制业务代码。
+2. 从 `lingcoo-core-stack` 复制工程思想，不复制业务代码。
 3. 先实现 `system/auth/tenant` 三个基础模块。
 4. 再实现 `catalog/trial/crm`，跑通扫码报名到线索。
 5. 最后实现 `people/scheduling/attendance/lesson/finance`，跑通教学和消课。

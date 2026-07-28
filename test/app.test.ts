@@ -12,7 +12,7 @@ import { LessonNotificationService } from '../src/modules/notifications/lesson-n
 
 const testEnv: AppEnv = {
   NODE_ENV: 'test',
-  APP_NAME: 'fd-edu-system',
+  APP_NAME: 'lingcoo-edu-system',
   API_HOST: '127.0.0.1',
   API_PORT: 0,
   CORS_ORIGIN: 'http://localhost:5173',

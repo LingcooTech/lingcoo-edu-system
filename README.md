@@ -2,7 +2,7 @@
 
 独立的社区教室 / 小型培训机构招生、排课、签到、消课与运营系统。
 
-本项目不依赖 `fd-core-stack` 的 API 或数据库，只对齐其工程架构和 UI 标准：
+本项目不依赖 `lingcoo-core-stack` 的 API 或数据库，只对齐其工程架构和 UI 标准：
 
 - API：Fastify + TypeScript
 - 数据库：PostgreSQL + Drizzle ORM
@@ -22,6 +22,14 @@
 ├── scripts
 └── deploy
 ```
+
+微信小程序已拆分为独立仓库：
+
+- `LingcooTech/lingcoo-edu-mini-program`
+
+EasyDeploy 交付脚本也作为独立仓库维护：
+
+- `LingcooTech/lingcoo-easydeploy-edu-system-delivery`
 
 ## MVP 闭环
 

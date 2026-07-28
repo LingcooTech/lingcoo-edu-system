@@ -28,7 +28,7 @@ services:
       retries: 10
 
   api:
-    image: ${FD_EDU_RUNTIME_IMAGE:-ghcr.io/futuredecade/fd-edu-system:latest}
+    image: ${FD_EDU_RUNTIME_IMAGE:-ghcr.io/lingcootech/lingcoo-edu-system:latest}
     restart: unless-stopped
     init: true
     env_file:
@@ -64,7 +64,7 @@ services:
       start_period: 20s
 
   worker:
-    image: ${FD_EDU_RUNTIME_IMAGE:-ghcr.io/futuredecade/fd-edu-system:latest}
+    image: ${FD_EDU_RUNTIME_IMAGE:-ghcr.io/lingcootech/lingcoo-edu-system:latest}
     restart: unless-stopped
     init: true
     env_file:
