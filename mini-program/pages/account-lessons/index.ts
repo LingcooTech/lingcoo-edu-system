@@ -38,6 +38,7 @@ type RenewalAction = {
 
 type LessonAccountCard = LessonAccountItem & {
   balanceLabel: string;
+  periodLabel: string;
   renewal: RenewalAction | null;
   upcoming: CalendarEventItem[];
   attendance: AttendanceItem[];
@@ -233,7 +234,14 @@ Page({
         const renewal = renewals.get(item.id) ?? null;
         return {
           ...item,
-          balanceLabel: `${item.balance} 课时`,
+          balanceLabel: item.periodPackage
+            ? `${item.periodPackage.periodUnit === 'week' ? '周卡' : '月卡'} ${item.balance}/${
+                item.periodPackage.lessonCount
+              }`
+            : `${item.balance} 课时`,
+          periodLabel: item.periodPackage?.endsAt
+            ? `有效期至 ${new Date(item.periodPackage.endsAt).toLocaleDateString('zh-CN')}`
+            : '',
           renewal: renewal && !dismissed.has(renewal.key) ? renewal : null,
           upcoming,
           attendance: accountAttendance,
@@ -269,7 +277,7 @@ Page({
 
   async buildRenewals(lessonItems: LessonAccountItem[]): Promise<Map<string, RenewalAction>> {
     const lowBalanceItems = lessonItems.filter(
-      (item) => item.balance <= 3 && item.balance >= 0 && item.course?.slug,
+      (item) => !item.periodPackage && item.balance <= 3 && item.balance >= 0 && item.course?.slug,
     );
     const renewals = new Map<string, RenewalAction>();
     if (!lowBalanceItems.length) return renewals;

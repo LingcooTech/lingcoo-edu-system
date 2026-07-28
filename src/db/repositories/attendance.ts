@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -8,15 +8,109 @@ type AttendanceStatus = (typeof schema.attendanceStatusEnum.enumValues)[number];
 
 function lessonDeltaForStatus(
   status: AttendanceStatus,
-  options: { deductLesson?: boolean; lessonUnits?: number } = {},
+  options: { deductLesson?: boolean; lessonUnits?: number; periodPackage?: boolean } = {},
 ): number {
-  if (status === 'absent' && options.deductLesson === false) {
+  if (status === 'absent' && options.deductLesson === false && !options.periodPackage) {
     return 0;
   }
-  if (status === 'present' || status === 'late' || status === 'absent' || status === 'makeup') {
+  if (
+    status === 'present' ||
+    status === 'late' ||
+    status === 'absent' ||
+    status === 'makeup' ||
+    (status === 'leave' && options.periodPackage)
+  ) {
     return -(options.lessonUnits ?? 1);
   }
   return 0;
+}
+
+async function periodPackageForSession(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  input: { sessionId: string; studentId: string; courseId: string },
+) {
+  const [session] = await tx
+    .select({ startsAt: schema.classSessions.startsAt })
+    .from(schema.classSessions)
+    .where(eq(schema.classSessions.id, input.sessionId))
+    .limit(1);
+  if (!session) {
+    throw Object.assign(new Error('课次不存在'), { statusCode: 404 });
+  }
+
+  const contracts = await tx
+    .select({
+      startsAt: schema.courseContracts.startsAt,
+      endsAt: schema.courseContracts.endsAt,
+      billingType: schema.coursePackages.billingType,
+    })
+    .from(schema.courseContracts)
+    .innerJoin(
+      schema.coursePackages,
+      eq(schema.courseContracts.packageId, schema.coursePackages.id),
+    )
+    .where(
+      and(
+        eq(schema.courseContracts.studentId, input.studentId),
+        eq(schema.courseContracts.courseId, input.courseId),
+        ne(schema.courseContracts.status, 'cancelled'),
+        eq(schema.coursePackages.billingType, 'period'),
+      ),
+    );
+  if (contracts.length === 0) return false;
+
+  const valid = contracts.some(
+    (contract) =>
+      (!contract.startsAt || session.startsAt >= contract.startsAt) &&
+      (!contract.endsAt || session.startsAt <= contract.endsAt),
+  );
+  if (valid) return true;
+
+  const ordinaryContracts = await tx
+    .select({
+      startsAt: schema.courseContracts.startsAt,
+      endsAt: schema.courseContracts.endsAt,
+      billingType: schema.coursePackages.billingType,
+    })
+    .from(schema.courseContracts)
+    .leftJoin(schema.coursePackages, eq(schema.courseContracts.packageId, schema.coursePackages.id))
+    .where(
+      and(
+        eq(schema.courseContracts.studentId, input.studentId),
+        eq(schema.courseContracts.courseId, input.courseId),
+        eq(schema.courseContracts.status, 'active'),
+      ),
+    );
+  const hasValidOrdinaryContract = ordinaryContracts.some(
+    (contract) =>
+      contract.billingType !== 'period' &&
+      (!contract.startsAt || session.startsAt >= contract.startsAt) &&
+      (!contract.endsAt || session.startsAt <= contract.endsAt),
+  );
+  if (hasValidOrdinaryContract) return false;
+
+  throw Object.assign(new Error('该学员的周期卡不在本课次有效期内'), { statusCode: 422 });
+}
+
+async function ensurePeriodBalance(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  input: { studentId: string; courseId: string; required: number },
+) {
+  if (input.required <= 0) return;
+  const [account] = await tx
+    .select()
+    .from(schema.lessonAccounts)
+    .where(
+      and(
+        eq(schema.lessonAccounts.studentId, input.studentId),
+        eq(schema.lessonAccounts.courseId, input.courseId),
+      ),
+    )
+    .limit(1)
+    .for('update');
+  if (!account || account.balance < input.required) {
+    throw Object.assign(new Error('该学员本周期课时已用完'), { statusCode: 422 });
+  }
 }
 
 export async function listAttendanceForSession(db: Database, sessionId: string) {
@@ -104,10 +198,24 @@ export async function recordAttendance(
         continue;
       }
 
+      const billingCourseId = record.courseId ?? input.courseId;
+      const periodPackage = await periodPackageForSession(tx, {
+        sessionId: input.sessionId,
+        studentId: record.studentId,
+        courseId: billingCourseId,
+      });
       const lessonDelta = lessonDeltaForStatus(record.status, {
         deductLesson: record.deductLesson,
         lessonUnits: record.lessonUnits,
+        periodPackage,
       });
+      if (periodPackage && lessonDelta < 0) {
+        await ensurePeriodBalance(tx, {
+          studentId: record.studentId,
+          courseId: billingCourseId,
+          required: -lessonDelta,
+        });
+      }
       const [attendanceRecord] = await tx
         .insert(schema.attendanceRecords)
         .values({
@@ -123,7 +231,7 @@ export async function recordAttendance(
       if (lessonDelta !== 0) {
         await applyLessonDelta(tx, {
           studentId: record.studentId,
-          courseId: record.courseId ?? input.courseId,
+          courseId: billingCourseId,
           type: 'consume',
           amount: lessonDelta,
           relatedEntityType: 'class_session',
@@ -171,11 +279,24 @@ export async function updateAttendanceRecord(
       return null;
     }
 
+    const periodPackage = await periodPackageForSession(tx, {
+      sessionId: input.sessionId,
+      studentId: input.studentId,
+      courseId: input.courseId,
+    });
     const nextLessonDelta = lessonDeltaForStatus(input.status, {
       deductLesson: input.deductLesson,
       lessonUnits: input.lessonUnits,
+      periodPackage,
     });
     const lessonDeltaAdjustment = nextLessonDelta - existing.lessonDelta;
+    if (periodPackage && lessonDeltaAdjustment < 0) {
+      await ensurePeriodBalance(tx, {
+        studentId: input.studentId,
+        courseId: input.courseId,
+        required: -lessonDeltaAdjustment,
+      });
+    }
     const [updated] = await tx
       .update(schema.attendanceRecords)
       .set({

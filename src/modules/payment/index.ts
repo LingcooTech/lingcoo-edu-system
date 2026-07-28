@@ -114,6 +114,9 @@ export const paymentModule: AppModule = {
       if (pkg.status !== 'active') {
         throw httpError(422, '该课时包已下架');
       }
+      if (packagesRepo.isPeriodPackage(pkg)) {
+        throw httpError(422, '周期卡请联系老师办理并确认生效日期');
+      }
       const [course, organization] = await Promise.all([
         resolvePackageCourse(app.db, pkg, body.courseId),
         organizationRepo.requireOrganization(app.db),

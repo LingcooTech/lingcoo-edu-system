@@ -6,6 +6,7 @@ import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
 import * as crmRepo from '../../db/repositories/crm.js';
+import * as lessonRepo from '../../db/repositories/lesson.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import * as schedulingRepo from '../../db/repositories/scheduling.js';
@@ -2125,6 +2126,7 @@ export const teachingModule: AppModule = {
       '/public/teacher/dashboard',
       { preHandler: app.requireRole('teacher') },
       async (request) => {
+        await courseContractsRepo.expirePeriodPackageContracts(app.db);
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const account = { ...access.account, teacherId: access.teacherId };
         const dataScope = await resolveTeacherDataScope(access);
@@ -2136,8 +2138,11 @@ export const teachingModule: AppModule = {
           classrooms,
           campuses,
           students,
+          guardians,
+          accounts,
           attendanceRecords,
           lessonAccounts,
+          periodContracts,
         ] = await Promise.all([
           schedulingRepo.listClassSessions(app.db),
           schedulingRepo.listClasses(app.db),
@@ -2145,14 +2150,41 @@ export const teachingModule: AppModule = {
           teachingRepo.listClassrooms(app.db),
           organizationRepo.listCampuses(app.db),
           peopleRepo.listStudents(app.db),
+          peopleRepo.listGuardians(app.db),
+          accountsRepo.listAccounts(app.db),
           app.db.select().from(schema.attendanceRecords),
           app.db.select().from(schema.lessonAccounts),
+          app.db
+            .select({
+              id: schema.courseContracts.id,
+              studentId: schema.courseContracts.studentId,
+              courseId: schema.courseContracts.courseId,
+              lessonCount: schema.courseContracts.lessonCount,
+              startsAt: schema.courseContracts.startsAt,
+              endsAt: schema.courseContracts.endsAt,
+              status: schema.courseContracts.status,
+              packageName: schema.coursePackages.name,
+              periodUnit: schema.coursePackages.periodUnit,
+              periodCount: schema.coursePackages.periodCount,
+            })
+            .from(schema.courseContracts)
+            .innerJoin(
+              schema.coursePackages,
+              eq(schema.courseContracts.packageId, schema.coursePackages.id),
+            )
+            .where(eq(schema.coursePackages.billingType, 'period')),
         ]);
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
         const classroomById = new Map(classrooms.map((item) => [item.id, item]));
         const campusById = new Map(campuses.map((item) => [item.id, item]));
         const studentById = new Map(students.map((item) => [item.id, item]));
+        const guardianById = new Map(guardians.map((item) => [item.id, item]));
+        const parentAccountByGuardianId = new Map(
+          accounts
+            .filter((account) => account.role === 'parent' && account.guardianId)
+            .map((account) => [account.guardianId!, account]),
+        );
         const lessonAccountByStudentCourse = new Map(
           lessonAccounts.map((item) => [`${item.studentId}:${item.courseId}`, item]),
         );
@@ -2332,34 +2364,69 @@ export const teachingModule: AppModule = {
         }
         const dashboardStudents = students
           .filter((student) => visibleStudentIds.has(student.id) && student.status !== 'archived')
-          .map((student) => ({
-            id: student.id,
-            name: student.name,
-            grade: student.grade,
-            school: student.school,
-            status: student.status,
-            institution: dataScope.institutionId
-              ? {
-                  id: dataScope.institutionId,
-                  name: dataScope.institution?.name ?? '所属机构',
-                }
-              : null,
-            isMyStudent: ownStudentIds.has(student.id),
-            classes: studentClasses.get(student.id) ?? [],
-            lessonAccounts: lessonAccounts
-              .filter(
-                (lessonAccount) =>
-                  lessonAccount.studentId === student.id &&
-                  visibleCourseIds.has(lessonAccount.courseId),
-              )
-              .map((lessonAccount) => ({
-                id: lessonAccount.id,
-                courseId: lessonAccount.courseId,
-                courseName: courseById.get(lessonAccount.courseId)?.name ?? '课程',
-                balance: lessonAccount.balance,
-                totalLessons: totalLessonsForAccount(lessonAccount, consumedByLessonAccountId),
-              })),
-          }))
+          .map((student) => {
+            const guardian = student.guardianId
+              ? (guardianById.get(student.guardianId) ?? null)
+              : null;
+            const parentAccount = student.guardianId
+              ? (parentAccountByGuardianId.get(student.guardianId) ?? null)
+              : null;
+            return {
+              id: student.id,
+              name: student.name,
+              grade: student.grade,
+              school: student.school,
+              status: student.status,
+              guardian: guardian
+                ? {
+                    id: guardian.id,
+                    name: guardian.name,
+                    phone: guardian.phone,
+                  }
+                : null,
+              parentAccount: parentAccount
+                ? {
+                    id: parentAccount.id,
+                    displayName: parentAccount.displayName,
+                    phone: parentAccount.phone,
+                    status: parentAccount.status,
+                  }
+                : null,
+              institution: dataScope.institutionId
+                ? {
+                    id: dataScope.institutionId,
+                    name: dataScope.institution?.name ?? '所属机构',
+                  }
+                : null,
+              isMyStudent: ownStudentIds.has(student.id),
+              classes: studentClasses.get(student.id) ?? [],
+              lessonAccounts: lessonAccounts
+                .filter(
+                  (lessonAccount) =>
+                    lessonAccount.studentId === student.id &&
+                    visibleCourseIds.has(lessonAccount.courseId),
+                )
+                .map((lessonAccount) => ({
+                  periodPackage:
+                    periodContracts
+                      .filter(
+                        (contract) =>
+                          contract.studentId === student.id &&
+                          contract.courseId === lessonAccount.courseId &&
+                          contract.status !== 'cancelled',
+                      )
+                      .sort(
+                        (left, right) =>
+                          (right.endsAt?.getTime() ?? 0) - (left.endsAt?.getTime() ?? 0),
+                      )[0] ?? null,
+                  id: lessonAccount.id,
+                  courseId: lessonAccount.courseId,
+                  courseName: courseById.get(lessonAccount.courseId)?.name ?? '课程',
+                  balance: lessonAccount.balance,
+                  totalLessons: totalLessonsForAccount(lessonAccount, consumedByLessonAccountId),
+                })),
+            };
+          })
           .sort(
             (a, b) =>
               Number(b.isMyStudent) - Number(a.isMyStudent) ||
@@ -3201,6 +3268,27 @@ export const teachingModule: AppModule = {
         }
         const correctedRecords = correctedResults.map((result) => result.attendanceRecord);
         const attendanceRecords = [...createdRecords, ...correctedRecords];
+        for (const record of attendanceRecords) {
+          const billingCourseId = billingCourseMap.get(record.studentId) ?? session.courseId;
+          const [contract] = await app.db
+            .select()
+            .from(schema.courseContracts)
+            .where(
+              and(
+                eq(schema.courseContracts.studentId, record.studentId),
+                eq(schema.courseContracts.courseId, billingCourseId),
+                eq(schema.courseContracts.status, 'active'),
+              ),
+            )
+            .limit(1);
+          if (contract) {
+            await lessonRepo.checkAndCompleteCourseContract(app.db, {
+              studentId: record.studentId,
+              courseId: billingCourseId,
+              contractId: contract.id,
+            });
+          }
+        }
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: [

@@ -66,9 +66,10 @@
             </view>
           </view>
           <view wx:if="{{item.description}}" class="body-text package-desc">{{item.description}}</view>
-          <button wx:if="{{onlinePackageSalesAllowed}}" class="package-button" data-id="{{item.id}}" bindtap="onBuyTap">
-            <text>购买课时包</text>
+          <button wx:if="{{onlinePackageSalesAllowed && item.billingType != 'period'}}" class="package-button" data-id="{{item.id}}" bindtap="onBuyTap">
+            <text>{{item.billingType == 'period' ? '购买周期卡' : '购买课时包'}}</text>
           </button>
+          <view wx:elif="{{item.billingType == 'period'}}" class="muted package-desc">请联系老师办理并确认生效日期</view>
         </view>
       </view>
       <view wx:else class="empty">{{onlinePackageSalesAllowed ? '课时包暂未上架，可先预约试听。' : '暂无常规课程参考方案，可先预约试听。'}}</view>
@@ -95,7 +96,7 @@
         ></view>
         <view class="row-between checkout-heading">
           <view>
-            <view class="section-title">购买课时包</view>
+            <view class="section-title">{{selectedPackage.billingType == 'period' ? '购买周期卡' : '购买课时包'}}</view>
             <view class="muted form-hint">{{selectedPackage.name}} · {{selectedPackage.lessonLabel}} · {{selectedPackage.priceLabel}}</view>
           </view>
           <view class="close-button" aria-role="button" aria-label="关闭" bindtap="closeCheckout">×</view>

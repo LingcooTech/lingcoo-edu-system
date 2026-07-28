@@ -297,7 +297,8 @@
           <view class="teacher-trial-main">
             <view class="teacher-trial-title">{{item.title}}</view>
             <view class="teacher-trial-meta">{{item.courseName}} · {{item.campusName}}</view>
-            <view class="teacher-trial-meta">授课：{{item.teacherName}} · 已确认 {{item.bookedCount}} 人</view>
+            <view class="teacher-trial-meta">授课：{{item.teacherName}}</view>
+            <view class="{{item.confirmationClassName}}">{{item.confirmationLabel}}</view>
           </view>
           <view class="teacher-trial-card-side">
             <view class="teacher-trial-status">{{item.statusLabel}}</view>
@@ -1222,7 +1223,7 @@
           <input class="academic-input" value="{{contractForm.title}}" data-field="title" bindinput="onContractInput" placeholder="可不填，默认使用课程名" />
           <view class="form-two-cols">
             <view>
-              <view class="form-label">课时数</view>
+              <view class="form-label">{{contractPackageOptions[contractPackageIndex].billingType == 'period' ? '周期课时上限' : '课时数'}}</view>
               <input class="academic-input" type="number" value="{{contractForm.lessonCount}}" data-field="lessonCount" bindinput="onContractInput" placeholder="必填" />
             </view>
             <view>
@@ -1247,9 +1248,10 @@
             </view>
             <view>
               <view class="form-label">结束日期</view>
-              <picker mode="date" value="{{contractForm.endsAt}}" data-field="endsAt" bindchange="onContractDateChange">
+              <picker mode="date" value="{{contractForm.endsAt}}" data-field="endsAt" bindchange="onContractDateChange" disabled="{{contractPackageOptions[contractPackageIndex].billingType == 'period'}}">
                 <view class="academic-picker">{{contractForm.endsAt || '选择结束日期'}}</view>
               </picker>
+              <view wx:if="{{contractPackageOptions[contractPackageIndex].billingType == 'period'}}" class="form-hint">按周期自动计算</view>
             </view>
           </view>
           <view class="form-label">备注</view>

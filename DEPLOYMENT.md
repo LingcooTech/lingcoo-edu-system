@@ -9,9 +9,9 @@ Production server must not build images locally.
 ## Target server
 
 - Host: `82.157.22.93`
-- Domain: `edu.futuredecade.com`
+- Domain: `edu.lingcoo.com`
 - Suggested path: `/opt/fd-edu-system`
-- Health check: `https://edu.futuredecade.com/ready`
+- Health check: `https://edu.lingcoo.com/ready`
 
 ## Required GitHub Secrets
 
@@ -31,7 +31,7 @@ Expected values for this project:
 ```text
 DEPLOY_HOST=82.157.22.93
 DEPLOY_PATH=/opt/fd-edu-system
-DEPLOY_HEALTHCHECK_URL=https://edu.futuredecade.com/ready
+DEPLOY_HEALTHCHECK_URL=https://edu.lingcoo.com/ready
 ```
 
 ## Server bootstrap
@@ -50,8 +50,8 @@ Production `.env` must use:
 NODE_ENV=production
 API_HOST=0.0.0.0
 API_PORT=8090
-CORS_ORIGIN=https://edu.futuredecade.com
-PUBLIC_WEB_BASE_URL=https://edu.futuredecade.com
+CORS_ORIGIN=https://edu.lingcoo.com
+PUBLIC_WEB_BASE_URL=https://edu.lingcoo.com
 CADDY_SITE_ADDRESS=:80
 FD_EDU_HTTP_PORT=18090
 FD_EDU_HTTPS_PORT=18446

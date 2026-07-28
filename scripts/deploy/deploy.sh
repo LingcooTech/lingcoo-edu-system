@@ -10,7 +10,7 @@ set -eu
 : "${IMAGE_TAG:?IMAGE_TAG is required}"
 
 DEPLOY_COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-docker-compose.prod.yml}"
-DEPLOY_HEALTHCHECK_URL="${DEPLOY_HEALTHCHECK_URL:-https://edu.futuredecade.com/ready}"
+DEPLOY_HEALTHCHECK_URL="${DEPLOY_HEALTHCHECK_URL:-https://edu.lingcoo.com/ready}"
 FD_EDU_RUNTIME_IMAGE="${FD_EDU_IMAGE_NAME}:${IMAGE_TAG}"
 APP_VERSION="${IMAGE_TAG}"
 
@@ -61,4 +61,3 @@ done
 
 echo "deployment health check failed"
 exit 1
-

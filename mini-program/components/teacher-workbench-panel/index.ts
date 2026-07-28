@@ -106,6 +106,9 @@ interface ContractPackageOption {
   label: string;
   lessonCount: number;
   priceAmount: number;
+  billingType: 'lesson' | 'period';
+  periodUnit?: 'week' | 'month' | null;
+  periodCount: number;
 }
 
 interface ContractClassOption {
@@ -181,6 +184,8 @@ type TeacherTrialSessionRow = TeacherTrialSession & {
   campusName: string;
   teacherName: string;
   statusLabel: string;
+  confirmationLabel: string;
+  confirmationClassName: string;
 };
 
 type TeacherTrialLeadRow = TeacherTrialLead & {
@@ -562,6 +567,10 @@ function dateToApiDateTime(value: string) {
   return value ? new Date(`${value}T00:00:00`).toISOString() : null;
 }
 
+function dateToApiEndDateTime(value: string) {
+  return value ? new Date(`${value}T23:59:59.999`).toISOString() : null;
+}
+
 function packageMatchesCourse(coursePackage: CoursePackage, course: Course | null) {
   if (!course) return false;
   if (coursePackage.courseId) return coursePackage.courseId === course.id;
@@ -601,7 +610,14 @@ function buildContractPackageOptions(
   selectedCourse: Course | null,
 ): ContractPackageOption[] {
   return [
-    { id: '', label: '自定义课时', lessonCount: 0, priceAmount: 0 },
+    {
+      id: '',
+      label: '自定义课时',
+      lessonCount: 0,
+      priceAmount: 0,
+      billingType: 'lesson' as const,
+      periodCount: 1,
+    },
     ...coursePackages
       .filter((item) => packageMatchesCourse(item, selectedCourse))
       .map((item) => {
@@ -609,12 +625,34 @@ function buildContractPackageOptions(
         const priceAmount = effectivePackagePrice(item);
         return {
           id: item.id,
-          label: `${item.name} · ${lessonCount}课时 · ¥${moneyYuan(priceAmount)}`,
+          label:
+            item.billingType === 'period'
+              ? `${item.name} · ${item.periodCount}${item.periodUnit === 'week' ? '周' : '个月'} · 上限${lessonCount}课时 · ¥${moneyYuan(priceAmount)}`
+              : `${item.name} · ${lessonCount}课时 · ¥${moneyYuan(priceAmount)}`,
           lessonCount,
           priceAmount,
+          billingType: item.billingType ?? 'lesson',
+          periodUnit: item.periodUnit,
+          periodCount: item.periodCount ?? 1,
         };
       }),
   ];
+}
+
+function periodEndDateKey(startsOn: string, coursePackage: ContractPackageOption) {
+  if (coursePackage.billingType !== 'period' || !coursePackage.periodUnit || !startsOn) return '';
+  const end = new Date(`${startsOn}T00:00:00`);
+  if (coursePackage.periodUnit === 'week') {
+    end.setDate(end.getDate() + coursePackage.periodCount * 7 - 1);
+  } else {
+    const originalDay = end.getDate();
+    end.setDate(1);
+    end.setMonth(end.getMonth() + coursePackage.periodCount);
+    const lastDay = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+    end.setDate(Math.min(originalDay, lastDay));
+    end.setDate(end.getDate() - 1);
+  }
+  return dateKey(end);
 }
 
 function packageFormPatch(
@@ -626,6 +664,10 @@ function packageFormPatch(
     lessonCount: String(coursePackage.lessonCount),
     paidYuan: String(moneyYuan(coursePackage.priceAmount)),
   };
+  if (coursePackage.billingType === 'period') {
+    patch.startsAt = currentForm.startsAt || dateKey(new Date());
+    patch.endsAt = periodEndDateKey(patch.startsAt, coursePackage);
+  }
   if (!(currentForm.title || '').trim()) {
     patch.title = coursePackage.label.split(' · ')[0];
   }
@@ -972,20 +1014,36 @@ Component({
         const trialTeacherById = new Map(
           (trialWorkbench.teachers ?? []).map((teacher) => [teacher.id, teacher]),
         );
-        const teacherTrialSessions = (trialWorkbench.sessions ?? []).map((session) => ({
-          ...session,
-          dateLabel: dateLabel(session.startsAt),
-          timeLabel: timeRange(session.startsAt, session.endsAt),
-          courseName:
-            session.course?.name || trialCourseById.get(session.courseId)?.name || '试听课程',
-          campusName:
-            session.campus?.name || trialCampusById.get(session.campusId)?.name || '校区待确认',
-          teacherName:
-            session.teacher?.name ||
-            (session.teacherId ? trialTeacherById.get(session.teacherId)?.name : '') ||
-            '老师待安排',
-          statusLabel: TRIAL_SESSION_STATUS_LABEL[session.status] || '试听安排',
-        }));
+        const teacherTrialSessions = (trialWorkbench.sessions ?? []).map((session) => {
+          const familyConfirmed = session.bookedCount > 0;
+          const confirmationLabel =
+            session.sessionMode === 'private_invite'
+              ? familyConfirmed
+                ? '家长已确认'
+                : '待家长确认'
+              : session.sessionMode === 'lead_scheduled'
+                ? '已约试听'
+                : `已预约 ${session.bookedCount}/${session.capacity}`;
+          return {
+            ...session,
+            dateLabel: dateLabel(session.startsAt),
+            timeLabel: timeRange(session.startsAt, session.endsAt),
+            courseName:
+              session.course?.name || trialCourseById.get(session.courseId)?.name || '试听课程',
+            campusName:
+              session.campus?.name || trialCampusById.get(session.campusId)?.name || '校区待确认',
+            teacherName:
+              session.teacher?.name ||
+              (session.teacherId ? trialTeacherById.get(session.teacherId)?.name : '') ||
+              '老师待安排',
+            statusLabel: TRIAL_SESSION_STATUS_LABEL[session.status] || '试听安排',
+            confirmationLabel,
+            confirmationClassName:
+              familyConfirmed || session.sessionMode === 'lead_scheduled'
+                ? 'teacher-trial-confirmation confirmed'
+                : 'teacher-trial-confirmation pending',
+          };
+        });
         const pendingTeacherTrialSessions = teacherTrialSessions.filter(
           (session) => session.status === 'scheduled',
         );
@@ -1534,14 +1592,7 @@ Component({
       const packageIndex = Number(event.detail.value) || 0;
       const packageOptions = this.data.contractPackageOptions as ContractPackageOption[];
       const selectedPackage = packageOptions[packageIndex];
-      const patch: Partial<ContractCreateForm> = {};
-      if (selectedPackage?.id) {
-        patch.lessonCount = String(selectedPackage.lessonCount);
-        patch.paidYuan = String(moneyYuan(selectedPackage.priceAmount));
-        if (!((this.data.contractForm as ContractCreateForm).title || '').trim()) {
-          patch.title = selectedPackage.label.split(' · ')[0];
-        }
-      }
+      const patch = packageFormPatch(selectedPackage, this.data.contractForm as ContractCreateForm);
       this.setData({
         contractPackageIndex: packageIndex,
         contractForm: {
@@ -1554,10 +1605,16 @@ Component({
     onContractDateChange(event: MiniPickerEvent) {
       const field = event.currentTarget.dataset.field as 'startsAt' | 'endsAt' | undefined;
       if (!field) return;
+      const packageOptions = this.data.contractPackageOptions as ContractPackageOption[];
+      const selectedPackage = packageOptions[this.data.contractPackageIndex];
+      const value = String(event.detail.value || '');
       this.setData({
         contractForm: {
           ...(this.data.contractForm as ContractCreateForm),
-          [field]: String(event.detail.value || ''),
+          [field]: value,
+          ...(field === 'startsAt' && selectedPackage?.billingType === 'period'
+            ? { endsAt: periodEndDateKey(value, selectedPackage) }
+            : {}),
         },
       });
     },
@@ -1626,7 +1683,7 @@ Component({
           paidAmount: Math.round(paidYuan * 100),
           paymentMethod: form.paymentMethod,
           startsAt: dateToApiDateTime(form.startsAt),
-          endsAt: dateToApiDateTime(form.endsAt),
+          endsAt: dateToApiEndDateTime(form.endsAt),
           note: form.note.trim() || null,
         });
         wx.showToast({ title: '课程档案已创建', icon: 'success' });

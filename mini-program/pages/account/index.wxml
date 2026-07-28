@@ -51,10 +51,6 @@
           <text>登录手机号</text>
           <text>{{teacherProfile.account.phone || '未绑定'}}</text>
         </view>
-        <view class="teacher-account-row">
-          <text>登录邮箱</text>
-          <text>{{teacherProfile.account.email || '未绑定'}}</text>
-        </view>
       </view>
 
       <view class="teacher-profile-card">

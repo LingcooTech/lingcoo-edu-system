@@ -20,6 +20,9 @@ interface PackageForm {
   description: string;
   courseId: string;
   courseSeriesId: string;
+  billingType: 'lesson' | 'period';
+  periodUnit: 'week' | 'month';
+  periodCount: string;
   lessonCount: string;
   giftedLessonCount: string;
   priceYuan: string;
@@ -32,6 +35,9 @@ const emptyPackageForm: PackageForm = {
   description: '',
   courseId: '',
   courseSeriesId: '',
+  billingType: 'lesson',
+  periodUnit: 'month',
+  periodCount: '1',
   lessonCount: '12',
   giftedLessonCount: '0',
   priceYuan: '0',
@@ -48,6 +54,10 @@ function effectiveLessonCount(pkg: CoursePackage) {
 }
 
 function lessonLabel(pkg: CoursePackage) {
+  if (pkg.billingType === 'period') {
+    const unit = pkg.periodUnit === 'week' ? '周' : '个月';
+    return `${pkg.periodCount}${unit}内最多 ${pkg.lessonCount} 节`;
+  }
   return pkg.giftedLessonCount
     ? `${pkg.lessonCount} + 赠 ${pkg.giftedLessonCount} 节`
     : `${pkg.lessonCount} 节`;
@@ -107,6 +117,9 @@ export function PackagesPage({
       description: pkg.description ?? '',
       courseId: pkg.courseId ?? '',
       courseSeriesId: pkg.courseSeriesId ?? '',
+      billingType: pkg.billingType ?? 'lesson',
+      periodUnit: pkg.periodUnit === 'week' ? 'week' : 'month',
+      periodCount: String(pkg.periodCount ?? 1),
       lessonCount: String(pkg.lessonCount),
       giftedLessonCount: String(pkg.giftedLessonCount ?? 0),
       priceYuan: String(pkg.priceAmount / 100),
@@ -135,8 +148,12 @@ export function PackagesPage({
         description: form.description,
         courseId: form.courseId || null,
         courseSeriesId: form.courseSeriesId || null,
+        billingType: form.billingType,
+        periodUnit: form.billingType === 'period' ? form.periodUnit : null,
+        periodCount: form.billingType === 'period' ? Math.max(1, Number(form.periodCount) || 1) : 1,
         lessonCount: Number(form.lessonCount) || 1,
-        giftedLessonCount: Math.max(0, Number(form.giftedLessonCount) || 0),
+        giftedLessonCount:
+          form.billingType === 'period' ? 0 : Math.max(0, Number(form.giftedLessonCount) || 0),
         priceAmount: Math.round((Number(form.priceYuan) || 0) * 100),
         discountPriceAmount:
           form.discountPriceYuan.trim() === ''
@@ -321,7 +338,53 @@ export function PackagesPage({
           </Field>
         </FieldRow>
         <FieldRow>
-          <Field label="课时数(节)">
+          <Field label="计费方式">
+            <select
+              className="form-input"
+              value={form.billingType}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  billingType: event.target.value as PackageForm['billingType'],
+                  giftedLessonCount: event.target.value === 'period' ? '0' : form.giftedLessonCount,
+                })
+              }
+            >
+              <option value="lesson">普通课时包</option>
+              <option value="period">周期卡</option>
+            </select>
+          </Field>
+          {form.billingType === 'period' ? (
+            <Field label="有效周期" hint="每次购买对应一个周期">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="form-input"
+                  type="number"
+                  min={1}
+                  value={form.periodCount}
+                  onChange={(event) => setForm({ ...form, periodCount: event.target.value })}
+                />
+                <select
+                  className="form-input"
+                  value={form.periodUnit}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      periodUnit: event.target.value as PackageForm['periodUnit'],
+                    })
+                  }
+                >
+                  <option value="week">周</option>
+                  <option value="month">个月</option>
+                </select>
+              </div>
+            </Field>
+          ) : (
+            <div />
+          )}
+        </FieldRow>
+        <FieldRow>
+          <Field label={form.billingType === 'period' ? '周期内课时上限' : '课时数(节)'}>
             <input
               className="form-input"
               type="number"
@@ -335,6 +398,7 @@ export function PackagesPage({
               type="number"
               min={0}
               value={form.giftedLessonCount}
+              disabled={form.billingType === 'period'}
               onChange={(e) => setForm({ ...form, giftedLessonCount: e.target.value })}
             />
           </Field>

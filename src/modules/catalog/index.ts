@@ -73,6 +73,9 @@ const packageShape = {
   courseSeriesId: z.string().uuid().nullable().optional(),
   name: z.string().min(1),
   description: z.string(),
+  billingType: z.enum(['lesson', 'period']),
+  periodUnit: z.enum(['week', 'month']).nullable().optional(),
+  periodCount: z.number().int().positive(),
   lessonCount: z.number().int().positive(),
   giftedLessonCount: z.number().int().nonnegative(),
   priceAmount: z.number().int().nonnegative(),
@@ -84,6 +87,9 @@ const packageSchema = z
   .object({
     ...packageShape,
     description: packageShape.description.default(''),
+    billingType: packageShape.billingType.default('lesson'),
+    periodUnit: packageShape.periodUnit.default(null),
+    periodCount: packageShape.periodCount.default(1),
     giftedLessonCount: packageShape.giftedLessonCount.default(0),
     status: packageShape.status.default('active'),
   })
@@ -94,6 +100,10 @@ const packageSchema = z
   .refine((body) => !(body.courseId && body.courseSeriesId), {
     message: '课时包只能关联课程或课程系列其中一个',
     path: ['courseSeriesId'],
+  })
+  .refine((body) => body.billingType !== 'period' || Boolean(body.periodUnit), {
+    message: '周期卡必须设置周期单位',
+    path: ['periodUnit'],
   });
 
 const packageUpdateSchema = z
@@ -112,6 +122,18 @@ const packageUpdateSchema = z
   .refine((body) => !(body.courseId && body.courseSeriesId), {
     message: '课时包只能关联课程或课程系列其中一个',
     path: ['courseSeriesId'],
+  })
+  .refine(
+    (body) =>
+      body.billingType !== 'period' || body.periodUnit === 'week' || body.periodUnit === 'month',
+    {
+      message: '周期卡必须设置周期单位',
+      path: ['periodUnit'],
+    },
+  )
+  .refine((body) => body.billingType !== 'lesson' || !body.periodUnit, {
+    message: '普通课时包不能设置周期单位',
+    path: ['periodUnit'],
   });
 
 const courseSeriesSchema = z.object({
@@ -191,6 +213,9 @@ function normalizePackageCreate(
     ...body,
     courseId: body.courseId ?? null,
     courseSeriesId: body.courseSeriesId ?? null,
+    periodUnit: body.billingType === 'period' ? body.periodUnit : null,
+    periodCount: body.billingType === 'period' ? body.periodCount : 1,
+    giftedLessonCount: body.billingType === 'period' ? 0 : body.giftedLessonCount,
   };
 }
 
@@ -206,6 +231,13 @@ function normalizePackageUpdate(body: z.infer<typeof packageUpdateSchema>) {
   if ('courseSeriesId' in body) {
     patch.courseSeriesId = body.courseSeriesId ?? null;
     if (patch.courseSeriesId) patch.courseId = null;
+  }
+  if (body.billingType === 'lesson') {
+    patch.periodUnit = null;
+    patch.periodCount = 1;
+  }
+  if (body.billingType === 'period') {
+    patch.giftedLessonCount = 0;
   }
 
   return patch;

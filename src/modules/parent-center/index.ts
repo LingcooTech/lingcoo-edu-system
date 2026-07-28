@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, ne, or } from 'drizzle-orm';
 import * as accountsRepo from '../../db/repositories/accounts.js';
 import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as courseContractsRepo from '../../db/repositories/course-contracts.js';
 import * as notificationsRepo from '../../db/repositories/notifications.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as peopleRepo from '../../db/repositories/people.js';
@@ -432,17 +433,42 @@ export const parentCenterModule: AppModule = {
     });
 
     app.get('/public/me/lesson-accounts', { preHandler: app.requireParent }, async (request) => {
+      await courseContractsRepo.expirePeriodPackageContracts(app.db);
       const { students } = await resolveChildren(request.account!.id);
       const studentIds = students.map((s) => s.id);
       if (studentIds.length === 0) {
         return { lessonAccounts: [] };
       }
-      const [lessonAccounts, courses] = await Promise.all([
+      const [lessonAccounts, courses, periodContracts] = await Promise.all([
         app.db
           .select()
           .from(schema.lessonAccounts)
           .where(inArray(schema.lessonAccounts.studentId, studentIds)),
         catalogRepo.listCourses(app.db),
+        app.db
+          .select({
+            id: schema.courseContracts.id,
+            studentId: schema.courseContracts.studentId,
+            courseId: schema.courseContracts.courseId,
+            lessonCount: schema.courseContracts.lessonCount,
+            startsAt: schema.courseContracts.startsAt,
+            endsAt: schema.courseContracts.endsAt,
+            status: schema.courseContracts.status,
+            packageName: schema.coursePackages.name,
+            periodUnit: schema.coursePackages.periodUnit,
+            periodCount: schema.coursePackages.periodCount,
+          })
+          .from(schema.courseContracts)
+          .innerJoin(
+            schema.coursePackages,
+            eq(schema.courseContracts.packageId, schema.coursePackages.id),
+          )
+          .where(
+            and(
+              inArray(schema.courseContracts.studentId, studentIds),
+              eq(schema.coursePackages.billingType, 'period'),
+            ),
+          ),
       ]);
       const studentById = new Map(students.map((s) => [s.id, s]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
@@ -451,6 +477,17 @@ export const parentCenterModule: AppModule = {
           ...row,
           student: studentById.get(row.studentId),
           course: courseById.get(row.courseId) ?? null,
+          periodPackage:
+            periodContracts
+              .filter(
+                (contract) =>
+                  contract.studentId === row.studentId &&
+                  contract.courseId === row.courseId &&
+                  contract.status !== 'cancelled',
+              )
+              .sort(
+                (left, right) => (right.endsAt?.getTime() ?? 0) - (left.endsAt?.getTime() ?? 0),
+              )[0] ?? null,
         })),
       };
     });

@@ -186,6 +186,9 @@ export const financeModule: AppModule = {
         if (pkg.status !== 'active') {
           throw httpError(422, '该课时包已下架');
         }
+        if (packagesRepo.isPeriodPackage(pkg)) {
+          throw httpError(422, '周期卡请通过正式课程档案添加，以设置有效期');
+        }
         const course = await resolvePackageCourse(app.db, pkg, body.courseId);
         const [paymentReceiverInstitution, providerInstitution] = await Promise.all([
           teachingRepo.findInstitution(app.db, course.paymentReceiverInstitutionId),

@@ -30,6 +30,11 @@ function packageLessonCount(pkg: CoursePackage) {
 }
 
 function packageLessonLabel(pkg: CoursePackage) {
+  if (pkg.billingType === 'period') {
+    return `${pkg.periodCount}${pkg.periodUnit === 'week' ? '周' : '个月'} · 上限 ${
+      pkg.lessonCount
+    } 课时`;
+  }
   return pkg.giftedLessonCount
     ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
     : `${pkg.lessonCount} 课时`;
@@ -305,7 +310,7 @@ export function CourseDetailPage() {
                       {pkg.description ? (
                         <p className="text-ink-soft mt-3 text-sm leading-6">{pkg.description}</p>
                       ) : null}
-                      {onlinePackageSalesAllowed ? (
+                      {onlinePackageSalesAllowed && pkg.billingType !== 'period' ? (
                         <button
                           type="button"
                           className="pwbtn pwbtn-primary mt-5 w-full"
@@ -324,6 +329,8 @@ export function CourseDetailPage() {
                         >
                           购买课时包
                         </button>
+                      ) : pkg.billingType === 'period' ? (
+                        <div className="text-muted mt-4 text-sm">请联系老师办理并确认生效日期</div>
                       ) : null}
                     </div>
                   ))}

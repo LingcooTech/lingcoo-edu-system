@@ -37,6 +37,7 @@
               <view class="lesson-meta">
                 {{item.studentName}} · 更新 {{item.updatedAtLabel}}
               </view>
+              <view wx:if="{{item.periodLabel}}" class="lesson-meta">{{item.periodLabel}}</view>
             </view>
             <view class="lesson-balance">{{item.balanceLabel}}</view>
           </view>

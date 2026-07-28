@@ -2293,6 +2293,26 @@
   white-space: nowrap;
 }
 
+.teacher-trial-confirmation {
+  display: inline-flex;
+  margin-top: 9rpx;
+  border-radius: 999rpx;
+  font-size: 19rpx;
+  font-weight: 800;
+  line-height: 1;
+  padding: 8rpx 13rpx;
+}
+
+.teacher-trial-confirmation.confirmed {
+  background: #e9f3e9;
+  color: #47744d;
+}
+
+.teacher-trial-confirmation.pending {
+  background: #f2ece6;
+  color: #8c5d41;
+}
+
 .teacher-trial-status,
 .trial-lead-status {
   flex-shrink: 0;

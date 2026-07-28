@@ -107,6 +107,9 @@ export interface CoursePackage {
   courseSeriesId?: string | null;
   name: string;
   description: string;
+  billingType: 'lesson' | 'period';
+  periodUnit?: 'week' | 'month' | null;
+  periodCount: number;
   lessonCount: number;
   giftedLessonCount: number;
   priceAmount: number;

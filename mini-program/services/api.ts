@@ -38,6 +38,9 @@ export interface CoursePackage {
   courseSeriesId?: string | null;
   name: string;
   description: string;
+  billingType: 'lesson' | 'period';
+  periodUnit?: 'week' | 'month' | null;
+  periodCount: number;
   lessonCount: number;
   giftedLessonCount: number;
   priceAmount: number;
@@ -546,6 +549,16 @@ export interface ParentLessonAccount {
   updatedAt: string;
   student?: ParentChild | null;
   course?: Course | null;
+  periodPackage?: {
+    id: string;
+    lessonCount: number;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    status: string;
+    packageName: string;
+    periodUnit?: 'week' | 'month' | null;
+    periodCount: number;
+  } | null;
 }
 
 export interface ParentOrder {
@@ -905,6 +918,17 @@ export interface TeacherDashboardStudent {
   grade: string;
   school?: string | null;
   status?: string;
+  guardian: {
+    id: string;
+    name: string;
+    phone: string;
+  } | null;
+  parentAccount: {
+    id: string;
+    displayName: string;
+    phone?: string | null;
+    status: string;
+  } | null;
   institution?: { id: string; name: string } | null;
   isMyStudent: boolean;
   classes: Array<{
@@ -920,6 +944,16 @@ export interface TeacherDashboardStudent {
     courseName: string;
     balance: number;
     totalLessons: number;
+    periodPackage?: {
+      id: string;
+      lessonCount: number;
+      startsAt?: string | null;
+      endsAt?: string | null;
+      status: string;
+      packageName: string;
+      periodUnit?: 'week' | 'month' | null;
+      periodCount: number;
+    } | null;
   }>;
 }
 

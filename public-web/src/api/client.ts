@@ -289,10 +289,7 @@ export async function publicApi<T>(path: string, init: RequestInit = {}): Promis
     });
   } catch (error) {
     throw new Error(
-      toUserFacingMessage(
-        error instanceof Error ? error.message : '',
-        '网络请求失败，请检查网络',
-      ),
+      toUserFacingMessage(error instanceof Error ? error.message : '', '网络请求失败，请检查网络'),
     );
   }
 
@@ -463,6 +460,9 @@ export interface CoursePackage {
   courseSeriesId?: string | null;
   name: string;
   description: string;
+  billingType: 'lesson' | 'period';
+  periodUnit?: 'week' | 'month' | null;
+  periodCount: number;
   lessonCount: number;
   giftedLessonCount: number;
   priceAmount: number;

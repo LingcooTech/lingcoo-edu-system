@@ -95,6 +95,10 @@ function toDateTime(value: string) {
   return value ? new Date(`${value}T00:00:00+08:00`).toISOString() : undefined;
 }
 
+function toEndDateTime(value: string) {
+  return value ? new Date(`${value}T23:59:59.999+08:00`).toISOString() : undefined;
+}
+
 function contractSearchText(contract: CourseContract) {
   return [
     contract.contractNo,
@@ -136,9 +140,39 @@ function effectivePackageLessonCount(coursePackage: CoursePackage) {
 }
 
 function packageLessonLabel(coursePackage: CoursePackage) {
+  if (coursePackage.billingType === 'period') {
+    const unit = coursePackage.periodUnit === 'week' ? '周' : '个月';
+    return `${coursePackage.periodCount}${unit} · 上限 ${coursePackage.lessonCount} 节`;
+  }
   return coursePackage.giftedLessonCount
     ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
     : `${coursePackage.lessonCount} 节`;
+}
+
+function todayDateKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+function periodEndDateKey(startsOn: string, coursePackage: CoursePackage) {
+  if (coursePackage.billingType !== 'period' || !coursePackage.periodUnit || !startsOn) return '';
+  const start = new Date(`${startsOn}T00:00:00`);
+  const end = new Date(start);
+  if (coursePackage.periodUnit === 'week') {
+    end.setDate(end.getDate() + coursePackage.periodCount * 7 - 1);
+  } else {
+    const originalDay = end.getDate();
+    end.setDate(1);
+    end.setMonth(end.getMonth() + coursePackage.periodCount);
+    const lastDay = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+    end.setDate(Math.min(originalDay, lastDay));
+    end.setDate(end.getDate() - 1);
+  }
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(
+    end.getDate(),
+  ).padStart(2, '0')}`;
 }
 
 function giftSummary(contract: CourseContract) {
@@ -241,12 +275,19 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
 
   function applyPackage(next: ContractForm, coursePackage?: CoursePackage): ContractForm {
     if (!coursePackage) return next;
+    const startsAt =
+      coursePackage.billingType === 'period' ? next.startsAt || todayDateKey() : next.startsAt;
     return {
       ...next,
       packageId: coursePackage.id,
       title: next.title || coursePackage.name,
       lessonCount: String(effectivePackageLessonCount(coursePackage)),
       paidYuan: String(effectivePackagePrice(coursePackage) / 100),
+      startsAt,
+      endsAt:
+        coursePackage.billingType === 'period'
+          ? periodEndDateKey(startsAt, coursePackage)
+          : next.endsAt,
     };
   }
 
@@ -383,7 +424,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           paidAmount: Math.round((Number(form.paidYuan) || 0) * 100),
           paymentMethod: form.paymentMethod,
           startsAt: toDateTime(form.startsAt),
-          endsAt: toDateTime(form.endsAt),
+          endsAt: toEndDateTime(form.endsAt),
           note: form.note.trim() || null,
           gifts: gifts.map((gift) => ({
             courseId: gift.courseId,
@@ -392,7 +433,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             lessonCount: gift.lessonCount,
             reason: gift.reason,
             startsAt: toDateTime(gift.startsAt),
-            endsAt: toDateTime(gift.endsAt),
+            endsAt: toEndDateTime(gift.endsAt),
             note: gift.note.trim() || null,
           })),
         },
@@ -443,7 +484,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           paidAmount: Math.round((Number(form.paidYuan) || 0) * 100),
           paymentMethod: form.paymentMethod,
           startsAt: toDateTime(form.startsAt),
-          endsAt: toDateTime(form.endsAt),
+          endsAt: toEndDateTime(form.endsAt),
           note: form.note.trim() || null,
         },
       );
@@ -507,7 +548,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           lessonCount,
           reason: giftForm.reason,
           startsAt: toDateTime(giftForm.startsAt),
-          endsAt: toDateTime(giftForm.endsAt),
+          endsAt: toEndDateTime(giftForm.endsAt),
           note: giftForm.note.trim() || null,
         },
       );
@@ -625,7 +666,22 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               </div>
             ),
           },
-          { key: 'lessons', header: '课时', cell: (row) => `${row.lessonCount} 节` },
+          {
+            key: 'lessons',
+            header: '课时/周期',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">{row.lessonCount} 节</span>
+                <span className="cell-subtitle">
+                  {row.package?.billingType === 'period'
+                    ? `${row.startsAt ? new Date(row.startsAt).toLocaleDateString('zh-CN') : '-'} 至 ${
+                        row.endsAt ? new Date(row.endsAt).toLocaleDateString('zh-CN') : '-'
+                      }`
+                    : '普通课时包'}
+                </span>
+              </div>
+            ),
+          },
           { key: 'gifts', header: '赠课', cell: (row) => giftSummary(row) },
           { key: 'paid', header: '实收', cell: (row) => money(row.paidAmount) },
           {
@@ -817,7 +873,8 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
         </Field>
         {selectedPackage && (
           <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            默认添加 {effectivePackageLessonCount(selectedPackage)} 节课时，展示价{' '}
+            {selectedPackage.billingType === 'period' ? '周期课时上限' : '默认添加'}{' '}
+            {effectivePackageLessonCount(selectedPackage)} 节，展示价{' '}
             {money(effectivePackagePrice(selectedPackage))}
             {selectedPackage.discountPriceAmount !== null &&
             selectedPackage.discountPriceAmount !== undefined
@@ -834,7 +891,10 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           />
         </Field>
         <FieldRow>
-          <Field label="课时数" required>
+          <Field
+            label={selectedPackage?.billingType === 'period' ? '周期课时上限' : '课时数'}
+            required
+          >
             <input
               className="form-input"
               type="number"
@@ -886,15 +946,28 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               className="form-input"
               type="date"
               value={form.startsAt}
-              onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  startsAt: event.target.value,
+                  endsAt:
+                    selectedPackage?.billingType === 'period'
+                      ? periodEndDateKey(event.target.value, selectedPackage)
+                      : form.endsAt,
+                })
+              }
             />
           </Field>
-          <Field label="课程结束日期">
+          <Field
+            label="课程结束日期"
+            hint={selectedPackage?.billingType === 'period' ? '按周期自动计算' : undefined}
+          >
             <input
               className="form-input"
               type="date"
               value={form.endsAt}
               onChange={(event) => setForm({ ...form, endsAt: event.target.value })}
+              readOnly={selectedPackage?.billingType === 'period'}
             />
           </Field>
         </FieldRow>

@@ -185,6 +185,13 @@
   white-space: nowrap;
 }
 
+.balance {
+  max-width: 48%;
+  line-height: 1.35;
+  text-align: right;
+  white-space: normal;
+}
+
 .text-content,
 .teacher-feedback {
   margin-top: 18rpx;
@@ -208,6 +215,51 @@
   padding: 34rpx;
   color: #8b857c;
   font-size: 26rpx;
+}
+
+.guardian-account-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 26rpx 28rpx;
+}
+
+.guardian-account-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.guardian-account-name {
+  overflow: hidden;
+  color: #211f1c;
+  font-size: 28rpx;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guardian-account-phone {
+  margin-top: 7rpx;
+  color: #8b857c;
+  font-size: 23rpx;
+}
+
+.guardian-account-status {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #e9f3e9;
+  color: #47744d;
+  font-size: 21rpx;
+  font-weight: 800;
+  padding: 9rpx 16rpx;
+  white-space: nowrap;
+}
+
+.guardian-account-status.pending {
+  background: #f2ece6;
+  color: #8c5d41;
 }
 
 .class-option-stats {

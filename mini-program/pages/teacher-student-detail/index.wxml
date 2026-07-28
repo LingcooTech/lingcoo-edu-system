@@ -38,6 +38,23 @@
     </view>
 
     <block wx:if="{{activeTab == 'overview'}}">
+      <view class="section-title">关联家长账号</view>
+      <view wx:if="{{profile.parentAccount}}" class="card guardian-account-card">
+        <view class="guardian-account-main">
+          <view class="guardian-account-name">{{profile.parentAccount.displayName}}</view>
+          <view class="guardian-account-phone">{{profile.parentAccount.phoneLabel}}</view>
+        </view>
+        <view class="guardian-account-status">{{profile.parentAccount.statusLabel}}</view>
+      </view>
+      <view wx:elif="{{profile.guardian}}" class="card guardian-account-card">
+        <view class="guardian-account-main">
+          <view class="guardian-account-name">{{profile.guardian.name}}</view>
+          <view class="guardian-account-phone">{{profile.guardian.phone}}</view>
+        </view>
+        <view class="guardian-account-status pending">未开通账号</view>
+      </view>
+      <view wx:else class="card empty-card">暂未关联家长档案或家长账号。</view>
+
       <view class="section-title">所在班级</view>
       <view wx:if="{{classes.length}}" class="list">
         <view wx:for="{{classes}}" wx:key="id" class="card row-card">

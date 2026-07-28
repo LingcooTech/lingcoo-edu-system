@@ -1,4 +1,5 @@
 import { db, pool } from './db/client.js';
+import * as courseContractsRepo from './db/repositories/course-contracts.js';
 import * as trialRepo from './db/repositories/trial.js';
 import { loadEnv } from './lib/env.js';
 import { LessonNotificationService } from './modules/notifications/lesson-notification-service.js';
@@ -16,9 +17,11 @@ const lessonNotifications = new LessonNotificationService({
 
 const LESSON_REMINDER_INTERVAL_MS = 5 * 60 * 1000;
 const EXPIRED_TRIAL_CLOSE_INTERVAL_MS = 10 * 60 * 1000;
+const PERIOD_PACKAGE_EXPIRY_INTERVAL_MS = 10 * 60 * 1000;
 
 let lessonReminderRunning = false;
 let expiredTrialCloseRunning = false;
+let periodPackageExpiryRunning = false;
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
@@ -78,10 +81,26 @@ async function runExpiredTrialCloseTick() {
   }
 }
 
+async function runPeriodPackageExpiryTick() {
+  if (periodPackageExpiryRunning) return;
+  periodPackageExpiryRunning = true;
+  try {
+    const count = await courseContractsRepo.expirePeriodPackageContracts(db);
+    if (count > 0) {
+      writeLog('info', 'expired period packages completed', { count });
+    }
+  } catch (error) {
+    writeLog('error', 'period package expiry job failed', { err: serializeError(error) });
+  } finally {
+    periodPackageExpiryRunning = false;
+  }
+}
+
 writeLog('info', 'fd-edu worker started');
 
 void runLessonReminderTick();
 void runExpiredTrialCloseTick();
+void runPeriodPackageExpiryTick();
 
 const lessonReminderInterval = setInterval(() => {
   void runLessonReminderTick();
@@ -91,6 +110,10 @@ const expiredTrialCloseInterval = setInterval(() => {
   void runExpiredTrialCloseTick();
 }, EXPIRED_TRIAL_CLOSE_INTERVAL_MS);
 
+const periodPackageExpiryInterval = setInterval(() => {
+  void runPeriodPackageExpiryTick();
+}, PERIOD_PACKAGE_EXPIRY_INTERVAL_MS);
+
 const heartbeatInterval = setInterval(() => {
   writeLog('info', 'fd-edu worker heartbeat');
 }, 60_000);
@@ -99,6 +122,7 @@ async function shutdown(signal: string) {
   writeLog('info', 'fd-edu worker shutting down', { signal });
   clearInterval(lessonReminderInterval);
   clearInterval(expiredTrialCloseInterval);
+  clearInterval(periodPackageExpiryInterval);
   clearInterval(heartbeatInterval);
   await pool.end();
   process.exit(0);

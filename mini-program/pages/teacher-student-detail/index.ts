@@ -33,6 +33,19 @@ type StudentProfile = {
   totalLessons: number;
   totalStars: number;
   isMyStudent: boolean;
+  guardian: {
+    id: string;
+    name: string;
+    phone: string;
+  } | null;
+  parentAccount: {
+    id: string;
+    displayName: string;
+    phone?: string | null;
+    status: string;
+    statusLabel: string;
+    phoneLabel: string;
+  } | null;
 };
 
 type ClassRow = {
@@ -133,6 +146,12 @@ function formatDateTime(value: string) {
   )}`;
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return '未设置';
+  const date = new Date(value);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function calendarRange() {
   const from = new Date();
   from.setDate(from.getDate() - 365);
@@ -149,7 +168,8 @@ function ratingLabel(rating?: number | null) {
 
 function lessonCountLabel(balance?: number | null, totalLessons?: number | null) {
   const balanceLabel = balance === null || balance === undefined ? '-' : String(balance);
-  const totalLabel = totalLessons === null || totalLessons === undefined ? '-' : String(totalLessons);
+  const totalLabel =
+    totalLessons === null || totalLessons === undefined ? '-' : String(totalLessons);
   return `剩余${balanceLabel}/总计${totalLabel}`;
 }
 
@@ -263,14 +283,14 @@ Page({
         .filter((classGroup) => classGroup.students.some((item) => item.id === studentId))
         .map((classGroup) => {
           const classStudent = classGroup.students.find((item) => item.id === studentId);
-          const billingCourseId =
-            classStudent?.billingCourseId || classGroup.course?.id || '';
+          const billingCourseId = classStudent?.billingCourseId || classGroup.course?.id || '';
           const balance =
             (billingCourseId ? balanceByCourseId.get(billingCourseId) : undefined) ??
             classStudent?.lessonBalance;
           const lessonAccount = billingCourseId
             ? student?.lessonAccounts.find((item) => item.courseId === billingCourseId)
             : null;
+          const periodPackage = lessonAccount?.periodPackage;
           const metaLabel = [classGroup.course?.name || '课程', classGroup.teacher?.name || '']
             .filter(Boolean)
             .join(' · ');
@@ -281,7 +301,11 @@ Page({
             courseName: classGroup.course?.name || '课程',
             classroomName: classGroup.classroom?.name || '教室待确认',
             balance: balance === null || balance === undefined ? '-' : String(balance),
-            lessonCountLabel: lessonCountLabel(balance, lessonAccount?.totalLessons ?? null),
+            lessonCountLabel: periodPackage
+              ? `${periodPackage.periodUnit === 'week' ? '周卡' : '月卡'} · 剩余 ${
+                  balance ?? 0
+                }/${periodPackage.lessonCount} · 至${formatDateOnly(periodPackage.endsAt)}`
+              : lessonCountLabel(balance, lessonAccount?.totalLessons ?? null),
             metaLabel,
             teacherName: classGroup.teacher?.name || '',
             isMine: classGroup.isMine !== false,
@@ -381,6 +405,8 @@ Page({
       const profileStudent = (student ?? classOptionsPayload!.student) as
         | TeacherDashboardStudent
         | NonNullable<typeof classOptionsPayload>['student'];
+      const guardian = 'guardian' in profileStudent ? profileStudent.guardian : null;
+      const parentAccount = 'parentAccount' in profileStudent ? profileStudent.parentAccount : null;
       const optionBalance =
         classOptionsPayload?.lessonAccounts.reduce((sum, item) => sum + item.balance, 0) ?? 0;
       const totalBalance =
@@ -405,6 +431,14 @@ Page({
           totalLessons,
           totalStars,
           isMyStudent: 'isMyStudent' in profileStudent ? profileStudent.isMyStudent : true,
+          guardian,
+          parentAccount: parentAccount
+            ? {
+                ...parentAccount,
+                statusLabel: parentAccount.status === 'active' ? '正常' : '已停用',
+                phoneLabel: parentAccount.phone || guardian?.phone || '未绑定手机号',
+              }
+            : null,
         },
         classes: classRows,
         classOptions,

@@ -141,6 +141,11 @@ function effectivePackageLessonCount(coursePackage: CoursePackage) {
 }
 
 function packageLessonLabel(coursePackage: CoursePackage) {
+  if (coursePackage.billingType === 'period') {
+    return `${coursePackage.periodCount}${coursePackage.periodUnit === 'week' ? '周' : '个月'} · 上限 ${
+      coursePackage.lessonCount
+    } 节`;
+  }
   return coursePackage.giftedLessonCount
     ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
     : `${coursePackage.lessonCount} 节`;
@@ -153,7 +158,11 @@ export function OrdersPage() {
   const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
   const { data: packages } = useApiResource<CoursePackage>('/v1/course-packages', 'coursePackages');
   const activePackages = useMemo(
-    () => packages.filter((coursePackage) => coursePackage.status === 'active'),
+    () =>
+      packages.filter(
+        (coursePackage) =>
+          coursePackage.status === 'active' && coursePackage.billingType !== 'period',
+      ),
     [packages],
   );
 
@@ -609,18 +618,10 @@ export function OrdersPage() {
         }
       >
         <Field label="订单号">
-          <input
-            className="form-input"
-            value={cancelTarget?.orderNo || ''}
-            readOnly
-          />
+          <input className="form-input" value={cancelTarget?.orderNo || ''} readOnly />
         </Field>
         <Field label="学员">
-          <input
-            className="form-input"
-            value={cancelTarget?.student?.name || ''}
-            readOnly
-          />
+          <input className="form-input" value={cancelTarget?.student?.name || ''} readOnly />
         </Field>
         <Field label="作废原因" required>
           <select
@@ -651,7 +652,9 @@ export function OrdersPage() {
                 <span className="text-muted-foreground">订单号</span>
                 <span className="font-mono">{detailOrder.orderNo}</span>
                 <span className="text-muted-foreground">订单类型</span>
-                <span>{ORDER_TYPE_LABEL[detailOrder.orderType ?? ''] ?? detailOrder.orderType ?? '-'}</span>
+                <span>
+                  {ORDER_TYPE_LABEL[detailOrder.orderType ?? ''] ?? detailOrder.orderType ?? '-'}
+                </span>
                 <span className="text-muted-foreground">订单状态</span>
                 <span>
                   <StatusPill tone={statusToTone(detailOrder.status)} label={detailOrder.status} />
@@ -697,20 +700,31 @@ export function OrdersPage() {
               <h3 className="mb-3 text-sm font-semibold">收款方</h3>
               <div className="grid grid-cols-2 gap-y-3 text-sm">
                 <span className="text-muted-foreground">收款方类型</span>
-                <span>{PAYMENT_RECEIVER_TYPE_LABEL[detailOrder.paymentReceiverType ?? ''] ?? detailOrder.paymentReceiverType ?? '-'}</span>
+                <span>
+                  {PAYMENT_RECEIVER_TYPE_LABEL[detailOrder.paymentReceiverType ?? ''] ??
+                    detailOrder.paymentReceiverType ??
+                    '-'}
+                </span>
                 <span className="text-muted-foreground">收款方名称</span>
                 <span>{detailOrder.paymentReceiverName ?? '-'}</span>
               </div>
             </section>
 
-            {(detailOrder.status === 'cancelled' && detailOrder.cancelReason) && (
+            {detailOrder.status === 'cancelled' && detailOrder.cancelReason && (
               <section className="resource-card p-4">
                 <h3 className="mb-3 text-sm font-semibold">作废信息</h3>
                 <div className="grid grid-cols-2 gap-y-3 text-sm">
                   <span className="text-muted-foreground">作废原因</span>
-                  <span>{ORDER_CANCEL_REASON_LABEL[detailOrder.cancelReason] ?? detailOrder.cancelReason}</span>
+                  <span>
+                    {ORDER_CANCEL_REASON_LABEL[detailOrder.cancelReason] ??
+                      detailOrder.cancelReason}
+                  </span>
                   <span className="text-muted-foreground">作废时间</span>
-                  <span>{detailOrder.cancelledAt ? new Date(detailOrder.cancelledAt).toLocaleString('zh-CN') : '-'}</span>
+                  <span>
+                    {detailOrder.cancelledAt
+                      ? new Date(detailOrder.cancelledAt).toLocaleString('zh-CN')
+                      : '-'}
+                  </span>
                 </div>
               </section>
             )}
@@ -719,7 +733,10 @@ export function OrdersPage() {
               <section className="resource-card p-4">
                 <h3 className="mb-3 text-sm font-semibold">退款信息</h3>
                 {detailOrder.refundRequests.map((refund) => (
-                  <div key={refund.id} className="mb-3 space-y-2 rounded-md bg-slate-50 p-3 text-sm">
+                  <div
+                    key={refund.id}
+                    className="mb-3 space-y-2 rounded-md bg-slate-50 p-3 text-sm"
+                  >
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">退款状态</span>
                       <span>{REFUND_STATUS_LABEL[refund.status] ?? refund.status}</span>

@@ -188,6 +188,11 @@ function effectivePackageLessonCount(coursePackage: CoursePackage) {
 }
 
 function packageLessonLabel(coursePackage: CoursePackage) {
+  if (coursePackage.billingType === 'period') {
+    return `${coursePackage.periodCount}${coursePackage.periodUnit === 'week' ? '周' : '个月'} · 上限 ${
+      coursePackage.lessonCount
+    } 节`;
+  }
   return coursePackage.giftedLessonCount
     ? `${coursePackage.lessonCount} + 赠 ${coursePackage.giftedLessonCount} 节`
     : `${coursePackage.lessonCount} 节`;

@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
 import { httpError } from '../../lib/http-error.js';
 import { applyLessonDelta } from './lesson.js';
 import { effectivePackagePrice } from './packages.js';
+import * as packagesRepo from './packages.js';
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type DbOrTx = Database | Tx;
@@ -127,6 +128,118 @@ async function findPackage(db: DbOrTx, packageId: string) {
     .where(eq(schema.coursePackages.id, packageId))
     .limit(1);
   return coursePackage ?? null;
+}
+
+function rangesOverlap(
+  left: { startsAt?: Date | null; endsAt?: Date | null },
+  right: { startsAt?: Date | null; endsAt?: Date | null },
+) {
+  const leftStart = left.startsAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const leftEnd = left.endsAt?.getTime() ?? Number.POSITIVE_INFINITY;
+  const rightStart = right.startsAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const rightEnd = right.endsAt?.getTime() ?? Number.POSITIVE_INFINITY;
+  return leftStart <= rightEnd && rightStart <= leftEnd;
+}
+
+async function prepareContractPeriod(
+  tx: Tx,
+  input: CourseContractInput,
+  coursePackage: typeof schema.coursePackages.$inferSelect | null,
+  creditedAmountAlreadyApplied = 0,
+) {
+  const isPeriod = packagesRepo.isPeriodPackage(coursePackage);
+  const startsAt = isPeriod ? (input.startsAt ?? new Date()) : (input.startsAt ?? null);
+  const endsAt = isPeriod
+    ? (input.endsAt ?? packagesRepo.calculatePeriodEnd(startsAt!, coursePackage!))
+    : (input.endsAt ?? null);
+
+  if (isPeriod && (!endsAt || endsAt <= startsAt!)) {
+    throw httpError(422, '周期卡结束时间必须晚于开始时间');
+  }
+  if (
+    isPeriod &&
+    coursePackage &&
+    input.lessonCount !== packagesRepo.effectivePackageLessonCount(coursePackage)
+  ) {
+    throw httpError(422, '周期卡课时上限必须与所选课时包一致');
+  }
+
+  const existingContracts = await tx
+    .select({
+      contract: schema.courseContracts,
+      coursePackage: schema.coursePackages,
+    })
+    .from(schema.courseContracts)
+    .leftJoin(schema.coursePackages, eq(schema.courseContracts.packageId, schema.coursePackages.id))
+    .where(
+      and(
+        eq(schema.courseContracts.studentId, input.studentId),
+        eq(schema.courseContracts.courseId, input.courseId),
+        ne(schema.courseContracts.status, 'cancelled'),
+      ),
+    );
+
+  const expiredPeriodContracts = existingContracts.filter(
+    (row) =>
+      packagesRepo.isPeriodPackage(row.coursePackage) &&
+      row.contract.endsAt &&
+      row.contract.endsAt < (startsAt ?? new Date()),
+  );
+  const expiredActiveIds = expiredPeriodContracts
+    .filter((row) => row.contract.status === 'active')
+    .map((row) => row.contract.id);
+  if (expiredActiveIds.length > 0) {
+    await tx
+      .update(schema.courseContracts)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(inArray(schema.courseContracts.id, expiredActiveIds));
+  }
+
+  const currentContracts = existingContracts.filter(
+    (row) => !expiredPeriodContracts.some((expired) => expired.contract.id === row.contract.id),
+  );
+  const conflict = currentContracts.find(
+    (row) =>
+      (row.contract.status === 'active' || packagesRepo.isPeriodPackage(row.coursePackage)) &&
+      (isPeriod || packagesRepo.isPeriodPackage(row.coursePackage)) &&
+      (isPeriod && row.contract.status === 'active'
+        ? true
+        : rangesOverlap(
+            { startsAt, endsAt },
+            { startsAt: row.contract.startsAt, endsAt: row.contract.endsAt },
+          )),
+  );
+  if (conflict) {
+    throw httpError(422, '同一学员、同一课程不能同时使用周期卡和其他进行中课时档案');
+  }
+
+  const activeCurrentContracts = currentContracts.filter((row) => row.contract.status === 'active');
+  if (expiredPeriodContracts.length > 0 && activeCurrentContracts.length === 0) {
+    const [account] = await tx
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, input.studentId),
+          eq(schema.lessonAccounts.courseId, input.courseId),
+        ),
+      )
+      .limit(1)
+      .for('update');
+    const expiredBalance = Math.max(0, (account?.balance ?? 0) - creditedAmountAlreadyApplied);
+    if (expiredBalance > 0) {
+      await applyLessonDelta(tx, {
+        studentId: input.studentId,
+        courseId: input.courseId,
+        type: 'adjustment',
+        amount: -expiredBalance,
+        relatedEntityType: 'period_package_expiry',
+        relatedEntityId: expiredPeriodContracts[0]!.contract.id,
+      });
+    }
+  }
+
+  return { startsAt, endsAt };
 }
 
 async function findClassForUpdate(tx: Tx, classId: string) {
@@ -339,6 +452,7 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
   if (coursePackage?.courseSeriesId && course.courseSeriesId !== coursePackage.courseSeriesId) {
     throw httpError(422, '课时包与课程系列不匹配');
   }
+  const contractPeriod = await prepareContractPeriod(tx, input, coursePackage);
 
   let classGroup: typeof schema.classes.$inferSelect | null = null;
   let enrollment: typeof schema.classEnrollments.$inferSelect | null = null;
@@ -398,8 +512,8 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
       paymentReceiverType: input.paymentReceiverType,
       paymentReceiverInstitutionId: input.paymentReceiverInstitutionId ?? null,
       paymentReceiverName: input.paymentReceiverName ?? null,
-      startsAt: input.startsAt ?? null,
-      endsAt: input.endsAt ?? null,
+      startsAt: contractPeriod.startsAt,
+      endsAt: contractPeriod.endsAt,
       status: 'active',
       note: input.note ?? null,
       createdByAccountId: input.createdByAccountId ?? null,
@@ -525,6 +639,7 @@ async function createCourseContractGiftInTx(
 }
 
 export async function listCourseContracts(db: Database) {
+  await expirePeriodPackageContracts(db);
   const [contracts, paymentRecords, gifts, students, courses, classes, packages, orders] =
     await Promise.all([
       db.select().from(schema.courseContracts).orderBy(desc(schema.courseContracts.createdAt)),
@@ -591,6 +706,71 @@ export async function listCourseContracts(db: Database) {
   }));
 }
 
+export async function expirePeriodPackageContracts(db: Database, now = new Date()) {
+  return db.transaction(async (tx) => {
+    const expired = (
+      await tx
+        .select({
+          contract: schema.courseContracts,
+          billingType: schema.coursePackages.billingType,
+        })
+        .from(schema.courseContracts)
+        .innerJoin(
+          schema.coursePackages,
+          eq(schema.courseContracts.packageId, schema.coursePackages.id),
+        )
+        .where(eq(schema.courseContracts.status, 'active'))
+        .for('update')
+    ).filter(
+      (row) =>
+        row.billingType === 'period' && Boolean(row.contract.endsAt && row.contract.endsAt < now),
+    );
+
+    for (const row of expired) {
+      await tx
+        .update(schema.courseContracts)
+        .set({ status: 'completed', updatedAt: now })
+        .where(eq(schema.courseContracts.id, row.contract.id));
+
+      const [otherActive] = await tx
+        .select({ id: schema.courseContracts.id })
+        .from(schema.courseContracts)
+        .where(
+          and(
+            eq(schema.courseContracts.studentId, row.contract.studentId),
+            eq(schema.courseContracts.courseId, row.contract.courseId),
+            eq(schema.courseContracts.status, 'active'),
+          ),
+        )
+        .limit(1);
+      if (otherActive) continue;
+
+      const [account] = await tx
+        .select()
+        .from(schema.lessonAccounts)
+        .where(
+          and(
+            eq(schema.lessonAccounts.studentId, row.contract.studentId),
+            eq(schema.lessonAccounts.courseId, row.contract.courseId),
+          ),
+        )
+        .limit(1)
+        .for('update');
+      if (!account || account.balance <= 0) continue;
+      await applyLessonDelta(tx, {
+        studentId: row.contract.studentId,
+        courseId: row.contract.courseId,
+        type: 'adjustment',
+        amount: -account.balance,
+        relatedEntityType: 'period_package_expiry',
+        relatedEntityId: row.contract.id,
+      });
+    }
+
+    return expired.length;
+  });
+}
+
 export async function createCourseContract(db: Database, input: CourseContractInput) {
   return db.transaction(async (tx) => createCourseContractInTx(tx, input));
 }
@@ -652,6 +832,25 @@ export async function createCourseContractFromPaidPackageOrderInTx(
   if (coursePackage.courseSeriesId && course.courseSeriesId !== coursePackage.courseSeriesId) {
     throw httpError(422, '课时包与课程系列不匹配');
   }
+  const contractInput: CourseContractInput = {
+    studentId: input.studentId,
+    courseId: order.courseId,
+    packageId: order.packageId,
+    lessonCount: order.lessonCount,
+    paidAmount: order.paidAmount || order.amount,
+    paymentMethod: onlineOrderPaymentMethod(order),
+    paymentReceiverType: order.paymentReceiverType,
+    paymentReceiverInstitutionId: order.paymentReceiverInstitutionId ?? null,
+    paymentReceiverName: order.paymentReceiverName ?? null,
+    startsAt: order.paidAt ?? new Date(),
+    endsAt: null,
+  };
+  const contractPeriod = await prepareContractPeriod(
+    tx,
+    contractInput,
+    coursePackage,
+    order.lessonCount,
+  );
 
   const paymentMethod = onlineOrderPaymentMethod(order);
   const note = '线上支付自动生成，待老师确认正式课程档案、分班与签约信息。';
@@ -671,8 +870,8 @@ export async function createCourseContractFromPaidPackageOrderInTx(
       paymentReceiverType: order.paymentReceiverType,
       paymentReceiverInstitutionId: order.paymentReceiverInstitutionId ?? null,
       paymentReceiverName: order.paymentReceiverName ?? null,
-      startsAt: null,
-      endsAt: null,
+      startsAt: contractPeriod.startsAt,
+      endsAt: contractPeriod.endsAt,
       status: 'active',
       note,
       createdByAccountId: null,

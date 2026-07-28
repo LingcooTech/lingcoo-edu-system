@@ -47,6 +47,11 @@ function packagePriceAmount(pkg: CoursePackage): number {
 }
 
 function packageLessonLabel(pkg: CoursePackage): string {
+  if (pkg.billingType === 'period') {
+    return `${pkg.periodCount}${pkg.periodUnit === 'week' ? '周' : '个月'} · 上限 ${
+      pkg.lessonCount
+    } 课时`;
+  }
   return pkg.giftedLessonCount
     ? `${pkg.lessonCount} 课时 + 赠 ${pkg.giftedLessonCount} 课时`
     : `${pkg.lessonCount} 课时`;
