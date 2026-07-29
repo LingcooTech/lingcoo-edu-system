@@ -751,7 +751,12 @@ export const teachingModule: AppModule = {
           sessions: visibleSessions,
           leads: access.isAdminTeacher
             ? leads
-                .filter((lead) => !lead.courseId || visibleCourseIds.has(lead.courseId))
+                .filter(
+                  (lead) =>
+                    lead.status === 'new' &&
+                    !lead.trialSessionId &&
+                    (!lead.courseId || visibleCourseIds.has(lead.courseId)),
+                )
                 .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
             : [],
           courses: institutionCourses.filter((course) => course.status === 'published'),
