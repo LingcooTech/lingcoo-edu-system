@@ -56,6 +56,12 @@ export interface WechatMiniSubscribeMessageResult {
   errmsg?: string;
 }
 
+export interface WechatMiniCodeInput {
+  page: string;
+  scene: string;
+  width?: number;
+}
+
 const accessTokenCache = new Map<string, { token: string; expiresAt: number }>();
 
 function requireWechatMiniConfig(env: AppEnv) {
@@ -109,10 +115,7 @@ export function getWechatMiniSubscribeTemplates(env: AppEnv): WechatMiniSubscrib
   return templates.filter((item) => Boolean(item.templateId));
 }
 
-export function getWechatMiniSubscribeTemplateId(
-  env: AppEnv,
-  key: WechatMiniSubscribeTemplateKey,
-) {
+export function getWechatMiniSubscribeTemplateId(env: AppEnv, key: WechatMiniSubscribeTemplateKey) {
   return getWechatMiniSubscribeTemplates(env).find((item) => item.key === key)?.templateId ?? '';
 }
 
@@ -167,6 +170,33 @@ async function getWechatAccessToken(env: AppEnv) {
     expiresAt: Date.now() + Math.max((payload.expires_in ?? 7200) - 300, 60) * 1000,
   });
   return payload.access_token;
+}
+
+export async function createWechatMiniCode(env: AppEnv, input: WechatMiniCodeInput) {
+  const accessToken = await getWechatAccessToken(env);
+  const url = new URL('https://api.weixin.qq.com/wxa/getwxacodeunlimit');
+  url.searchParams.set('access_token', accessToken);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      page: input.page.replace(/^\/+/, ''),
+      scene: input.scene,
+      width: input.width ?? 430,
+      check_path: false,
+      env_version: miniprogramState(env),
+    }),
+  });
+  if (!response.ok) {
+    throw httpError(502, `生成小程序码失败：${response.status}`);
+  }
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json') || contentType.includes('text/json')) {
+    const payload = (await response.json()) as WechatErrorPayload;
+    assertWechatSuccess(payload, '生成小程序码失败');
+    throw httpError(502, payload.errmsg || '微信未返回小程序码');
+  }
+  return Buffer.from(await response.arrayBuffer());
 }
 
 export async function getWechatMiniPhoneNumber(env: AppEnv, phoneCode: string) {

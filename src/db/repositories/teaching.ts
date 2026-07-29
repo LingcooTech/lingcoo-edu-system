@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -58,10 +58,23 @@ export async function updateTeacher(
 
 export async function setTrialConsultant(db: Database, teacherId: string) {
   return db.transaction(async (tx) => {
+    const [target] = await tx
+      .select()
+      .from(schema.teachers)
+      .where(eq(schema.teachers.id, teacherId))
+      .limit(1);
+    if (!target?.institutionId) {
+      return null;
+    }
     await tx
       .update(schema.teachers)
       .set({ isTrialConsultant: false, updatedAt: new Date() })
-      .where(eq(schema.teachers.isTrialConsultant, true));
+      .where(
+        and(
+          eq(schema.teachers.institutionId, target.institutionId),
+          eq(schema.teachers.isTrialConsultant, true),
+        ),
+      );
     const [teacher] = await tx
       .update(schema.teachers)
       .set({ isTrialConsultant: true, updatedAt: new Date() })

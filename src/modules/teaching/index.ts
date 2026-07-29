@@ -892,6 +892,33 @@ export const teachingModule: AppModule = {
       },
     );
 
+    app.post(
+      '/public/teacher/trials/:trialSessionId/cancel',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const { trialSessionId } = request.params as { trialSessionId: string };
+        const existing = await trialRepo.requireTrialSession(app.db, trialSessionId);
+        if (normalizeTrialStatus(existing.status, existing.endsAt) !== 'scheduled') {
+          throw Object.assign(new Error('只有待试听课次可以取消'), { statusCode: 422 });
+        }
+        const existingCourse = await catalogRepo.requireCourse(app.db, existing.courseId);
+        const dataScope = await resolveTeacherDataScope(access);
+        requireAdminTeacherAccess(access);
+        requireCourseInTeacherInstitution(existingCourse, dataScope.institutionId);
+        const trialSession = await trialRepo.cancelTrialSession(app.db, existing.id);
+        if (!trialSession) throw notFound('Trial session not found');
+        const leads = await crmRepo.listLeadsByTrialSession(app.db, existing.id);
+        for (const lead of leads) {
+          await crmRepo.updateLead(app.db, lead.id, {
+            trialSessionId: null,
+            status: 'contacted',
+          });
+        }
+        return { trialSession, updatedLeadCount: leads.length };
+      },
+    );
+
     app.patch(
       '/public/teacher/profile',
       { preHandler: app.requireRole('teacher') },
@@ -3887,9 +3914,11 @@ export const teachingModule: AppModule = {
       const body = teacherSchema.parse(request.body);
       if (
         body.isTrialConsultant &&
-        (body.status !== 'active' || (!body.phone.trim() && !body.wechatQrUrl?.trim()))
+        (!body.institutionId ||
+          body.status !== 'active' ||
+          (!body.phone.trim() && !body.wechatQrUrl?.trim()))
       ) {
-        throw Object.assign(new Error('试听咨询老师必须启用，并设置电话或微信二维码'), {
+        throw Object.assign(new Error('试听咨询老师必须绑定机构、保持启用并设置电话或微信二维码'), {
           statusCode: 422,
         });
       }
@@ -3910,19 +3939,23 @@ export const teachingModule: AppModule = {
       const current = await teachingRepo.findTeacher(app.db, teacherId);
       if (!current) throw notFound('Teacher not found');
       const nextStatus = body.status ?? current.status;
+      const nextInstitutionId =
+        body.institutionId === undefined ? current.institutionId : body.institutionId;
       const nextPhone = body.phone ?? current.phone ?? '';
       const nextWechatQrUrl = body.wechatQrUrl ?? current.wechatQrUrl ?? '';
       if (
         body.isTrialConsultant &&
-        (nextStatus !== 'active' || (!nextPhone.trim() && !nextWechatQrUrl.trim()))
+        (!nextInstitutionId ||
+          nextStatus !== 'active' ||
+          (!nextPhone.trim() && !nextWechatQrUrl.trim()))
       ) {
-        throw Object.assign(new Error('试听咨询老师必须启用，并设置电话或微信二维码'), {
+        throw Object.assign(new Error('试听咨询老师必须绑定机构、保持启用并设置电话或微信二维码'), {
           statusCode: 422,
         });
       }
       const patch = normalizeTeacherBody(body);
       if (body.isTrialConsultant) {
-        delete patch.isTrialConsultant;
+        patch.isTrialConsultant = false;
       } else if (
         current.isTrialConsultant &&
         (nextStatus !== 'active' || (!nextPhone.trim() && !nextWechatQrUrl.trim()))

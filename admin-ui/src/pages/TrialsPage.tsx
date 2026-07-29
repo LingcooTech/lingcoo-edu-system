@@ -215,6 +215,13 @@ export function TrialsPage() {
   const [qrSession, setQrSession] = useState<TrialSession | null>(null);
   const [qr, setQr] = useState<{ landingUrl: string; qrCodeDataUrl: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [formQrOpen, setFormQrOpen] = useState(false);
+  const [formQr, setFormQr] = useState<{
+    page: string;
+    scene: string;
+    qrCodeDataUrl: string;
+  } | null>(null);
+  const [formQrLoading, setFormQrLoading] = useState(false);
   const [registrationSession, setRegistrationSession] = useState<TrialSession | null>(null);
   const [registrations, setRegistrations] = useState<Lead[]>([]);
   const [seatReservations, setSeatReservations] = useState<SeatReservation[]>([]);
@@ -717,6 +724,23 @@ export function TrialsPage() {
     }
   }
 
+  async function openTrialFormQr() {
+    setFormQrOpen(true);
+    setFormQr(null);
+    setFormQrLoading(true);
+    try {
+      setFormQr(
+        await api<{ page: string; scene: string; qrCodeDataUrl: string }>(
+          '/v1/trial-registration/mini-code',
+        ),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '生成小程序码失败');
+    } finally {
+      setFormQrLoading(false);
+    }
+  }
+
   async function copyLanding() {
     if (!qr) return;
     try {
@@ -752,10 +776,16 @@ export function TrialsPage() {
     <PageFrame
       section="trials"
       actions={
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          新增试听
-        </button>
+        <div className="flex gap-2">
+          <button type="button" className="btn btn-secondary" onClick={openTrialFormQr}>
+            <QrCode className="h-4 w-4" />
+            预约表单小程序码
+          </button>
+          <button type="button" className="btn btn-primary" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            新增试听
+          </button>
+        </div>
       }
     >
       <DataTable
@@ -1558,6 +1588,33 @@ export function TrialsPage() {
             />
           </Field>
         </div>
+      </Drawer>
+
+      <Drawer
+        open={formQrOpen}
+        onClose={() => setFormQrOpen(false)}
+        title="预约表单小程序码"
+        description="家长扫码后直接选择意向校区、课程并填写联系方式。"
+      >
+        {formQrLoading ? (
+          <p className="text-muted-foreground text-sm">生成中...</p>
+        ) : formQr ? (
+          <div className="space-y-4">
+            <div className="flex justify-center rounded-xl border bg-white p-4">
+              <img src={formQr.qrCodeDataUrl} alt="预约表单小程序码" className="h-64 w-64" />
+            </div>
+            <p className="text-muted-foreground text-sm">
+              页面：{formQr.page}。可下载后用于门店物料、老师微信沟通或线下咨询。
+            </p>
+            <a
+              className="btn btn-primary w-full"
+              href={formQr.qrCodeDataUrl}
+              download="trial-registration-mini-code.png"
+            >
+              下载小程序码
+            </a>
+          </div>
+        ) : null}
       </Drawer>
 
       <Drawer

@@ -19,7 +19,11 @@ import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { resolvePublicWebBaseUrl } from '../../lib/public-url.js';
 import { readPublicProfile } from '../../lib/public-profile.js';
 import { readPublicSite } from '../../lib/public-site.js';
-import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
+import {
+  createWechatMiniCode,
+  exchangeWechatMiniCode,
+  getWechatMiniPhoneNumber,
+} from '../../lib/wechat-mini.js';
 import { sendTrialRegistrationSubscribe } from '../../lib/wechat-mini-subscribe-events.js';
 import { httpError } from '../../lib/http-error.js';
 import { hashPassword } from '../../lib/password.js';
@@ -268,17 +272,19 @@ export const trialModule: AppModule = {
       const organization = await organizationRepo.requireOrganization(app.db);
       const now = new Date();
 
-      const [courses, trialSessions, campuses, teachers, contentItems] = await Promise.all([
-        catalogRepo.listPublishedCourses(app.db),
-        trialRepo.listOpenFutureTrialSessions(app.db, {
-          from: now,
-          to: endOfCurrentWeek(now),
-          limit: 6,
-        }),
-        organizationRepo.listCampuses(app.db),
-        teachingRepo.listTeachers(app.db),
-        contentRepo.listPublishedContent(app.db, { limit: 5, offset: 0 }),
-      ]);
+      const [courses, trialSessions, campuses, classrooms, teachers, contentItems] =
+        await Promise.all([
+          catalogRepo.listPublishedCourses(app.db),
+          trialRepo.listOpenFutureTrialSessions(app.db, {
+            from: now,
+            to: endOfCurrentWeek(now),
+            limit: 6,
+          }),
+          organizationRepo.listCampuses(app.db),
+          teachingRepo.listClassrooms(app.db),
+          teachingRepo.listTeachers(app.db),
+          contentRepo.listPublishedContent(app.db, { limit: 5, offset: 0 }),
+        ]);
       const businessModel = readBusinessModel(organization.settings);
       const featuredCourses = await attachPackageSummary(app, courses, {
         showPackagePrice: businessModel.packagePriceDisplayEnabled,
@@ -299,6 +305,7 @@ export const trialModule: AppModule = {
         trialSessions,
         contentItems: contentItems.items,
         campuses,
+        classrooms: classrooms.filter((classroom) => classroom.status !== 'archived'),
         teachers: teachers
           .filter((teacher) => teacher.status !== 'archived')
           .slice(0, 5)
@@ -909,6 +916,17 @@ export const trialModule: AppModule = {
         });
       },
     );
+
+    app.get('/v1/trial-registration/mini-code', { preHandler: app.requireAdmin }, async () => {
+      const page = 'pages/trial-form/index';
+      const scene = 'source=offline_qr';
+      const image = await createWechatMiniCode(app.appEnv, { page, scene, width: 430 });
+      return {
+        page,
+        scene,
+        qrCodeDataUrl: `data:image/png;base64,${image.toString('base64')}`,
+      };
+    });
 
     app.get(
       '/v1/trial-sessions/:trialSessionId/qrcode',

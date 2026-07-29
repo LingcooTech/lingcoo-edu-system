@@ -577,8 +577,8 @@ export const teachers = pgTable(
     statusIdx: index('teachers_status_idx').on(table.status),
     institutionIdx: index('teachers_institution_idx').on(table.institutionId),
     trialConsultantUnique: uniqueIndex('teachers_trial_consultant_unique_idx')
-      .on(table.isTrialConsultant)
-      .where(sql`${table.isTrialConsultant} = true`),
+      .on(table.institutionId)
+      .where(sql`${table.isTrialConsultant} = true AND ${table.institutionId} IS NOT NULL`),
   }),
 );
 

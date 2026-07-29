@@ -185,7 +185,8 @@ export function TeachersPage({
           teachers.map((item) =>
             item.id === result.teacher.id
               ? result.teacher
-              : result.teacher.isTrialConsultant
+              : result.teacher.isTrialConsultant &&
+                  item.institutionId === result.teacher.institutionId
                 ? { ...item, isTrialConsultant: false }
                 : item,
           ),
@@ -196,7 +197,9 @@ export function TeachersPage({
         setTeachers([
           result.teacher,
           ...teachers.map((item) =>
-            result.teacher.isTrialConsultant ? { ...item, isTrialConsultant: false } : item,
+            result.teacher.isTrialConsultant && item.institutionId === result.teacher.institutionId
+              ? { ...item, isTrialConsultant: false }
+              : item,
           ),
         ]);
         surfaceSave(result);
@@ -386,7 +389,7 @@ export function TeachersPage({
           <span>
             <span className="block font-medium">设为试听咨询老师</span>
             <span className="text-muted-foreground mt-0.5 block text-xs">
-              全局只会保留一位，试听页优先展示其微信二维码和电话；必须启用并填写至少一种联系方式。
+              每个机构保留一位，试听页可按机构滑动切换；必须绑定机构、保持启用并填写至少一种联系方式。
             </span>
           </span>
         </label>
