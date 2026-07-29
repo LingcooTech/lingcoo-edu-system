@@ -55,6 +55,13 @@ export async function listClassSessionsForClass(db: Database, classId: string) {
     .orderBy(asc(schema.classSessions.startsAt));
 }
 
+export function shouldSyncEnrollmentToSession(
+  session: Pick<typeof schema.classSessions.$inferSelect, 'startsAt' | 'status'>,
+  joinedAt: Date,
+) {
+  return session.status !== 'cancelled' && session.startsAt >= joinedAt;
+}
+
 export async function listClassSessionTeachers(db: Database, sessionIds: string[]) {
   if (sessionIds.length === 0) {
     return [];
@@ -581,13 +588,48 @@ export async function createEnrollment(
       })
       .where(eq(schema.classEnrollments.id, existing.id))
       .returning();
-    await syncEnrollmentToScheduledSessions(db, enrollment);
+    await syncEnrollmentToEligibleSessions(db, enrollment);
     return enrollment;
   }
 
   const [enrollment] = await db.insert(schema.classEnrollments).values(values).returning();
-  await syncEnrollmentToScheduledSessions(db, enrollment);
+  await syncEnrollmentToEligibleSessions(db, enrollment);
   return enrollment;
+}
+
+async function ensureSessionRosterSnapshot(db: Database, sessionId: string) {
+  const rows = await listSessionStudentRows(db, sessionId);
+  if (rows.length > 0) return;
+  const legacyRoster = await listSessionRoster(db, sessionId);
+  if (legacyRoster.length === 0) return;
+  await replaceSessionRoster(
+    db,
+    sessionId,
+    legacyRoster.map((entry) => ({
+      studentId: entry.studentId,
+      billingCourseId: entry.billingCourseId,
+      source: entry.source === 'enrollment' ? 'enrollment' : 'session_only',
+    })),
+  );
+}
+
+async function syncEnrollmentToEligibleSessions(
+  db: Database,
+  enrollment: typeof schema.classEnrollments.$inferSelect,
+) {
+  const sessions = (await listClassSessionsForClass(db, enrollment.classId)).filter((session) =>
+    shouldSyncEnrollmentToSession(session, enrollment.joinedAt),
+  );
+  for (const session of sessions) {
+    await ensureSessionRosterSnapshot(db, session.id);
+    await upsertSessionStudent(db, {
+      classSessionId: session.id,
+      studentId: enrollment.studentId,
+      billingCourseId: enrollment.billingCourseId,
+      source: 'enrollment',
+      active: true,
+    });
+  }
 }
 
 async function syncEnrollmentToScheduledSessions(
@@ -645,7 +687,8 @@ export async function updateEnrollmentJoinedAt(
   if (enrollment) {
     const sessions = await listClassSessionsForClass(db, input.classId);
     for (const session of sessions) {
-      if (session.status === 'scheduled' && session.startsAt >= input.joinedAt) {
+      if (shouldSyncEnrollmentToSession(session, input.joinedAt)) {
+        await ensureSessionRosterSnapshot(db, session.id);
         await upsertSessionStudent(db, {
           classSessionId: session.id,
           studentId: enrollment.studentId,

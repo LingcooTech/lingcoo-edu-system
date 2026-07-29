@@ -546,7 +546,7 @@ export const teachingModule: AppModule = {
       let syncedCount = 0;
       for (const session of sessions) {
         await ensureSessionRosterSnapshot(session.id);
-        if (session.status === 'scheduled' && session.startsAt >= input.joinedAt) {
+        if (schedulingRepo.shouldSyncEnrollmentToSession(session, input.joinedAt)) {
           await schedulingRepo.upsertSessionStudent(app.db, {
             classSessionId: session.id,
             studentId: input.studentId,
