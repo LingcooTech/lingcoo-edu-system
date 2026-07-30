@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from 'node:crypto';
+
 import { z } from 'zod';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
@@ -15,10 +17,12 @@ import * as trialRepo from '../../db/repositories/trial.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as schema from '../../db/schema.js';
 import { readBusinessModel } from '../../lib/business-model.js';
+import { httpError } from '../../lib/http-error.js';
 import { hashPassword, defaultPasswordFromPhone } from '../../lib/password.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import { QiniuSettingsService } from '../../lib/qiniu-settings.js';
 import { requireTeacherPermission, resolveTeacherAccess } from '../../lib/teacher-permissions.js';
+import { exchangeWechatMiniCode, getWechatMiniPhoneNumber } from '../../lib/wechat-mini.js';
 import { LearningNotificationService } from '../notifications/learning-notification-service.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import { NotificationsService } from '../notifications/service.js';
@@ -52,6 +56,25 @@ const teacherSchema = z.object({
 });
 
 const teacherUpdateSchema = teacherSchema.partial();
+
+const guardianOnboardingConfirmationSchema = z
+  .object({
+    studentName: z.string().trim().min(1).max(120),
+    grade: z.string().trim().min(1).max(80),
+    school: z.string().trim().max(160).default(''),
+    guardianName: z.string().trim().min(1).max(120),
+    relation: z.string().trim().min(1).max(40).default('guardian'),
+    phoneCode: z.string().min(1).optional(),
+    phone: z.string().trim().min(6).max(40).optional(),
+    wechatMiniCode: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.phoneCode || value.phone), {
+    message: '请授权微信手机号',
+  });
+
+function guardianInvitationTokenHash(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 const teacherSelfProfileUpdateSchema = z
   .object({
@@ -1428,6 +1451,363 @@ export const teachingModule: AppModule = {
     );
 
     app.post(
+      '/public/teacher/students/:studentId/guardian-invitation',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const dataScope = await resolveTeacherDataScope(access);
+        const { studentId } = request.params as { studentId: string };
+        const student = await peopleRepo.findStudent(app.db, studentId);
+        if (!student || student.status === 'archived') throw notFound('Student not found');
+
+        const [classes, lessonAccounts, courses] = await Promise.all([
+          schedulingRepo.listClasses(app.db),
+          app.db
+            .select()
+            .from(schema.lessonAccounts)
+            .where(eq(schema.lessonAccounts.studentId, studentId)),
+          catalogRepo.listCourses(app.db),
+        ]);
+        const institutionCourseIds = new Set(
+          courses
+            .filter((course) => courseBelongsToTeacherInstitution(course, dataScope.institutionId))
+            .map((course) => course.id),
+        );
+        let teacherOwnsStudent = false;
+        for (const classGroup of classes.filter(
+          (item) =>
+            institutionCourseIds.has(item.courseId) &&
+            (item.teacherId === access.teacherId ||
+              (access.isAdminTeacher && dataScope.visibleTeacherIds.has(item.teacherId))),
+        )) {
+          const enrollments = await schedulingRepo.listEnrollments(app.db, classGroup.id);
+          if (enrollments.some((item) => item.studentId === studentId && !item.leftAt)) {
+            teacherOwnsStudent = true;
+            break;
+          }
+        }
+        const hasInstitutionAccount = lessonAccounts.some((item) =>
+          institutionCourseIds.has(item.courseId),
+        );
+        if (!teacherOwnsStudent && !(access.isAdminTeacher && hasInstitutionAccount)) {
+          throw httpError(403, '无权邀请该学员的家长');
+        }
+
+        const now = new Date();
+        await app.db
+          .update(schema.guardianOnboardingInvitations)
+          .set({ revokedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(schema.guardianOnboardingInvitations.studentId, studentId),
+              isNull(schema.guardianOnboardingInvitations.completedAt),
+              isNull(schema.guardianOnboardingInvitations.revokedAt),
+            ),
+          );
+        const token = randomBytes(24).toString('base64url');
+        const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const [invitation] = await app.db
+          .insert(schema.guardianOnboardingInvitations)
+          .values({
+            studentId,
+            institutionId: dataScope.institutionId,
+            tokenHash: guardianInvitationTokenHash(token),
+            createdByAccountId: request.account!.id,
+            expiresAt,
+          })
+          .returning();
+        return {
+          invitation: {
+            id: invitation.id,
+            status: 'pending',
+            expiresAt: invitation.expiresAt,
+            sharePath: `/pages/guardian-confirm/index?token=${encodeURIComponent(token)}`,
+          },
+        };
+      },
+    );
+
+    app.get('/public/guardian-onboarding/:token', async (request) => {
+      const { token } = request.params as { token: string };
+      const tokenHash = guardianInvitationTokenHash(token);
+      const [invitation] = await app.db
+        .select()
+        .from(schema.guardianOnboardingInvitations)
+        .where(eq(schema.guardianOnboardingInvitations.tokenHash, tokenHash))
+        .limit(1);
+      if (!invitation) throw notFound('邀请不存在或已失效');
+      if (invitation.revokedAt) throw httpError(410, '邀请已撤销，请联系老师重新发送');
+      if (invitation.completedAt) throw httpError(410, '资料已经确认，无需重复提交');
+      if (invitation.expiresAt <= new Date())
+        throw httpError(410, '邀请已过期，请联系老师重新发送');
+
+      const [student, institution, lessonAccounts, courses, transactions, contracts] =
+        await Promise.all([
+          peopleRepo.findStudent(app.db, invitation.studentId),
+          invitation.institutionId
+            ? teachingRepo.findInstitution(app.db, invitation.institutionId)
+            : Promise.resolve(null),
+          app.db
+            .select()
+            .from(schema.lessonAccounts)
+            .where(eq(schema.lessonAccounts.studentId, invitation.studentId)),
+          catalogRepo.listCourses(app.db),
+          app.db
+            .select()
+            .from(schema.lessonTransactions)
+            .where(eq(schema.lessonTransactions.studentId, invitation.studentId)),
+          app.db
+            .select({
+              id: schema.courseContracts.id,
+              courseId: schema.courseContracts.courseId,
+              lessonCount: schema.courseContracts.lessonCount,
+              startsAt: schema.courseContracts.startsAt,
+              endsAt: schema.courseContracts.endsAt,
+              status: schema.courseContracts.status,
+              packageName: schema.coursePackages.name,
+            })
+            .from(schema.courseContracts)
+            .leftJoin(
+              schema.coursePackages,
+              eq(schema.courseContracts.packageId, schema.coursePackages.id),
+            )
+            .where(eq(schema.courseContracts.studentId, invitation.studentId)),
+        ]);
+      if (!student || student.status === 'archived') throw notFound('学员档案不存在');
+      if (!invitation.openedAt) {
+        await app.db
+          .update(schema.guardianOnboardingInvitations)
+          .set({ openedAt: new Date(), updatedAt: new Date() })
+          .where(eq(schema.guardianOnboardingInvitations.id, invitation.id));
+      }
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const visibleCourseIds = new Set(
+        courses
+          .filter((course) => courseBelongsToTeacherInstitution(course, invitation.institutionId))
+          .map((course) => course.id),
+      );
+      const consumedByAccountId = consumedLessonsByAccountId(transactions);
+      return {
+        institution: institution
+          ? { id: institution.id, name: institution.name, logoUrl: institution.logoUrl }
+          : null,
+        student: {
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          school: student.school ?? '',
+        },
+        lessonAccounts: lessonAccounts
+          .filter((account) => visibleCourseIds.has(account.courseId))
+          .map((account) => {
+            const accountContracts = contracts
+              .filter(
+                (contract) =>
+                  contract.courseId === account.courseId && contract.status !== 'cancelled',
+              )
+              .sort(
+                (left, right) => (right.endsAt?.getTime() ?? 0) - (left.endsAt?.getTime() ?? 0),
+              );
+            const currentContract = accountContracts[0] ?? null;
+            return {
+              id: account.id,
+              courseName: courseById.get(account.courseId)?.name ?? '课程',
+              packageName: currentContract?.packageName ?? '课程档案',
+              balance: account.balance,
+              totalLessons: totalLessonsForAccount(account, consumedByAccountId),
+              startsAt: currentContract?.startsAt ?? null,
+              endsAt: currentContract?.endsAt ?? null,
+            };
+          }),
+        expiresAt: invitation.expiresAt,
+      };
+    });
+
+    app.post(
+      '/public/teacher/guardian-invitations/:invitationId/revoke',
+      { preHandler: app.requireRole('teacher') },
+      async (request) => {
+        const access = await requireTeacherAccessForAccount(request.account!.id);
+        const { invitationId } = request.params as { invitationId: string };
+        const [invitation] = await app.db
+          .select()
+          .from(schema.guardianOnboardingInvitations)
+          .where(eq(schema.guardianOnboardingInvitations.id, invitationId))
+          .limit(1);
+        if (!invitation) throw notFound('邀请不存在');
+        if (invitation.createdByAccountId !== request.account!.id && !access.isAdminTeacher) {
+          throw httpError(403, '无权撤销该邀请');
+        }
+        if (invitation.completedAt) throw httpError(409, '家长已经完成确认');
+        const [revoked] = await app.db
+          .update(schema.guardianOnboardingInvitations)
+          .set({ revokedAt: new Date(), updatedAt: new Date() })
+          .where(eq(schema.guardianOnboardingInvitations.id, invitation.id))
+          .returning();
+        return { invitation: revoked };
+      },
+    );
+
+    app.post('/public/guardian-onboarding/:token/confirm', async (request, reply) => {
+      const { token } = request.params as { token: string };
+      const body = guardianOnboardingConfirmationSchema.parse(request.body);
+      const tokenHash = guardianInvitationTokenHash(token);
+      const [invitation] = await app.db
+        .select()
+        .from(schema.guardianOnboardingInvitations)
+        .where(eq(schema.guardianOnboardingInvitations.tokenHash, tokenHash))
+        .limit(1);
+      if (!invitation) throw notFound('邀请不存在或已失效');
+      if (invitation.revokedAt || invitation.completedAt || invitation.expiresAt <= new Date()) {
+        throw httpError(410, '邀请已失效，请联系老师重新发送');
+      }
+      const wechatIdentity = body.wechatMiniCode
+        ? await exchangeWechatMiniCode(app.appEnv, body.wechatMiniCode)
+        : null;
+      if (!body.phoneCode && app.appEnv.NODE_ENV === 'production') {
+        throw httpError(422, '请使用微信手机号授权完成确认');
+      }
+      const phone = (
+        body.phoneCode ? await getWechatMiniPhoneNumber(app.appEnv, body.phoneCode) : body.phone
+      )?.trim();
+      if (!phone) throw httpError(422, '手机号不能为空');
+
+      const result = await app.db.transaction(async (tx) => {
+        const [existingGuardian] = await tx
+          .select()
+          .from(schema.guardians)
+          .where(eq(schema.guardians.phone, phone))
+          .limit(1);
+        const guardian =
+          existingGuardian ??
+          (
+            await tx.insert(schema.guardians).values({ name: body.guardianName, phone }).returning()
+          )[0];
+        if (existingGuardian && existingGuardian.name !== body.guardianName) {
+          await tx
+            .update(schema.guardians)
+            .set({ name: body.guardianName, updatedAt: new Date() })
+            .where(eq(schema.guardians.id, guardian.id));
+        }
+
+        const [existingAccount] = await tx
+          .select()
+          .from(schema.accounts)
+          .where(eq(schema.accounts.phone, phone))
+          .limit(1);
+        if (existingAccount && existingAccount.role !== 'parent') {
+          throw httpError(409, '该手机号已绑定其他工作账号，请联系管理员处理');
+        }
+        if (existingAccount && existingAccount.status !== 'active') {
+          throw httpError(403, '账号已停用');
+        }
+        const defaultPassword = defaultPasswordFromPhone(phone) ?? randomBytes(8).toString('hex');
+        const account =
+          existingAccount ??
+          (
+            await tx
+              .insert(schema.accounts)
+              .values({
+                role: 'parent',
+                phone,
+                passwordHash: hashPassword(defaultPassword),
+                displayName: body.guardianName,
+                guardianId: guardian.id,
+                mustChangePassword: true,
+              })
+              .returning()
+          )[0];
+        if (!account.guardianId) {
+          await tx
+            .update(schema.accounts)
+            .set({
+              guardianId: guardian.id,
+              displayName: body.guardianName,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.accounts.id, account.id));
+        }
+        const [student] = await tx
+          .select()
+          .from(schema.students)
+          .where(eq(schema.students.id, invitation.studentId))
+          .limit(1);
+        if (!student || student.status === 'archived') {
+          throw notFound('学员档案不存在');
+        }
+        if (student.guardianId && student.guardianId !== guardian.id) {
+          await tx
+            .insert(schema.studentGuardians)
+            .values({
+              studentId: invitation.studentId,
+              guardianId: student.guardianId,
+              relation: 'guardian',
+            })
+            .onConflictDoNothing();
+        }
+        await tx
+          .update(schema.students)
+          .set({
+            guardianId: guardian.id,
+            name: body.studentName,
+            grade: body.grade,
+            school: body.school || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.students.id, invitation.studentId));
+        await tx
+          .insert(schema.studentGuardians)
+          .values({
+            studentId: invitation.studentId,
+            guardianId: guardian.id,
+            relation: body.relation,
+          })
+          .onConflictDoUpdate({
+            target: [schema.studentGuardians.studentId, schema.studentGuardians.guardianId],
+            set: { relation: body.relation },
+          });
+
+        if (wechatIdentity) {
+          const [existingIdentity] = await tx
+            .select()
+            .from(schema.accountWechatIdentities)
+            .where(
+              and(
+                eq(schema.accountWechatIdentities.appId, wechatIdentity.appId),
+                eq(schema.accountWechatIdentities.openid, wechatIdentity.openid),
+              ),
+            )
+            .limit(1);
+          if (existingIdentity && existingIdentity.accountId !== account.id) {
+            throw httpError(409, '当前微信已绑定其他账号');
+          }
+          if (!existingIdentity) {
+            await tx.insert(schema.accountWechatIdentities).values({
+              accountId: account.id,
+              appId: wechatIdentity.appId,
+              openid: wechatIdentity.openid,
+              unionid: wechatIdentity.unionid ?? null,
+            });
+          }
+        }
+        await tx
+          .update(schema.guardianOnboardingInvitations)
+          .set({ completedAt: new Date(), updatedAt: new Date() })
+          .where(eq(schema.guardianOnboardingInvitations.id, invitation.id));
+        return { account, guardian };
+      });
+      const authToken = await reply.jwtSign(
+        { sub: result.account.id, role: 'parent' },
+        { expiresIn: '14d' },
+      );
+      return {
+        ok: true,
+        authToken,
+        message: '课时账户与家长资料已确认',
+      };
+    });
+
+    app.post(
       '/public/teacher/students',
       { preHandler: app.requireRole('teacher') },
       async (request) => {
@@ -2175,6 +2555,7 @@ export const teachingModule: AppModule = {
           attendanceRecords,
           lessonAccounts,
           periodContracts,
+          guardianInvitations,
         ] = await Promise.all([
           schedulingRepo.listClassSessions(app.db),
           schedulingRepo.listClasses(app.db),
@@ -2205,6 +2586,10 @@ export const teachingModule: AppModule = {
               eq(schema.courseContracts.packageId, schema.coursePackages.id),
             )
             .where(eq(schema.coursePackages.billingType, 'period')),
+          app.db
+            .select()
+            .from(schema.guardianOnboardingInvitations)
+            .orderBy(desc(schema.guardianOnboardingInvitations.createdAt)),
         ]);
         const classById = new Map(classes.map((item) => [item.id, item]));
         const courseById = new Map(courses.map((item) => [item.id, item]));
@@ -2217,6 +2602,15 @@ export const teachingModule: AppModule = {
             .filter((account) => account.role === 'parent' && account.guardianId)
             .map((account) => [account.guardianId!, account]),
         );
+        const latestGuardianInvitationByStudentId = new Map<
+          string,
+          typeof schema.guardianOnboardingInvitations.$inferSelect
+        >();
+        for (const invitation of guardianInvitations) {
+          if (!latestGuardianInvitationByStudentId.has(invitation.studentId)) {
+            latestGuardianInvitationByStudentId.set(invitation.studentId, invitation);
+          }
+        }
         const lessonAccountByStudentCourse = new Map(
           lessonAccounts.map((item) => [`${item.studentId}:${item.courseId}`, item]),
         );
@@ -2403,6 +2797,18 @@ export const teachingModule: AppModule = {
             const parentAccount = student.guardianId
               ? (parentAccountByGuardianId.get(student.guardianId) ?? null)
               : null;
+            const guardianInvitation = latestGuardianInvitationByStudentId.get(student.id) ?? null;
+            const guardianInvitationStatus = guardianInvitation
+              ? guardianInvitation.completedAt
+                ? 'completed'
+                : guardianInvitation.revokedAt
+                  ? 'revoked'
+                  : guardianInvitation.expiresAt <= new Date()
+                    ? 'expired'
+                    : guardianInvitation.openedAt
+                      ? 'opened'
+                      : 'pending'
+              : 'none';
             return {
               id: student.id,
               name: student.name,
@@ -2422,6 +2828,15 @@ export const teachingModule: AppModule = {
                     displayName: parentAccount.displayName,
                     phone: parentAccount.phone,
                     status: parentAccount.status,
+                  }
+                : null,
+              guardianInvitation: guardianInvitation
+                ? {
+                    id: guardianInvitation.id,
+                    status: guardianInvitationStatus,
+                    expiresAt: guardianInvitation.expiresAt,
+                    openedAt: guardianInvitation.openedAt,
+                    completedAt: guardianInvitation.completedAt,
                   }
                 : null,
               institution: dataScope.institutionId

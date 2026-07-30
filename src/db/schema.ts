@@ -1268,6 +1268,39 @@ export const studentGuardians = pgTable(
   }),
 );
 
+export const guardianOnboardingInvitations = pgTable(
+  'guardian_onboarding_invitations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    institutionId: uuid('institution_id').references(() => institutions.id, {
+      onDelete: 'set null',
+    }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tokenHashUnique: uniqueIndex('guardian_onboarding_invitations_token_hash_idx').on(
+      table.tokenHash,
+    ),
+    studentIdx: index('guardian_onboarding_invitations_student_idx').on(
+      table.studentId,
+      table.createdAt,
+    ),
+    expiresIdx: index('guardian_onboarding_invitations_expires_idx').on(table.expiresAt),
+  }),
+);
+
 // --- Infrastructure tables (settings, notifications) ---
 
 export const notificationRecipientEnum = pgEnum('notification_recipient', ['staff', 'parent']);

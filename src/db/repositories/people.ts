@@ -93,6 +93,15 @@ export async function findStudentForGuardian(
   return student ?? null;
 }
 
+export async function findStudent(db: Database, studentId: string) {
+  const [student] = await db
+    .select()
+    .from(schema.students)
+    .where(eq(schema.students.id, studentId))
+    .limit(1);
+  return student ?? null;
+}
+
 type StudentListScope = 'all' | 'current' | 'archived';
 
 export async function listStudents(db: Database, options: { scope?: StudentListScope } = {}) {
@@ -165,9 +174,7 @@ export async function hardDeleteStudent(db: Database, studentId: string) {
     }
 
     await tx.delete(schema.orders).where(eq(schema.orders.studentId, studentId));
-    await tx
-      .delete(schema.courseContracts)
-      .where(eq(schema.courseContracts.studentId, studentId));
+    await tx.delete(schema.courseContracts).where(eq(schema.courseContracts.studentId, studentId));
 
     const [student] = await tx
       .delete(schema.students)
