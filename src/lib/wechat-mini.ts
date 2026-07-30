@@ -84,6 +84,13 @@ function miniprogramState(env: AppEnv) {
   return env.WECHAT_MINI_PROGRAM_STATE ?? (env.NODE_ENV === 'production' ? 'formal' : 'developer');
 }
 
+function miniCodeEnvVersion(env: AppEnv) {
+  const state = miniprogramState(env);
+  if (state === 'formal') return 'release';
+  if (state === 'developer') return 'develop';
+  return 'trial';
+}
+
 export function getWechatMiniSubscribeTemplates(env: AppEnv): WechatMiniSubscribeTemplate[] {
   const templates: WechatMiniSubscribeTemplate[] = [
     {
@@ -184,7 +191,7 @@ export async function createWechatMiniCode(env: AppEnv, input: WechatMiniCodeInp
       scene: input.scene,
       width: input.width ?? 430,
       check_path: false,
-      env_version: miniprogramState(env),
+      env_version: miniCodeEnvVersion(env),
     }),
   });
   if (!response.ok) {
