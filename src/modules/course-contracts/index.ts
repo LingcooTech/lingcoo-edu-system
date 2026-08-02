@@ -6,11 +6,12 @@ import * as organizationRepo from '../../db/repositories/organization.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
 import * as lessonRepo from '../../db/repositories/lesson.js';
+import * as packagesRepo from '../../db/repositories/packages.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import type { AppModule } from '../types.js';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 
 const paymentMethodSchema = z.enum([
   'cash',
@@ -220,7 +221,6 @@ export const courseContractsModule: AppModule = {
         const { courseContractId } = request.params as { courseContractId: string };
         const body = courseContractSchema.partial().parse(request.body);
 
-        // Get the existing contract to check if lessonCount changed
         const [existingContract] = await app.db
           .select()
           .from(schema.courseContracts)
@@ -231,21 +231,165 @@ export const courseContractsModule: AppModule = {
           throw httpError(404, 'Course contract not found');
         }
 
-        const updateData: Record<string, unknown> = {};
+        const nextStudentId = body.studentId ?? existingContract.studentId;
+        const nextCourseId = body.courseId ?? existingContract.courseId;
+        const nextPackageId =
+          body.packageId === undefined ? existingContract.packageId : body.packageId;
+        const nextClassId = body.classId === undefined ? existingContract.classId : body.classId;
+        const nextLessonCount = body.lessonCount ?? existingContract.lessonCount;
+        const nextRemainingLessonCount =
+          existingContract.remainingLessonCount + (nextLessonCount - existingContract.lessonCount);
+        if (nextRemainingLessonCount < 0) {
+          throw httpError(422, '课时数不能低于该课时包已核销的课时数量');
+        }
 
-        if (body.title !== undefined) updateData.title = body.title || null;
-        if (body.lessonCount !== undefined) updateData.lessonCount = body.lessonCount;
-        if (body.paidAmount !== undefined) updateData.paidAmount = body.paidAmount;
-        if (body.paymentMethod !== undefined) updateData.paymentMethod = body.paymentMethod;
-        if (body.startsAt !== undefined) updateData.startsAt = normalizeDate(body.startsAt);
-        if (body.endsAt !== undefined) updateData.endsAt = normalizeDate(body.endsAt);
-        if (body.note !== undefined) updateData.note = body.note || null;
+        const defaults = await resolveContractDefaults({
+          courseId: nextCourseId,
+          paymentReceiverType:
+            body.paymentReceiverType ??
+            (nextCourseId === existingContract.courseId
+              ? existingContract.paymentReceiverType
+              : undefined),
+          paymentReceiverInstitutionId:
+            body.paymentReceiverInstitutionId ??
+            (nextCourseId === existingContract.courseId
+              ? existingContract.paymentReceiverInstitutionId
+              : undefined),
+          paymentReceiverName:
+            body.paymentReceiverName ??
+            (nextCourseId === existingContract.courseId
+              ? existingContract.paymentReceiverName
+              : undefined),
+        });
 
-        // Handle lesson count changes: recalculate balance as (new total - consumed)
         const result = await app.db.transaction(async (tx) => {
+          const [student, coursePackage] = await Promise.all([
+            tx
+              .select()
+              .from(schema.students)
+              .where(eq(schema.students.id, nextStudentId))
+              .limit(1)
+              .then((rows) => rows[0] ?? null),
+            nextPackageId
+              ? tx
+                  .select()
+                  .from(schema.coursePackages)
+                  .where(eq(schema.coursePackages.id, nextPackageId))
+                  .limit(1)
+                  .then((rows) => rows[0] ?? null)
+              : Promise.resolve(null),
+          ]);
+          if (!student) throw httpError(404, 'Student not found');
+          if (nextPackageId && !coursePackage) throw httpError(404, 'Course package not found');
+          if (
+            coursePackage?.status !== 'active' &&
+            coursePackage?.id !== existingContract.packageId
+          ) {
+            throw httpError(422, '该课时包已下架');
+          }
+          if (coursePackage?.courseId && coursePackage.courseId !== nextCourseId) {
+            throw httpError(422, '课时包与课程不匹配');
+          }
+          if (
+            coursePackage?.courseSeriesId &&
+            defaults.course.courseSeriesId !== coursePackage.courseSeriesId
+          ) {
+            throw httpError(422, '课时包与课程系列不匹配');
+          }
+
+          const isPeriod = packagesRepo.isPeriodPackage(coursePackage);
+          let startsAt =
+            body.startsAt === undefined ? existingContract.startsAt : normalizeDate(body.startsAt);
+          let endsAt =
+            body.endsAt === undefined ? existingContract.endsAt : normalizeDate(body.endsAt);
+          if (isPeriod) {
+            startsAt ??= new Date();
+            endsAt ??= packagesRepo.calculatePeriodEnd(startsAt, coursePackage!);
+            if (!endsAt || endsAt <= startsAt) {
+              throw httpError(422, '周期卡结束时间必须晚于开始时间');
+            }
+            if (nextLessonCount !== packagesRepo.effectivePackageLessonCount(coursePackage!)) {
+              throw httpError(422, '周期卡课时上限必须与所选课时包一致');
+            }
+            const periodContracts = await tx
+              .select({ contract: schema.courseContracts, coursePackage: schema.coursePackages })
+              .from(schema.courseContracts)
+              .leftJoin(
+                schema.coursePackages,
+                eq(schema.courseContracts.packageId, schema.coursePackages.id),
+              )
+              .where(
+                and(
+                  eq(schema.courseContracts.studentId, nextStudentId),
+                  eq(schema.courseContracts.courseId, nextCourseId),
+                  eq(schema.courseContracts.status, 'active'),
+                  ne(schema.courseContracts.id, existingContract.id),
+                ),
+              );
+            const startsAtMs = startsAt.getTime();
+            const endsAtMs = endsAt.getTime();
+            if (
+              periodContracts.some(
+                (row) =>
+                  packagesRepo.isPeriodPackage(row.coursePackage) &&
+                  (row.contract.startsAt?.getTime() ?? Number.NEGATIVE_INFINITY) <= endsAtMs &&
+                  startsAtMs <= (row.contract.endsAt?.getTime() ?? Number.POSITIVE_INFINITY),
+              )
+            ) {
+              throw httpError(422, '同一学员、同一课程的周期卡有效期不能重叠');
+            }
+          }
+
+          const identityChanged =
+            nextStudentId !== existingContract.studentId ||
+            nextCourseId !== existingContract.courseId;
+          const classChanged = nextClassId !== existingContract.classId || identityChanged;
+          const classGroup = classChanged
+            ? await courseContractsRepo.changeCourseContractClassInTx(tx, {
+                contractId: existingContract.id,
+                studentId: nextStudentId,
+                courseId: nextCourseId,
+                previousStudentId: existingContract.studentId,
+                previousCourseId: existingContract.courseId,
+                previousClassId: existingContract.classId,
+                classId: nextClassId,
+              })
+            : nextClassId
+              ? await tx
+                  .select()
+                  .from(schema.classes)
+                  .where(eq(schema.classes.id, nextClassId))
+                  .limit(1)
+                  .then((rows) => rows[0] ?? null)
+              : null;
+
+          const nextPaidAmount = body.paidAmount ?? existingContract.paidAmount;
+          const nextPaymentMethod = body.paymentMethod ?? existingContract.paymentMethod;
+          const nextNote = body.note === undefined ? existingContract.note : body.note || null;
+          const nextTitle =
+            body.title === undefined
+              ? existingContract.title
+              : body.title?.trim() || coursePackage?.name || `${defaults.course.name}正式课程`;
           const [courseContract] = await tx
             .update(schema.courseContracts)
-            .set({ ...updateData, updatedAt: new Date() })
+            .set({
+              studentId: nextStudentId,
+              courseId: nextCourseId,
+              classId: nextClassId,
+              packageId: nextPackageId,
+              title: nextTitle,
+              lessonCount: nextLessonCount,
+              remainingLessonCount: nextRemainingLessonCount,
+              paidAmount: nextPaidAmount,
+              paymentMethod: nextPaymentMethod,
+              paymentReceiverType: defaults.paymentReceiverType,
+              paymentReceiverInstitutionId: defaults.paymentReceiverInstitutionId,
+              paymentReceiverName: defaults.paymentReceiverName,
+              startsAt,
+              endsAt,
+              note: nextNote,
+              updatedAt: new Date(),
+            })
             .where(eq(schema.courseContracts.id, courseContractId))
             .returning();
 
@@ -253,23 +397,86 @@ export const courseContractsModule: AppModule = {
             throw httpError(404, 'Course contract not found');
           }
 
-          // Lesson accounts can have multiple sources (renewals and gifts), so
-          // contract edits must append a delta instead of replacing the balance.
-          if (body.lessonCount !== undefined && body.lessonCount !== existingContract.lessonCount) {
-            const amount = body.lessonCount - existingContract.lessonCount;
-            if (amount !== 0) {
-              await lessonRepo.applyLessonDelta(tx, {
-                studentId: courseContract.studentId,
-                courseId: courseContract.courseId,
-                type: 'adjustment',
-                amount,
-                relatedEntityType: 'course_contract',
-                relatedEntityId: courseContract.id,
-              });
+          const accountDelta = identityChanged
+            ? -existingContract.remainingLessonCount
+            : nextRemainingLessonCount - existingContract.remainingLessonCount;
+          if (accountDelta !== 0) {
+            const [oldAccount] = await tx
+              .select()
+              .from(schema.lessonAccounts)
+              .where(
+                and(
+                  eq(schema.lessonAccounts.studentId, existingContract.studentId),
+                  eq(schema.lessonAccounts.courseId, existingContract.courseId),
+                ),
+              )
+              .limit(1)
+              .for('update');
+            if ((oldAccount?.balance ?? 0) + accountDelta < 0) {
+              throw httpError(422, '课时数不能低于已使用或已调整的课时数量');
             }
+            await lessonRepo.applyLessonDelta(tx, {
+              studentId: existingContract.studentId,
+              courseId: existingContract.courseId,
+              type: 'adjustment',
+              amount: accountDelta,
+              relatedEntityType: identityChanged
+                ? 'course_contract_reassignment'
+                : 'course_contract',
+              relatedEntityId: courseContract.id,
+              courseContractId: courseContract.id,
+            });
+          }
+          if (identityChanged && nextRemainingLessonCount !== 0) {
+            await lessonRepo.applyLessonDelta(tx, {
+              studentId: nextStudentId,
+              courseId: nextCourseId,
+              type: 'adjustment',
+              amount: nextRemainingLessonCount,
+              relatedEntityType: 'course_contract_reassignment',
+              relatedEntityId: courseContract.id,
+              courseContractId: courseContract.id,
+            });
           }
 
-          return courseContract;
+          if (courseContract.orderId) {
+            await tx
+              .update(schema.orders)
+              .set({
+                studentId: nextStudentId,
+                courseId: nextCourseId,
+                courseSeriesId: coursePackage?.courseSeriesId ?? defaults.course.courseSeriesId,
+                packageId: nextPackageId,
+                amount: coursePackage
+                  ? packagesRepo.effectivePackagePrice(coursePackage)
+                  : nextPaidAmount,
+                paidAmount: nextPaidAmount,
+                lessonCount: nextLessonCount,
+                paymentReceiverType: defaults.paymentReceiverType,
+                paymentReceiverInstitutionId: defaults.paymentReceiverInstitutionId,
+                paymentReceiverName: defaults.paymentReceiverName,
+                paymentMethod: nextPaymentMethod,
+                offlinePaymentNote: nextNote,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.orders.id, courseContract.orderId));
+            await tx
+              .update(schema.courseContractPaymentRecords)
+              .set({
+                paidAmount: nextPaidAmount,
+                paymentMethod: nextPaymentMethod,
+                note: nextNote,
+              })
+              .where(eq(schema.courseContractPaymentRecords.courseContractId, courseContract.id));
+          }
+
+          return {
+            ...courseContract,
+            student,
+            course: defaults.course,
+            class: classGroup,
+            package: coursePackage,
+          };
         });
 
         return { courseContract: result };

@@ -60,6 +60,7 @@ export async function applyLessonDelta(
     amount: number;
     relatedEntityType?: string;
     relatedEntityId?: string;
+    courseContractId?: string | null;
   },
 ) {
   const account = await findOrCreateAccount(tx, {
@@ -79,6 +80,7 @@ export async function applyLessonDelta(
     .values({
       lessonAccountId: account.id,
       studentId: input.studentId,
+      courseContractId: input.courseContractId ?? null,
       type: input.type,
       amount: input.amount,
       balanceAfter,
@@ -116,20 +118,20 @@ export async function checkAndCompleteCourseContract(
   input: { studentId: string; courseId: string; contractId: string },
 ) {
   return db.transaction(async (tx) => {
-    const [account] = await tx
+    const [contract] = await tx
       .select()
-      .from(schema.lessonAccounts)
+      .from(schema.courseContracts)
       .where(
         and(
-          eq(schema.lessonAccounts.studentId, input.studentId),
-          eq(schema.lessonAccounts.courseId, input.courseId),
+          eq(schema.courseContracts.id, input.contractId),
+          eq(schema.courseContracts.studentId, input.studentId),
+          eq(schema.courseContracts.courseId, input.courseId),
         ),
       )
       .limit(1);
 
-    // If balance is 0 (all lessons consumed), mark contract as completed
-    if (account && account.balance === 0) {
-      const [contract] = await tx
+    if (contract?.remainingLessonCount === 0 && contract.status === 'active') {
+      const [updated] = await tx
         .update(schema.courseContracts)
         .set({ status: 'completed', updatedAt: new Date() })
         .where(
@@ -139,7 +141,7 @@ export async function checkAndCompleteCourseContract(
           ),
         )
         .returning();
-      return contract;
+      return updated;
     }
 
     return null;

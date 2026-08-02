@@ -18,6 +18,7 @@ const attendanceSchema = z.object({
       status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
       note: z.string().optional(),
       deductLesson: z.boolean().optional(),
+      courseContractId: z.string().uuid().nullable().optional(),
     }),
   ),
 });
@@ -26,6 +27,7 @@ const attendanceCorrectionSchema = z.object({
   status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
   note: z.string().optional(),
   deductLesson: z.boolean().optional(),
+  courseContractId: z.string().uuid().nullable().optional(),
 });
 
 const publicCheckInSchema = z.object({
@@ -238,6 +240,30 @@ export const attendanceModule: AppModule = {
     );
 
     app.get(
+      '/v1/class-sessions/:sessionId/attendance-sources',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { sessionId } = request.params as { sessionId: string };
+        const session = await schedulingRepo.findSession(app.db, sessionId);
+        if (!session) throw notFound('Class session not found');
+        const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
+        const lessonSourcesByStudentId = Object.fromEntries(
+          await Promise.all(
+            rosterEntries.map(async (entry) => [
+              entry.studentId,
+              await attendanceRepo.listAttendanceLessonSources(app.db, {
+                sessionId,
+                studentId: entry.studentId,
+                courseId: entry.billingCourseId,
+              }),
+            ]),
+          ),
+        );
+        return { lessonSourcesByStudentId };
+      },
+    );
+
+    app.get(
       '/v1/courses/:courseId/attendance-summary',
       { preHandler: app.requireAdmin },
       async (request) => {
@@ -368,6 +394,7 @@ export const attendanceModule: AppModule = {
             ...record,
             courseId: billingCourseMap.get(record.studentId),
             lessonUnits: session.lessonUnits,
+            courseContractId: record.courseContractId,
           })),
           completeSession: false,
         });
@@ -453,6 +480,7 @@ export const attendanceModule: AppModule = {
           deductLesson: body.deductLesson,
           lessonUnits: session.lessonUnits,
           courseId: billingCourseId,
+          courseContractId: body.courseContractId,
         });
         if (!result) {
           throw Object.assign(new Error('Attendance record not found'), { statusCode: 404 });

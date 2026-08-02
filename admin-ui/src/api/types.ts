@@ -446,7 +446,27 @@ export interface AttendanceRecord {
   studentId: string;
   status: AttendanceStatus;
   lessonDelta: number;
+  courseContractId?: string | null;
   note?: string | null;
+  lessonSource?: {
+    id: string;
+    title: string;
+    packageName?: string | null;
+    billingType?: string | null;
+    remainingLessonCount: number;
+  } | null;
+}
+
+export interface AttendanceLessonSource {
+  id: string;
+  title: string;
+  packageId?: string | null;
+  packageName?: string | null;
+  billingType: string;
+  lessonCount: number;
+  remainingLessonCount: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 
 export interface LessonAccount {
@@ -560,6 +580,7 @@ export interface CourseContract {
   contractNo: string;
   title: string;
   lessonCount: number;
+  remainingLessonCount: number;
   paidAmount: number;
   paymentMethod?: string | null;
   paymentReceiverType: 'platform' | 'provider' | 'other' | string;

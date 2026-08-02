@@ -206,6 +206,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [renewalSource, setRenewalSource] = useState<CourseContract | null>(null);
   const [organization, setOrganization] = useState<{
     businessModel: Pick<OrganizationSettings['businessModel'], 'courseContractEditEnabled'>;
   } | null>(null);
@@ -217,6 +218,15 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   const activePackages = useMemo(
     () => packages.filter((coursePackage) => coursePackage.status === 'active'),
     [packages],
+  );
+  const packagesForSelection = useMemo(
+    () =>
+      packages.filter(
+        (coursePackage) =>
+          coursePackage.status === 'active' ||
+          Boolean(editingId && coursePackage.id === form.packageId),
+      ),
+    [editingId, form.packageId, packages],
   );
   const courseById = useMemo(
     () => new Map(courses.map((course) => [course.id, course])),
@@ -234,19 +244,20 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   );
   const selectedCoursePackages = useMemo(
     () =>
-      activePackages.filter((coursePackage) =>
+      packagesForSelection.filter((coursePackage) =>
         form.courseId ? packageAppliesToCourse(coursePackage, form.courseId) : true,
       ),
-    [activePackages, form.courseId, packageAppliesToCourse],
+    [form.courseId, packageAppliesToCourse, packagesForSelection],
   );
   const selectedCourseClasses = useMemo(
     () =>
       classes.filter(
         (classGroup) =>
           classGroup.courseId === form.courseId &&
-          !['archived', 'completed'].includes(classGroup.status),
+          (!['archived', 'completed'].includes(classGroup.status) ||
+            Boolean(editingId && classGroup.id === form.classId)),
       ),
-    [classes, form.courseId],
+    [classes, editingId, form.classId, form.courseId],
   );
   const selectedPackage = selectedCoursePackages.find((item) => item.id === form.packageId);
   const activeGiftCourses = useMemo(
@@ -267,7 +278,10 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
     const activeContracts = filtered.filter((contract) => contract.status === 'active');
     return {
       activeCount: activeContracts.length,
-      lessonCount: activeContracts.reduce((sum, contract) => sum + contract.lessonCount, 0),
+      lessonCount: activeContracts.reduce(
+        (sum, contract) => sum + contract.remainingLessonCount,
+        0,
+      ),
       paidAmount: filtered.reduce((sum, contract) => sum + contract.paidAmount, 0),
       completedCount: filtered.filter((contract) => contract.status === 'completed').length,
     };
@@ -348,6 +362,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   }, []);
 
   function openCreate() {
+    setRenewalSource(null);
     const courseId = courses[0]?.id ?? '';
     const firstPackage = activePackages.find((item) => packageAppliesToCourse(item, courseId));
     const firstClass = classes.find(
@@ -360,6 +375,27 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           studentId: activeStudents[0]?.id ?? '',
           courseId,
           classId: firstClass?.id ?? '',
+        },
+        firstPackage,
+      ),
+    );
+    setOpen(true);
+  }
+
+  function openAddPackage(contract: CourseContract) {
+    const firstPackage = activePackages.find(
+      (item) => packageAppliesToCourse(item, contract.courseId) && item.id !== contract.packageId,
+    );
+    setEditingId(null);
+    setRenewalSource(contract);
+    setForm(
+      applyPackage(
+        {
+          ...emptyForm,
+          studentId: contract.studentId,
+          courseId: contract.courseId,
+          classId: contract.classId ?? '',
+          startsAt: todayDateKey(),
         },
         firstPackage,
       ),
@@ -449,12 +485,13 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   }
 
   function openEdit(contract: CourseContract) {
+    setRenewalSource(null);
     setEditingId(contract.id);
     setForm({
-      studentId: contract.student?.name ?? '',
-      courseId: contract.course?.name ?? '',
-      classId: contract.class?.id ?? '',
-      packageId: contract.package?.id ?? '',
+      studentId: contract.studentId,
+      courseId: contract.courseId,
+      classId: contract.classId ?? '',
+      packageId: contract.packageId ?? '',
       title: contract.title,
       lessonCount: String(contract.lessonCount),
       paidYuan: String(contract.paidAmount / 100),
@@ -469,6 +506,10 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
 
   async function submitEdit() {
     if (!editingId) return;
+    if (!form.studentId || !form.courseId) {
+      toast.error('请选择学员和课程');
+      return;
+    }
     const lessonCount = Number(form.lessonCount);
     if (!Number.isInteger(lessonCount) || lessonCount <= 0) {
       toast.error('课时数必须大于 0');
@@ -479,12 +520,16 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       const { courseContract } = await apiPatch<{ courseContract: CourseContract }>(
         `/v1/course-contracts/${editingId}`,
         {
+          studentId: form.studentId,
+          courseId: form.courseId,
+          classId: form.classId || null,
+          packageId: form.packageId || null,
           title: form.title.trim() || null,
           lessonCount,
           paidAmount: Math.round((Number(form.paidYuan) || 0) * 100),
           paymentMethod: form.paymentMethod,
-          startsAt: toDateTime(form.startsAt),
-          endsAt: toEndDateTime(form.endsAt),
+          startsAt: form.startsAt ? toDateTime(form.startsAt) : null,
+          endsAt: form.endsAt ? toEndDateTime(form.endsAt) : null,
           note: form.note.trim() || null,
         },
       );
@@ -671,7 +716,9 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             header: '课时/周期',
             cell: (row) => (
               <div className="cell-stack">
-                <span className="cell-title">{row.lessonCount} 节</span>
+                <span className="cell-title">
+                  剩 {row.remainingLessonCount} / {row.lessonCount} 节
+                </span>
                 <span className="cell-subtitle">
                   {row.package?.billingType === 'period'
                     ? `${row.startsAt ? new Date(row.startsAt).toLocaleDateString('zh-CN') : '-'} 至 ${
@@ -738,6 +785,15 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
                   type="button"
                   className="btn btn-ghost px-2 py-1"
                   disabled={row.status !== 'active'}
+                  onClick={() => openAddPackage(row)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  追加课时包
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2 py-1"
+                  disabled={row.status !== 'active'}
                   onClick={() => openSupplementGift(row)}
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -774,12 +830,15 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
         onClose={() => {
           setOpen(false);
           setEditingId(null);
+          setRenewalSource(null);
         }}
-        title={editingId ? '编辑正式课程档案' : '新增正式课程档案'}
+        title={editingId ? '编辑正式课程档案' : renewalSource ? '追加课时包' : '新增正式课程档案'}
         description={
           editingId
             ? '修改课程档案信息，更新会实时同步到系统。'
-            : '线下确认收款后，创建档案并为学员添加对应课时。'
+            : renewalSource
+              ? '为同一学员、同一课程新增一条独立课时权益；原课时包余额会保留。'
+              : '线下确认收款后，创建档案并为学员添加对应课时。'
         }
         footer={
           <>
@@ -789,6 +848,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               onClick={() => {
                 setOpen(false);
                 setEditingId(null);
+                setRenewalSource(null);
               }}
             >
               取消
@@ -816,10 +876,10 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               className="form-input"
               value={form.studentId}
               onChange={(event) => setForm({ ...form, studentId: event.target.value })}
-              disabled={!!editingId}
+              disabled={!!renewalSource}
             >
               <option value="">选择学员</option>
-              {activeStudents.map((student) => (
+              {(editingId || renewalSource ? students : activeStudents).map((student) => (
                 <option key={student.id} value={student.id}>
                   {student.name} · {student.grade}
                 </option>
@@ -831,7 +891,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               className="form-input"
               value={form.courseId}
               onChange={(event) => handleCourseChange(event.target.value)}
-              disabled={!!editingId}
+              disabled={!!renewalSource}
             >
               <option value="">选择课程</option>
               {courses.map((course) => (

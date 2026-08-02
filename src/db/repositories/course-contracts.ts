@@ -141,11 +141,37 @@ function rangesOverlap(
   return leftStart <= rightEnd && rightStart <= leftEnd;
 }
 
+async function expirePeriodContractInTx(
+  tx: Tx,
+  contract: typeof schema.courseContracts.$inferSelect,
+  now: Date,
+) {
+  await tx
+    .update(schema.courseContracts)
+    .set({ status: 'completed', updatedAt: now })
+    .where(eq(schema.courseContracts.id, contract.id));
+
+  const amount = contract.remainingLessonCount;
+  if (amount <= 0) return;
+  await applyLessonDelta(tx, {
+    studentId: contract.studentId,
+    courseId: contract.courseId,
+    type: 'adjustment',
+    amount: -amount,
+    relatedEntityType: 'period_package_expiry',
+    relatedEntityId: contract.id,
+    courseContractId: contract.id,
+  });
+  await tx
+    .update(schema.courseContracts)
+    .set({ remainingLessonCount: 0, updatedAt: now })
+    .where(eq(schema.courseContracts.id, contract.id));
+}
+
 async function prepareContractPeriod(
   tx: Tx,
   input: CourseContractInput,
   coursePackage: typeof schema.coursePackages.$inferSelect | null,
-  creditedAmountAlreadyApplied = 0,
 ) {
   const isPeriod = packagesRepo.isPeriodPackage(coursePackage);
   const startsAt = isPeriod ? (input.startsAt ?? new Date()) : (input.startsAt ?? null);
@@ -183,16 +209,17 @@ async function prepareContractPeriod(
     (row) =>
       packagesRepo.isPeriodPackage(row.coursePackage) &&
       row.contract.endsAt &&
-      row.contract.endsAt < (startsAt ?? new Date()),
+      row.contract.endsAt < new Date(),
   );
   const expiredActiveIds = expiredPeriodContracts
     .filter((row) => row.contract.status === 'active')
     .map((row) => row.contract.id);
   if (expiredActiveIds.length > 0) {
-    await tx
-      .update(schema.courseContracts)
-      .set({ status: 'completed', updatedAt: new Date() })
-      .where(inArray(schema.courseContracts.id, expiredActiveIds));
+    for (const row of expiredPeriodContracts) {
+      if (row.contract.status === 'active') {
+        await expirePeriodContractInTx(tx, row.contract, new Date());
+      }
+    }
   }
 
   const currentContracts = existingContracts.filter(
@@ -200,43 +227,16 @@ async function prepareContractPeriod(
   );
   const conflict = currentContracts.find(
     (row) =>
-      (row.contract.status === 'active' || packagesRepo.isPeriodPackage(row.coursePackage)) &&
-      (isPeriod || packagesRepo.isPeriodPackage(row.coursePackage)) &&
-      (isPeriod && row.contract.status === 'active'
-        ? true
-        : rangesOverlap(
-            { startsAt, endsAt },
-            { startsAt: row.contract.startsAt, endsAt: row.contract.endsAt },
-          )),
+      isPeriod &&
+      packagesRepo.isPeriodPackage(row.coursePackage) &&
+      row.contract.status === 'active' &&
+      rangesOverlap(
+        { startsAt, endsAt },
+        { startsAt: row.contract.startsAt, endsAt: row.contract.endsAt },
+      ),
   );
   if (conflict) {
-    throw httpError(422, '同一学员、同一课程不能同时使用周期卡和其他进行中课时档案');
-  }
-
-  const activeCurrentContracts = currentContracts.filter((row) => row.contract.status === 'active');
-  if (expiredPeriodContracts.length > 0 && activeCurrentContracts.length === 0) {
-    const [account] = await tx
-      .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, input.studentId),
-          eq(schema.lessonAccounts.courseId, input.courseId),
-        ),
-      )
-      .limit(1)
-      .for('update');
-    const expiredBalance = Math.max(0, (account?.balance ?? 0) - creditedAmountAlreadyApplied);
-    if (expiredBalance > 0) {
-      await applyLessonDelta(tx, {
-        studentId: input.studentId,
-        courseId: input.courseId,
-        type: 'adjustment',
-        amount: -expiredBalance,
-        relatedEntityType: 'period_package_expiry',
-        relatedEntityId: expiredPeriodContracts[0]!.contract.id,
-      });
-    }
+    throw httpError(422, '同一学员、同一课程的周期卡有效期不能重叠');
   }
 
   return { startsAt, endsAt };
@@ -507,6 +507,7 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
       contractNo: generateContractNo(),
       title: input.title?.trim() || coursePackage?.name || `${course.name}正式课程`,
       lessonCount: input.lessonCount,
+      remainingLessonCount: input.lessonCount,
       paidAmount: input.paidAmount,
       paymentMethod: input.paymentMethod ?? null,
       paymentReceiverType: input.paymentReceiverType,
@@ -727,44 +728,7 @@ export async function expirePeriodPackageContracts(db: Database, now = new Date(
     );
 
     for (const row of expired) {
-      await tx
-        .update(schema.courseContracts)
-        .set({ status: 'completed', updatedAt: now })
-        .where(eq(schema.courseContracts.id, row.contract.id));
-
-      const [otherActive] = await tx
-        .select({ id: schema.courseContracts.id })
-        .from(schema.courseContracts)
-        .where(
-          and(
-            eq(schema.courseContracts.studentId, row.contract.studentId),
-            eq(schema.courseContracts.courseId, row.contract.courseId),
-            eq(schema.courseContracts.status, 'active'),
-          ),
-        )
-        .limit(1);
-      if (otherActive) continue;
-
-      const [account] = await tx
-        .select()
-        .from(schema.lessonAccounts)
-        .where(
-          and(
-            eq(schema.lessonAccounts.studentId, row.contract.studentId),
-            eq(schema.lessonAccounts.courseId, row.contract.courseId),
-          ),
-        )
-        .limit(1)
-        .for('update');
-      if (!account || account.balance <= 0) continue;
-      await applyLessonDelta(tx, {
-        studentId: row.contract.studentId,
-        courseId: row.contract.courseId,
-        type: 'adjustment',
-        amount: -account.balance,
-        relatedEntityType: 'period_package_expiry',
-        relatedEntityId: row.contract.id,
-      });
+      await expirePeriodContractInTx(tx, row.contract, now);
     }
 
     return expired.length;
@@ -773,6 +737,91 @@ export async function expirePeriodPackageContracts(db: Database, now = new Date(
 
 export async function createCourseContract(db: Database, input: CourseContractInput) {
   return db.transaction(async (tx) => createCourseContractInTx(tx, input));
+}
+
+export async function changeCourseContractClassInTx(
+  tx: Tx,
+  input: {
+    contractId: string;
+    studentId: string;
+    courseId: string;
+    previousStudentId?: string;
+    previousCourseId?: string;
+    previousClassId?: string | null;
+    classId?: string | null;
+  },
+) {
+  const previousStudentId = input.previousStudentId ?? input.studentId;
+  const previousCourseId = input.previousCourseId ?? input.courseId;
+  const identityChanged =
+    previousStudentId !== input.studentId || previousCourseId !== input.courseId;
+  if (input.previousClassId && (input.previousClassId !== input.classId || identityChanged)) {
+    const [otherContract] = await tx
+      .select({ id: schema.courseContracts.id })
+      .from(schema.courseContracts)
+      .where(
+        and(
+          eq(schema.courseContracts.studentId, previousStudentId),
+          eq(schema.courseContracts.classId, input.previousClassId),
+          eq(schema.courseContracts.status, 'active'),
+          ne(schema.courseContracts.id, input.contractId),
+        ),
+      )
+      .limit(1);
+    if (!otherContract) {
+      const now = new Date();
+      await tx
+        .update(schema.classEnrollments)
+        .set({ active: false, leftAt: now })
+        .where(
+          and(
+            eq(schema.classEnrollments.classId, input.previousClassId),
+            eq(schema.classEnrollments.studentId, previousStudentId),
+          ),
+        );
+      const futureSessionIds = (
+        await tx
+          .select({ id: schema.classSessions.id, startsAt: schema.classSessions.startsAt })
+          .from(schema.classSessions)
+          .where(eq(schema.classSessions.classId, input.previousClassId))
+      )
+        .filter((session) => session.startsAt >= now)
+        .map((session) => session.id);
+      if (futureSessionIds.length > 0) {
+        await tx
+          .update(schema.classSessionStudents)
+          .set({ active: false, updatedAt: now })
+          .where(
+            and(
+              inArray(schema.classSessionStudents.classSessionId, futureSessionIds),
+              eq(schema.classSessionStudents.studentId, previousStudentId),
+            ),
+          );
+      }
+    }
+  }
+
+  let classGroup: typeof schema.classes.$inferSelect | null = null;
+  if (input.classId) {
+    classGroup = await findClassForUpdate(tx, input.classId);
+    if (!classGroup) {
+      throw httpError(404, 'Class not found');
+    }
+    if (classGroup.courseId !== input.courseId) {
+      throw httpError(422, '班级与课程不匹配');
+    }
+    if (['archived', 'completed'].includes(classGroup.status)) {
+      throw httpError(422, '不能转入已结束或已归档的班级');
+    }
+    await upsertClassEnrollment(tx, {
+      classId: classGroup.id,
+      studentId: input.studentId,
+      billingCourseId: input.courseId,
+      capacity: classGroup.capacity,
+    });
+  }
+
+  return classGroup;
 }
 
 export async function createCourseContractFromPaidPackageOrderInTx(
@@ -845,12 +894,7 @@ export async function createCourseContractFromPaidPackageOrderInTx(
     startsAt: order.paidAt ?? new Date(),
     endsAt: null,
   };
-  const contractPeriod = await prepareContractPeriod(
-    tx,
-    contractInput,
-    coursePackage,
-    order.lessonCount,
-  );
+  const contractPeriod = await prepareContractPeriod(tx, contractInput, coursePackage);
 
   const paymentMethod = onlineOrderPaymentMethod(order);
   const note = '线上支付自动生成，待老师确认正式课程档案、分班与签约信息。';
@@ -865,6 +909,7 @@ export async function createCourseContractFromPaidPackageOrderInTx(
       contractNo: generateContractNo(),
       title: coursePackage.name || `${course.name}正式课程`,
       lessonCount: order.lessonCount,
+      remainingLessonCount: order.lessonCount,
       paidAmount: order.paidAmount || order.amount,
       paymentMethod,
       paymentReceiverType: order.paymentReceiverType,
@@ -1048,17 +1093,36 @@ export async function updateCourseContractStatus(
   courseContractId: string,
   status: CourseContractStatus,
 ) {
-  const [courseContract] = await db
-    .update(schema.courseContracts)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(schema.courseContracts.id, courseContractId))
-    .returning();
+  return db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, courseContractId))
+      .limit(1)
+      .for('update');
+    if (!existing) throw httpError(404, 'Course contract not found');
 
-  if (!courseContract) {
-    throw httpError(404, 'Course contract not found');
-  }
+    let remainingLessonCount = existing.remainingLessonCount;
+    if (status !== 'active' && existing.status === 'active' && remainingLessonCount > 0) {
+      await applyLessonDelta(tx, {
+        studentId: existing.studentId,
+        courseId: existing.courseId,
+        type: 'adjustment',
+        amount: -remainingLessonCount,
+        relatedEntityType: 'course_contract_status',
+        relatedEntityId: existing.id,
+        courseContractId: existing.id,
+      });
+      remainingLessonCount = 0;
+    }
 
-  return courseContract;
+    const [courseContract] = await tx
+      .update(schema.courseContracts)
+      .set({ status, remainingLessonCount, updatedAt: new Date() })
+      .where(eq(schema.courseContracts.id, courseContractId))
+      .returning();
+    return courseContract!;
+  });
 }
 
 export async function updateCourseContractInfo(

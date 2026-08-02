@@ -1221,6 +1221,7 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(created.statusCode, 200, created.body);
     const createdPayload = created.json();
     assert.equal(createdPayload.courseContract.status, 'active');
+    assert.equal(createdPayload.courseContract.remainingLessonCount, coursePackage.lessonCount);
     assert.equal(createdPayload.courseContract.student.id, student.id);
     assert.equal(createdPayload.courseContract.course.id, course.id);
     assert.equal(createdPayload.courseContract.package.id, coursePackage.id);
@@ -1338,6 +1339,7 @@ test('creates a course contract with offline payment, lesson credit and class en
       .limit(1);
     assert.ok(editedLessonAccount);
     assert.equal(editedLessonAccount.balance, coursePackage.lessonCount + 2);
+    assert.equal(edited.json().courseContract.remainingLessonCount, coursePackage.lessonCount + 2);
 
     const [unchangedGiftLessonAccount] = await app.db
       .select()
@@ -1405,6 +1407,264 @@ test('creates a course contract with offline payment, lesson credit and class en
       .courseContracts.find((item: { id: string }) => item.id === createdPayload.courseContract.id);
     assert.ok(supplementedContract);
     assert.equal(supplementedContract.gifts.length, 2);
+
+    const [periodPackage] = await app.db
+      .insert(schema.coursePackages)
+      .values({
+        courseId: course.id,
+        name: '同课程月卡',
+        description: '',
+        billingType: 'period',
+        periodUnit: 'month',
+        periodCount: 1,
+        lessonCount: 4,
+        priceAmount: 68000,
+        status: 'active',
+      })
+      .returning();
+    const periodStartsAt = new Date(createdPayload.courseContract.startsAt);
+    const periodCreated = await app.inject({
+      method: 'POST',
+      url: '/v1/course-contracts',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        studentId: student.id,
+        courseId: course.id,
+        classId: classGroup.id,
+        packageId: periodPackage.id,
+        lessonCount: periodPackage.lessonCount,
+        paidAmount: 68000,
+        paymentMethod: 'wechat_offline',
+        startsAt: periodStartsAt.toISOString(),
+      },
+    });
+    assert.equal(periodCreated.statusCode, 200, periodCreated.body);
+    const periodContract = periodCreated.json().courseContract;
+    assert.equal(periodContract.remainingLessonCount, 4);
+
+    const temporarilyUnassigned = await app.inject({
+      method: 'PATCH',
+      url: `/v1/course-contracts/${periodContract.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { classId: null },
+    });
+    assert.equal(temporarilyUnassigned.statusCode, 200, temporarilyUnassigned.body);
+    assert.equal(temporarilyUnassigned.json().courseContract.classId, null);
+
+    const laterEnrollment = await app.inject({
+      method: 'POST',
+      url: `/v1/classes/${classGroup.id}/enrollments`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { studentId: student.id, billingCourseId: course.id },
+    });
+    assert.equal(laterEnrollment.statusCode, 200, laterEnrollment.body);
+    const [syncedPeriodContract] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, periodContract.id))
+      .limit(1);
+    assert.equal(syncedPeriodContract.classId, classGroup.id);
+
+    const removedEnrollment = await app.inject({
+      method: 'DELETE',
+      url: `/v1/classes/${classGroup.id}/enrollments/${laterEnrollment.json().enrollment.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(removedEnrollment.statusCode, 200, removedEnrollment.body);
+    const [unassignedAfterRemoval] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, periodContract.id))
+      .limit(1);
+    assert.equal(unassignedAfterRemoval.classId, null);
+
+    const reenrolled = await app.inject({
+      method: 'POST',
+      url: `/v1/classes/${classGroup.id}/enrollments`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { studentId: student.id, billingCourseId: course.id },
+    });
+    assert.equal(reenrolled.statusCode, 200, reenrolled.body);
+
+    const sessionStartsAt = new Date(periodStartsAt.getTime() + 24 * 60 * 60 * 1000);
+    const [attendanceSession] = await app.db
+      .insert(schema.classSessions)
+      .values({
+        classId: classGroup.id,
+        courseId: course.id,
+        teacherId: teacher.id,
+        classroomId: classroom.id,
+        startsAt: sessionStartsAt,
+        endsAt: new Date(sessionStartsAt.getTime() + 60 * 60 * 1000),
+        topic: '多课时包扣课测试',
+        status: 'scheduled',
+      })
+      .returning();
+
+    const sources = await app.inject({
+      method: 'GET',
+      url: `/v1/class-sessions/${attendanceSession.id}/attendance-sources`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(sources.statusCode, 200, sources.body);
+    assert.equal(sources.json().lessonSourcesByStudentId[student.id][0].id, periodContract.id);
+
+    const attendance = await app.inject({
+      method: 'POST',
+      url: `/v1/class-sessions/${attendanceSession.id}/attendance`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { records: [{ studentId: student.id, status: 'present' }] },
+    });
+    assert.equal(attendance.statusCode, 200, attendance.body);
+    assert.equal(attendance.json().attendanceRecords[0].courseContractId, periodContract.id);
+    assert.equal(
+      attendance.json().attendanceRecords[0].lessonSource.packageName,
+      periodPackage.name,
+    );
+
+    const correctedAttendance = await app.inject({
+      method: 'PATCH',
+      url: `/v1/class-sessions/${attendanceSession.id}/attendance/${student.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        status: 'present',
+        courseContractId: createdPayload.courseContract.id,
+      },
+    });
+    assert.equal(correctedAttendance.statusCode, 200, correctedAttendance.body);
+    assert.equal(
+      correctedAttendance.json().attendanceRecord.courseContractId,
+      createdPayload.courseContract.id,
+    );
+
+    const [ordinaryAfterCorrection] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, createdPayload.courseContract.id))
+      .limit(1);
+    const [periodAfterCorrection] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, periodContract.id))
+      .limit(1);
+    assert.equal(ordinaryAfterCorrection.remainingLessonCount, coursePackage.lessonCount + 1);
+    assert.equal(periodAfterCorrection.remainingLessonCount, periodPackage.lessonCount);
+
+    const [targetGuardian] = await app.db
+      .insert(schema.guardians)
+      .values({
+        name: `Contract Target Guardian ${suffix.slice(0, 8)}`,
+        phone: phoneFromSuffix(suffix, '135'),
+      })
+      .returning();
+    const [targetStudent] = await app.db
+      .insert(schema.students)
+      .values({
+        guardianId: targetGuardian.id,
+        name: `Contract Target Student ${suffix.slice(0, 8)}`,
+        grade: '二年级',
+        status: 'active',
+      })
+      .returning();
+    const [targetCourse] = await app.db
+      .insert(schema.courses)
+      .values({
+        campusId: campus.id,
+        slug: `contract-target-course-${suffix}`,
+        name: 'Contract Target Course',
+        category: '编程',
+        ageRange: '7-10 岁',
+        durationMinutes: 60,
+        providerInstitutionId: institution.id,
+        paymentReceiverType: 'provider',
+        paymentReceiverInstitutionId: institution.id,
+        paymentReceiverName: institution.name,
+        summary: 'Contract target course',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [targetPackage] = await app.db
+      .insert(schema.coursePackages)
+      .values({
+        courseId: targetCourse.id,
+        name: '迁移后的 6 课时包',
+        description: '',
+        lessonCount: 6,
+        priceAmount: 60000,
+        status: 'active',
+      })
+      .returning();
+    const [targetClass] = await app.db
+      .insert(schema.classes)
+      .values({
+        campusId: campus.id,
+        courseId: targetCourse.id,
+        teacherId: teacher.id,
+        classroomId: classroom.id,
+        name: `Contract Target Class ${suffix.slice(0, 8)}`,
+        capacity: 8,
+        status: 'active',
+      })
+      .returning();
+
+    const fullyEdited = await app.inject({
+      method: 'PATCH',
+      url: `/v1/course-contracts/${periodContract.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        studentId: targetStudent.id,
+        courseId: targetCourse.id,
+        classId: targetClass.id,
+        packageId: targetPackage.id,
+        title: '迁移后的正式课程档案',
+        lessonCount: targetPackage.lessonCount,
+        paidAmount: targetPackage.priceAmount,
+        paymentMethod: 'bank_transfer',
+        startsAt: futureDateFromSuffix(suffix, 2041).toISOString(),
+        endsAt: null,
+        note: '修正原档案归属',
+      },
+    });
+    assert.equal(fullyEdited.statusCode, 200, fullyEdited.body);
+    assert.equal(fullyEdited.json().courseContract.student.id, targetStudent.id);
+    assert.equal(fullyEdited.json().courseContract.course.id, targetCourse.id);
+    assert.equal(fullyEdited.json().courseContract.package.id, targetPackage.id);
+    assert.equal(fullyEdited.json().courseContract.class.id, targetClass.id);
+    assert.equal(fullyEdited.json().courseContract.remainingLessonCount, 6);
+
+    const [oldAccountAfterReassignment] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, student.id),
+          eq(schema.lessonAccounts.courseId, course.id),
+        ),
+      )
+      .limit(1);
+    const [targetAccountAfterReassignment] = await app.db
+      .select()
+      .from(schema.lessonAccounts)
+      .where(
+        and(
+          eq(schema.lessonAccounts.studentId, targetStudent.id),
+          eq(schema.lessonAccounts.courseId, targetCourse.id),
+        ),
+      )
+      .limit(1);
+    assert.equal(oldAccountAfterReassignment.balance, coursePackage.lessonCount + 1);
+    assert.equal(targetAccountAfterReassignment.balance, targetPackage.lessonCount);
+
+    const [reassignedOrder] = await app.db
+      .select()
+      .from(schema.orders)
+      .where(eq(schema.orders.id, periodContract.orderId))
+      .limit(1);
+    assert.equal(reassignedOrder.studentId, targetStudent.id);
+    assert.equal(reassignedOrder.courseId, targetCourse.id);
+    assert.equal(reassignedOrder.packageId, targetPackage.id);
+    assert.equal(reassignedOrder.lessonCount, targetPackage.lessonCount);
 
     const completed = await app.inject({
       method: 'PATCH',

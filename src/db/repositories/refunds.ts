@@ -221,6 +221,12 @@ export async function approveRefundRequestAndReverseOrder(
       order.courseId &&
       order.lessonCount > 0
     ) {
+      const [courseContract] = await tx
+        .select()
+        .from(schema.courseContracts)
+        .where(eq(schema.courseContracts.orderId, order.id))
+        .limit(1)
+        .for('update');
       const [lessonAccount] = await tx
         .select()
         .from(schema.lessonAccounts)
@@ -233,7 +239,11 @@ export async function approveRefundRequestAndReverseOrder(
         .limit(1)
         .for('update');
 
-      if (!lessonAccount || lessonAccount.balance < order.lessonCount) {
+      if (
+        !lessonAccount ||
+        lessonAccount.balance < order.lessonCount ||
+        (courseContract && courseContract.remainingLessonCount < order.lessonCount)
+      ) {
         throw httpError(422, '该订单课时已被消耗，暂不能自动全额退款');
       }
 
@@ -244,7 +254,14 @@ export async function approveRefundRequestAndReverseOrder(
         amount: -order.lessonCount,
         relatedEntityType: 'order',
         relatedEntityId: order.id,
+        courseContractId: courseContract?.id ?? null,
       });
+      if (courseContract) {
+        await tx
+          .update(schema.courseContracts)
+          .set({ remainingLessonCount: 0, status: 'cancelled', updatedAt: new Date() })
+          .where(eq(schema.courseContracts.id, courseContract.id));
+      }
     }
 
     if (order.orderType === 'seat_reservation') {

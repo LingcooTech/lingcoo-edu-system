@@ -781,6 +781,9 @@ export const attendanceRecords = pgTable(
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'cascade' }),
+    courseContractId: uuid('course_contract_id').references(() => courseContracts.id, {
+      onDelete: 'set null',
+    }),
     status: attendanceStatusEnum('status').notNull(),
     lessonDelta: integer('lesson_delta').notNull().default(0),
     note: text('note'),
@@ -791,6 +794,7 @@ export const attendanceRecords = pgTable(
       table.classSessionId,
       table.studentId,
     ),
+    courseContractIdx: index('attendance_records_course_contract_idx').on(table.courseContractId),
   }),
 );
 
@@ -957,6 +961,9 @@ export const lessonTransactions = pgTable(
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'cascade' }),
+    courseContractId: uuid('course_contract_id').references(() => courseContracts.id, {
+      onDelete: 'set null',
+    }),
     type: lessonTransactionTypeEnum('type').notNull(),
     amount: integer('amount').notNull(),
     balanceAfter: integer('balance_after').notNull(),
@@ -969,6 +976,7 @@ export const lessonTransactions = pgTable(
       table.lessonAccountId,
       table.createdAt,
     ),
+    courseContractIdx: index('lesson_transactions_course_contract_idx').on(table.courseContractId),
   }),
 );
 
@@ -1040,6 +1048,7 @@ export const courseContracts = pgTable(
     contractNo: varchar('contract_no', { length: 64 }).notNull(),
     title: varchar('title', { length: 200 }).notNull(),
     lessonCount: integer('lesson_count').notNull(),
+    remainingLessonCount: integer('remaining_lesson_count').notNull().default(0),
     paidAmount: integer('paid_amount').notNull().default(0),
     paymentMethod: varchar('payment_method', { length: 40 }),
     paymentReceiverType: paymentReceiverTypeEnum('payment_receiver_type')
