@@ -628,6 +628,31 @@ export const classes = pgTable(
   }),
 );
 
+export const classCourseAssociations = pgTable(
+  'class_course_associations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    classId: uuid('class_id')
+      .notNull()
+      .references(() => classes.id, { onDelete: 'cascade' }),
+    courseId: uuid('course_id')
+      .notNull()
+      .references(() => courses.id, { onDelete: 'restrict' }),
+    source: varchar('source', { length: 40 }).notNull().default('enrollment'),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    classCourseUnique: uniqueIndex('class_course_associations_class_course_idx').on(
+      table.classId,
+      table.courseId,
+    ),
+    classIdx: index('class_course_associations_class_idx').on(table.classId),
+    courseIdx: index('class_course_associations_course_idx').on(table.courseId),
+  }),
+);
+
 export const classEnrollments = pgTable(
   'class_enrollments',
   {

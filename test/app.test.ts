@@ -1598,18 +1598,22 @@ test('creates a course contract with offline payment, lesson credit and class en
         status: 'active',
       })
       .returning();
-    const [targetClass] = await app.db
-      .insert(schema.classes)
-      .values({
+    const targetClassCreated = await app.inject({
+      method: 'POST',
+      url: '/v1/classes',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
         campusId: campus.id,
-        courseId: targetCourse.id,
+        courseId: giftCourse.id,
         teacherId: teacher.id,
         classroomId: classroom.id,
         name: `Contract Target Class ${suffix.slice(0, 8)}`,
         capacity: 8,
         status: 'active',
-      })
-      .returning();
+      },
+    });
+    assert.equal(targetClassCreated.statusCode, 200, targetClassCreated.body);
+    const targetClass = targetClassCreated.json().class;
 
     const fullyEdited = await app.inject({
       method: 'PATCH',
@@ -1618,7 +1622,7 @@ test('creates a course contract with offline payment, lesson credit and class en
       payload: {
         studentId: targetStudent.id,
         courseId: targetCourse.id,
-        classId: targetClass.id,
+        classId: null,
         packageId: targetPackage.id,
         title: '迁移后的正式课程档案',
         lessonCount: targetPackage.lessonCount,
@@ -1633,8 +1637,46 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(fullyEdited.json().courseContract.student.id, targetStudent.id);
     assert.equal(fullyEdited.json().courseContract.course.id, targetCourse.id);
     assert.equal(fullyEdited.json().courseContract.package.id, targetPackage.id);
-    assert.equal(fullyEdited.json().courseContract.class.id, targetClass.id);
+    assert.equal(fullyEdited.json().courseContract.classId, null);
     assert.equal(fullyEdited.json().courseContract.remainingLessonCount, 6);
+
+    const crossCourseEnrollment = await app.inject({
+      method: 'POST',
+      url: `/v1/classes/${targetClass.id}/enrollments`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { studentId: targetStudent.id, billingCourseId: targetCourse.id },
+    });
+    assert.equal(crossCourseEnrollment.statusCode, 200, crossCourseEnrollment.body);
+
+    const [contractAfterCrossCourseEnrollment] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, periodContract.id))
+      .limit(1);
+    assert.equal(contractAfterCrossCourseEnrollment.classId, targetClass.id);
+    const [automaticCourseAssociation] = await app.db
+      .select()
+      .from(schema.classCourseAssociations)
+      .where(
+        and(
+          eq(schema.classCourseAssociations.classId, targetClass.id),
+          eq(schema.classCourseAssociations.courseId, targetCourse.id),
+        ),
+      )
+      .limit(1);
+    assert.equal(automaticCourseAssociation.source, 'enrollment');
+
+    const classesAfterAutomaticAssociation = await app.inject({
+      method: 'GET',
+      url: '/v1/classes',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(classesAfterAutomaticAssociation.statusCode, 200);
+    const associatedClass = classesAfterAutomaticAssociation
+      .json()
+      .classes.find((item: { id: string }) => item.id === targetClass.id);
+    assert.ok(associatedClass.courseIds.includes(giftCourse.id));
+    assert.ok(associatedClass.courseIds.includes(targetCourse.id));
 
     const [oldAccountAfterReassignment] = await app.db
       .select()

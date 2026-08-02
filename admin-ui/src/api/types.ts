@@ -377,6 +377,8 @@ export interface ClassGroup {
   capacity: number;
   enrolledCount: number;
   course?: Course;
+  courseIds?: string[];
+  courses?: Course[];
   teacher?: { name: string };
   classroom?: { name: string };
 }

@@ -109,9 +109,14 @@ export function ClassesPage() {
   }
 
   function hydrateClass(classGroup: ClassGroup, enrolledCount?: number): ClassGroup {
+    const courseIds = classGroup.courseIds ?? [classGroup.courseId];
     return {
       ...classGroup,
       enrolledCount: enrolledCount ?? classGroup.enrolledCount ?? 0,
+      courseIds,
+      courses: courseIds
+        .map((courseId) => courses.find((course) => course.id === courseId))
+        .filter((course): course is Course => Boolean(course)),
       course: courses.find((item) => item.id === classGroup.courseId) ?? classGroup.course,
       teacher: teachers.find((item) => item.id === classGroup.teacherId) ?? classGroup.teacher,
       classroom:
@@ -146,6 +151,22 @@ export function ClassesPage() {
         null,
       lessonAccount,
     };
+  }
+
+  function addAssociatedCourseToClass(classId: string, courseId: string) {
+    setData((current) =>
+      current.map((item) => {
+        if (item.id !== classId) return item;
+        const courseIds = Array.from(new Set([...(item.courseIds ?? [item.courseId]), courseId]));
+        return {
+          ...item,
+          courseIds,
+          courses: courseIds
+            .map((associatedCourseId) => courses.find((course) => course.id === associatedCourseId))
+            .filter((course): course is Course => Boolean(course)),
+        };
+      }),
+    );
   }
 
   function openCreate() {
@@ -241,6 +262,7 @@ export function ClassesPage() {
             : item,
         ),
       );
+      addAssociatedCourseToClass(enrollmentClass.id, billingCourseId);
       setStudentId('');
       setBillingCourseId('');
       setJoinedAt(toDateTimeLocal());
@@ -290,6 +312,7 @@ export function ClassesPage() {
       setEnrollments((current) =>
         current.map((item) => (item.id === updated.id ? hydrateEnrollment(updated) : item)),
       );
+      addAssociatedCourseToClass(enrollmentClass.id, nextBillingCourseId);
       toast.success('扣课账户已更新');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '更新扣课账户失败');
@@ -332,7 +355,15 @@ export function ClassesPage() {
             cell: (row) => (
               <div className="cell-stack">
                 <span className="cell-title">{row.name}</span>
-                <span className="cell-subtitle">{row.course?.name}</span>
+                <span className="cell-subtitle">
+                  默认：{row.course?.name}
+                  {(row.courses?.length ?? 0) > 1
+                    ? ` · 自动关联 ${row
+                        .courses!.filter((course) => course.id !== row.courseId)
+                        .map((course) => course.name)
+                        .join('、')}`
+                    : ''}
+                </span>
               </div>
             ),
           },

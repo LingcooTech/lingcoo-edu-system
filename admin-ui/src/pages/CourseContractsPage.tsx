@@ -249,15 +249,26 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
       ),
     [form.courseId, packageAppliesToCourse, packagesForSelection],
   );
+  const classSupportsCourse = useCallback(
+    (classGroup: ClassGroup, courseId: string) =>
+      classGroup.courseId === courseId || Boolean(classGroup.courseIds?.includes(courseId)),
+    [],
+  );
   const selectedCourseClasses = useMemo(
     () =>
-      classes.filter(
-        (classGroup) =>
-          classGroup.courseId === form.courseId &&
-          (!['archived', 'completed'].includes(classGroup.status) ||
-            Boolean(editingId && classGroup.id === form.classId)),
-      ),
-    [classes, editingId, form.classId, form.courseId],
+      [...classes]
+        .filter(
+          (classGroup) =>
+            !['archived', 'completed'].includes(classGroup.status) ||
+            Boolean(editingId && classGroup.id === form.classId),
+        )
+        .sort(
+          (left, right) =>
+            Number(classSupportsCourse(right, form.courseId)) -
+              Number(classSupportsCourse(left, form.courseId)) ||
+            left.name.localeCompare(right.name),
+        ),
+    [classSupportsCourse, classes, editingId, form.classId, form.courseId],
   );
   const selectedPackage = selectedCoursePackages.find((item) => item.id === form.packageId);
   const activeGiftCourses = useMemo(
@@ -306,10 +317,13 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   }
 
   function giftClasses(courseId: string) {
-    return classes.filter(
-      (classGroup) =>
-        classGroup.courseId === courseId && !['archived', 'completed'].includes(classGroup.status),
-    );
+    return [...classes]
+      .filter((classGroup) => !['archived', 'completed'].includes(classGroup.status))
+      .sort(
+        (left, right) =>
+          Number(classSupportsCourse(right, courseId)) -
+            Number(classSupportsCourse(left, courseId)) || left.name.localeCompare(right.name),
+      );
   }
 
   function createGiftForm(baseCourseId?: string, startsAt = '', endsAt = ''): GiftForm {
@@ -366,7 +380,8 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
     const courseId = courses[0]?.id ?? '';
     const firstPackage = activePackages.find((item) => packageAppliesToCourse(item, courseId));
     const firstClass = classes.find(
-      (item) => item.courseId === courseId && !['archived', 'completed'].includes(item.status),
+      (item) =>
+        classSupportsCourse(item, courseId) && !['archived', 'completed'].includes(item.status),
     );
     setForm(
       applyPackage(
@@ -406,7 +421,8 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   function handleCourseChange(courseId: string) {
     const firstPackage = activePackages.find((item) => packageAppliesToCourse(item, courseId));
     const firstClass = classes.find(
-      (item) => item.courseId === courseId && !['archived', 'completed'].includes(item.status),
+      (item) =>
+        classSupportsCourse(item, courseId) && !['archived', 'completed'].includes(item.status),
     );
     setForm(
       applyPackage(
@@ -982,6 +998,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               {selectedCourseClasses.map((classGroup) => (
                 <option key={classGroup.id} value={classGroup.id}>
                   {classGroup.name} · {classGroup.enrolledCount}/{classGroup.capacity}
+                  {!classSupportsCourse(classGroup, form.courseId) ? ' · 入班后自动关联课程' : ''}
                 </option>
               ))}
             </select>

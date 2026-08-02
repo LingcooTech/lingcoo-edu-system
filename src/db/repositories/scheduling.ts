@@ -3,13 +3,60 @@ import { and, asc, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
 
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+type DbOrTx = Database | Tx;
+
 export async function listClasses(db: Database) {
   return db.select().from(schema.classes).orderBy(asc(schema.classes.createdAt));
 }
 
+export async function listClassCourseAssociations(db: Database, classIds?: string[]) {
+  if (classIds && classIds.length === 0) return [];
+  const query = db.select().from(schema.classCourseAssociations);
+  return classIds ? query.where(inArray(schema.classCourseAssociations.classId, classIds)) : query;
+}
+
+export async function ensureClassCourseAssociation(
+  db: DbOrTx,
+  input: {
+    classId: string;
+    courseId: string;
+    source?: 'primary' | 'enrollment' | 'session' | 'contract';
+    isPrimary?: boolean;
+  },
+) {
+  const now = new Date();
+  const [association] = await db
+    .insert(schema.classCourseAssociations)
+    .values({
+      classId: input.classId,
+      courseId: input.courseId,
+      source: input.source ?? 'enrollment',
+      isPrimary: input.isPrimary ?? false,
+    })
+    .onConflictDoUpdate({
+      target: [schema.classCourseAssociations.classId, schema.classCourseAssociations.courseId],
+      set: {
+        isPrimary: input.isPrimary ?? undefined,
+        source: input.isPrimary ? 'primary' : undefined,
+        updatedAt: now,
+      },
+    })
+    .returning();
+  return association;
+}
+
 export async function createClass(db: Database, values: typeof schema.classes.$inferInsert) {
-  const [classGroup] = await db.insert(schema.classes).values(values).returning();
-  return classGroup;
+  return db.transaction(async (tx) => {
+    const [classGroup] = await tx.insert(schema.classes).values(values).returning();
+    await ensureClassCourseAssociation(tx, {
+      classId: classGroup.id,
+      courseId: classGroup.courseId,
+      source: 'primary',
+      isPrimary: true,
+    });
+    return classGroup;
+  });
 }
 
 export async function updateClass(
@@ -22,6 +69,18 @@ export async function updateClass(
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(schema.classes.id, classId))
     .returning();
+  if (classGroup && patch.courseId) {
+    await db
+      .update(schema.classCourseAssociations)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(eq(schema.classCourseAssociations.classId, classId));
+    await ensureClassCourseAssociation(db, {
+      classId,
+      courseId: patch.courseId,
+      source: 'primary',
+      isPrimary: true,
+    });
+  }
   return classGroup ?? null;
 }
 
@@ -145,7 +204,7 @@ export async function listUpcomingLessonNotificationTargets(
     .select(lessonNotificationTargetSelect())
     .from(schema.classSessions)
     .innerJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
-    .innerJoin(schema.courses, eq(schema.classes.courseId, schema.courses.id))
+    .innerJoin(schema.courses, eq(schema.classSessions.courseId, schema.courses.id))
     .innerJoin(schema.classrooms, eq(schema.classSessions.classroomId, schema.classrooms.id))
     .innerJoin(schema.teachers, eq(schema.classSessions.teacherId, schema.teachers.id))
     .innerJoin(
@@ -181,7 +240,7 @@ export async function listLessonNotificationTargetsForSessionStudents(
     .select(lessonNotificationTargetSelect())
     .from(schema.classSessions)
     .innerJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
-    .innerJoin(schema.courses, eq(schema.classes.courseId, schema.courses.id))
+    .innerJoin(schema.courses, eq(schema.classSessions.courseId, schema.courses.id))
     .innerJoin(schema.classrooms, eq(schema.classSessions.classroomId, schema.classrooms.id))
     .innerJoin(schema.teachers, eq(schema.classSessions.teacherId, schema.teachers.id))
     .innerJoin(schema.students, inArray(schema.students.id, studentIds))
@@ -195,6 +254,11 @@ export async function createClassSession(
 ) {
   const [session] = await db.insert(schema.classSessions).values(values).returning();
   if (session.classId) {
+    await ensureClassCourseAssociation(db, {
+      classId: session.classId,
+      courseId: session.courseId,
+      source: 'session',
+    });
     const enrollments = await listEnrollmentHistory(db, session.classId);
     const roster = enrollments
       .filter(
@@ -589,12 +653,22 @@ export async function createEnrollment(
       .where(eq(schema.classEnrollments.id, existing.id))
       .returning();
     await syncEnrollmentToEligibleSessions(db, enrollment);
+    await ensureClassCourseAssociation(db, {
+      classId: enrollment.classId,
+      courseId: enrollment.billingCourseId,
+      source: 'enrollment',
+    });
     await syncEnrollmentToCourseContracts(db, enrollment);
     return enrollment;
   }
 
   const [enrollment] = await db.insert(schema.classEnrollments).values(values).returning();
   await syncEnrollmentToEligibleSessions(db, enrollment);
+  await ensureClassCourseAssociation(db, {
+    classId: enrollment.classId,
+    courseId: enrollment.billingCourseId,
+    source: 'enrollment',
+  });
   await syncEnrollmentToCourseContracts(db, enrollment);
   return enrollment;
 }
@@ -603,12 +677,6 @@ async function syncEnrollmentToCourseContracts(
   db: Database,
   enrollment: typeof schema.classEnrollments.$inferSelect,
 ) {
-  const [classGroup] = await db
-    .select({ courseId: schema.classes.courseId })
-    .from(schema.classes)
-    .where(eq(schema.classes.id, enrollment.classId))
-    .limit(1);
-  if (!classGroup || classGroup.courseId !== enrollment.billingCourseId) return;
   await db
     .update(schema.courseContracts)
     .set({ classId: enrollment.classId, updatedAt: new Date() })
@@ -691,6 +759,11 @@ export async function updateEnrollmentBillingCourse(
     .returning();
   if (enrollment) {
     await syncEnrollmentToScheduledSessions(db, enrollment);
+    await ensureClassCourseAssociation(db, {
+      classId: enrollment.classId,
+      courseId: enrollment.billingCourseId,
+      source: 'enrollment',
+    });
     await syncEnrollmentToCourseContracts(db, enrollment);
   }
   return enrollment ?? null;

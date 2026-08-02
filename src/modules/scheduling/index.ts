@@ -327,20 +327,32 @@ export const schedulingModule: AppModule = {
     }
 
     app.get('/v1/classes', { preHandler: app.requireAdmin }, async () => {
-      const [classes, courses, teachers, classrooms] = await Promise.all([
+      const [classes, courses, teachers, classrooms, classCourseAssociations] = await Promise.all([
         schedulingRepo.listClasses(app.db),
         catalogRepo.listCourses(app.db),
         teachingRepo.listTeachers(app.db),
         teachingRepo.listClassrooms(app.db),
+        schedulingRepo.listClassCourseAssociations(app.db),
       ]);
       const courseById = new Map(courses.map((item) => [item.id, item]));
       const teacherById = new Map(teachers.map((item) => [item.id, item]));
       const classroomById = new Map(classrooms.map((item) => [item.id, item]));
+      const courseIdsByClassId = new Map<string, string[]>();
+      for (const association of classCourseAssociations) {
+        courseIdsByClassId.set(association.classId, [
+          ...(courseIdsByClassId.get(association.classId) ?? []),
+          association.courseId,
+        ]);
+      }
 
       const enriched = await Promise.all(
         classes.map(async (item) => ({
           ...item,
           course: courseById.get(item.courseId),
+          courseIds: courseIdsByClassId.get(item.id) ?? [item.courseId],
+          courses: (courseIdsByClassId.get(item.id) ?? [item.courseId])
+            .map((courseId) => courseById.get(courseId))
+            .filter((course): course is NonNullable<typeof course> => Boolean(course)),
           teacher: teacherById.get(item.teacherId),
           classroom: classroomById.get(item.classroomId),
           enrolledCount: await schedulingRepo.countActiveEnrollments(app.db, item.id),
@@ -394,7 +406,7 @@ export const schedulingModule: AppModule = {
             if (!classGroup) return false;
             if (!overlapsRange(session, from, to)) return false;
             if (query.classId && session.classId !== query.classId) return false;
-            if (query.courseId && classGroup.courseId !== query.courseId) return false;
+            if (query.courseId && session.courseId !== query.courseId) return false;
             if (query.teacherId && !session.teacherIds.includes(query.teacherId)) return false;
             if (query.classroomId && session.classroomId !== query.classroomId) return false;
             if (query.status && session.status !== query.status) return false;
@@ -402,7 +414,7 @@ export const schedulingModule: AppModule = {
           })
           .map((session) => {
             const classGroup = session.class;
-            const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
+            const course = courseById.get(session.courseId);
             return {
               id: session.id,
               type: 'class_session',
@@ -437,12 +449,11 @@ export const schedulingModule: AppModule = {
       const to = query.to ? new Date(query.to) : defaultTo;
       const trialFrom = from > now ? from : now;
 
-      const [sessionRows, classes, courses, teachers, classrooms, campuses, trialSessions] =
+      const [sessionRows, classes, courses, classrooms, campuses, trialSessions] =
         await Promise.all([
           schedulingRepo.listClassSessions(app.db),
           schedulingRepo.listClasses(app.db),
           catalogRepo.listPublishedCourses(app.db),
-          teachingRepo.listTeachers(app.db),
           teachingRepo.listClassrooms(app.db),
           organizationRepo.listCampuses(app.db),
           trialRepo.listOpenFutureTrialSessions(app.db, { from: trialFrom, to }),
@@ -450,7 +461,6 @@ export const schedulingModule: AppModule = {
       const sessions = await enrichClassSessions(sessionRows);
       const classById = new Map(classes.map((item) => [item.id, item]));
       const courseById = new Map(courses.map((item) => [item.id, item]));
-      const teacherById = new Map(teachers.map((item) => [item.id, item]));
       const classroomById = new Map(classrooms.map((item) => [item.id, item]));
       const campusById = new Map(campuses.map((item) => [item.id, item]));
 
@@ -459,13 +469,13 @@ export const schedulingModule: AppModule = {
           const classGroup = session.classId ? classById.get(session.classId) : undefined;
           if (!classGroup) return false;
           if (!['recruiting', 'active'].includes(classGroup.status)) return false;
-          if (!courseById.has(classGroup.courseId)) return false;
+          if (!courseById.has(session.courseId)) return false;
           if (session.status !== 'scheduled') return false;
           return overlapsRange(session, from, to);
         })
         .map((session) => {
           const classGroup = session.classId ? classById.get(session.classId) : undefined;
-          const course = classGroup ? courseById.get(classGroup.courseId) : undefined;
+          const course = courseById.get(session.courseId);
           const classroom = classroomById.get(session.classroomId);
           return {
             id: session.id,

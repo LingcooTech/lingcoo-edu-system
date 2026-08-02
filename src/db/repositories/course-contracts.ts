@@ -8,6 +8,7 @@ import { httpError } from '../../lib/http-error.js';
 import { applyLessonDelta } from './lesson.js';
 import { effectivePackagePrice } from './packages.js';
 import * as packagesRepo from './packages.js';
+import { ensureClassCourseAssociation } from './scheduling.js';
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type DbOrTx = Database | Tx;
@@ -461,9 +462,11 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
     if (!classGroup) {
       throw httpError(404, 'Class not found');
     }
-    if (classGroup.courseId !== input.courseId) {
-      throw httpError(422, '班级与课程不匹配');
-    }
+    await ensureClassCourseAssociation(tx, {
+      classId: classGroup.id,
+      courseId: input.courseId,
+      source: 'contract',
+    });
     enrollment = await upsertClassEnrollment(tx, {
       classId: classGroup.id,
       studentId: input.studentId,
@@ -593,9 +596,11 @@ async function createCourseContractGiftInTx(
     if (!giftClass) {
       throw httpError(404, 'Gift class not found');
     }
-    if (giftClass.courseId !== input.gift.courseId) {
-      throw httpError(422, '赠课班级与赠课课程不匹配');
-    }
+    await ensureClassCourseAssociation(tx, {
+      classId: giftClass.id,
+      courseId: input.gift.courseId,
+      source: 'contract',
+    });
     giftEnrollment = await upsertClassEnrollment(tx, {
       classId: giftClass.id,
       studentId: input.contract.studentId,
@@ -723,13 +728,6 @@ export async function syncUnassignedCourseContractsFromEnrollments(db: Database)
         eq(schema.classEnrollments.active, true),
       ),
     )
-    .innerJoin(
-      schema.classes,
-      and(
-        eq(schema.classes.id, schema.classEnrollments.classId),
-        eq(schema.classes.courseId, schema.courseContracts.courseId),
-      ),
-    )
     .where(and(eq(schema.courseContracts.status, 'active'), isNull(schema.courseContracts.classId)))
     .orderBy(desc(schema.classEnrollments.joinedAt), desc(schema.classEnrollments.createdAt));
 
@@ -851,9 +849,11 @@ export async function changeCourseContractClassInTx(
     if (!classGroup) {
       throw httpError(404, 'Class not found');
     }
-    if (classGroup.courseId !== input.courseId) {
-      throw httpError(422, '班级与课程不匹配');
-    }
+    await ensureClassCourseAssociation(tx, {
+      classId: classGroup.id,
+      courseId: input.courseId,
+      source: 'contract',
+    });
     if (['archived', 'completed'].includes(classGroup.status)) {
       throw httpError(422, '不能转入已结束或已归档的班级');
     }

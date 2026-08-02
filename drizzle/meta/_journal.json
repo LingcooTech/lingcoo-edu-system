@@ -386,6 +386,13 @@
       "when": 1785686400000,
       "tag": "0054_backfill_course_contract_classes",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1785688200000,
+      "tag": "0055_class_course_associations",
+      "breakpoints": true
     }
   ]
 }
