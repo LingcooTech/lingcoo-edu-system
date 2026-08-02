@@ -1451,13 +1451,16 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(temporarilyUnassigned.statusCode, 200, temporarilyUnassigned.body);
     assert.equal(temporarilyUnassigned.json().courseContract.classId, null);
 
-    const laterEnrollment = await app.inject({
-      method: 'POST',
-      url: `/v1/classes/${classGroup.id}/enrollments`,
+    const listAfterHistoricalEnrollment = await app.inject({
+      method: 'GET',
+      url: '/v1/course-contracts',
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { studentId: student.id, billingCourseId: course.id },
     });
-    assert.equal(laterEnrollment.statusCode, 200, laterEnrollment.body);
+    assert.equal(listAfterHistoricalEnrollment.statusCode, 200, listAfterHistoricalEnrollment.body);
+    const backfilledContract = listAfterHistoricalEnrollment
+      .json()
+      .courseContracts.find((item: { id: string }) => item.id === periodContract.id);
+    assert.equal(backfilledContract.classId, classGroup.id);
     const [syncedPeriodContract] = await app.db
       .select()
       .from(schema.courseContracts)
@@ -1467,7 +1470,7 @@ test('creates a course contract with offline payment, lesson credit and class en
 
     const removedEnrollment = await app.inject({
       method: 'DELETE',
-      url: `/v1/classes/${classGroup.id}/enrollments/${laterEnrollment.json().enrollment.id}`,
+      url: `/v1/classes/${classGroup.id}/enrollments/${enrollment.id}`,
       headers: { authorization: `Bearer ${adminToken}` },
     });
     assert.equal(removedEnrollment.statusCode, 200, removedEnrollment.body);

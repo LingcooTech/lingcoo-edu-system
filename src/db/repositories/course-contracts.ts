@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -641,6 +641,7 @@ async function createCourseContractGiftInTx(
 
 export async function listCourseContracts(db: Database) {
   await expirePeriodPackageContracts(db);
+  await syncUnassignedCourseContractsFromEnrollments(db);
   const [contracts, paymentRecords, gifts, students, courses, classes, packages, orders] =
     await Promise.all([
       db.select().from(schema.courseContracts).orderBy(desc(schema.courseContracts.createdAt)),
@@ -705,6 +706,49 @@ export async function listCourseContracts(db: Database) {
     paymentRecords: paymentRecordsByContractId.get(contract.id) ?? [],
     gifts: giftsByContractId.get(contract.id) ?? [],
   }));
+}
+
+export async function syncUnassignedCourseContractsFromEnrollments(db: Database) {
+  const candidates = await db
+    .select({
+      contractId: schema.courseContracts.id,
+      classId: schema.classEnrollments.classId,
+    })
+    .from(schema.courseContracts)
+    .innerJoin(
+      schema.classEnrollments,
+      and(
+        eq(schema.classEnrollments.studentId, schema.courseContracts.studentId),
+        eq(schema.classEnrollments.billingCourseId, schema.courseContracts.courseId),
+        eq(schema.classEnrollments.active, true),
+      ),
+    )
+    .innerJoin(
+      schema.classes,
+      and(
+        eq(schema.classes.id, schema.classEnrollments.classId),
+        eq(schema.classes.courseId, schema.courseContracts.courseId),
+      ),
+    )
+    .where(and(eq(schema.courseContracts.status, 'active'), isNull(schema.courseContracts.classId)))
+    .orderBy(desc(schema.classEnrollments.joinedAt), desc(schema.classEnrollments.createdAt));
+
+  const classIdByContractId = new Map<string, string>();
+  for (const candidate of candidates) {
+    if (!classIdByContractId.has(candidate.contractId)) {
+      classIdByContractId.set(candidate.contractId, candidate.classId);
+    }
+  }
+  await Promise.all(
+    Array.from(classIdByContractId, ([contractId, classId]) =>
+      db
+        .update(schema.courseContracts)
+        .set({ classId, updatedAt: new Date() })
+        .where(
+          and(eq(schema.courseContracts.id, contractId), isNull(schema.courseContracts.classId)),
+        ),
+    ),
+  );
 }
 
 export async function expirePeriodPackageContracts(db: Database, now = new Date()) {
