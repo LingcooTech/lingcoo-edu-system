@@ -1515,7 +1515,18 @@ test('creates a course contract with offline payment, lesson credit and class en
       headers: { authorization: `Bearer ${adminToken}` },
     });
     assert.equal(sources.statusCode, 200, sources.body);
-    assert.equal(sources.json().lessonSourcesByStudentId[student.id][0].id, periodContract.id);
+    const studentLessonSources = sources.json().lessonSourcesByStudentId[student.id];
+    assert.equal(studentLessonSources[0].id, periodContract.id);
+    assert.ok(
+      studentLessonSources.every(
+        (source: { studentId: string; courseId: string }) =>
+          source.studentId === student.id && source.courseId === course.id,
+      ),
+    );
+    assert.deepEqual(
+      new Set(studentLessonSources.map((source: { id: string }) => source.id)),
+      new Set([periodContract.id, createdPayload.courseContract.id]),
+    );
 
     const attendance = await app.inject({
       method: 'POST',

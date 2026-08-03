@@ -10,6 +10,8 @@ type DbOrTx = Database | Tx;
 
 export type AttendanceLessonSource = {
   id: string;
+  studentId: string;
+  courseId: string;
   title: string;
   packageId: string | null;
   packageName: string | null;
@@ -192,6 +194,8 @@ async function listLessonSourcesInTx(
       (source) =>
         ({
           id: source.id,
+          studentId: input.studentId,
+          courseId: input.courseId,
           title: source.title,
           packageId: source.packageId,
           packageName: source.packageName ?? null,

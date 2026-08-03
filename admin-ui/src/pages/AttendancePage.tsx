@@ -526,9 +526,13 @@ export function AttendancePage() {
               const student = entry.student;
               const record = recordByStudentId.get(entry.studentId);
               const draft = drafts[entry.studentId] ?? defaultDraft();
-              const lessonSources = lessonSourcesByStudentId[entry.studentId] ?? [];
+              const requiredLessonUnits = selectedSession?.lessonUnits ?? 1;
+              const lessonSources = (lessonSourcesByStudentId[entry.studentId] ?? []).filter(
+                (source) =>
+                  source.studentId === entry.studentId && source.courseId === entry.billingCourseId,
+              );
               const automaticLessonSource = lessonSources.find(
-                (source) => source.remainingLessonCount >= (selectedSession?.lessonUnits ?? 1),
+                (source) => source.remainingLessonCount >= requiredLessonUnits,
               );
               const currentSourceMissing = Boolean(
                 record?.lessonSource &&
@@ -540,7 +544,9 @@ export function AttendancePage() {
                     ? record.lessonSource
                     : null))
                 : automaticLessonSource;
-              const sourcePickerOpen = sourcePickerStudentId === entry.studentId;
+              const canOverrideLessonSource = lessonSources.length > 1 || currentSourceMissing;
+              const sourcePickerOpen =
+                canOverrideLessonSource && sourcePickerStudentId === entry.studentId;
               return (
                 <div
                   key={`${entry.source}-${entry.id}`}
@@ -581,31 +587,48 @@ export function AttendancePage() {
                   <div className="relative">
                     <button
                       type="button"
+                      disabled={!canOverrideLessonSource}
                       className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition ${
                         sourcePickerOpen
                           ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
-                          : 'border-slate-200 bg-white hover:border-blue-300'
+                          : canOverrideLessonSource
+                            ? 'border-slate-200 bg-white hover:border-blue-300'
+                            : 'cursor-default border-slate-200 bg-slate-50'
                       }`}
-                      onClick={() =>
-                        setSourcePickerStudentId(sourcePickerOpen ? '' : entry.studentId)
-                      }
+                      onClick={() => {
+                        if (canOverrideLessonSource) {
+                          setSourcePickerStudentId(sourcePickerOpen ? '' : entry.studentId);
+                        }
+                      }}
                     >
                       <span className="min-w-0">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
                           <WalletCards className="h-3.5 w-3.5 text-blue-600" />
-                          {draft.courseContractId ? '指定扣课包' : '系统自动推荐'}
+                          {lessonSources.length === 0
+                            ? '无独立课时包'
+                            : canOverrideLessonSource
+                              ? draft.courseContractId
+                                ? '指定扣课包'
+                                : '系统自动推荐'
+                              : '本学员课时包'}
                         </span>
                         <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                           {selectedLessonSource
                             ? `${selectedLessonSource.packageName ?? selectedLessonSource.title} · 剩 ${selectedLessonSource.remainingLessonCount} 节`
-                            : '暂无独立课时包，将按账户余额处理'}
+                            : lessonSources.length > 0
+                              ? `${lessonSources[0].packageName ?? lessonSources[0].title} · 余额不足，不可扣课`
+                              : '将按该学员当前课程账户余额自动处理'}
                         </span>
                       </span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-slate-400 transition ${sourcePickerOpen ? 'rotate-180' : ''}`}
-                      />
+                      {canOverrideLessonSource ? (
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-slate-400 transition ${sourcePickerOpen ? 'rotate-180' : ''}`}
+                        />
+                      ) : lessonSources.length === 1 && automaticLessonSource ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                      ) : null}
                     </button>
-                    {sourcePickerOpen ? (
+                    {sourcePickerOpen && canOverrideLessonSource ? (
                       <div className="mt-2 space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-2 shadow-sm">
                         <button
                           type="button"
@@ -645,9 +668,7 @@ export function AttendancePage() {
                           <button
                             key={source.id}
                             type="button"
-                            disabled={
-                              source.remainingLessonCount < (selectedSession?.lessonUnits ?? 1)
-                            }
+                            disabled={source.remainingLessonCount < requiredLessonUnits}
                             className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-45 ${
                               draft.courseContractId === source.id
                                 ? 'border-blue-400 bg-blue-50 text-blue-700'
@@ -682,9 +703,19 @@ export function AttendancePage() {
                         ))}
                       </div>
                     ) : null}
-                    <div className="text-muted-foreground mt-1 text-[11px]">
-                      点击可查看余额、到期日并覆盖系统选择
-                    </div>
+                    {canOverrideLessonSource ? (
+                      <div className="text-muted-foreground mt-1 text-[11px]">
+                        仅显示该学员当前课程下实际拥有的课时包；可覆盖系统推荐
+                      </div>
+                    ) : lessonSources.length === 1 && automaticLessonSource ? (
+                      <div className="text-muted-foreground mt-1 text-[11px]">
+                        该学员只有一个可用扣课来源，系统将自动使用
+                      </div>
+                    ) : lessonSources.length === 1 ? (
+                      <div className="mt-1 text-[11px] text-amber-600">
+                        该课时包余额不足，本课次不能从此来源扣课
+                      </div>
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <input

@@ -461,6 +461,8 @@ export interface AttendanceRecord {
 
 export interface AttendanceLessonSource {
   id: string;
+  studentId: string;
+  courseId: string;
   title: string;
   packageId?: string | null;
   packageName?: string | null;
