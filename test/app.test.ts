@@ -1139,6 +1139,7 @@ test('creates a course contract with offline payment, lesson credit and class en
         category: '书法',
         ageRange: '6-9 岁',
         durationMinutes: 60,
+        providerInstitutionId: institution.id,
         summary: 'Contract gift course',
         content: '',
         status: 'published',
@@ -1157,7 +1158,11 @@ test('creates a course contract with offline payment, lesson credit and class en
       .returning();
     const [teacher] = await app.db
       .insert(schema.teachers)
-      .values({ name: `Contract Teacher ${suffix.slice(0, 8)}`, status: 'active' })
+      .values({
+        name: `Contract Teacher ${suffix.slice(0, 8)}`,
+        institutionId: institution.id,
+        status: 'active',
+      })
       .returning();
     const [classroom] = await app.db
       .insert(schema.classrooms)
@@ -1677,6 +1682,94 @@ test('creates a course contract with offline payment, lesson credit and class en
       .classes.find((item: { id: string }) => item.id === targetClass.id);
     assert.ok(associatedClass.courseIds.includes(giftCourse.id));
     assert.ok(associatedClass.courseIds.includes(targetCourse.id));
+
+    const [teacherAccount] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'teacher',
+        phone: phoneFromSuffix(randomUUID(), '137'),
+        passwordHash: hashPassword('test-password'),
+        displayName: teacher.name,
+        teacherId: teacher.id,
+      })
+      .returning();
+    await app.db.insert(schema.accountRoleAssignments).values([
+      {
+        accountId: teacherAccount.id,
+        role: 'teacher',
+        teacherId: teacher.id,
+      },
+      {
+        accountId: teacherAccount.id,
+        role: 'admin',
+      },
+    ]);
+    const teacherToken = await app.jwt.sign(
+      { sub: teacherAccount.id, role: 'teacher' },
+      { expiresIn: '1h' },
+    );
+
+    const teacherSchedulingOptions = await app.inject({
+      method: 'GET',
+      url: '/public/teacher/scheduling-options',
+      headers: { authorization: `Bearer ${teacherToken}` },
+    });
+    assert.equal(teacherSchedulingOptions.statusCode, 200, teacherSchedulingOptions.body);
+    const teacherTargetClass = teacherSchedulingOptions
+      .json()
+      .classes.find((item: { id: string }) => item.id === targetClass.id);
+    assert.ok(teacherTargetClass.courseIds.includes(giftCourse.id));
+    assert.ok(teacherTargetClass.courseIds.includes(targetCourse.id));
+
+    const [teacherContractStudent] = await app.db
+      .insert(schema.students)
+      .values({
+        name: `Teacher Contract Student ${suffix.slice(0, 8)}`,
+        grade: '三年级',
+        status: 'active',
+      })
+      .returning();
+    const teacherCrossCourseContract = await app.inject({
+      method: 'POST',
+      url: '/public/teacher/course-contracts',
+      headers: { authorization: `Bearer ${teacherToken}` },
+      payload: {
+        studentId: teacherContractStudent.id,
+        courseId: targetCourse.id,
+        classId: targetClass.id,
+        packageId: targetPackage.id,
+        lessonCount: targetPackage.lessonCount,
+        paidAmount: targetPackage.priceAmount,
+        paymentMethod: 'wechat_offline',
+        startsAt: futureDateFromSuffix(suffix, 2042).toISOString(),
+      },
+    });
+    assert.equal(teacherCrossCourseContract.statusCode, 200, teacherCrossCourseContract.body);
+
+    const teacherSessionStartsAt = futureDateFromSuffix(suffix, 2046);
+    const teacherCrossCourseSession = await app.inject({
+      method: 'POST',
+      url: '/public/teacher/class-sessions',
+      headers: { authorization: `Bearer ${teacherToken}` },
+      payload: {
+        classId: targetClass.id,
+        courseId: targetCourse.id,
+        classroomId: classroom.id,
+        startsAt: teacherSessionStartsAt.toISOString(),
+        endsAt: new Date(teacherSessionStartsAt.getTime() + 60 * 60 * 1000).toISOString(),
+        topic: '跨课程班级课次',
+        lessonUnits: 1,
+        students: [
+          {
+            studentId: targetStudent.id,
+            enrollmentMode: 'class',
+            billingCourseId: targetCourse.id,
+          },
+        ],
+      },
+    });
+    assert.equal(teacherCrossCourseSession.statusCode, 200, teacherCrossCourseSession.body);
+    assert.equal(teacherCrossCourseSession.json().classSession.course.id, targetCourse.id);
 
     const [oldAccountAfterReassignment] = await app.db
       .select()
