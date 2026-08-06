@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as financeRepo from '../../db/repositories/finance.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
+import * as crmRepo from '../../db/repositories/crm.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import * as refundsRepo from '../../db/repositories/refunds.js';
 import * as organizationRepo from '../../db/repositories/organization.js';
@@ -57,22 +58,31 @@ export const financeModule: AppModule = {
   name: 'finance',
   async register(app) {
     app.get('/v1/orders', { preHandler: app.requireAdmin }, async () => {
-      const [orders, students, courses, packages] = await Promise.all([
-        financeRepo.listOrders(app.db),
-        peopleRepo.listStudents(app.db),
-        catalogRepo.listCourses(app.db),
-        packagesRepo.listPackages(app.db),
-      ]);
+      const [orders, students, guardians, courses, courseSeries, packages, channels, campaigns] =
+        await Promise.all([
+          financeRepo.listOrders(app.db),
+          peopleRepo.listStudents(app.db),
+          peopleRepo.listGuardians(app.db),
+          catalogRepo.listCourses(app.db),
+          catalogRepo.listCourseSeries(app.db),
+          packagesRepo.listPackages(app.db),
+          crmRepo.listChannels(app.db),
+          crmRepo.listCampaigns(app.db),
+        ]);
       const refundRequests = await refundsRepo.listRefundRequestsForOrders(
         app.db,
         orders.map((order) => order.id),
       );
       const studentById = new Map(students.map((student) => [student.id, student]));
+      const guardianById = new Map(guardians.map((guardian) => [guardian.id, guardian]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
+      const courseSeriesById = new Map(courseSeries.map((series) => [series.id, series]));
       const packageById = new Map(
         packages.map((coursePackage) => [coursePackage.id, coursePackage]),
       );
       const refundRequestsByOrderId = new Map<string, typeof refundRequests>();
+      const channelById = new Map(channels.map((channel) => [channel.id, channel]));
+      const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
       for (const refund of refundRequests) {
         refundRequestsByOrderId.set(refund.orderId, [
           ...(refundRequestsByOrderId.get(refund.orderId) ?? []),
@@ -81,13 +91,26 @@ export const financeModule: AppModule = {
       }
 
       return {
-        orders: orders.map((order) => ({
-          ...order,
-          student: order.studentId ? studentById.get(order.studentId) : undefined,
-          course: order.courseId ? courseById.get(order.courseId) : undefined,
-          package: order.packageId ? packageById.get(order.packageId) : undefined,
-          refundRequests: refundRequestsByOrderId.get(order.id) ?? [],
-        })),
+        orders: orders.map((order) => {
+          const student = order.studentId ? studentById.get(order.studentId) : undefined;
+          return {
+            ...order,
+            student: student
+              ? {
+                  ...student,
+                  guardian: student.guardianId ? guardianById.get(student.guardianId) : undefined,
+                }
+              : undefined,
+            course: order.courseId ? courseById.get(order.courseId) : undefined,
+            courseSeries: order.courseSeriesId
+              ? courseSeriesById.get(order.courseSeriesId)
+              : undefined,
+            package: order.packageId ? packageById.get(order.packageId) : undefined,
+            channel: order.channelId ? channelById.get(order.channelId) : undefined,
+            campaign: order.campaignId ? campaignById.get(order.campaignId) : undefined,
+            refundRequests: refundRequestsByOrderId.get(order.id) ?? [],
+          };
+        }),
       };
     });
 

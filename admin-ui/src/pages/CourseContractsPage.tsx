@@ -182,6 +182,10 @@ function giftSummary(contract: CourseContract) {
   return gifts.map((gift) => `${gift.course?.name ?? '赠课'} ${gift.lessonCount} 节`).join('；');
 }
 
+function contractActualPaidAmount(contract: CourseContract) {
+  return contract.order?.paidAmount ?? contract.paidAmount;
+}
+
 export function CourseContractsPage() {
   return <CourseContractsPanel framed />;
 }
@@ -295,7 +299,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
         (sum, contract) => sum + contract.remainingLessonCount,
         0,
       ),
-      paidAmount: filtered.reduce((sum, contract) => sum + contract.paidAmount, 0),
+      paidAmount: filtered.reduce((sum, contract) => sum + contractActualPaidAmount(contract), 0),
       completedCount: filtered.filter((contract) => contract.status === 'completed').length,
     };
   }, [filtered]);
@@ -781,7 +785,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           {
             key: 'paidAmount',
             header: '实收金额',
-            value: (contract) => contract.paidAmount / 100,
+            value: (contract) => contractActualPaidAmount(contract) / 100,
             width: 14,
             format: 'currency',
             alignment: 'right',
@@ -953,7 +957,11 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             ),
           },
           { key: 'gifts', header: '赠课', cell: (row) => giftSummary(row) },
-          { key: 'paid', header: '实收', cell: (row) => money(row.paidAmount) },
+          {
+            key: 'paid',
+            header: '实收',
+            cell: (row) => money(contractActualPaidAmount(row)),
+          },
           {
             key: 'receiver',
             header: '收款方',

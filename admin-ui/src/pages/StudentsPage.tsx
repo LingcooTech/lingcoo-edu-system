@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Archive, Download, Eye, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Account, Student } from '@/api/types';
+import type { Account, CourseContract, Student } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -60,6 +60,11 @@ export function StudentsPage() {
     ARCHIVED_STUDENTS,
     'students',
   );
+  const {
+    data: courseContracts,
+    loading: contractsLoading,
+    error: contractsError,
+  } = useApiResource<CourseContract>('/v1/course-contracts', 'courseContracts');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [selected, setSelected] = useState<Student | null>(null);
@@ -74,6 +79,14 @@ export function StudentsPage() {
   const [exporting, setExporting] = useState(false);
 
   async function exportStudents(rows: Student[], archived = false) {
+    if (contractsLoading) {
+      toast.error('正式课程档案仍在加载，请稍后再导出');
+      return;
+    }
+    if (contractsError) {
+      toast.error('正式课程档案加载失败，暂不能生成完整导出');
+      return;
+    }
     if (rows.length === 0) {
       toast.error(archived ? '暂无历史档案可导出' : '暂无学员档案可导出');
       return;
@@ -82,6 +95,18 @@ export function StudentsPage() {
     setExporting(true);
     try {
       const dateKey = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      const contractsByStudentId = new Map<string, CourseContract[]>();
+      for (const contract of courseContracts) {
+        contractsByStudentId.set(contract.studentId, [
+          ...(contractsByStudentId.get(contract.studentId) ?? []),
+          contract,
+        ]);
+      }
+      const studentContracts = (student: Student) => contractsByStudentId.get(student.id) ?? [];
+      const actualPaidAmount = (contract: CourseContract) =>
+        contract.order?.paidAmount ?? contract.paidAmount;
+      const contractStatusLabel = (status: string) =>
+        ({ active: '进行中', completed: '已完成', cancelled: '已取消' })[status] ?? status;
       await exportStyledExcel({
         filename: `${archived ? '历史学员档案' : '学员正式档案'}-${dateKey}`,
         sheetName: archived ? '历史学员档案' : '学员正式档案',
@@ -136,6 +161,88 @@ export function StudentsPage() {
             width: 14,
             format: 'integer',
             alignment: 'right',
+          },
+          {
+            key: 'formalPackages',
+            header: '正式课程 / 课包',
+            value: (student) => {
+              const contracts = studentContracts(student);
+              return contracts.length
+                ? contracts
+                    .map(
+                      (contract) =>
+                        `${contract.course?.name ?? '未命名课程'} / ${
+                          contract.package?.name ?? contract.title
+                        }（${contractStatusLabel(contract.status)}）`,
+                    )
+                    .join('\n')
+                : '暂无正式课程档案';
+            },
+            width: 34,
+          },
+          {
+            key: 'purchasedLessons',
+            header: '正式档案总课时',
+            value: (student) =>
+              studentContracts(student).reduce((sum, contract) => sum + contract.lessonCount, 0),
+            width: 15,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'consumedLessons',
+            header: '正式档案已用课时',
+            value: (student) =>
+              studentContracts(student).reduce(
+                (sum, contract) =>
+                  sum + Math.max(contract.lessonCount - contract.remainingLessonCount, 0),
+                0,
+              ),
+            width: 15,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'contractBalance',
+            header: '正式档案剩余课时',
+            value: (student) =>
+              studentContracts(student).reduce(
+                (sum, contract) => sum + contract.remainingLessonCount,
+                0,
+              ),
+            width: 15,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'actualPaidAmount',
+            header: '累计实收费用',
+            value: (student) =>
+              studentContracts(student).reduce(
+                (sum, contract) => sum + actualPaidAmount(contract),
+                0,
+              ) / 100,
+            width: 16,
+            format: 'currency',
+            alignment: 'right',
+          },
+          {
+            key: 'actualPaidDetails',
+            header: '实收费用明细',
+            value: (student) => {
+              const contracts = studentContracts(student);
+              return contracts.length
+                ? contracts
+                    .map(
+                      (contract) =>
+                        `${contract.package?.name ?? contract.title}：¥${(
+                          actualPaidAmount(contract) / 100
+                        ).toFixed(2)}`,
+                    )
+                    .join('\n')
+                : '-';
+            },
+            width: 28,
           },
           {
             key: 'status',
@@ -323,6 +430,8 @@ export function StudentsPage() {
                       ),
                     disabled:
                       exporting ||
+                      contractsLoading ||
+                      Boolean(contractsError) ||
                       (activeTab === 'history' ? archivedData.length === 0 : data.length === 0),
                     icon: Download,
                   },

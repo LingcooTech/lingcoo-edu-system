@@ -1241,6 +1241,21 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(createdPayload.paymentRecord.paidAmount, 158000);
     assert.equal(createdPayload.enrollment.classId, classGroup.id);
 
+    const orderList = await app.inject({
+      method: 'GET',
+      url: '/v1/orders',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(orderList.statusCode, 200, orderList.body);
+    const exportedOrder = orderList
+      .json()
+      .orders.find((order: { id: string }) => order.id === createdPayload.courseContract.order.id);
+    assert.ok(exportedOrder);
+    assert.equal(exportedOrder.package.name, coursePackage.name);
+    assert.equal(exportedOrder.student.guardian.name, guardian.name);
+    assert.equal(exportedOrder.student.guardian.phone, guardian.phone);
+    assert.equal(exportedOrder.paidAmount, 158000);
+
     const [lessonAccount] = await app.db
       .select()
       .from(schema.lessonAccounts)

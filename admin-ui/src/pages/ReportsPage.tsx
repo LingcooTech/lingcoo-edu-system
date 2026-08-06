@@ -31,6 +31,25 @@ const PAYMENT_RECEIVER_TYPE_LABEL: Record<string, string> = {
   other: '其他收款方',
 };
 
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  cash: '现金',
+  bank_transfer: '银行转账',
+  wechat_offline: '微信线下',
+  alipay_offline: '支付宝线下',
+  offline_other: '其他线下',
+  wechat_pay: '微信支付',
+  alipay: '支付宝',
+  mock: '模拟支付',
+  online_payment: '线上支付',
+};
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: '待支付',
+  paid: '已支付',
+  refunded: '已退款',
+  cancelled: '已取消',
+};
+
 interface ReceiverSettlementRow {
   key: string;
   receiverName: string;
@@ -47,6 +66,9 @@ interface ReceiverSettlementRow {
   onlinePackagePaidAmount: number;
   manualGrantPaidAmount: number;
   seatReservationPaidAmount: number;
+  courseNames: string[];
+  packageNames: string[];
+  studentNames: string[];
   latestCreatedAt: string;
 }
 
@@ -60,6 +82,29 @@ function receiverType(order: Order) {
 
 function orderPaidAt(order: Order) {
   return order.paidAt ?? order.createdAt;
+}
+
+function approvedRefundAmount(order: Order) {
+  return (order.refundRequests ?? [])
+    .filter((refund) => refund.status === 'approved')
+    .reduce((sum, refund) => sum + refund.amount, 0);
+}
+
+function packageBillingLabel(order: Order) {
+  if (!order.package) return order.orderType === 'seat_reservation' ? '试听席位' : '自定义课时';
+  if (order.package.billingType !== 'period') return '课时卡';
+  const unit = order.package.periodUnit === 'week' ? '周' : '个月';
+  return `周期卡（${order.package.periodCount ?? 1}${unit}）`;
+}
+
+function addUnique(values: string[], value?: string | null) {
+  const normalized = value?.trim();
+  if (normalized && !values.includes(normalized)) values.push(normalized);
+}
+
+function settlementStatusLabel(order: Order, settledOrderIds: Set<string>) {
+  if (order.status === 'paid') return settledOrderIds.has(order.id) ? '已结算' : '未结算';
+  return ORDER_STATUS_LABEL[order.status] ?? order.status;
 }
 
 function dateInputToIso(value: string, endOfDay = false) {
@@ -176,6 +221,9 @@ export function ReportsPage() {
           onlinePackagePaidAmount: 0,
           manualGrantPaidAmount: 0,
           seatReservationPaidAmount: 0,
+          courseNames: [],
+          packageNames: [],
+          studentNames: [],
           latestCreatedAt: order.createdAt,
         } satisfies ReceiverSettlementRow);
 
@@ -204,6 +252,13 @@ export function ReportsPage() {
       if (new Date(order.createdAt).getTime() > new Date(current.latestCreatedAt).getTime()) {
         current.latestCreatedAt = order.createdAt;
       }
+      addUnique(current.courseNames, order.course?.name);
+      addUnique(
+        current.packageNames,
+        order.package?.name ??
+          (order.orderType === 'seat_reservation' ? '试听席位保留费' : '自定义课时'),
+      );
+      addUnique(current.studentNames, order.student?.name);
 
       rows.set(key, current);
     }
@@ -230,9 +285,8 @@ export function ReportsPage() {
   const settlementOrderDetails = useMemo(
     () =>
       ordersInRange
-        .filter((order) => ['paid', 'pending'].includes(order.status))
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 50),
+        .slice()
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [ordersInRange],
   );
 
@@ -299,6 +353,25 @@ export function ReportsPage() {
             header: '收款方类型',
             value: (row) => PAYMENT_RECEIVER_TYPE_LABEL[row.receiverType] ?? row.receiverType,
             width: 17,
+          },
+          {
+            key: 'courseNames',
+            header: '涉及课程',
+            value: (row) => row.courseNames.join('\n') || '-',
+            width: 24,
+          },
+          {
+            key: 'packageNames',
+            header: '涉及课包',
+            value: (row) => row.packageNames.join('\n') || '-',
+            width: 28,
+          },
+          {
+            key: 'studentCount',
+            header: '学员数',
+            value: (row) => row.studentNames.length,
+            width: 11,
+            format: 'integer',
           },
           {
             key: 'orderCount',
@@ -409,6 +482,130 @@ export function ReportsPage() {
             width: 17,
           },
           {
+            key: 'packageName',
+            header: '课包名称',
+            value: (order) =>
+              order.package?.name ??
+              (order.orderType === 'seat_reservation' ? '试听席位保留费' : '自定义课时'),
+            width: 24,
+          },
+          {
+            key: 'billingType',
+            header: '课包类型',
+            value: (order) => packageBillingLabel(order),
+            width: 18,
+          },
+          {
+            key: 'courseSeries',
+            header: '课程系列',
+            value: (order) => order.courseSeries?.name ?? '-',
+            width: 20,
+          },
+          {
+            key: 'course',
+            header: '课程',
+            value: (order) => order.course?.name ?? '-',
+            width: 20,
+          },
+          {
+            key: 'packagePrice',
+            header: '课包标价',
+            value: (order) => (order.package ? order.package.priceAmount / 100 : null),
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'packageSalePrice',
+            header: '课包优惠价',
+            value: (order) =>
+              order.package
+                ? (order.package.discountPriceAmount ?? order.package.priceAmount) / 100
+                : null,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'lessonCount',
+            header: '订单课时',
+            value: (order) => order.lessonCount,
+            width: 12,
+            format: 'integer',
+          },
+          {
+            key: 'giftedLessons',
+            header: '课包赠送课时',
+            value: (order) => order.package?.giftedLessonCount ?? 0,
+            width: 14,
+            format: 'integer',
+          },
+          {
+            key: 'student',
+            header: '学员姓名',
+            value: (order) => order.student?.name ?? '-',
+            width: 14,
+          },
+          {
+            key: 'grade',
+            header: '年级 / 年龄',
+            value: (order) => order.student?.grade ?? '-',
+            width: 14,
+          },
+          {
+            key: 'school',
+            header: '学校',
+            value: (order) => order.student?.school ?? '-',
+            width: 20,
+          },
+          {
+            key: 'guardianName',
+            header: '家长姓名',
+            value: (order) => order.student?.guardian?.name ?? '-',
+            width: 14,
+          },
+          {
+            key: 'guardianPhone',
+            header: '家长手机号',
+            value: (order) => order.student?.guardian?.phone ?? '-',
+            width: 18,
+            format: 'text',
+          },
+          {
+            key: 'amount',
+            header: '应收金额',
+            value: (order) => order.amount / 100,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'paidAmount',
+            header: '实收金额',
+            value: (order) => order.paidAmount / 100,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'refundAmount',
+            header: '已退款金额',
+            value: (order) => approvedRefundAmount(order) / 100,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'paymentMethod',
+            header: '支付方式',
+            value: (order) =>
+              order.paymentMethod
+                ? (PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod)
+                : '-',
+            width: 15,
+          },
+          {
+            key: 'paymentProvider',
+            header: '支付渠道',
+            value: (order) => order.paymentProvider ?? '-',
+            width: 15,
+          },
+          {
             key: 'receiverName',
             header: '收款方',
             value: (order) => receiverName(order),
@@ -421,46 +618,65 @@ export function ReportsPage() {
               PAYMENT_RECEIVER_TYPE_LABEL[receiverType(order)] ?? receiverType(order),
             width: 17,
           },
-          { key: 'course', header: '课程', value: (order) => order.course?.name ?? '-', width: 20 },
-          {
-            key: 'student',
-            header: '学员',
-            value: (order) => order.student?.name ?? '-',
-            width: 14,
-          },
-          {
-            key: 'amount',
-            header: '金额',
-            value: (order) => (order.status === 'paid' ? order.paidAmount : order.amount) / 100,
-            width: 14,
-            format: 'currency',
-          },
           {
             key: 'orderStatus',
             header: '订单状态',
-            value: (order) => order.status,
+            value: (order) => ORDER_STATUS_LABEL[order.status] ?? order.status,
             width: 13,
             alignment: 'center',
           },
           {
             key: 'settlementStatus',
             header: '结算状态',
-            value: (order) =>
-              order.status === 'paid'
-                ? settledOrderIds.has(order.id)
-                  ? '已结算'
-                  : '未结算'
-                : '待支付',
+            value: (order) => settlementStatusLabel(order, settledOrderIds),
             width: 13,
             alignment: 'center',
           },
           {
+            key: 'source',
+            header: '订单来源',
+            value: (order) => order.source ?? '-',
+            width: 16,
+          },
+          {
+            key: 'channel',
+            header: '归因渠道',
+            value: (order) => order.channel?.name ?? '-',
+            width: 18,
+          },
+          {
+            key: 'campaign',
+            header: '归因活动',
+            value: (order) => order.campaign?.name ?? '-',
+            width: 20,
+          },
+          {
+            key: 'medium',
+            header: '媒介',
+            value: (order) => order.medium ?? '-',
+            width: 14,
+          },
+          {
             key: 'paidAt',
             header: '支付时间',
-            value: (order) => new Date(orderPaidAt(order)),
+            value: (order) => (order.paidAt ? new Date(order.paidAt) : null),
             width: 19,
             format: 'datetime',
             alignment: 'center',
+          },
+          {
+            key: 'createdAt',
+            header: '下单时间',
+            value: (order) => new Date(order.createdAt),
+            width: 19,
+            format: 'datetime',
+            alignment: 'center',
+          },
+          {
+            key: 'note',
+            header: '收款备注',
+            value: (order) => order.offlinePaymentNote ?? '-',
+            width: 30,
           },
         ],
       });
@@ -715,11 +931,29 @@ export function ReportsPage() {
             ),
           },
           { key: 'course', header: '课程', cell: (row) => row.course?.name ?? '-' },
+          {
+            key: 'package',
+            header: '课包',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">
+                  {row.package?.name ??
+                    (row.orderType === 'seat_reservation' ? '试听席位保留费' : '自定义课时')}
+                </span>
+                <span className="cell-subtitle">{packageBillingLabel(row)}</span>
+              </div>
+            ),
+          },
           { key: 'student', header: '学员', cell: (row) => row.student?.name ?? '-' },
           {
-            key: 'amount',
-            header: '金额',
-            cell: (row) => money(row.status === 'paid' ? row.paidAmount : row.amount),
+            key: 'amounts',
+            header: '应收 / 实收',
+            cell: (row) => (
+              <div className="cell-stack">
+                <span className="cell-title">{money(row.amount)}</span>
+                <span className="cell-subtitle">实收 {money(row.paidAmount)}</span>
+              </div>
+            ),
           },
           {
             key: 'status',

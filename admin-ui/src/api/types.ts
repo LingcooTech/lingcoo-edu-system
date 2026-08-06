@@ -509,16 +509,32 @@ export interface Order {
     | null;
   cancelledByAdminId?: string | null;
   cancelledAt?: string | null;
+  source?: string;
+  channelId?: string | null;
+  campaignId?: string | null;
+  medium?: string | null;
   createdAt: string;
-  student?: { name: string };
+  updatedAt?: string;
+  student?: {
+    name: string;
+    grade?: string;
+    school?: string | null;
+    guardian?: { name: string; phone: string };
+  };
   course?: { name: string };
+  courseSeries?: { name: string };
   package?: {
     name: string;
+    billingType?: string;
+    periodUnit?: string | null;
+    periodCount?: number;
     lessonCount: number;
     giftedLessonCount?: number;
     priceAmount: number;
     discountPriceAmount?: number | null;
   };
+  channel?: { code: string; name: string };
+  campaign?: { code: string; name: string };
   refundRequests?: RefundRequest[];
 }
 
