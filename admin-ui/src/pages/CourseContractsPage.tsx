@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Plus, XCircle, Pencil, Trash2 } from 'lucide-react';
+import { CheckCircle2, Download, Plus, XCircle, Pencil, Trash2 } from 'lucide-react';
 
 import { apiPatch, apiPost, fetchOrganization } from '@/api/client';
 import type {
@@ -17,6 +17,7 @@ import { Field, FieldRow } from '@/components/shared/FormField';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
+import { exportStyledExcel } from '@/lib/excel-export';
 import { formatDateTime, money } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -206,6 +207,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [renewalSource, setRenewalSource] = useState<CourseContract | null>(null);
   const [organization, setOrganization] = useState<{
     businessModel: Pick<OrganizationSettings['businessModel'], 'courseContractEditEnabled'>;
@@ -656,6 +658,202 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
     }
   }
 
+  async function exportContracts() {
+    if (filtered.length === 0) {
+      toast.error('当前筛选条件下没有可导出的正式课程档案');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const dateKey = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      const statusText =
+        statusFilter === 'all' ? '全部状态' : (CONTRACT_STATUS_LABEL[statusFilter] ?? statusFilter);
+      await exportStyledExcel({
+        filename: `正式课程档案-${dateKey}`,
+        sheetName: '正式课程档案',
+        title: '学员正式课程档案',
+        subtitle: `${statusText} · 当前筛选结果${query.trim() ? ` · 搜索：${query.trim()}` : ''}`,
+        rows: filtered,
+        columns: [
+          {
+            key: 'index',
+            header: '序号',
+            value: (_, index) => index + 1,
+            width: 8,
+            format: 'integer',
+            alignment: 'center',
+          },
+          {
+            key: 'contractNo',
+            header: '档案编号',
+            value: (contract) => contract.contractNo,
+            width: 22,
+            format: 'text',
+          },
+          { key: 'title', header: '档案标题', value: (contract) => contract.title, width: 24 },
+          {
+            key: 'studentName',
+            header: '学员姓名',
+            value: (contract) => contract.student?.name || '-',
+            width: 14,
+          },
+          {
+            key: 'grade',
+            header: '年级 / 年龄',
+            value: (contract) => contract.student?.grade || '-',
+            width: 14,
+          },
+          {
+            key: 'school',
+            header: '学校',
+            value: (contract) => contract.student?.school || '-',
+            width: 20,
+          },
+          {
+            key: 'guardianName',
+            header: '家长姓名',
+            value: (contract) => contract.student?.guardian?.name || '-',
+            width: 14,
+          },
+          {
+            key: 'guardianPhone',
+            header: '家长手机号',
+            value: (contract) => contract.student?.guardian?.phone || '-',
+            width: 18,
+            format: 'text',
+          },
+          {
+            key: 'course',
+            header: '课程',
+            value: (contract) => contract.course?.name || '-',
+            width: 20,
+          },
+          {
+            key: 'class',
+            header: '班级',
+            value: (contract) => contract.class?.name || '-',
+            width: 18,
+          },
+          {
+            key: 'package',
+            header: '课时包',
+            value: (contract) => contract.package?.name || '自定义课时',
+            width: 20,
+          },
+          {
+            key: 'billingType',
+            header: '计费类型',
+            value: (contract) => (contract.package?.billingType === 'period' ? '周期卡' : '课时卡'),
+            width: 12,
+            alignment: 'center',
+          },
+          {
+            key: 'lessonCount',
+            header: '总课时',
+            value: (contract) => contract.lessonCount,
+            width: 11,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'usedLessonCount',
+            header: '已用课时',
+            value: (contract) => contract.lessonCount - contract.remainingLessonCount,
+            width: 11,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'remainingLessonCount',
+            header: '剩余课时',
+            value: (contract) => contract.remainingLessonCount,
+            width: 11,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'gifts',
+            header: '赠课明细',
+            value: (contract) => giftSummary(contract),
+            width: 28,
+          },
+          {
+            key: 'paidAmount',
+            header: '实收金额',
+            value: (contract) => contract.paidAmount / 100,
+            width: 14,
+            format: 'currency',
+            alignment: 'right',
+          },
+          {
+            key: 'paymentMethod',
+            header: '支付方式',
+            value: (contract) =>
+              contract.paymentMethod
+                ? (PAYMENT_METHOD_LABEL[contract.paymentMethod] ?? contract.paymentMethod)
+                : '-',
+            width: 14,
+          },
+          {
+            key: 'receiver',
+            header: '收款方',
+            value: (contract) => contract.paymentReceiverName || '-',
+            width: 20,
+          },
+          {
+            key: 'receiverType',
+            header: '收款方类型',
+            value: (contract) =>
+              PAYMENT_RECEIVER_TYPE_LABEL[contract.paymentReceiverType] ??
+              contract.paymentReceiverType,
+            width: 16,
+          },
+          {
+            key: 'startsAt',
+            header: '开始日期',
+            value: (contract) => (contract.startsAt ? new Date(contract.startsAt) : null),
+            width: 15,
+            format: 'date',
+            alignment: 'center',
+          },
+          {
+            key: 'endsAt',
+            header: '结束日期',
+            value: (contract) => (contract.endsAt ? new Date(contract.endsAt) : null),
+            width: 15,
+            format: 'date',
+            alignment: 'center',
+          },
+          {
+            key: 'status',
+            header: '档案状态',
+            value: (contract) =>
+              needsOnlineConfirmation(contract)
+                ? '待确认'
+                : (CONTRACT_STATUS_LABEL[contract.status] ?? contract.status),
+            width: 12,
+            alignment: 'center',
+          },
+          {
+            key: 'createdAt',
+            header: '建档时间',
+            value: (contract) => new Date(contract.createdAt),
+            width: 19,
+            format: 'datetime',
+            alignment: 'center',
+          },
+          { key: 'note', header: '备注', value: (contract) => contract.note || '-', width: 30 },
+        ],
+      });
+      toast.success(`已导出 ${filtered.length} 份正式课程档案`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const toolbar = (
     <div className="flex flex-wrap justify-end gap-2">
       <select
@@ -674,6 +872,15 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={exportContracts}
+        disabled={exporting || filtered.length === 0}
+      >
+        <Download className="h-4 w-4" />
+        {exporting ? '导出中...' : '导出 Excel'}
+      </button>
       <button type="button" className="btn btn-primary" onClick={openCreate}>
         <Plus className="h-4 w-4" />
         新增正式课程档案

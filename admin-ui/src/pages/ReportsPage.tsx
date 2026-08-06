@@ -14,6 +14,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
+import { exportStyledExcel } from '@/lib/excel-export';
 import { formatDateTime, money } from '@/lib/utils';
 
 const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
@@ -70,21 +71,6 @@ function dateInputToIso(value: string, endOfDay = false) {
   return date.toISOString();
 }
 
-function csvEscape(value: string | number) {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function downloadCsv(filename: string, rows: Array<Array<string | number>>) {
-  const csv = `\uFEFF${rows.map((row) => row.map(csvEscape).join(',')).join('\n')}`;
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 export function ReportsPage() {
   const toast = useToast();
   const [channelFunnel, setChannelFunnel] = useState<ChannelFunnelRow[]>([]);
@@ -96,6 +82,7 @@ export function ReportsPage() {
   const [endsOn, setEndsOn] = useState('');
   const [creatingSettlementKey, setCreatingSettlementKey] = useState('');
   const [voidingSettlementId, setVoidingSettlementId] = useState('');
+  const [exporting, setExporting] = useState<'summary' | 'details' | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -291,66 +278,198 @@ export function ReportsPage() {
     }
   }
 
-  function exportReceiverSettlement() {
-    downloadCsv('收款方结算汇总.csv', [
-      [
-        '收款方',
-        '收款方类型',
-        '订单数',
-        '已支付订单',
-        '已结算订单',
-        '未结算订单',
-        '已收金额',
-        '未结算金额',
-        '待收金额',
-        '席位保留费',
-        '线下课时包',
-        '线上课时包',
-      ],
-      ...receiverSettlement.map((row) => [
-        row.receiverName,
-        PAYMENT_RECEIVER_TYPE_LABEL[row.receiverType] ?? row.receiverType,
-        row.orderCount,
-        row.paidOrderCount,
-        row.settledOrderCount,
-        row.unsettledPaidOrderCount,
-        money(row.paidAmount),
-        money(row.unsettledPaidAmount),
-        money(row.pendingAmount),
-        money(row.seatReservationPaidAmount),
-        money(row.manualGrantPaidAmount),
-        money(row.onlinePackagePaidAmount),
-      ]),
-    ]);
+  async function exportReceiverSettlement() {
+    if (receiverSettlement.length === 0) {
+      toast.error('当前日期范围内没有可导出的结算汇总');
+      return;
+    }
+    setExporting('summary');
+    try {
+      const dateKey = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      await exportStyledExcel({
+        filename: `收款方结算汇总-${dateKey}`,
+        sheetName: '结算汇总',
+        title: '收款方结算汇总',
+        subtitle: `统计范围：${startsOn || '不限开始日期'} 至 ${endsOn || '不限结束日期'}`,
+        rows: receiverSettlement,
+        columns: [
+          { key: 'receiverName', header: '收款方', value: (row) => row.receiverName, width: 22 },
+          {
+            key: 'receiverType',
+            header: '收款方类型',
+            value: (row) => PAYMENT_RECEIVER_TYPE_LABEL[row.receiverType] ?? row.receiverType,
+            width: 17,
+          },
+          {
+            key: 'orderCount',
+            header: '订单数',
+            value: (row) => row.orderCount,
+            width: 11,
+            format: 'integer',
+          },
+          {
+            key: 'paidOrderCount',
+            header: '已支付订单',
+            value: (row) => row.paidOrderCount,
+            width: 13,
+            format: 'integer',
+          },
+          {
+            key: 'settledOrderCount',
+            header: '已结算订单',
+            value: (row) => row.settledOrderCount,
+            width: 13,
+            format: 'integer',
+          },
+          {
+            key: 'unsettledPaidOrderCount',
+            header: '未结算订单',
+            value: (row) => row.unsettledPaidOrderCount,
+            width: 13,
+            format: 'integer',
+          },
+          {
+            key: 'paidAmount',
+            header: '已收金额',
+            value: (row) => row.paidAmount / 100,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'unsettledPaidAmount',
+            header: '未结算金额',
+            value: (row) => row.unsettledPaidAmount / 100,
+            width: 15,
+            format: 'currency',
+          },
+          {
+            key: 'pendingAmount',
+            header: '待收金额',
+            value: (row) => row.pendingAmount / 100,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'seatReservationPaidAmount',
+            header: '席位保留费',
+            value: (row) => row.seatReservationPaidAmount / 100,
+            width: 15,
+            format: 'currency',
+          },
+          {
+            key: 'manualGrantPaidAmount',
+            header: '线下课时包',
+            value: (row) => row.manualGrantPaidAmount / 100,
+            width: 15,
+            format: 'currency',
+          },
+          {
+            key: 'onlinePackagePaidAmount',
+            header: '线上课时包',
+            value: (row) => row.onlinePackagePaidAmount / 100,
+            width: 15,
+            format: 'currency',
+          },
+        ],
+      });
+      toast.success(`已导出 ${receiverSettlement.length} 条结算汇总`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '导出失败');
+    } finally {
+      setExporting(null);
+    }
   }
 
-  function exportSettlementOrderDetails() {
-    downloadCsv('收款方订单明细.csv', [
-      [
-        '订单号',
-        '订单类型',
-        '收款方',
-        '收款方类型',
-        '课程',
-        '学员',
-        '金额',
-        '订单状态',
-        '结算状态',
-        '支付时间',
-      ],
-      ...settlementOrderDetails.map((order) => [
-        order.orderNo,
-        ORDER_TYPE_LABEL[order.orderType ?? ''] ?? order.orderType ?? '-',
-        receiverName(order),
-        PAYMENT_RECEIVER_TYPE_LABEL[receiverType(order)] ?? receiverType(order),
-        order.course?.name ?? '-',
-        order.student?.name ?? '-',
-        money(order.status === 'paid' ? order.paidAmount : order.amount),
-        order.status,
-        order.status === 'paid' ? (settledOrderIds.has(order.id) ? '已结算' : '未结算') : '待支付',
-        formatDateTime(orderPaidAt(order)),
-      ]),
-    ]);
+  async function exportSettlementOrderDetails() {
+    if (settlementOrderDetails.length === 0) {
+      toast.error('当前日期范围内没有可导出的订单明细');
+      return;
+    }
+    setExporting('details');
+    try {
+      const dateKey = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      await exportStyledExcel({
+        filename: `收款方订单明细-${dateKey}`,
+        sheetName: '订单明细',
+        title: '收款方订单明细',
+        subtitle: `统计范围：${startsOn || '不限开始日期'} 至 ${endsOn || '不限结束日期'}`,
+        rows: settlementOrderDetails,
+        columns: [
+          {
+            key: 'orderNo',
+            header: '订单号',
+            value: (order) => order.orderNo,
+            width: 23,
+            format: 'text',
+          },
+          {
+            key: 'orderType',
+            header: '订单类型',
+            value: (order) => ORDER_TYPE_LABEL[order.orderType ?? ''] ?? order.orderType ?? '-',
+            width: 17,
+          },
+          {
+            key: 'receiverName',
+            header: '收款方',
+            value: (order) => receiverName(order),
+            width: 22,
+          },
+          {
+            key: 'receiverType',
+            header: '收款方类型',
+            value: (order) =>
+              PAYMENT_RECEIVER_TYPE_LABEL[receiverType(order)] ?? receiverType(order),
+            width: 17,
+          },
+          { key: 'course', header: '课程', value: (order) => order.course?.name ?? '-', width: 20 },
+          {
+            key: 'student',
+            header: '学员',
+            value: (order) => order.student?.name ?? '-',
+            width: 14,
+          },
+          {
+            key: 'amount',
+            header: '金额',
+            value: (order) => (order.status === 'paid' ? order.paidAmount : order.amount) / 100,
+            width: 14,
+            format: 'currency',
+          },
+          {
+            key: 'orderStatus',
+            header: '订单状态',
+            value: (order) => order.status,
+            width: 13,
+            alignment: 'center',
+          },
+          {
+            key: 'settlementStatus',
+            header: '结算状态',
+            value: (order) =>
+              order.status === 'paid'
+                ? settledOrderIds.has(order.id)
+                  ? '已结算'
+                  : '未结算'
+                : '待支付',
+            width: 13,
+            alignment: 'center',
+          },
+          {
+            key: 'paidAt',
+            header: '支付时间',
+            value: (order) => new Date(orderPaidAt(order)),
+            width: 19,
+            format: 'datetime',
+            alignment: 'center',
+          },
+        ],
+      });
+      toast.success(`已导出 ${settlementOrderDetails.length} 条订单明细`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '导出失败');
+    } finally {
+      setExporting(null);
+    }
   }
 
   return (
@@ -370,17 +489,23 @@ export function ReportsPage() {
             value={endsOn}
             onChange={(event) => setEndsOn(event.target.value)}
           />
-          <button type="button" className="btn btn-secondary" onClick={exportReceiverSettlement}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={exportReceiverSettlement}
+            disabled={exporting !== null || receiverSettlement.length === 0}
+          >
             <Download className="h-4 w-4" />
-            导出汇总
+            {exporting === 'summary' ? '导出中...' : '导出汇总'}
           </button>
           <button
             type="button"
             className="btn btn-secondary"
             onClick={exportSettlementOrderDetails}
+            disabled={exporting !== null || settlementOrderDetails.length === 0}
           >
             <Download className="h-4 w-4" />
-            导出明细
+            {exporting === 'details' ? '导出中...' : '导出明细'}
           </button>
         </div>
       }

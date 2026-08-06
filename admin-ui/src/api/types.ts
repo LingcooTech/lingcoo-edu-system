@@ -356,6 +356,8 @@ export interface Student {
   grade: string;
   school?: string | null;
   status: string;
+  createdAt?: string;
+  updatedAt?: string;
   guardian?: { name: string; phone: string };
   lessonAccounts?: Array<{
     id?: string;

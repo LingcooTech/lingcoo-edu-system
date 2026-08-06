@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Eye, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, Download, Eye, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
 import type { Account, Student } from '@/api/types';
@@ -11,6 +11,7 @@ import { Field, FieldRow } from '@/components/shared/FormField';
 import { ResourceToolbar } from '@/components/shared/ResourceToolbar';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
+import { exportStyledExcel } from '@/lib/excel-export';
 import { useApiResource } from '@/lib/useApiResource';
 import { CourseContractsPanel } from '@/pages/CourseContractsPage';
 import { LessonAccountsPanel } from '@/pages/LessonsPage';
@@ -70,6 +71,104 @@ export function StudentsPage() {
   const [hardDeleting, setHardDeleting] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<StudentTab>('profiles');
+  const [exporting, setExporting] = useState(false);
+
+  async function exportStudents(rows: Student[], archived = false) {
+    if (rows.length === 0) {
+      toast.error(archived ? '暂无历史档案可导出' : '暂无学员档案可导出');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const dateKey = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      await exportStyledExcel({
+        filename: `${archived ? '历史学员档案' : '学员正式档案'}-${dateKey}`,
+        sheetName: archived ? '历史学员档案' : '学员正式档案',
+        title: archived ? '历史学员档案' : '学员正式档案',
+        subtitle: archived
+          ? '已归档学员信息、家长联系方式与课时余额'
+          : '当前学员信息、家长联系方式与各课程课时余额',
+        rows,
+        columns: [
+          {
+            key: 'index',
+            header: '序号',
+            value: (_, index) => index + 1,
+            width: 8,
+            format: 'integer',
+            alignment: 'center',
+          },
+          { key: 'name', header: '学员姓名', value: (student) => student.name, width: 14 },
+          { key: 'grade', header: '年级 / 年龄', value: (student) => student.grade, width: 14 },
+          { key: 'school', header: '学校', value: (student) => student.school || '-', width: 22 },
+          {
+            key: 'guardianName',
+            header: '家长姓名',
+            value: (student) => student.guardian?.name || '-',
+            width: 14,
+          },
+          {
+            key: 'guardianPhone',
+            header: '家长手机号',
+            value: (student) => student.guardian?.phone || '-',
+            width: 18,
+            format: 'text',
+          },
+          {
+            key: 'courseBalances',
+            header: '课程与剩余课时',
+            value: (student) =>
+              student.lessonAccounts?.length
+                ? student.lessonAccounts
+                    .map(
+                      (account) => `${account.course?.name ?? '未命名课程'}：${account.balance} 节`,
+                    )
+                    .join('\n')
+                : '暂无课时账户',
+            width: 32,
+          },
+          {
+            key: 'totalBalance',
+            header: '剩余课时合计',
+            value: (student) =>
+              student.lessonAccounts?.reduce((sum, account) => sum + account.balance, 0) ?? 0,
+            width: 14,
+            format: 'integer',
+            alignment: 'right',
+          },
+          {
+            key: 'status',
+            header: '档案状态',
+            value: (student) => statusLabel(student.status),
+            width: 12,
+            alignment: 'center',
+          },
+          {
+            key: 'createdAt',
+            header: '建档时间',
+            value: (student) => (student.createdAt ? new Date(student.createdAt) : null),
+            width: 19,
+            format: 'datetime',
+            alignment: 'center',
+          },
+          {
+            key: 'updatedAt',
+            header: '最近更新',
+            value: (student) => (student.updatedAt ? new Date(student.updatedAt) : null),
+            width: 19,
+            format: 'datetime',
+            alignment: 'center',
+          },
+        ],
+      });
+      toast.success(`已导出 ${rows.length} 份${archived ? '历史' : '正式'}学员档案`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -212,6 +311,24 @@ export function StudentsPage() {
           activeKey={activeTab}
           onTabChange={setActiveTab}
           action={activeTab === 'profiles' ? { label: '新增学员', onClick: openCreate } : null}
+          secondaryActions={
+            activeTab === 'profiles' || activeTab === 'history'
+              ? [
+                  {
+                    label: exporting ? '导出中...' : '导出 Excel',
+                    onClick: () =>
+                      exportStudents(
+                        activeTab === 'history' ? archivedData : data,
+                        activeTab === 'history',
+                      ),
+                    disabled:
+                      exporting ||
+                      (activeTab === 'history' ? archivedData.length === 0 : data.length === 0),
+                    icon: Download,
+                  },
+                ]
+              : []
+          }
         />
 
         {activeTab === 'profiles' ? (
@@ -560,9 +677,7 @@ function ParentAccountsPanel({ students }: { students: Student[] }) {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const { account } = await apiDelete<{ account: Account }>(
-        `/v1/accounts/${deleteTarget.id}`,
-      );
+      const { account } = await apiDelete<{ account: Account }>(`/v1/accounts/${deleteTarget.id}`);
       setAccounts((current) => current.filter((item) => item.id !== account.id));
       setDeleteTarget(null);
       toast.success('家长账号已删除，手机号已释放');
@@ -612,7 +727,10 @@ function ParentAccountsPanel({ students }: { students: Student[] }) {
                 '无关联学员'
               );
             },
-            filterValue: (row) => linkedStudents(row).map((student) => student.name).join(' '),
+            filterValue: (row) =>
+              linkedStudents(row)
+                .map((student) => student.name)
+                .join(' '),
           },
           {
             key: 'status',
