@@ -169,6 +169,25 @@ function normalizeSessionTeacherIds(primaryTeacherId: string, teacherIds?: strin
 export const schedulingModule: AppModule = {
   name: 'scheduling',
   async register(app) {
+    async function requireTeachersInClassInstitution(
+      classGroup: typeof schema.classes.$inferSelect,
+      teacherIds: string[],
+    ) {
+      const [course, classTeacher, selectedTeachers] = await Promise.all([
+        catalogRepo.requireCourse(app.db, classGroup.courseId),
+        teachingRepo.findTeacher(app.db, classGroup.teacherId),
+        teachingRepo.findTeachers(app.db, teacherIds),
+      ]);
+      if (selectedTeachers.length !== new Set(teacherIds).size) {
+        throw unprocessable('所选老师不存在');
+      }
+
+      const institutionId = course.providerInstitutionId ?? classTeacher?.institutionId ?? null;
+      if (selectedTeachers.some((teacher) => teacher.institutionId !== institutionId)) {
+        throw unprocessable('主老师、协同/替班老师必须属于班级对应机构');
+      }
+    }
+
     async function enrichClassSessions(
       sessions: Awaited<ReturnType<typeof schedulingRepo.listClassSessions>>,
     ) {
@@ -543,6 +562,7 @@ export const schedulingModule: AppModule = {
       const startsAt = new Date(body.startsAt);
       const endsAt = new Date(body.endsAt);
       const teacherIds = normalizeSessionTeacherIds(body.teacherId, body.teacherIds);
+      await requireTeachersInClassInstitution(classGroup, teacherIds);
 
       const conflict = await schedulingRepo.findScheduleConflict(app.db, {
         startsAt,
@@ -583,6 +603,7 @@ export const schedulingModule: AppModule = {
       const teacherId = body.teacherId || classGroup.teacherId;
       const classroomId = body.classroomId || classGroup.classroomId;
       const teacherIds = normalizeSessionTeacherIds(teacherId, body.teacherIds);
+      await requireTeachersInClassInstitution(classGroup, teacherIds);
       const dates = datesForBatch(body);
       const createdSessions: Awaited<ReturnType<typeof schedulingRepo.createClassSession>>[] = [];
       const skipped: Array<{ date: string; reason: string }> = [];
@@ -657,6 +678,11 @@ export const schedulingModule: AppModule = {
           teacherId,
           requestedTeacherIds ?? currentTeacherIds,
         );
+        const classId = body.classId ?? current.classId;
+        if (!classId) throw unprocessable('课次必须关联班级');
+        const classGroup = await schedulingRepo.findClass(app.db, classId);
+        if (!classGroup) throw notFound('Class not found');
+        await requireTeachersInClassInstitution(classGroup, teacherIds);
         const nextStatus = body.status ?? current.status;
 
         if (nextStatus !== 'cancelled') {

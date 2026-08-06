@@ -419,6 +419,144 @@ test('exposes public institution detail with media items', async () => {
   }
 });
 
+test('restricts class session teachers to the class institution', async () => {
+  const app = await buildApp(testEnv);
+  const suffix = randomUUID();
+
+  try {
+    const [admin] = await app.db
+      .insert(schema.accounts)
+      .values({
+        role: 'admin',
+        email: `schedule-admin-${suffix}@example.com`,
+        passwordHash: hashPassword('test-password'),
+        displayName: 'Schedule Admin',
+      })
+      .returning();
+    const adminToken = await app.jwt.sign({ sub: admin.id, role: 'admin' }, { expiresIn: '1h' });
+    const [classInstitution, otherInstitution] = await app.db
+      .insert(schema.institutions)
+      .values([
+        { name: `Schedule Institution ${suffix}` },
+        { name: `Other Schedule Institution ${suffix}` },
+      ])
+      .returning();
+    const [campus] = await app.db
+      .insert(schema.campuses)
+      .values({ name: `Schedule Campus ${suffix}` })
+      .returning();
+    const [course] = await app.db
+      .insert(schema.courses)
+      .values({
+        campusId: campus.id,
+        slug: `schedule-course-${suffix}`,
+        name: 'Schedule Course',
+        category: '测试',
+        ageRange: '6-12 岁',
+        durationMinutes: 60,
+        providerInstitutionId: classInstitution.id,
+        summary: '',
+        content: '',
+        status: 'published',
+      })
+      .returning();
+    const [primaryTeacher, assistantTeacher, otherTeacher] = await app.db
+      .insert(schema.teachers)
+      .values([
+        { name: `Primary Teacher ${suffix}`, institutionId: classInstitution.id },
+        { name: `Assistant Teacher ${suffix}`, institutionId: classInstitution.id },
+        { name: `Other Teacher ${suffix}`, institutionId: otherInstitution.id },
+      ])
+      .returning();
+    const [classroom] = await app.db
+      .insert(schema.classrooms)
+      .values({ campusId: campus.id, name: `Schedule Room ${suffix}` })
+      .returning();
+    const [classGroup] = await app.db
+      .insert(schema.classes)
+      .values({
+        campusId: campus.id,
+        courseId: course.id,
+        teacherId: primaryTeacher.id,
+        classroomId: classroom.id,
+        name: `Schedule Class ${suffix}`,
+        status: 'active',
+      })
+      .returning();
+    const startsAt = futureDateFromSuffix(suffix, 2043);
+    const endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
+    const headers = { authorization: `Bearer ${adminToken}` };
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/class-sessions',
+      headers,
+      payload: {
+        classId: classGroup.id,
+        teacherId: primaryTeacher.id,
+        teacherIds: [primaryTeacher.id, assistantTeacher.id],
+        classroomId: classroom.id,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        topic: '同机构协同课',
+        lessonUnits: 1,
+      },
+    });
+    assert.equal(created.statusCode, 200, created.body);
+
+    const crossInstitutionCreate = await app.inject({
+      method: 'POST',
+      url: '/v1/class-sessions',
+      headers,
+      payload: {
+        classId: classGroup.id,
+        teacherId: primaryTeacher.id,
+        teacherIds: [primaryTeacher.id, otherTeacher.id],
+        classroomId: classroom.id,
+        startsAt: new Date(startsAt.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(endsAt.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+        topic: '跨机构协同课',
+        lessonUnits: 1,
+      },
+    });
+    assert.equal(crossInstitutionCreate.statusCode, 422, crossInstitutionCreate.body);
+    assert.match(crossInstitutionCreate.body, /必须属于班级对应机构/);
+
+    const dateKey = startsAt.toISOString().slice(0, 10);
+    const crossInstitutionBatch = await app.inject({
+      method: 'POST',
+      url: '/v1/class-sessions/batch',
+      headers,
+      payload: {
+        classId: classGroup.id,
+        startsOn: dateKey,
+        endsOn: dateKey,
+        mode: 'daily',
+        weekdays: [],
+        startTime: '18:00',
+        endTime: '19:00',
+        topic: '跨机构批量排课',
+        lessonUnits: 1,
+        teacherId: primaryTeacher.id,
+        teacherIds: [primaryTeacher.id, otherTeacher.id],
+        skipConflicts: true,
+        timezoneOffsetMinutes: -480,
+      },
+    });
+    assert.equal(crossInstitutionBatch.statusCode, 422, crossInstitutionBatch.body);
+
+    const crossInstitutionEdit = await app.inject({
+      method: 'PATCH',
+      url: `/v1/class-sessions/${created.json().classSession.id}`,
+      headers,
+      payload: { teacherIds: [primaryTeacher.id, otherTeacher.id] },
+    });
+    assert.equal(crossInstitutionEdit.statusCode, 422, crossInstitutionEdit.body);
+  } finally {
+    await app.close();
+  }
+});
+
 test('exposes configured WeChat Mini Program subscribe templates', async () => {
   const app = await buildApp({
     ...testEnv,

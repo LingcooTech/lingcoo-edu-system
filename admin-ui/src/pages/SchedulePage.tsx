@@ -206,6 +206,41 @@ export function SchedulePage() {
     [classrooms],
   );
   const courseById = useMemo(() => new Map(courses.map((item) => [item.id, item])), [courses]);
+
+  function teacherOptionsForClass(classId: string) {
+    const classGroup = classes.find((item) => item.id === classId);
+    if (!classGroup) return teachers;
+
+    const course = courseById.get(classGroup.courseId);
+    if (course?.providerInstitutionId) {
+      return teachers.filter((teacher) => teacher.institutionId === course.providerInstitutionId);
+    }
+
+    const classTeacher = teachers.find((teacher) => teacher.id === classGroup.teacherId);
+    return classTeacher
+      ? teachers.filter((teacher) => teacher.institutionId === classTeacher.institutionId)
+      : teachers;
+  }
+
+  function scopedTeacherIds(classId: string, primaryTeacherId: string, teacherIds: string[]) {
+    const allowedIds = new Set(teacherOptionsForClass(classId).map((teacher) => teacher.id));
+    return normalizeTeacherIds(primaryTeacherId, teacherIds).filter((teacherId) =>
+      allowedIds.has(teacherId),
+    );
+  }
+
+  function scopedPrimaryTeacherId(classId: string, requestedTeacherId: string) {
+    const options = teacherOptionsForClass(classId);
+    if (options.some((teacher) => teacher.id === requestedTeacherId)) {
+      return requestedTeacherId;
+    }
+    const classGroup = classes.find((item) => item.id === classId);
+    const classTeacherId = classGroup?.teacherId;
+    return classTeacherId && options.some((teacher) => teacher.id === classTeacherId)
+      ? classTeacherId
+      : (options[0]?.id ?? '');
+  }
+
   const filteredSessions = useMemo(
     () =>
       data
@@ -321,12 +356,12 @@ export function SchedulePage() {
 
   function selectBatchClass(classId: string) {
     const classGroup = classes.find((item) => item.id === classId);
-    const teacherId = classGroup?.teacherId ?? batchForm.teacherId;
+    const teacherId = scopedPrimaryTeacherId(classId, classGroup?.teacherId ?? batchForm.teacherId);
     setBatchForm({
       ...batchForm,
       classId,
       teacherId,
-      teacherIds: normalizeTeacherIds(teacherId),
+      teacherIds: scopedTeacherIds(classId, teacherId, [teacherId]),
     });
   }
 
@@ -334,7 +369,7 @@ export function SchedulePage() {
     setForm({
       ...form,
       teacherId,
-      teacherIds: normalizeTeacherIds(teacherId, form.teacherIds),
+      teacherIds: scopedTeacherIds(form.classId, teacherId, form.teacherIds),
     });
   }
 
@@ -345,14 +380,17 @@ export function SchedulePage() {
     const teacherIds = form.teacherIds.includes(teacherId)
       ? form.teacherIds.filter((item) => item !== teacherId)
       : [...form.teacherIds, teacherId];
-    setForm({ ...form, teacherIds: normalizeTeacherIds(form.teacherId, teacherIds) });
+    setForm({
+      ...form,
+      teacherIds: scopedTeacherIds(form.classId, form.teacherId, teacherIds),
+    });
   }
 
   function changeBatchMainTeacher(teacherId: string) {
     setBatchForm({
       ...batchForm,
       teacherId,
-      teacherIds: normalizeTeacherIds(teacherId, batchForm.teacherIds),
+      teacherIds: scopedTeacherIds(batchForm.classId, teacherId, batchForm.teacherIds),
     });
   }
 
@@ -365,16 +403,18 @@ export function SchedulePage() {
       : [...batchForm.teacherIds, teacherId];
     setBatchForm({
       ...batchForm,
-      teacherIds: normalizeTeacherIds(batchForm.teacherId, teacherIds),
+      teacherIds: scopedTeacherIds(batchForm.classId, batchForm.teacherId, teacherIds),
     });
   }
 
   function openEdit(session: ClassSession) {
-    const teacherIds = sessionTeacherIds(session);
+    const classId = session.classId ?? '';
+    const teacherId = scopedPrimaryTeacherId(classId, session.teacherId);
+    const teacherIds = scopedTeacherIds(classId, teacherId, sessionTeacherIds(session));
     setEditing(session);
     setForm({
-      classId: session.classId ?? '',
-      teacherId: session.teacherId,
+      classId,
+      teacherId,
       teacherIds,
       classroomId: session.classroomId,
       lessonUnits: session.lessonUnits ?? 1,
@@ -390,12 +430,12 @@ export function SchedulePage() {
 
   function selectClass(classId: string) {
     const classGroup = classes.find((item) => item.id === classId);
-    const teacherId = classGroup?.teacherId ?? form.teacherId;
+    const teacherId = scopedPrimaryTeacherId(classId, classGroup?.teacherId ?? form.teacherId);
     setForm({
       ...form,
       classId,
       teacherId,
-      teacherIds: normalizeTeacherIds(teacherId),
+      teacherIds: scopedTeacherIds(classId, teacherId, [teacherId]),
       classroomId: classGroup?.classroomId ?? form.classroomId,
     });
   }
@@ -436,7 +476,7 @@ export function SchedulePage() {
     try {
       const payload = {
         ...form,
-        teacherIds: normalizeTeacherIds(form.teacherId, form.teacherIds),
+        teacherIds: scopedTeacherIds(form.classId, form.teacherId, form.teacherIds),
         topic: form.topic.trim(),
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: new Date(form.endsAt).toISOString(),
@@ -478,7 +518,7 @@ export function SchedulePage() {
         skipped: Array<{ date: string; reason: string }>;
       }>(`${SESSIONS()}/batch`, {
         ...batchForm,
-        teacherIds: normalizeTeacherIds(batchForm.teacherId, batchForm.teacherIds),
+        teacherIds: scopedTeacherIds(batchForm.classId, batchForm.teacherId, batchForm.teacherIds),
         topic: batchForm.topic.trim(),
         timezoneOffsetMinutes: new Date().getTimezoneOffset(),
       });
@@ -591,6 +631,14 @@ export function SchedulePage() {
   }
 
   const temporaryBillingOptions = billingAccountOptions(temporaryStudentForm.studentId);
+  const sessionTeacherOptions = teacherOptionsForClass(form.classId);
+  const batchTeacherOptions = teacherOptionsForClass(batchForm.classId);
+  const scopedSessionTeacherIds = scopedTeacherIds(form.classId, form.teacherId, form.teacherIds);
+  const scopedBatchTeacherIds = scopedTeacherIds(
+    batchForm.classId,
+    batchForm.teacherId,
+    batchForm.teacherIds,
+  );
 
   function sessionTeacherIds(session: ClassSession) {
     return normalizeTeacherIds(
@@ -921,7 +969,7 @@ export function SchedulePage() {
               onChange={(event) => changeMainTeacher(event.target.value)}
             >
               <option value="">选择老师</option>
-              {teachers.map((teacher) => (
+              {sessionTeacherOptions.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
                   {teacher.name}
                 </option>
@@ -945,10 +993,8 @@ export function SchedulePage() {
         </FieldRow>
         <Field label="协同/替班老师">
           <div className="grid gap-2 sm:grid-cols-2">
-            {teachers.map((teacher) => {
-              const checked = normalizeTeacherIds(form.teacherId, form.teacherIds).includes(
-                teacher.id,
-              );
+            {sessionTeacherOptions.map((teacher) => {
+              const checked = scopedSessionTeacherIds.includes(teacher.id);
               const isPrimary = teacher.id === form.teacherId;
               return (
                 <label
@@ -1171,7 +1217,7 @@ export function SchedulePage() {
               onChange={(event) => changeBatchMainTeacher(event.target.value)}
             >
               <option value="">使用班级默认老师</option>
-              {teachers.map((teacher) => (
+              {batchTeacherOptions.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
                   {teacher.name}
                 </option>
@@ -1180,11 +1226,8 @@ export function SchedulePage() {
           </Field>
           <Field label="协同/替班老师">
             <div className="grid gap-2 sm:grid-cols-2">
-              {teachers.map((teacher) => {
-                const checked = normalizeTeacherIds(
-                  batchForm.teacherId,
-                  batchForm.teacherIds,
-                ).includes(teacher.id);
+              {batchTeacherOptions.map((teacher) => {
+                const checked = scopedBatchTeacherIds.includes(teacher.id);
                 const isPrimary = teacher.id === batchForm.teacherId;
                 return (
                   <label
