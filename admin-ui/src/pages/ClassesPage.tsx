@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2, Users } from 'lucide-react';
 
 import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Campus, ClassGroup, Classroom, Course, Student, Teacher } from '@/api/types';
+import type {
+  Campus,
+  ClassGroup,
+  Classroom,
+  Course,
+  CourseContract,
+  Student,
+  Teacher,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -28,9 +36,11 @@ interface Enrollment {
   id: string;
   studentId: string;
   billingCourseId: string;
+  billingCourseContractId?: string | null;
   joinedAt: string;
   student?: Student;
   billingCourse?: Course | null;
+  billingCourseContract?: CourseContract | null;
   lessonAccount?: { balance: number; courseId: string; course?: Course | null } | null;
 }
 
@@ -60,6 +70,10 @@ export function ClassesPage() {
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
   const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
   const { data: students } = useApiResource<Student>('/v1/students', 'students');
+  const { data: courseContracts } = useApiResource<CourseContract>(
+    '/v1/course-contracts',
+    'courseContracts',
+  );
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ClassGroup | null>(null);
@@ -70,7 +84,7 @@ export function ClassesPage() {
   const [enrollmentClass, setEnrollmentClass] = useState<ClassGroup | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [studentId, setStudentId] = useState('');
-  const [billingCourseId, setBillingCourseId] = useState('');
+  const [billingCourseContractId, setBillingCourseContractId] = useState('');
   const [joinedAt, setJoinedAt] = useState(toDateTimeLocal());
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
   const [updatingEnrollmentId, setUpdatingEnrollmentId] = useState('');
@@ -86,15 +100,15 @@ export function ClassesPage() {
 
   useEffect(() => {
     if (!studentId || !enrollmentClass) {
-      setBillingCourseId('');
+      setBillingCourseContractId('');
       return;
     }
     const options = billingAccountOptions(studentId);
-    const defaultCourseId =
-      options.find((account) => account.courseId === enrollmentClass.courseId)?.courseId ??
-      options[0]?.courseId ??
+    const defaultContractId =
+      options.find((contract) => contract.courseId === enrollmentClass.courseId)?.id ??
+      options[0]?.id ??
       '';
-    setBillingCourseId(defaultCourseId);
+    setBillingCourseContractId(defaultContractId);
   }, [studentId, enrollmentClass]);
 
   function defaults(): ClassForm {
@@ -124,15 +138,29 @@ export function ClassesPage() {
     };
   }
 
-  function billingAccountOptions(targetStudentId: string) {
-    return [...(students.find((student) => student.id === targetStudentId)?.lessonAccounts ?? [])]
-      .filter((account) => account.courseId)
-      .sort(
-        (left, right) =>
-          (left.course?.name ?? left.courseId).localeCompare(
-            right.course?.name ?? right.courseId,
-          ) || right.balance - left.balance,
-      );
+  function billingAccountOptions(targetStudentId: string, currentContractId?: string | null) {
+    return courseContracts
+      .filter(
+        (contract) =>
+          contract.studentId === targetStudentId &&
+          ((contract.status === 'active' && contract.remainingLessonCount > 0) ||
+            contract.id === currentContractId),
+      )
+      .sort((left, right) => {
+        const targetCourseId = enrollmentClass?.courseId;
+        const courseOrder =
+          Number(right.courseId === targetCourseId) - Number(left.courseId === targetCourseId);
+        if (courseOrder !== 0) return courseOrder;
+        const periodOrder =
+          Number(right.package?.billingType === 'period') -
+          Number(left.package?.billingType === 'period');
+        if (periodOrder !== 0) return periodOrder;
+        const expiryOrder =
+          (left.endsAt ? new Date(left.endsAt).getTime() : Number.POSITIVE_INFINITY) -
+          (right.endsAt ? new Date(right.endsAt).getTime() : Number.POSITIVE_INFINITY);
+        if (expiryOrder !== 0) return expiryOrder;
+        return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+      });
   }
 
   function hydrateEnrollment(enrollment: Enrollment): Enrollment {
@@ -148,6 +176,10 @@ export function ClassesPage() {
         courses.find((course) => course.id === enrollment.billingCourseId) ??
         lessonAccount?.course ??
         enrollment.billingCourse ??
+        null,
+      billingCourseContract:
+        courseContracts.find((contract) => contract.id === enrollment.billingCourseContractId) ??
+        enrollment.billingCourseContract ??
         null,
       lessonAccount,
     };
@@ -191,7 +223,7 @@ export function ClassesPage() {
 
   function openEnrollments(item: ClassGroup) {
     setStudentId('');
-    setBillingCourseId('');
+    setBillingCourseContractId('');
     setJoinedAt(toDateTimeLocal());
     setEnrollmentClass(item);
   }
@@ -248,11 +280,18 @@ export function ClassesPage() {
   }
 
   async function addEnrollment() {
-    if (!enrollmentClass || !studentId || !billingCourseId || !joinedAt) return;
+    if (!enrollmentClass || !studentId || !billingCourseContractId || !joinedAt) return;
+    const contract = courseContracts.find((item) => item.id === billingCourseContractId);
+    if (!contract) return;
     try {
       const { enrollment } = await apiPost<{ enrollment: Enrollment }>(
         `${CLASSES()}/${enrollmentClass.id}/enrollments`,
-        { studentId, billingCourseId, joinedAt: new Date(joinedAt).toISOString() },
+        {
+          studentId,
+          billingCourseId: contract.courseId,
+          billingCourseContractId: contract.id,
+          joinedAt: new Date(joinedAt).toISOString(),
+        },
       );
       setEnrollments([hydrateEnrollment(enrollment), ...enrollments]);
       setData(
@@ -262,9 +301,9 @@ export function ClassesPage() {
             : item,
         ),
       );
-      addAssociatedCourseToClass(enrollmentClass.id, billingCourseId);
+      addAssociatedCourseToClass(enrollmentClass.id, contract.courseId);
       setStudentId('');
-      setBillingCourseId('');
+      setBillingCourseContractId('');
       setJoinedAt(toDateTimeLocal());
       toast.success('已加入班级');
     } catch (err) {
@@ -293,26 +332,32 @@ export function ClassesPage() {
     }
   }
 
-  async function updateEnrollmentBillingCourse(
+  async function updateEnrollmentBillingContract(
     enrollment: Enrollment,
-    nextBillingCourseId: string,
+    nextBillingCourseContractId: string,
   ) {
+    const nextContract = courseContracts.find(
+      (contract) => contract.id === nextBillingCourseContractId,
+    );
     if (
       !enrollmentClass ||
-      !nextBillingCourseId ||
-      nextBillingCourseId === enrollment.billingCourseId
+      !nextContract ||
+      nextBillingCourseContractId === enrollment.billingCourseContractId
     ) {
       return;
     }
     try {
       const { enrollment: updated } = await apiPatch<{ enrollment: Enrollment }>(
         `${CLASSES()}/${enrollmentClass.id}/enrollments/${enrollment.id}`,
-        { billingCourseId: nextBillingCourseId },
+        {
+          billingCourseId: nextContract.courseId,
+          billingCourseContractId: nextContract.id,
+        },
       );
       setEnrollments((current) =>
         current.map((item) => (item.id === updated.id ? hydrateEnrollment(updated) : item)),
       );
-      addAssociatedCourseToClass(enrollmentClass.id, nextBillingCourseId);
+      addAssociatedCourseToClass(enrollmentClass.id, nextContract.courseId);
       toast.success('扣课账户已更新');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '更新扣课账户失败');
@@ -549,14 +594,16 @@ export function ClassesPage() {
           <Field label="扣课账户">
             <select
               className="form-input"
-              value={billingCourseId}
+              value={billingCourseContractId}
               disabled={!studentId}
-              onChange={(event) => setBillingCourseId(event.target.value)}
+              onChange={(event) => setBillingCourseContractId(event.target.value)}
             >
-              <option value="">选择扣课账户</option>
-              {billingAccountOptions(studentId).map((account) => (
-                <option key={account.courseId} value={account.courseId}>
-                  {account.course?.name ?? account.courseId} · 剩余 {account.balance} 课时
+              <option value="">选择扣课课包</option>
+              {billingAccountOptions(studentId).map((contract) => (
+                <option key={contract.id} value={contract.id}>
+                  {contract.course?.name ?? contract.courseId} ·{' '}
+                  {contract.package?.name ?? contract.title} · 剩余 {contract.remainingLessonCount}{' '}
+                  课时
                 </option>
               ))}
             </select>
@@ -570,7 +617,12 @@ export function ClassesPage() {
               onChange={(event) => setJoinedAt(event.target.value)}
             />
           </Field>
-          <button type="button" className="btn btn-primary mb-3.5 shrink-0" onClick={addEnrollment}>
+          <button
+            type="button"
+            className="btn btn-primary mb-3.5 shrink-0"
+            onClick={addEnrollment}
+            disabled={!billingCourseContractId}
+          >
             加入
           </button>
         </div>
@@ -591,14 +643,26 @@ export function ClassesPage() {
                 </div>
                 <select
                   className="form-input max-w-xs"
-                  value={enrollment.billingCourseId}
+                  value={enrollment.billingCourseContractId ?? ''}
                   onChange={(event) =>
-                    updateEnrollmentBillingCourse(enrollment, event.target.value)
+                    updateEnrollmentBillingContract(enrollment, event.target.value)
                   }
                 >
-                  {billingAccountOptions(enrollment.studentId).map((account) => (
-                    <option key={account.courseId} value={account.courseId}>
-                      扣 {account.course?.name ?? account.courseId} · 剩余 {account.balance} 课时
+                  {billingAccountOptions(
+                    enrollment.studentId,
+                    enrollment.billingCourseContractId,
+                  ).map((contract) => (
+                    <option
+                      key={contract.id}
+                      value={contract.id}
+                      disabled={
+                        contract.id !== enrollment.billingCourseContractId &&
+                        (contract.status !== 'active' || contract.remainingLessonCount <= 0)
+                      }
+                    >
+                      扣 {contract.course?.name ?? contract.courseId} ·{' '}
+                      {contract.package?.name ?? contract.title} · 剩余{' '}
+                      {contract.remainingLessonCount} 课时
                     </option>
                   ))}
                 </select>

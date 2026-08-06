@@ -335,7 +335,13 @@ async function findOrCreateStudentFromContact(
 
 async function upsertClassEnrollment(
   tx: Tx,
-  input: { classId: string; studentId: string; billingCourseId: string; capacity: number },
+  input: {
+    classId: string;
+    studentId: string;
+    billingCourseId: string;
+    billingCourseContractId?: string | null;
+    capacity: number;
+  },
 ) {
   const [existing] = await tx
     .select()
@@ -350,6 +356,25 @@ async function upsertClassEnrollment(
     .for('update');
 
   if (existing?.active) {
+    if (
+      existing.billingCourseId !== input.billingCourseId ||
+      (input.billingCourseContractId !== undefined &&
+        existing.billingCourseContractId !== input.billingCourseContractId)
+    ) {
+      const [enrollment] = await tx
+        .update(schema.classEnrollments)
+        .set({
+          billingCourseId: input.billingCourseId,
+          billingCourseContractId:
+            input.billingCourseContractId === undefined
+              ? existing.billingCourseContractId
+              : input.billingCourseContractId,
+        })
+        .where(eq(schema.classEnrollments.id, existing.id))
+        .returning();
+      await syncEnrollmentToScheduledSessions(tx, enrollment);
+      return enrollment;
+    }
     return existing;
   }
 
@@ -373,6 +398,10 @@ async function upsertClassEnrollment(
       .set({
         active: true,
         billingCourseId: input.billingCourseId,
+        billingCourseContractId:
+          input.billingCourseContractId === undefined
+            ? existing.billingCourseContractId
+            : input.billingCourseContractId,
         joinedAt: new Date(),
         leftAt: null,
       })
@@ -388,6 +417,7 @@ async function upsertClassEnrollment(
       classId: input.classId,
       studentId: input.studentId,
       billingCourseId: input.billingCourseId,
+      billingCourseContractId: input.billingCourseContractId ?? null,
       active: true,
     })
     .returning();
@@ -413,6 +443,7 @@ async function syncEnrollmentToScheduledSessions(
         classSessionId: session.id,
         studentId: enrollment.studentId,
         billingCourseId: enrollment.billingCourseId,
+        billingCourseContractId: enrollment.billingCourseContractId,
         source: 'enrollment',
         active: true,
       })
@@ -420,6 +451,7 @@ async function syncEnrollmentToScheduledSessions(
         target: [schema.classSessionStudents.classSessionId, schema.classSessionStudents.studentId],
         set: {
           billingCourseId: enrollment.billingCourseId,
+          billingCourseContractId: enrollment.billingCourseContractId,
           source: 'enrollment',
           active: true,
           updatedAt: new Date(),
@@ -536,6 +568,15 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
     })
     .returning();
 
+  if (enrollment) {
+    [enrollment] = await tx
+      .update(schema.classEnrollments)
+      .set({ billingCourseContractId: contract.id })
+      .where(eq(schema.classEnrollments.id, enrollment.id))
+      .returning();
+    await syncEnrollmentToScheduledSessions(tx, enrollment);
+  }
+
   if (input.lessonCount > 0) {
     await applyLessonDelta(tx, {
       studentId: input.studentId,
@@ -544,6 +585,7 @@ async function createCourseContractInTx(tx: Tx, input: CourseContractInput) {
       amount: input.lessonCount,
       relatedEntityType: 'course_contract',
       relatedEntityId: contract.id,
+      courseContractId: contract.id,
     });
   }
 
@@ -861,6 +903,7 @@ export async function changeCourseContractClassInTx(
       classId: classGroup.id,
       studentId: input.studentId,
       billingCourseId: input.courseId,
+      billingCourseContractId: input.contractId,
       capacity: classGroup.capacity,
     });
   }

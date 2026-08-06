@@ -162,10 +162,25 @@ async function createLessonNotificationFixture(
       status: 'scheduled',
     })
     .returning();
+  const [courseContract] = await app.db
+    .insert(schema.courseContracts)
+    .values({
+      studentId: student.id,
+      courseId: course.id,
+      classId: classGroup.id,
+      contractNo: `LESSON-${suffix}`,
+      title: `Lesson Package ${suffix.slice(0, 8)}`,
+      lessonCount: input.balance ?? 6,
+      remainingLessonCount: input.balance ?? 6,
+      paidAmount: 0,
+      status: 'active',
+    })
+    .returning();
   await app.db.insert(schema.classEnrollments).values({
     classId: classGroup.id,
     studentId: student.id,
     billingCourseId: course.id,
+    billingCourseContractId: courseContract.id,
     active: true,
   });
   const [lessonAccount] = await app.db
@@ -184,6 +199,7 @@ async function createLessonNotificationFixture(
     classroom,
     classGroup,
     session,
+    courseContract,
     lessonAccount,
   };
 }
@@ -1378,6 +1394,10 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(createdPayload.courseContract.gifts[0].course.id, giftCourse.id);
     assert.equal(createdPayload.paymentRecord.paidAmount, 158000);
     assert.equal(createdPayload.enrollment.classId, classGroup.id);
+    assert.equal(
+      createdPayload.enrollment.billingCourseContractId,
+      createdPayload.courseContract.id,
+    );
 
     const orderList = await app.inject({
       method: 'GET',
@@ -1643,9 +1663,14 @@ test('creates a course contract with offline payment, lesson credit and class en
       method: 'POST',
       url: `/v1/classes/${classGroup.id}/enrollments`,
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { studentId: student.id, billingCourseId: course.id },
+      payload: {
+        studentId: student.id,
+        billingCourseId: course.id,
+        billingCourseContractId: periodContract.id,
+      },
     });
     assert.equal(reenrolled.statusCode, 200, reenrolled.body);
+    assert.equal(reenrolled.json().enrollment.billingCourseContractId, periodContract.id);
 
     const sessionStartsAt = new Date(periodStartsAt.getTime() + 24 * 60 * 60 * 1000);
     const [attendanceSession] = await app.db
@@ -1668,6 +1693,13 @@ test('creates a course contract with offline payment, lesson credit and class en
       headers: { authorization: `Bearer ${adminToken}` },
     });
     assert.equal(sources.statusCode, 200, sources.body);
+    const rosterResponse = await app.inject({
+      method: 'GET',
+      url: `/v1/class-sessions/${attendanceSession.id}/roster`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(rosterResponse.statusCode, 200, rosterResponse.body);
+    assert.equal(rosterResponse.json().roster[0].billingCourseContractId, periodContract.id);
     const studentLessonSources = sources.json().lessonSourcesByStudentId[student.id];
     assert.equal(studentLessonSources[0].id, periodContract.id);
     assert.ok(
@@ -1721,6 +1753,32 @@ test('creates a course contract with offline payment, lesson credit and class en
       .limit(1);
     assert.equal(ordinaryAfterCorrection.remainingLessonCount, coursePackage.lessonCount + 1);
     assert.equal(periodAfterCorrection.remainingLessonCount, periodPackage.lessonCount);
+
+    const ordinaryLeave = await app.inject({
+      method: 'PATCH',
+      url: `/v1/class-sessions/${attendanceSession.id}/attendance/${student.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { status: 'leave', courseContractId: createdPayload.courseContract.id },
+    });
+    assert.equal(ordinaryLeave.statusCode, 200, ordinaryLeave.body);
+    assert.equal(ordinaryLeave.json().attendanceRecord.lessonDelta, 0);
+
+    const periodLeave = await app.inject({
+      method: 'PATCH',
+      url: `/v1/class-sessions/${attendanceSession.id}/attendance/${student.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { status: 'leave', courseContractId: periodContract.id },
+    });
+    assert.equal(periodLeave.statusCode, 200, periodLeave.body);
+    assert.equal(periodLeave.json().attendanceRecord.lessonDelta, -1);
+
+    const restoreOrdinaryAttendance = await app.inject({
+      method: 'PATCH',
+      url: `/v1/class-sessions/${attendanceSession.id}/attendance/${student.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { status: 'present', courseContractId: createdPayload.courseContract.id },
+    });
+    assert.equal(restoreOrdinaryAttendance.statusCode, 200, restoreOrdinaryAttendance.body);
 
     const [targetGuardian] = await app.db
       .insert(schema.guardians)

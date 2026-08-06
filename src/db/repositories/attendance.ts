@@ -43,7 +43,12 @@ function lessonDeltaForStatus(
 
 async function periodPackageForSession(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
-  input: { sessionId: string; studentId: string; courseId: string },
+  input: {
+    sessionId: string;
+    studentId: string;
+    courseId: string;
+    preferredCourseContractId?: string | null;
+  },
 ) {
   const [session] = await tx
     .select({ startsAt: schema.classSessions.startsAt })
@@ -52,6 +57,40 @@ async function periodPackageForSession(
     .limit(1);
   if (!session) {
     throw Object.assign(new Error('课次不存在'), { statusCode: 404 });
+  }
+
+  if (input.preferredCourseContractId) {
+    const [preferred] = await tx
+      .select({
+        startsAt: schema.courseContracts.startsAt,
+        endsAt: schema.courseContracts.endsAt,
+        remainingLessonCount: schema.courseContracts.remainingLessonCount,
+        billingType: schema.coursePackages.billingType,
+      })
+      .from(schema.courseContracts)
+      .leftJoin(
+        schema.coursePackages,
+        eq(schema.courseContracts.packageId, schema.coursePackages.id),
+      )
+      .where(
+        and(
+          eq(schema.courseContracts.id, input.preferredCourseContractId),
+          eq(schema.courseContracts.studentId, input.studentId),
+          eq(schema.courseContracts.courseId, input.courseId),
+        ),
+      )
+      .limit(1);
+    if (preferred?.billingType !== 'period') return false;
+    if (
+      (preferred.startsAt && session.startsAt < preferred.startsAt) ||
+      (preferred.endsAt && session.startsAt > preferred.endsAt) ||
+      preferred.remainingLessonCount <= 0
+    ) {
+      throw Object.assign(new Error('所选周期卡不在本课次有效期内或课时已用完'), {
+        statusCode: 422,
+      });
+    }
+    return true;
   }
 
   const contracts = await tx
@@ -108,27 +147,6 @@ async function periodPackageForSession(
   if (hasValidOrdinaryContract) return false;
 
   throw Object.assign(new Error('该学员的周期卡不在本课次有效期内'), { statusCode: 422 });
-}
-
-async function requireAccountBalance(
-  tx: DbOrTx,
-  input: { studentId: string; courseId: string; required: number },
-) {
-  const [account] = await tx
-    .select()
-    .from(schema.lessonAccounts)
-    .where(
-      and(
-        eq(schema.lessonAccounts.studentId, input.studentId),
-        eq(schema.lessonAccounts.courseId, input.courseId),
-      ),
-    )
-    .limit(1)
-    .for('update');
-  if (!account || account.balance < input.required) {
-    throw Object.assign(new Error('该学员当前课程课时余额不足'), { statusCode: 422 });
-  }
-  return account;
 }
 
 function sourceIsValidAt(
@@ -231,7 +249,6 @@ async function takeLessonSource(
     preferredCourseContractId?: string | null;
   },
 ) {
-  await requireAccountBalance(tx, input);
   const sources = await listLessonSourcesInTx(tx, input);
   const source = input.preferredCourseContractId
     ? sources.find((item) => item.id === input.preferredCourseContractId)
@@ -413,6 +430,7 @@ export async function recordAttendance(
         sessionId: input.sessionId,
         studentId: record.studentId,
         courseId: billingCourseId,
+        preferredCourseContractId: record.courseContractId,
       });
       const lessonDelta = lessonDeltaForStatus(record.status, {
         deductLesson: record.deductLesson,
@@ -429,8 +447,11 @@ export async function recordAttendance(
               preferredCourseContractId: record.courseContractId,
             })
           : null;
-      if (periodPackage && lessonDelta < 0 && !lessonSource) {
-        throw Object.assign(new Error('该学员本周期课时已用完'), { statusCode: 422 });
+      if (lessonDelta < 0 && !lessonSource) {
+        throw Object.assign(
+          new Error(periodPackage ? '该学员本周期课时已用完' : '该学员当前课程无可用课时包'),
+          { statusCode: 422 },
+        );
       }
       const [attendanceRecord] = await tx
         .insert(schema.attendanceRecords)
@@ -505,18 +526,19 @@ export async function updateAttendanceRecord(
       return null;
     }
 
+    const requestedSourceId =
+      input.courseContractId === undefined ? existing.courseContractId : input.courseContractId;
     const periodPackage = await periodPackageForSession(tx, {
       sessionId: input.sessionId,
       studentId: input.studentId,
       courseId: input.courseId,
+      preferredCourseContractId: requestedSourceId,
     });
     const nextLessonDelta = lessonDeltaForStatus(input.status, {
       deductLesson: input.deductLesson,
       lessonUnits: input.lessonUnits,
       periodPackage,
     });
-    const requestedSourceId =
-      input.courseContractId === undefined ? existing.courseContractId : input.courseContractId;
     const allocationChanged =
       nextLessonDelta !== existing.lessonDelta ||
       (nextLessonDelta < 0 && requestedSourceId !== existing.courseContractId);
@@ -545,8 +567,11 @@ export async function updateAttendanceRecord(
         required: -nextLessonDelta,
         preferredCourseContractId: requestedSourceId,
       });
-      if (periodPackage && !source) {
-        throw Object.assign(new Error('该学员本周期课时已用完'), { statusCode: 422 });
+      if (!source) {
+        throw Object.assign(
+          new Error(periodPackage ? '该学员本周期课时已用完' : '该学员当前课程无可用课时包'),
+          { statusCode: 422 },
+        );
       }
       lessonSourceId = source?.id ?? null;
       await applyLessonDelta(tx, {

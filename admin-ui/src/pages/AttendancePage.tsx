@@ -216,6 +216,16 @@ export function AttendancePage() {
           const existing = attendancePayload.attendanceRecords.find(
             (record) => record.studentId === entry.studentId,
           );
+          const lessonSources = (
+            sourcePayload.lessonSourcesByStudentId[entry.studentId] ?? []
+          ).filter((source) => source.courseId === entry.billingCourseId);
+          const requiredLessonUnits = selectedSession.lessonUnits ?? 1;
+          const selectedSource =
+            lessonSources.find(
+              (source) =>
+                source.id === entry.billingCourseContractId &&
+                source.remainingLessonCount >= requiredLessonUnits,
+            ) ?? lessonSources.find((source) => source.remainingLessonCount >= requiredLessonUnits);
           nextDrafts[entry.studentId] = existing
             ? {
                 status: editableAttendanceStatus(existing.status),
@@ -223,7 +233,10 @@ export function AttendancePage() {
                 deductLesson: existing.lessonDelta < 0,
                 courseContractId: existing.courseContractId ?? '',
               }
-            : defaultDraft();
+            : {
+                ...defaultDraft(),
+                courseContractId: selectedSource?.id ?? '',
+              };
         });
         setDrafts(nextDrafts);
       })
@@ -534,6 +547,12 @@ export function AttendancePage() {
               const automaticLessonSource = lessonSources.find(
                 (source) => source.remainingLessonCount >= requiredLessonUnits,
               );
+              const configuredLessonSource = lessonSources.find(
+                (source) =>
+                  source.id === entry.billingCourseContractId &&
+                  source.remainingLessonCount >= requiredLessonUnits,
+              );
+              const recommendedLessonSource = configuredLessonSource ?? automaticLessonSource;
               const currentSourceMissing = Boolean(
                 record?.lessonSource &&
                 !lessonSources.some((source) => source.id === record.lessonSource?.id),
@@ -543,7 +562,7 @@ export function AttendancePage() {
                   (record?.lessonSource?.id === draft.courseContractId
                     ? record.lessonSource
                     : null))
-                : automaticLessonSource;
+                : recommendedLessonSource;
               const canOverrideLessonSource = lessonSources.length > 1 || currentSourceMissing;
               const sourcePickerOpen =
                 canOverrideLessonSource && sourcePickerStudentId === entry.studentId;
@@ -604,49 +623,26 @@ export function AttendancePage() {
                       <span className="min-w-0">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
                           <WalletCards className="h-3.5 w-3.5 text-blue-600" />
-                          {lessonSources.length === 0
-                            ? '无独立课时包'
-                            : canOverrideLessonSource
-                              ? draft.courseContractId
-                                ? '指定扣课包'
-                                : '系统自动推荐'
-                              : '本学员课时包'}
+                          {lessonSources.length === 0 ? '无可用课时包' : '扣课课时包'}
                         </span>
                         <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                           {selectedLessonSource
                             ? `${selectedLessonSource.packageName ?? selectedLessonSource.title} · 剩 ${selectedLessonSource.remainingLessonCount} 节`
                             : lessonSources.length > 0
                               ? `${lessonSources[0].packageName ?? lessonSources[0].title} · 余额不足，不可扣课`
-                              : '将按该学员当前课程账户余额自动处理'}
+                              : '请先为学员配置可用课时包'}
                         </span>
                       </span>
                       {canOverrideLessonSource ? (
                         <ChevronDown
                           className={`h-4 w-4 shrink-0 text-slate-400 transition ${sourcePickerOpen ? 'rotate-180' : ''}`}
                         />
-                      ) : lessonSources.length === 1 && automaticLessonSource ? (
+                      ) : lessonSources.length === 1 && recommendedLessonSource ? (
                         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                       ) : null}
                     </button>
                     {sourcePickerOpen && canOverrideLessonSource ? (
                       <div className="mt-2 space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-2 shadow-sm">
-                        <button
-                          type="button"
-                          className={`w-full rounded-lg border px-2.5 py-2 text-left text-xs transition ${
-                            !draft.courseContractId
-                              ? 'border-blue-400 bg-blue-50 text-blue-700'
-                              : 'border-transparent bg-white text-slate-700 hover:border-blue-200'
-                          }`}
-                          onClick={() => {
-                            updateDraft(entry.studentId, { courseContractId: '' });
-                            setSourcePickerStudentId('');
-                          }}
-                        >
-                          <span className="block font-medium">系统自动选择（推荐）</span>
-                          <span className="mt-0.5 block opacity-75">
-                            优先周期卡，再按到期日和购买时间扣减
-                          </span>
-                        </button>
                         {currentSourceMissing && record?.lessonSource ? (
                           <button
                             type="button"
@@ -692,10 +688,10 @@ export function AttendancePage() {
                             </span>
                             <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px]">
                               {source.billingType === 'period'
-                                ? source.id === automaticLessonSource?.id
+                                ? source.id === recommendedLessonSource?.id
                                   ? '周期卡 · 推荐'
                                   : '周期卡'
-                                : source.id === automaticLessonSource?.id
+                                : source.id === recommendedLessonSource?.id
                                   ? '推荐'
                                   : '课时包'}
                             </span>
@@ -705,11 +701,11 @@ export function AttendancePage() {
                     ) : null}
                     {canOverrideLessonSource ? (
                       <div className="text-muted-foreground mt-1 text-[11px]">
-                        仅显示该学员当前课程下实际拥有的课时包；可覆盖系统推荐
+                        仅显示该学员当前课程下实际拥有的课时包；可切换扣课来源
                       </div>
-                    ) : lessonSources.length === 1 && automaticLessonSource ? (
+                    ) : lessonSources.length === 1 && recommendedLessonSource ? (
                       <div className="text-muted-foreground mt-1 text-[11px]">
-                        该学员只有一个可用扣课来源，系统将自动使用
+                        已定位到该学员当前可用课时包
                       </div>
                     ) : lessonSources.length === 1 ? (
                       <div className="mt-1 text-[11px] text-amber-600">

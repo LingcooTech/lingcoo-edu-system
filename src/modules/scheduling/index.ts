@@ -71,21 +71,28 @@ const publicCalendarQuerySchema = z.object({
 const enrollmentSchema = z.object({
   studentId: z.string(),
   billingCourseId: z.string().uuid().optional(),
+  billingCourseContractId: z.string().uuid().optional(),
   joinedAt: z.string().datetime({ offset: true }).optional(),
 });
 
 const enrollmentUpdateSchema = z
   .object({
     billingCourseId: z.string().uuid().optional(),
+    billingCourseContractId: z.string().uuid().optional(),
     joinedAt: z.string().datetime({ offset: true }).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: 'No changes supplied' });
 
-const temporaryStudentSchema = z.object({
-  studentId: z.string().uuid(),
-  billingCourseId: z.string().uuid(),
-  note: z.string().trim().max(300).optional(),
-});
+const temporaryStudentSchema = z
+  .object({
+    studentId: z.string().uuid(),
+    billingCourseId: z.string().uuid().optional(),
+    billingCourseContractId: z.string().uuid().optional(),
+    note: z.string().trim().max(300).optional(),
+  })
+  .refine((value) => value.billingCourseId || value.billingCourseContractId, {
+    message: '请选择扣课课包',
+  });
 
 function notFound(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
@@ -248,13 +255,23 @@ export const schedulingModule: AppModule = {
 
       const studentIds = Array.from(new Set(roster.map((entry) => entry.studentId)));
       const billingCourseIds = Array.from(new Set(roster.map((entry) => entry.billingCourseId)));
-      const [students, courses, lessonAccounts] = await Promise.all([
+      const contractIds = Array.from(
+        new Set(roster.map((entry) => entry.billingCourseContractId).filter(Boolean)),
+      ) as string[];
+      const [students, courses, lessonAccounts, courseContracts, packages] = await Promise.all([
         peopleRepo.listStudents(app.db, { scope: 'all' }),
         catalogRepo.listCourses(app.db),
         app.db
           .select()
           .from(schema.lessonAccounts)
           .where(inArray(schema.lessonAccounts.studentId, studentIds)),
+        contractIds.length > 0
+          ? app.db
+              .select()
+              .from(schema.courseContracts)
+              .where(inArray(schema.courseContracts.id, contractIds))
+          : Promise.resolve([]),
+        app.db.select().from(schema.coursePackages),
       ]);
       const studentById = new Map(students.map((student) => [student.id, student]));
       const courseById = new Map(
@@ -265,13 +282,33 @@ export const schedulingModule: AppModule = {
       const lessonAccountByStudentCourse = new Map(
         lessonAccounts.map((account) => [`${account.studentId}:${account.courseId}`, account]),
       );
+      const contractById = new Map(courseContracts.map((contract) => [contract.id, contract]));
+      const packageById = new Map(
+        packages.map((coursePackage) => [coursePackage.id, coursePackage]),
+      );
 
       return roster.map((entry) => ({
         ...entry,
         student: studentById.get(entry.studentId) ?? null,
         billingCourse: courseById.get(entry.billingCourseId) ?? null,
-        lessonAccount:
-          lessonAccountByStudentCourse.get(`${entry.studentId}:${entry.billingCourseId}`) ?? null,
+        billingCourseContract: entry.billingCourseContractId
+          ? {
+              ...contractById.get(entry.billingCourseContractId),
+              package: packageById.get(
+                contractById.get(entry.billingCourseContractId)?.packageId ?? '',
+              ),
+            }
+          : null,
+        lessonAccount: entry.billingCourseContractId
+          ? {
+              id: entry.billingCourseContractId,
+              courseContractId: entry.billingCourseContractId,
+              studentId: entry.studentId,
+              courseId: entry.billingCourseId,
+              balance: contractById.get(entry.billingCourseContractId)?.remainingLessonCount ?? 0,
+            }
+          : (lessonAccountByStudentCourse.get(`${entry.studentId}:${entry.billingCourseId}`) ??
+            null),
       }));
     }
 
@@ -295,9 +332,11 @@ export const schedulingModule: AppModule = {
             classSessionId: sessionId,
             studentId: entry.studentId,
             billingCourseId: entry.billingCourseId,
+            billingCourseContractId: entry.billingCourseContractId ?? null,
             note: temporaryStudent?.note ?? ('note' in entry ? entry.note : null) ?? null,
             student: entry.student,
             billingCourse: entry.billingCourse,
+            billingCourseContract: entry.billingCourseContract,
             lessonAccount: entry.lessonAccount,
           };
         });
@@ -319,6 +358,33 @@ export const schedulingModule: AppModule = {
         throw unprocessable('该学员暂无所选课程课时账户');
       }
       return lessonAccount;
+    }
+
+    async function requireStudentCourseContract(input: {
+      studentId: string;
+      courseContractId: string;
+      requireBalance?: boolean;
+    }) {
+      const [courseContract] = await app.db
+        .select()
+        .from(schema.courseContracts)
+        .where(
+          and(
+            eq(schema.courseContracts.id, input.courseContractId),
+            eq(schema.courseContracts.studentId, input.studentId),
+          ),
+        )
+        .limit(1);
+      if (!courseContract || courseContract.status === 'cancelled') {
+        throw unprocessable('所选课时包不属于该学员或已取消');
+      }
+      if (
+        input.requireBalance !== false &&
+        (courseContract.status !== 'active' || courseContract.remainingLessonCount <= 0)
+      ) {
+        throw unprocessable('所选课时包余额不足或已失效');
+      }
+      return courseContract;
     }
 
     async function requireLessonAccountForTemporaryStudent(input: {
@@ -759,15 +825,29 @@ export const schedulingModule: AppModule = {
           : null;
         if (!classGroup) throw notFound('Class not found');
 
-        const [student, billingCourse, enrollments, existingTemporaryStudent] = await Promise.all([
+        const [student, enrollments, existingTemporaryStudent] = await Promise.all([
           peopleRepo.requireStudent(app.db, body.studentId),
-          catalogRepo.requireCourse(app.db, body.billingCourseId),
           schedulingRepo.listEnrollments(app.db, classGroup.id),
           schedulingRepo.findTemporaryStudent(app.db, {
             sessionId,
             studentId: body.studentId,
           }),
         ]);
+        const selectedContract = body.billingCourseContractId
+          ? await requireStudentCourseContract({
+              studentId: body.studentId,
+              courseContractId: body.billingCourseContractId,
+            })
+          : null;
+        const billingCourseId = selectedContract?.courseId ?? body.billingCourseId!;
+        if (
+          selectedContract &&
+          body.billingCourseId &&
+          body.billingCourseId !== selectedContract.courseId
+        ) {
+          throw unprocessable('所选课时包与扣课课程不匹配');
+        }
+        const billingCourse = await catalogRepo.requireCourse(app.db, billingCourseId);
 
         if (student.status === 'archived') {
           throw unprocessable('不能添加已归档学员');
@@ -778,15 +858,18 @@ export const schedulingModule: AppModule = {
         if (existingTemporaryStudent) {
           throw conflict('该学员已是本课次临时学员');
         }
-        await requireLessonAccountForTemporaryStudent({
-          studentId: student.id,
-          billingCourseId: billingCourse.id,
-        });
+        if (!selectedContract) {
+          await requireLessonAccountForTemporaryStudent({
+            studentId: student.id,
+            billingCourseId: billingCourse.id,
+          });
+        }
 
         const temporaryStudent = await schedulingRepo.createTemporaryStudent(app.db, {
           classSessionId: sessionId,
           studentId: student.id,
           billingCourseId: billingCourse.id,
+          billingCourseContractId: selectedContract?.id ?? null,
           note: body.note?.trim() || null,
         });
         if ((await schedulingRepo.listSessionStudentRows(app.db, sessionId)).length > 0) {
@@ -794,6 +877,7 @@ export const schedulingModule: AppModule = {
             classSessionId: sessionId,
             studentId: student.id,
             billingCourseId: billingCourse.id,
+            billingCourseContractId: selectedContract?.id ?? null,
             source: 'session_only',
             active: true,
           });
@@ -873,7 +957,7 @@ export const schedulingModule: AppModule = {
         if (!classGroup) throw notFound('Class not found');
         const enrollments = await schedulingRepo.listEnrollments(app.db, classId);
         const studentIds = enrollments.map((item) => item.studentId);
-        const [students, courses, lessonAccounts] = await Promise.all([
+        const [students, courses, lessonAccounts, courseContracts, packages] = await Promise.all([
           peopleRepo.listStudents(app.db),
           catalogRepo.listCourses(app.db),
           studentIds.length > 0
@@ -882,21 +966,50 @@ export const schedulingModule: AppModule = {
                 .from(schema.lessonAccounts)
                 .where(inArray(schema.lessonAccounts.studentId, studentIds))
             : Promise.resolve([]),
+          studentIds.length > 0
+            ? app.db
+                .select()
+                .from(schema.courseContracts)
+                .where(inArray(schema.courseContracts.studentId, studentIds))
+            : Promise.resolve([]),
+          app.db.select().from(schema.coursePackages),
         ]);
         const studentById = new Map(students.map((student) => [student.id, student]));
         const courseById = new Map(courses.map((course) => [course.id, course]));
         const lessonAccountByStudentCourse = new Map(
           lessonAccounts.map((account) => [`${account.studentId}:${account.courseId}`, account]),
         );
+        const contractById = new Map(courseContracts.map((contract) => [contract.id, contract]));
+        const packageById = new Map(
+          packages.map((coursePackage) => [coursePackage.id, coursePackage]),
+        );
         return {
           enrollments: enrollments.map((enrollment) => ({
             ...enrollment,
             student: studentById.get(enrollment.studentId),
             billingCourse: courseById.get(enrollment.billingCourseId) ?? null,
-            lessonAccount:
-              lessonAccountByStudentCourse.get(
-                `${enrollment.studentId}:${enrollment.billingCourseId}`,
-              ) ?? null,
+            billingCourseContract: enrollment.billingCourseContractId
+              ? {
+                  ...contractById.get(enrollment.billingCourseContractId),
+                  package: enrollment.billingCourseContractId
+                    ? packageById.get(
+                        contractById.get(enrollment.billingCourseContractId)?.packageId ?? '',
+                      )
+                    : undefined,
+                }
+              : null,
+            lessonAccount: enrollment.billingCourseContractId
+              ? {
+                  id: enrollment.billingCourseContractId,
+                  courseContractId: enrollment.billingCourseContractId,
+                  studentId: enrollment.studentId,
+                  courseId: enrollment.billingCourseId,
+                  balance:
+                    contractById.get(enrollment.billingCourseContractId)?.remainingLessonCount ?? 0,
+                }
+              : (lessonAccountByStudentCourse.get(
+                  `${enrollment.studentId}:${enrollment.billingCourseId}`,
+                ) ?? null),
           })),
         };
       },
@@ -911,9 +1024,28 @@ export const schedulingModule: AppModule = {
         if (!classGroup) throw notFound('Class not found');
         const body = enrollmentSchema.parse(request.body);
         await peopleRepo.requireStudent(app.db, body.studentId);
-        const billingCourseId = body.billingCourseId ?? classGroup.courseId;
+        const selectedContract = body.billingCourseContractId
+          ? await requireStudentCourseContract({
+              studentId: body.studentId,
+              courseContractId: body.billingCourseContractId,
+            })
+          : null;
+        const billingCourseId =
+          selectedContract?.courseId ?? body.billingCourseId ?? classGroup.courseId;
+        if (
+          selectedContract &&
+          body.billingCourseId &&
+          body.billingCourseId !== selectedContract.courseId
+        ) {
+          throw unprocessable('所选课时包与扣课课程不匹配');
+        }
         await catalogRepo.requireCourse(app.db, billingCourseId);
-        await requireStudentLessonAccount({ studentId: body.studentId, courseId: billingCourseId });
+        if (!selectedContract) {
+          await requireStudentLessonAccount({
+            studentId: body.studentId,
+            courseId: billingCourseId,
+          });
+        }
 
         const enrolledCount = await schedulingRepo.countActiveEnrollments(app.db, classId);
         if (enrolledCount >= classGroup.capacity) {
@@ -924,6 +1056,7 @@ export const schedulingModule: AppModule = {
           classId,
           studentId: body.studentId,
           billingCourseId,
+          billingCourseContractId: selectedContract?.id ?? null,
           active: true,
           joinedAt: body.joinedAt ? new Date(body.joinedAt) : new Date(),
           leftAt: null,
@@ -948,17 +1081,34 @@ export const schedulingModule: AppModule = {
         );
         if (!current) throw notFound('Enrollment not found');
         let enrollment = current;
-        if (body.billingCourseId && body.billingCourseId !== current.billingCourseId) {
-          await catalogRepo.requireCourse(app.db, body.billingCourseId);
-          await requireStudentLessonAccount({
-            studentId: current.studentId,
-            courseId: body.billingCourseId,
-          });
+        if (body.billingCourseContractId || body.billingCourseId) {
+          const selectedContract = body.billingCourseContractId
+            ? await requireStudentCourseContract({
+                studentId: current.studentId,
+                courseContractId: body.billingCourseContractId,
+              })
+            : null;
+          const billingCourseId = selectedContract?.courseId ?? body.billingCourseId!;
+          if (
+            selectedContract &&
+            body.billingCourseId &&
+            body.billingCourseId !== selectedContract.courseId
+          ) {
+            throw unprocessable('所选课时包与扣课课程不匹配');
+          }
+          await catalogRepo.requireCourse(app.db, billingCourseId);
+          if (!selectedContract) {
+            await requireStudentLessonAccount({
+              studentId: current.studentId,
+              courseId: billingCourseId,
+            });
+          }
           enrollment =
-            (await schedulingRepo.updateEnrollmentBillingCourse(app.db, {
+            (await schedulingRepo.updateEnrollmentBillingAccount(app.db, {
               classId,
               enrollmentId,
-              billingCourseId: body.billingCourseId,
+              billingCourseId,
+              billingCourseContractId: selectedContract?.id ?? null,
             })) ?? enrollment;
         }
         if (body.joinedAt) {

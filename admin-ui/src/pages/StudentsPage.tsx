@@ -78,6 +78,38 @@ export function StudentsPage() {
   const [activeTab, setActiveTab] = useState<StudentTab>('profiles');
   const [exporting, setExporting] = useState(false);
 
+  function contractsForStudent(studentId: string) {
+    return courseContracts
+      .filter((contract) => contract.studentId === studentId && contract.status !== 'cancelled')
+      .sort((left, right) => {
+        const courseOrder = (left.course?.name ?? '').localeCompare(right.course?.name ?? '');
+        return (
+          courseOrder || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+        );
+      });
+  }
+
+  function balanceCell(student: Student) {
+    const contracts = contractsForStudent(student.id);
+    if (contracts.length === 0) {
+      return student.lessonAccounts?.length ? (
+        <span>{student.lessonAccounts.map((account) => `${account.balance} 节`).join(' / ')}</span>
+      ) : (
+        <span>0 节</span>
+      );
+    }
+    return (
+      <div className="cell-stack">
+        {contracts.map((contract) => (
+          <span key={contract.id} className="text-xs">
+            {contract.course?.name ?? '未命名课程'} / {contract.package?.name ?? contract.title}：
+            {contract.remainingLessonCount} / {contract.lessonCount} 节
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   async function exportStudents(rows: Student[], archived = false) {
     if (contractsLoading) {
       toast.error('正式课程档案仍在加载，请稍后再导出');
@@ -142,22 +174,31 @@ export function StudentsPage() {
           },
           {
             key: 'courseBalances',
-            header: '课程与剩余课时',
-            value: (student) =>
-              student.lessonAccounts?.length
-                ? student.lessonAccounts
+            header: '课程 / 课包与剩余课时',
+            value: (student) => {
+              const contracts = studentContracts(student).filter(
+                (contract) => contract.status !== 'cancelled',
+              );
+              return contracts.length
+                ? contracts
                     .map(
-                      (account) => `${account.course?.name ?? '未命名课程'}：${account.balance} 节`,
+                      (contract) =>
+                        `${contract.course?.name ?? '未命名课程'} / ${
+                          contract.package?.name ?? contract.title
+                        }：${contract.remainingLessonCount} 节`,
                     )
                     .join('\n')
-                : '暂无课时账户',
-            width: 32,
+                : '暂无课时包账户';
+            },
+            width: 40,
           },
           {
             key: 'totalBalance',
             header: '剩余课时合计',
             value: (student) =>
-              student.lessonAccounts?.reduce((sum, account) => sum + account.balance, 0) ?? 0,
+              studentContracts(student)
+                .filter((contract) => contract.status !== 'cancelled')
+                .reduce((sum, contract) => sum + contract.remainingLessonCount, 0),
             width: 14,
             format: 'integer',
             alignment: 'right',
@@ -173,7 +214,10 @@ export function StudentsPage() {
                       (contract) =>
                         `${contract.course?.name ?? '未命名课程'} / ${
                           contract.package?.name ?? contract.title
-                        }（${contractStatusLabel(contract.status)}）`,
+                        }（${contractStatusLabel(contract.status)}，总 ${contract.lessonCount} / 已用 ${Math.max(
+                          contract.lessonCount - contract.remainingLessonCount,
+                          0,
+                        )} / 剩 ${contract.remainingLessonCount} 节）`,
                     )
                     .join('\n')
                 : '暂无正式课程档案';
@@ -468,8 +512,7 @@ export function StudentsPage() {
               {
                 key: 'lesson',
                 header: '课时余额',
-                cell: (row) =>
-                  row.lessonAccounts?.map((account) => account.balance).join(' / ') || '0',
+                cell: balanceCell,
               },
               {
                 key: 'status',
@@ -541,8 +584,7 @@ export function StudentsPage() {
               {
                 key: 'lesson',
                 header: '课时余额',
-                cell: (row) =>
-                  row.lessonAccounts?.map((account) => account.balance).join(' / ') || '0',
+                cell: balanceCell,
               },
               {
                 key: 'status',
@@ -721,7 +763,35 @@ export function StudentsPage() {
             </section>
             <section className="resource-card p-4">
               <h3 className="mb-3 text-sm font-semibold">课时包 / 课时余额</h3>
-              {selected.lessonAccounts?.length ? (
+              {contractsForStudent(selected.id).length ? (
+                <div className="space-y-2">
+                  {contractsForStudent(selected.id).map((contract) => (
+                    <div
+                      key={contract.id}
+                      className="flex justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
+                    >
+                      <span>
+                        <span className="block font-medium">
+                          {contract.course?.name ?? contract.courseId}
+                        </span>
+                        <span className="text-muted-foreground block text-xs">
+                          {contract.package?.name ?? contract.title}
+                          {contract.endsAt
+                            ? ` · ${new Date(contract.endsAt).toLocaleDateString('zh-CN')} 到期`
+                            : ''}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        {contract.remainingLessonCount} / {contract.lessonCount} 节
+                        <span className="text-muted-foreground block text-xs">
+                          已用 {Math.max(contract.lessonCount - contract.remainingLessonCount, 0)}{' '}
+                          节
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : selected.lessonAccounts?.length ? (
                 <div className="space-y-2">
                   {selected.lessonAccounts.map((account) => (
                     <div
@@ -729,9 +799,7 @@ export function StudentsPage() {
                       className="flex justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
                     >
                       <span>{account.course?.name ?? account.courseId}</span>
-                      <span className={account.balance < 0 ? 'font-medium text-red-600' : ''}>
-                        {account.balance} 节{account.balance < 0 ? ' · 待校正' : ''}
-                      </span>
+                      <span>{account.balance} 节</span>
                     </div>
                   ))}
                 </div>

@@ -57,6 +57,20 @@ export const attendanceModule: AppModule = {
       return new Map(roster.map((entry) => [entry.studentId, entry.billingCourseId]));
     }
 
+    function billingContractByStudentId(
+      roster: Array<
+        Pick<schedulingRepo.SessionRosterEntry, 'studentId' | 'billingCourseContractId'>
+      >,
+    ) {
+      return new Map(
+        roster
+          .filter((entry): entry is typeof entry & { billingCourseContractId: string } =>
+            Boolean(entry.billingCourseContractId),
+          )
+          .map((entry) => [entry.studentId, entry.billingCourseContractId]),
+      );
+    }
+
     async function loadPublicCheckInContext(sessionId: string) {
       const session = await schedulingRepo.findSession(app.db, sessionId);
       if (!session) {
@@ -166,6 +180,7 @@ export const attendanceModule: AppModule = {
             note: '家长扫码签到',
             courseId: rosterEntry.billingCourseId,
             lessonUnits: context.session.lessonUnits,
+            courseContractId: rosterEntry.billingCourseContractId,
           },
         ],
         completeSession: false,
@@ -379,6 +394,7 @@ export const attendanceModule: AppModule = {
         const body = attendanceSchema.parse(request.body);
         const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
         const billingCourseMap = billingCourseByStudentId(rosterEntries);
+        const billingContractMap = billingContractByStudentId(rosterEntries);
         const invalidRecord = body.records.find(
           (record) => !billingCourseMap.has(record.studentId),
         );
@@ -394,7 +410,8 @@ export const attendanceModule: AppModule = {
             ...record,
             courseId: billingCourseMap.get(record.studentId),
             lessonUnits: session.lessonUnits,
-            courseContractId: record.courseContractId,
+            courseContractId:
+              record.courseContractId ?? billingContractMap.get(record.studentId) ?? null,
           })),
           completeSession: false,
         });

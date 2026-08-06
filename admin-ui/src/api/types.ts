@@ -363,6 +363,13 @@ export interface Student {
     id?: string;
     balance: number;
     courseId: string;
+    courseContractId?: string;
+    lessonCount?: number;
+    consumedLessonCount?: number;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    status?: string;
+    package?: CoursePackage | null;
     studentId?: string;
     course?: Course | null;
   }>;
@@ -410,12 +417,14 @@ export interface SessionRosterEntry {
   source: 'enrollment' | 'temporary' | 'session_only';
   studentId: string;
   billingCourseId: string;
+  billingCourseContractId?: string | null;
   classEnrollmentId?: string;
   temporaryStudentId?: string;
   note?: string | null;
   student?: Student | null;
   billingCourse?: Course | null;
-  lessonAccount?: { balance: number; courseId: string } | null;
+  billingCourseContract?: CourseContract | null;
+  lessonAccount?: { balance: number; courseId: string; courseContractId?: string } | null;
 }
 
 export interface TemporarySessionStudent {
@@ -423,10 +432,12 @@ export interface TemporarySessionStudent {
   classSessionId: string;
   studentId: string;
   billingCourseId: string;
+  billingCourseContractId?: string | null;
   note?: string | null;
   student?: Student | null;
   billingCourse?: Course | null;
-  lessonAccount?: { balance: number; courseId: string } | null;
+  billingCourseContract?: CourseContract | null;
+  lessonAccount?: { balance: number; courseId: string; courseContractId?: string } | null;
 }
 
 export interface CalendarEvent {
@@ -478,8 +489,15 @@ export interface AttendanceLessonSource {
 export interface LessonAccount {
   id: string;
   balance: number;
+  courseContractId?: string;
+  lessonCount?: number;
+  consumedLessonCount?: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  status?: string;
   student?: { name: string; grade: string };
   course?: { name: string };
+  package?: CoursePackage | null;
 }
 
 export interface Order {

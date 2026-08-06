@@ -270,6 +270,7 @@ export async function createClassSession(
         classSessionId: session.id,
         studentId: enrollment.studentId,
         billingCourseId: enrollment.billingCourseId,
+        billingCourseContractId: enrollment.billingCourseContractId,
         source: 'enrollment',
         active: true,
       }));
@@ -488,6 +489,7 @@ export type SessionRosterEntry = {
   source: 'enrollment' | 'session_only' | 'temporary';
   studentId: string;
   billingCourseId: string;
+  billingCourseContractId?: string | null;
   classEnrollmentId?: string;
   temporaryStudentId?: string;
   note?: string | null;
@@ -511,6 +513,7 @@ export async function listSessionRoster(db: Database, sessionId: string) {
         source: row.source === 'enrollment' ? 'enrollment' : 'session_only',
         studentId: row.studentId,
         billingCourseId: row.billingCourseId,
+        billingCourseContractId: row.billingCourseContractId,
       })) satisfies SessionRosterEntry[];
   }
 
@@ -539,6 +542,7 @@ export async function listSessionRoster(db: Database, sessionId: string) {
       source: 'enrollment',
       studentId: enrollment.studentId,
       billingCourseId: enrollment.billingCourseId,
+      billingCourseContractId: enrollment.billingCourseContractId,
       classEnrollmentId: enrollment.id,
     });
   }
@@ -552,6 +556,7 @@ export async function listSessionRoster(db: Database, sessionId: string) {
       source: 'temporary',
       studentId: temporaryStudent.studentId,
       billingCourseId: temporaryStudent.billingCourseId,
+      billingCourseContractId: temporaryStudent.billingCourseContractId,
       temporaryStudentId: temporaryStudent.id,
       note: temporaryStudent.note,
     });
@@ -574,6 +579,7 @@ export async function replaceSessionRoster(
   students: Array<{
     studentId: string;
     billingCourseId: string;
+    billingCourseContractId?: string | null;
     source: 'enrollment' | 'session_only';
   }>,
 ) {
@@ -600,6 +606,7 @@ export async function upsertSessionStudent(
       target: [schema.classSessionStudents.classSessionId, schema.classSessionStudents.studentId],
       set: {
         billingCourseId: values.billingCourseId,
+        billingCourseContractId: values.billingCourseContractId ?? null,
         source: values.source ?? 'session_only',
         active: true,
         updatedAt: new Date(),
@@ -647,6 +654,7 @@ export async function createEnrollment(
       .set({
         active: true,
         billingCourseId: values.billingCourseId,
+        billingCourseContractId: values.billingCourseContractId ?? null,
         joinedAt: values.joinedAt ?? new Date(),
         leftAt: null,
       })
@@ -701,6 +709,7 @@ async function ensureSessionRosterSnapshot(db: Database, sessionId: string) {
     legacyRoster.map((entry) => ({
       studentId: entry.studentId,
       billingCourseId: entry.billingCourseId,
+      billingCourseContractId: entry.billingCourseContractId,
       source: entry.source === 'enrollment' ? 'enrollment' : 'session_only',
     })),
   );
@@ -719,6 +728,7 @@ async function syncEnrollmentToEligibleSessions(
       classSessionId: session.id,
       studentId: enrollment.studentId,
       billingCourseId: enrollment.billingCourseId,
+      billingCourseContractId: enrollment.billingCourseContractId,
       source: 'enrollment',
       active: true,
     });
@@ -737,19 +747,28 @@ async function syncEnrollmentToScheduledSessions(
       classSessionId: session.id,
       studentId: enrollment.studentId,
       billingCourseId: enrollment.billingCourseId,
+      billingCourseContractId: enrollment.billingCourseContractId,
       source: 'enrollment',
       active: true,
     });
   }
 }
 
-export async function updateEnrollmentBillingCourse(
+export async function updateEnrollmentBillingAccount(
   db: Database,
-  input: { classId: string; enrollmentId: string; billingCourseId: string },
+  input: {
+    classId: string;
+    enrollmentId: string;
+    billingCourseId: string;
+    billingCourseContractId: string | null;
+  },
 ) {
   const [enrollment] = await db
     .update(schema.classEnrollments)
-    .set({ billingCourseId: input.billingCourseId })
+    .set({
+      billingCourseId: input.billingCourseId,
+      billingCourseContractId: input.billingCourseContractId,
+    })
     .where(
       and(
         eq(schema.classEnrollments.classId, input.classId),
@@ -792,6 +811,7 @@ export async function updateEnrollmentJoinedAt(
           classSessionId: session.id,
           studentId: enrollment.studentId,
           billingCourseId: enrollment.billingCourseId,
+          billingCourseContractId: enrollment.billingCourseContractId,
           source: 'enrollment',
           active: true,
         });

@@ -666,6 +666,10 @@ export const classEnrollments = pgTable(
     billingCourseId: uuid('billing_course_id')
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
+    billingCourseContractId: uuid('billing_course_contract_id').references(
+      () => courseContracts.id,
+      { onDelete: 'set null' },
+    ),
     active: boolean('active').notNull().default(true),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
     leftAt: timestamp('left_at', { withTimezone: true }),
@@ -677,6 +681,9 @@ export const classEnrollments = pgTable(
       table.studentId,
     ),
     billingCourseIdx: index('class_enrollments_billing_course_idx').on(table.billingCourseId),
+    billingCourseContractIdx: index('class_enrollments_billing_contract_idx').on(
+      table.billingCourseContractId,
+    ),
     joinedAtIdx: index('class_enrollments_joined_at_idx').on(table.classId, table.joinedAt),
   }),
 );
@@ -729,6 +736,10 @@ export const classSessionStudents = pgTable(
     billingCourseId: uuid('billing_course_id')
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
+    billingCourseContractId: uuid('billing_course_contract_id').references(
+      () => courseContracts.id,
+      { onDelete: 'set null' },
+    ),
     source: varchar('source', { length: 40 }).notNull().default('session_only'),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -741,6 +752,9 @@ export const classSessionStudents = pgTable(
     ),
     sessionIdx: index('class_session_students_session_idx').on(table.classSessionId),
     studentIdx: index('class_session_students_student_idx').on(table.studentId),
+    billingCourseContractIdx: index('class_session_students_billing_contract_idx').on(
+      table.billingCourseContractId,
+    ),
   }),
 );
 
@@ -780,6 +794,10 @@ export const classSessionTemporaryStudents = pgTable(
     billingCourseId: uuid('billing_course_id')
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
+    billingCourseContractId: uuid('billing_course_contract_id').references(
+      () => courseContracts.id,
+      { onDelete: 'set null' },
+    ),
     note: text('note'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -792,6 +810,9 @@ export const classSessionTemporaryStudents = pgTable(
     studentIdx: index('class_session_temporary_students_student_idx').on(table.studentId),
     billingCourseIdx: index('class_session_temporary_students_billing_course_idx').on(
       table.billingCourseId,
+    ),
+    billingCourseContractIdx: index('class_session_temporary_students_billing_contract_idx').on(
+      table.billingCourseContractId,
     ),
   }),
 );

@@ -17,6 +17,7 @@ import type {
   ClassSession,
   Classroom,
   Course,
+  CourseContract,
   Student,
   Teacher,
   TemporarySessionStudent,
@@ -62,7 +63,7 @@ interface BatchForm {
 
 interface TemporaryStudentForm {
   studentId: string;
-  billingCourseId: string;
+  billingCourseContractId: string;
   note: string;
 }
 
@@ -161,6 +162,10 @@ export function SchedulePage() {
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
   const { data: classrooms } = useApiResource<Classroom>('/v1/classrooms', 'classrooms');
   const { data: courses } = useApiResource<Course>('/v1/courses', 'courses');
+  const { data: courseContracts } = useApiResource<CourseContract>(
+    '/v1/course-contracts',
+    'courseContracts',
+  );
   const { data: students } = useApiResource<Student>('/v1/students?scope=current', 'students');
 
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
@@ -187,7 +192,7 @@ export function SchedulePage() {
   const [temporaryStudents, setTemporaryStudents] = useState<TemporarySessionStudent[]>([]);
   const [temporaryStudentForm, setTemporaryStudentForm] = useState<TemporaryStudentForm>({
     studentId: '',
-    billingCourseId: '',
+    billingCourseContractId: '',
     note: '',
   });
   const [temporaryStudentsLoading, setTemporaryStudentsLoading] = useState(false);
@@ -274,12 +279,17 @@ export function SchedulePage() {
   );
 
   function billingAccountOptions(studentId: string) {
-    const student = students.find((item) => item.id === studentId);
     const classGroup = classes.find((item) => item.id === form.classId);
     const targetCourse = classGroup ? courseById.get(classGroup.courseId) : null;
-    return [...(student?.lessonAccounts ?? [])]
-      .map((account) => {
-        const course = courseById.get(account.courseId) ?? null;
+    return courseContracts
+      .filter(
+        (contract) =>
+          contract.studentId === studentId &&
+          contract.status === 'active' &&
+          contract.remainingLessonCount > 0,
+      )
+      .map((contract) => {
+        const course = courseById.get(contract.courseId) ?? contract.course ?? null;
         const sameCourse = Boolean(targetCourse && course?.id === targetCourse.id);
         const sameSeries = Boolean(
           targetCourse?.courseSeriesId &&
@@ -290,11 +300,11 @@ export function SchedulePage() {
           targetCourse?.category && course?.category === targetCourse.category,
         );
         return {
-          ...account,
+          ...contract,
           course,
           recommended: sameCourse || sameSeries || sameCategory,
           sortScore:
-            (account.balance > 0 ? 10 : 0) +
+            (contract.remainingLessonCount > 0 ? 10 : 0) +
             (sameCourse ? 4 : 0) +
             (sameSeries ? 3 : 0) +
             (sameCategory ? 1 : 0),
@@ -308,11 +318,11 @@ export function SchedulePage() {
 
   function selectTemporaryStudent(studentId: string) {
     const firstAvailableAccount = billingAccountOptions(studentId).find(
-      (account) => account.balance > 0,
+      (contract) => contract.remainingLessonCount > 0,
     );
     setTemporaryStudentForm({
       studentId,
-      billingCourseId: firstAvailableAccount?.courseId ?? '',
+      billingCourseContractId: firstAvailableAccount?.id ?? '',
       note: '',
     });
   }
@@ -336,7 +346,7 @@ export function SchedulePage() {
     setEditing(null);
     setForm(defaultForm(classes, teachers, classrooms));
     setTemporaryStudents([]);
-    setTemporaryStudentForm({ studentId: '', billingCourseId: '', note: '' });
+    setTemporaryStudentForm({ studentId: '', billingCourseContractId: '', note: '' });
     setOpen(true);
   }
 
@@ -423,7 +433,7 @@ export function SchedulePage() {
       topic: session.topic,
       status: session.status as SessionForm['status'],
     });
-    setTemporaryStudentForm({ studentId: '', billingCourseId: '', note: '' });
+    setTemporaryStudentForm({ studentId: '', billingCourseContractId: '', note: '' });
     void loadTemporaryStudents(session.id);
     setOpen(true);
   }
@@ -569,7 +579,7 @@ export function SchedulePage() {
 
   async function addTemporaryStudent() {
     if (!editing) return;
-    if (!temporaryStudentForm.studentId || !temporaryStudentForm.billingCourseId) {
+    if (!temporaryStudentForm.studentId || !temporaryStudentForm.billingCourseContractId) {
       toast.error('请选择临时学员和扣课账户');
       return;
     }
@@ -579,11 +589,11 @@ export function SchedulePage() {
         temporaryStudent: TemporarySessionStudent;
       }>(`${SESSIONS()}/${editing.id}/temporary-students`, {
         studentId: temporaryStudentForm.studentId,
-        billingCourseId: temporaryStudentForm.billingCourseId,
+        billingCourseContractId: temporaryStudentForm.billingCourseContractId,
         note: temporaryStudentForm.note.trim() || undefined,
       });
       setTemporaryStudents([...temporaryStudents, temporaryStudent]);
-      setTemporaryStudentForm({ studentId: '', billingCourseId: '', note: '' });
+      setTemporaryStudentForm({ studentId: '', billingCourseContractId: '', note: '' });
       toast.success('临时学员已添加');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '添加临时学员失败');
@@ -1060,6 +1070,9 @@ export function SchedulePage() {
                       </div>
                       <div className="text-muted-foreground truncate text-xs">
                         扣 {item.billingCourse?.name ?? item.billingCourseId}
+                        {item.billingCourseContract?.package?.name
+                          ? ` · ${item.billingCourseContract.package.name}`
+                          : ''}
                         {typeof item.lessonAccount?.balance === 'number'
                           ? ` · 剩余 ${item.lessonAccount.balance} 课时`
                           : ''}
@@ -1101,23 +1114,25 @@ export function SchedulePage() {
               </select>
               <select
                 className="form-input"
-                value={temporaryStudentForm.billingCourseId}
+                value={temporaryStudentForm.billingCourseContractId}
                 disabled={!temporaryStudentForm.studentId}
                 onChange={(event) =>
                   setTemporaryStudentForm({
                     ...temporaryStudentForm,
-                    billingCourseId: event.target.value,
+                    billingCourseContractId: event.target.value,
                   })
                 }
               >
-                <option value="">选择扣课账户</option>
+                <option value="">选择扣课课包</option>
                 {temporaryBillingOptions.map((account) => (
                   <option
-                    key={account.courseId}
-                    value={account.courseId}
-                    disabled={account.balance <= 0}
+                    key={account.id}
+                    value={account.id}
+                    disabled={account.remainingLessonCount <= 0}
                   >
-                    {account.course?.name ?? account.courseId} · 剩余 {account.balance} 课时
+                    {account.course?.name ?? account.courseId} ·{' '}
+                    {account.package?.name ?? account.title} · 剩余 {account.remainingLessonCount}{' '}
+                    课时
                     {account.recommended ? ' · 推荐' : ''}
                   </option>
                 ))}
@@ -1133,7 +1148,7 @@ export function SchedulePage() {
               <button
                 type="button"
                 className="btn btn-secondary justify-center"
-                disabled={temporaryStudentSaving || !temporaryStudentForm.billingCourseId}
+                disabled={temporaryStudentSaving || !temporaryStudentForm.billingCourseContractId}
                 onClick={addTemporaryStudent}
               >
                 {temporaryStudentSaving ? (
