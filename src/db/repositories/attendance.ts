@@ -356,6 +356,7 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
       status: schema.attendanceRecords.status,
       lessonDelta: schema.attendanceRecords.lessonDelta,
       note: schema.attendanceRecords.note,
+      courseContractId: schema.attendanceRecords.courseContractId,
       createdAt: schema.attendanceRecords.createdAt,
       sessionId: schema.classSessions.id,
       startsAt: schema.classSessions.startsAt,
@@ -363,6 +364,9 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
       courseId: schema.courses.id,
       className: schema.classes.name,
       courseName: schema.courses.name,
+      contractTitle: schema.courseContracts.title,
+      packageName: schema.coursePackages.name,
+      billingType: schema.coursePackages.billingType,
     })
     .from(schema.attendanceRecords)
     .innerJoin(
@@ -371,6 +375,11 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
     )
     .leftJoin(schema.classes, eq(schema.classSessions.classId, schema.classes.id))
     .innerJoin(schema.courses, eq(schema.classSessions.courseId, schema.courses.id))
+    .leftJoin(
+      schema.courseContracts,
+      eq(schema.attendanceRecords.courseContractId, schema.courseContracts.id),
+    )
+    .leftJoin(schema.coursePackages, eq(schema.courseContracts.packageId, schema.coursePackages.id))
     .where(inArray(schema.attendanceRecords.studentId, studentIds))
     .orderBy(desc(schema.classSessions.startsAt));
 }

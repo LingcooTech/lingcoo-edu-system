@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
-import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 
 import { fetchMe, getToken, type AuthAccount } from '@/api/client';
 import { Shell } from '@/components/layout/Shell';
 import { AccountsPage } from '@/pages/AccountsPage';
 import { AdminChangePasswordPage } from '@/pages/AdminChangePasswordPage';
-import { AttendancePage } from '@/pages/AttendancePage';
+import { AcademicWorkbenchPage } from '@/pages/AcademicWorkbenchPage';
 import { BusinessModelPage } from '@/pages/BusinessModelPage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
 import { ClassroomsPage } from '@/pages/ClassroomsPage';
 import { ContentMarketingPage } from '@/pages/ContentMarketingPage';
-import { CourseAttendanceSummaryPage } from '@/pages/CourseAttendanceSummaryPage';
 import { CourseContractsPage } from '@/pages/CourseContractsPage';
 import { CourseResourcesPage } from '@/pages/CourseResourcesPage';
 import { CoursesPage } from '@/pages/CoursesPage';
@@ -26,7 +25,6 @@ import { MarketingPage } from '@/pages/MarketingPage';
 import { OrdersPage } from '@/pages/OrdersPage';
 import { PackagesPage } from '@/pages/PackagesPage';
 import { ReportsPage } from '@/pages/ReportsPage';
-import { SchedulePage } from '@/pages/SchedulePage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { StudentsPage } from '@/pages/StudentsPage';
 import { TeacherResourcesPage } from '@/pages/TeacherResourcesPage';
@@ -107,11 +105,15 @@ const router = createBrowserRouter(
         { path: 'admissions/leads', element: <LeadsPage /> },
         { path: 'admissions/trials', element: <TrialsPage /> },
         // 教务管理
+        { path: 'academic/workbench', element: <AcademicWorkbenchPage /> },
         { path: 'academic/students', element: <StudentsPage /> },
         { path: 'academic/classes', element: <ClassesPage /> },
-        { path: 'academic/schedule', element: <SchedulePage /> },
-        { path: 'academic/attendance', element: <AttendancePage /> },
-        { path: 'academic/course-attendance', element: <CourseAttendanceSummaryPage /> },
+        { path: 'academic/schedule', element: <Navigate to="/academic/workbench" replace /> },
+        { path: 'academic/attendance', element: <Navigate to="/academic/workbench" replace /> },
+        {
+          path: 'academic/course-attendance',
+          element: <Navigate to="/academic/workbench" replace />,
+        },
         // 运营管理
         { path: 'operations/orders', element: <OrdersPage /> },
         { path: 'operations/business-model', element: <BusinessModelPage /> },
@@ -132,8 +134,8 @@ const router = createBrowserRouter(
         { path: 'students', element: <StudentsPage /> },
         { path: 'guardians', element: <GuardiansPage /> },
         { path: 'classes', element: <ClassesPage /> },
-        { path: 'schedule', element: <SchedulePage /> },
-        { path: 'attendance', element: <AttendancePage /> },
+        { path: 'schedule', element: <Navigate to="/academic/workbench" replace /> },
+        { path: 'attendance', element: <Navigate to="/academic/workbench" replace /> },
         { path: 'lessons', element: <LessonsPage /> },
         { path: 'teachers', element: <TeachersPage /> },
         { path: 'classrooms', element: <ClassroomsPage /> },

@@ -155,7 +155,13 @@ function defaultForm(
   };
 }
 
-export function SchedulePage() {
+export function SchedulePage({
+  embedded = false,
+  onOpenAttendance,
+}: {
+  embedded?: boolean;
+  onOpenAttendance?: (sessionId: string) => void;
+} = {}) {
   const toast = useToast();
   const { data, setData } = useApiResource<ClassSession>(SESSIONS(), 'classSessions');
   const { data: classes } = useApiResource<ClassGroup>('/v1/classes', 'classes');
@@ -484,6 +490,7 @@ export function SchedulePage() {
     }
     setSaving(true);
     try {
+      let createdSessionId = '';
       const payload = {
         ...form,
         teacherIds: scopedTeacherIds(form.classId, form.teacherId, form.teacherIds),
@@ -502,9 +509,11 @@ export function SchedulePage() {
       } else {
         const { classSession } = await apiPost<{ classSession: ClassSession }>(SESSIONS(), payload);
         setData([hydrateSession(classSession), ...data]);
+        createdSessionId = classSession.id;
       }
       toast.success('课次已保存');
       setOpen(false);
+      if (createdSessionId) onOpenAttendance?.(createdSessionId);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -666,23 +675,28 @@ export function SchedulePage() {
     return names.length > 0 ? names.join('、') : (session.teacher?.name ?? '-');
   }
 
+  const scheduleActions = (
+    <div className="flex flex-wrap gap-2">
+      <button type="button" className="btn btn-secondary" onClick={openBatch}>
+        <Repeat className="h-4 w-4" />
+        快捷排课
+      </button>
+      <button type="button" className="btn btn-primary" onClick={openCreate}>
+        <Plus className="h-4 w-4" />
+        新增课次
+      </button>
+    </div>
+  );
+
   return (
     <PageFrame
       section="schedule"
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn btn-secondary" onClick={openBatch}>
-            <Repeat className="h-4 w-4" />
-            快捷排课
-          </button>
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            新增课次
-          </button>
-        </div>
-      }
+      actions={embedded ? undefined : scheduleActions}
+      headerClassName={embedded ? 'hidden' : undefined}
+      contentClassName={embedded ? 'pt-0' : undefined}
     >
       <div className="space-y-4">
+        {embedded ? <div className="flex justify-end">{scheduleActions}</div> : null}
         <div className="resource-card p-4">
           <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
             <select
@@ -798,29 +812,44 @@ export function SchedulePage() {
                   </div>
                   <div className="space-y-2">
                     {day.sessions.map((session) => (
-                      <button
+                      <div
                         key={session.id}
-                        type="button"
-                        className="hover:border-primary/40 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-left transition hover:bg-white"
-                        onClick={() => openEdit(session)}
+                        className="hover:border-primary/40 rounded-lg border border-slate-200 bg-slate-50 p-2 transition hover:bg-white"
                       >
-                        <div className="text-xs font-semibold">
-                          {toDateTimeLocal(session.startsAt).slice(11)} -{' '}
-                          {toDateTimeLocal(session.endsAt).slice(11)}
-                        </div>
-                        <div className="mt-1 line-clamp-2 text-sm font-medium">{session.topic}</div>
-                        <div className="text-muted-foreground mt-1 text-xs">
-                          {(session.classId ? classNameById.get(session.classId) : null) ??
-                            session.class?.name ??
-                            '临时课次'}{' '}
-                          · {teacherNamesForSession(session)}
-                        </div>
-                        <div className="text-muted-foreground mt-1 text-xs">
-                          {classroomNameById.get(session.classroomId) ??
-                            session.classroom?.name ??
-                            '教室'}
-                        </div>
-                      </button>
+                        <button
+                          type="button"
+                          className="w-full text-left"
+                          onClick={() => openEdit(session)}
+                        >
+                          <div className="text-xs font-semibold">
+                            {toDateTimeLocal(session.startsAt).slice(11)} -{' '}
+                            {toDateTimeLocal(session.endsAt).slice(11)}
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-sm font-medium">
+                            {session.topic}
+                          </div>
+                          <div className="text-muted-foreground mt-1 text-xs">
+                            {(session.classId ? classNameById.get(session.classId) : null) ??
+                              session.class?.name ??
+                              '临时课次'}{' '}
+                            · {teacherNamesForSession(session)}
+                          </div>
+                          <div className="text-muted-foreground mt-1 text-xs">
+                            {classroomNameById.get(session.classroomId) ??
+                              session.classroom?.name ??
+                              '教室'}
+                          </div>
+                        </button>
+                        {onOpenAttendance && session.status !== 'cancelled' ? (
+                          <button
+                            type="button"
+                            className="btn btn-primary mt-2 w-full py-1 text-xs"
+                            onClick={() => onOpenAttendance(session.id)}
+                          >
+                            点名
+                          </button>
+                        ) : null}
+                      </div>
                     ))}
                     {day.sessions.length === 0 ? (
                       <div className="text-muted-foreground rounded-lg border border-dashed py-6 text-center text-xs">
@@ -858,6 +887,15 @@ export function SchedulePage() {
                 header: '操作',
                 cell: (row) => (
                   <div className="flex gap-1">
+                    {onOpenAttendance && row.status !== 'cancelled' ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary px-2 py-1"
+                        onClick={() => onOpenAttendance(row.id)}
+                      >
+                        点名
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="btn btn-ghost px-2 py-1"

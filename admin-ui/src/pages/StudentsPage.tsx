@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Archive, Download, Eye, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 
-import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Account, CourseContract, Student } from '@/api/types';
+import { api, apiDelete, apiPatch, apiPost } from '@/api/client';
+import type {
+  Account,
+  AttendanceStatus,
+  CourseContract,
+  Student,
+  StudentAttendanceHistoryRecord,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable } from '@/components/shared/DataTable';
@@ -47,6 +53,15 @@ const emptyForm: StudentForm = {
   status: 'active',
 };
 
+const ATTENDANCE_LABEL: Record<AttendanceStatus, string> = {
+  present: '到课',
+  late: '迟到',
+  leave: '请假',
+  absent: '未到',
+  makeup: '补课到课',
+  trial: '试听到课',
+};
+
 interface StudentMutationResponse {
   student: Student;
   parentAccountCreated?: boolean;
@@ -77,6 +92,22 @@ export function StudentsPage() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<StudentTab>('profiles');
   const [exporting, setExporting] = useState(false);
+  const [attendanceHistory, setAttendanceHistory] = useState<StudentAttendanceHistoryRecord[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selected) {
+      setAttendanceHistory([]);
+      return;
+    }
+    setAttendanceLoading(true);
+    api<{ attendanceRecords: StudentAttendanceHistoryRecord[] }>(
+      `/v1/students/${selected.id}/attendance`,
+    )
+      .then((payload) => setAttendanceHistory(payload.attendanceRecords))
+      .catch(() => setAttendanceHistory([]))
+      .finally(() => setAttendanceLoading(false));
+  }, [selected]);
 
   function contractsForStudent(studentId: string) {
     return courseContracts
@@ -805,6 +836,49 @@ export function StudentsPage() {
                 </div>
               ) : (
                 <p className="text-muted-foreground text-sm">暂无课时账户</p>
+              )}
+            </section>
+            <section className="resource-card p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold">签到 / 出勤记录</h3>
+                <span className="text-muted-foreground text-xs">
+                  {attendanceLoading ? '加载中...' : `${attendanceHistory.length} 条`}
+                </span>
+              </div>
+              {attendanceHistory.length ? (
+                <div className="max-h-80 divide-y overflow-y-auto">
+                  {attendanceHistory.map((record) => (
+                    <div key={record.id} className="flex justify-between gap-3 py-3 text-sm">
+                      <div className="min-w-0">
+                        <div className="font-medium">{record.topic || record.courseName}</div>
+                        <div className="text-muted-foreground mt-1 text-xs">
+                          {new Date(record.startsAt).toLocaleString('zh-CN')} ·{' '}
+                          {record.className || record.courseName}
+                        </div>
+                        <div className="text-muted-foreground mt-1 text-xs">
+                          课包：{record.packageName ?? record.contractTitle ?? '历史课时账户'}
+                          {record.lessonDelta < 0
+                            ? ` · 扣 ${-record.lessonDelta} 课时`
+                            : ' · 未扣课'}
+                        </div>
+                      </div>
+                      <StatusPill
+                        tone={
+                          record.status === 'present' || record.status === 'makeup'
+                            ? 'ok'
+                            : record.status === 'late' || record.status === 'leave'
+                              ? 'warn'
+                              : 'danger'
+                        }
+                        label={ATTENDANCE_LABEL[record.status]}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  {attendanceLoading ? '正在加载签到记录...' : '暂无签到记录'}
+                </p>
               )}
             </section>
           </div>

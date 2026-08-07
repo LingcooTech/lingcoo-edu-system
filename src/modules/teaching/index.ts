@@ -2581,7 +2581,7 @@ export const teachingModule: AppModule = {
           accounts,
           attendanceRecords,
           lessonAccounts,
-          periodContracts,
+          courseContracts,
           guardianInvitations,
           classCourseAssociations,
         ] = await Promise.all([
@@ -2600,20 +2600,23 @@ export const teachingModule: AppModule = {
               id: schema.courseContracts.id,
               studentId: schema.courseContracts.studentId,
               courseId: schema.courseContracts.courseId,
+              packageId: schema.courseContracts.packageId,
+              title: schema.courseContracts.title,
               lessonCount: schema.courseContracts.lessonCount,
+              remainingLessonCount: schema.courseContracts.remainingLessonCount,
               startsAt: schema.courseContracts.startsAt,
               endsAt: schema.courseContracts.endsAt,
               status: schema.courseContracts.status,
               packageName: schema.coursePackages.name,
+              billingType: schema.coursePackages.billingType,
               periodUnit: schema.coursePackages.periodUnit,
               periodCount: schema.coursePackages.periodCount,
             })
             .from(schema.courseContracts)
-            .innerJoin(
+            .leftJoin(
               schema.coursePackages,
               eq(schema.courseContracts.packageId, schema.coursePackages.id),
-            )
-            .where(eq(schema.coursePackages.billingType, 'period')),
+            ),
           app.db
             .select()
             .from(schema.guardianOnboardingInvitations)
@@ -2656,22 +2659,6 @@ export const teachingModule: AppModule = {
             association.courseId,
           ]);
         }
-        const institutionLessonAccountIds = lessonAccounts
-          .filter((lessonAccount) => institutionCourseIds.has(lessonAccount.courseId))
-          .map((lessonAccount) => lessonAccount.id);
-        const lessonTransactions =
-          institutionLessonAccountIds.length > 0
-            ? await app.db
-                .select()
-                .from(schema.lessonTransactions)
-                .where(
-                  and(
-                    eq(schema.lessonTransactions.type, 'consume'),
-                    inArray(schema.lessonTransactions.lessonAccountId, institutionLessonAccountIds),
-                  ),
-                )
-            : [];
-        const consumedByLessonAccountId = consumedLessonsByAccountId(lessonTransactions);
         const assignedSessionIds = await listAssignedSessionIdsForTeacher(account.teacherId);
         const assignedClassIds = new Set(
           sessions
@@ -2731,9 +2718,15 @@ export const teachingModule: AppModule = {
                     billingCourseName:
                       courseById.get(enrollment.billingCourseId)?.name ?? '课时档案',
                     lessonBalance:
+                      courseContracts.find(
+                        (contract) =>
+                          contract.id === enrollment.billingCourseContractId &&
+                          contract.status !== 'cancelled',
+                      )?.remainingLessonCount ??
                       lessonAccountByStudentCourse.get(
                         `${student.id}:${enrollment.billingCourseId}`,
-                      )?.balance ?? null,
+                      )?.balance ??
+                      null,
                   },
                 ];
               }),
@@ -2796,6 +2789,11 @@ export const teachingModule: AppModule = {
           for (const lessonAccount of lessonAccounts) {
             if (visibleCourseIds.has(lessonAccount.courseId)) {
               visibleStudentIds.add(lessonAccount.studentId);
+            }
+          }
+          for (const contract of courseContracts) {
+            if (contract.status !== 'cancelled' && visibleCourseIds.has(contract.courseId)) {
+              visibleStudentIds.add(contract.studentId);
             }
           }
         }
@@ -2888,30 +2886,49 @@ export const teachingModule: AppModule = {
                 : null,
               isMyStudent: ownStudentIds.has(student.id),
               classes: studentClasses.get(student.id) ?? [],
-              lessonAccounts: lessonAccounts
+              lessonAccounts: courseContracts
                 .filter(
-                  (lessonAccount) =>
-                    lessonAccount.studentId === student.id &&
-                    visibleCourseIds.has(lessonAccount.courseId),
+                  (contract) =>
+                    contract.studentId === student.id &&
+                    contract.status !== 'cancelled' &&
+                    visibleCourseIds.has(contract.courseId),
                 )
-                .map((lessonAccount) => ({
+                .sort(
+                  (left, right) =>
+                    (left.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+                    (right.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER),
+                )
+                .map((contract) => ({
+                  id: contract.id,
+                  courseContractId: contract.id,
+                  courseId: contract.courseId,
+                  courseName: courseById.get(contract.courseId)?.name ?? '课程',
+                  title: contract.title,
+                  packageId: contract.packageId,
+                  packageName: contract.packageName ?? contract.title,
+                  billingType: contract.billingType ?? 'lesson',
+                  balance: contract.remainingLessonCount,
+                  totalLessons: contract.lessonCount,
+                  consumedLessonCount: Math.max(
+                    contract.lessonCount - contract.remainingLessonCount,
+                    0,
+                  ),
+                  startsAt: contract.startsAt,
+                  endsAt: contract.endsAt,
+                  status: contract.status,
                   periodPackage:
-                    periodContracts
-                      .filter(
-                        (contract) =>
-                          contract.studentId === student.id &&
-                          contract.courseId === lessonAccount.courseId &&
-                          contract.status !== 'cancelled',
-                      )
-                      .sort(
-                        (left, right) =>
-                          (right.endsAt?.getTime() ?? 0) - (left.endsAt?.getTime() ?? 0),
-                      )[0] ?? null,
-                  id: lessonAccount.id,
-                  courseId: lessonAccount.courseId,
-                  courseName: courseById.get(lessonAccount.courseId)?.name ?? '课程',
-                  balance: lessonAccount.balance,
-                  totalLessons: totalLessonsForAccount(lessonAccount, consumedByLessonAccountId),
+                    contract.billingType === 'period'
+                      ? {
+                          id: contract.id,
+                          lessonCount: contract.lessonCount,
+                          startsAt: contract.startsAt,
+                          endsAt: contract.endsAt,
+                          status: contract.status,
+                          packageName: contract.packageName ?? contract.title,
+                          periodUnit: contract.periodUnit,
+                          periodCount: contract.periodCount ?? 1,
+                        }
+                      : null,
                 })),
             };
           })

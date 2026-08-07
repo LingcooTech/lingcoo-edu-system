@@ -97,13 +97,21 @@ function statusButtonClass(status: AttendanceStatus, selected: boolean) {
   return 'border-red-500 bg-red-50 text-red-700';
 }
 
-export function AttendancePage() {
+export function AttendancePage({
+  embedded = false,
+  initialSessionId = '',
+  hideSessionPicker = false,
+}: {
+  embedded?: boolean;
+  initialSessionId?: string;
+  hideSessionPicker?: boolean;
+} = {}) {
   const toast = useToast();
   const { data: sessions, setData: setSessions } = useApiResource<ClassSession>(
     '/v1/class-sessions',
     'classSessions',
   );
-  const [sessionId, setSessionId] = useState('');
+  const [sessionId, setSessionId] = useState(initialSessionId);
   const [selectedDateKey, setSelectedDateKey] = useState('');
   const [roster, setRoster] = useState<SessionRosterEntry[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -172,6 +180,10 @@ export function AttendancePage() {
   }, [roster, records]);
 
   useEffect(() => {
+    if (initialSessionId && sessions.some((session) => session.id === initialSessionId)) {
+      setSessionId(initialSessionId);
+      return;
+    }
     if (!sessionId && sessions.length > 0) {
       const now = Date.now();
       const selectableSessions = sortedSessions.filter((session) => session.status !== 'cancelled');
@@ -182,7 +194,7 @@ export function AttendancePage() {
       setSessionId(bestSession.id);
       setSelectedDateKey(dateKey(bestSession.startsAt));
     }
-  }, [sessionId, sessions.length, sortedSessions]);
+  }, [initialSessionId, sessionId, sessions, sortedSessions]);
 
   useEffect(() => {
     if (selectedSession) setSelectedDateKey(dateKey(selectedSession.startsAt));
@@ -351,8 +363,12 @@ export function AttendancePage() {
   }
 
   return (
-    <PageFrame section="attendance">
-      <div className="resource-card mb-4 overflow-hidden">
+    <PageFrame
+      section="attendance"
+      headerClassName={embedded ? 'hidden' : undefined}
+      contentClassName={embedded ? 'pt-0' : undefined}
+    >
+      <div className={hideSessionPicker ? 'hidden' : 'resource-card mb-4 overflow-hidden'}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold">

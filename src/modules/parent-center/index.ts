@@ -439,56 +439,83 @@ export const parentCenterModule: AppModule = {
       if (studentIds.length === 0) {
         return { lessonAccounts: [] };
       }
-      const [lessonAccounts, courses, periodContracts] = await Promise.all([
+      const [contracts, courses, legacyAccounts] = await Promise.all([
+        courseContractsRepo.listCourseContracts(app.db),
+        catalogRepo.listCourses(app.db),
         app.db
           .select()
           .from(schema.lessonAccounts)
           .where(inArray(schema.lessonAccounts.studentId, studentIds)),
-        catalogRepo.listCourses(app.db),
-        app.db
-          .select({
-            id: schema.courseContracts.id,
-            studentId: schema.courseContracts.studentId,
-            courseId: schema.courseContracts.courseId,
-            lessonCount: schema.courseContracts.lessonCount,
-            startsAt: schema.courseContracts.startsAt,
-            endsAt: schema.courseContracts.endsAt,
-            status: schema.courseContracts.status,
-            packageName: schema.coursePackages.name,
-            periodUnit: schema.coursePackages.periodUnit,
-            periodCount: schema.coursePackages.periodCount,
-          })
-          .from(schema.courseContracts)
-          .innerJoin(
-            schema.coursePackages,
-            eq(schema.courseContracts.packageId, schema.coursePackages.id),
-          )
-          .where(
-            and(
-              inArray(schema.courseContracts.studentId, studentIds),
-              eq(schema.coursePackages.billingType, 'period'),
-            ),
-          ),
       ]);
       const studentById = new Map(students.map((s) => [s.id, s]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
+      const visibleContracts = contracts.filter(
+        (contract) => studentById.has(contract.studentId) && contract.status !== 'cancelled',
+      );
+      const contractAccountKeys = new Set(
+        visibleContracts.map((contract) => `${contract.studentId}:${contract.courseId}`),
+      );
       return {
-        lessonAccounts: lessonAccounts.map((row) => ({
-          ...row,
-          student: studentById.get(row.studentId),
-          course: courseById.get(row.courseId) ?? null,
-          periodPackage:
-            periodContracts
-              .filter(
-                (contract) =>
-                  contract.studentId === row.studentId &&
-                  contract.courseId === row.courseId &&
-                  contract.status !== 'cancelled',
-              )
-              .sort(
-                (left, right) => (right.endsAt?.getTime() ?? 0) - (left.endsAt?.getTime() ?? 0),
-              )[0] ?? null,
-        })),
+        lessonAccounts: [
+          ...visibleContracts.map((contract) => ({
+            id: contract.id,
+            courseContractId: contract.id,
+            studentId: contract.studentId,
+            courseId: contract.courseId,
+            title: contract.title,
+            packageId: contract.packageId,
+            packageName: contract.package?.name ?? contract.title,
+            billingType: contract.package?.billingType ?? 'lesson',
+            balance: contract.remainingLessonCount,
+            lessonCount: contract.lessonCount,
+            consumedLessonCount: Math.max(contract.lessonCount - contract.remainingLessonCount, 0),
+            startsAt: contract.startsAt,
+            endsAt: contract.endsAt,
+            status: contract.status,
+            updatedAt: contract.updatedAt,
+            student: studentById.get(contract.studentId),
+            course: courseById.get(contract.courseId) ?? null,
+            package: contract.package ?? null,
+            periodPackage:
+              contract.package?.billingType === 'period'
+                ? {
+                    id: contract.id,
+                    lessonCount: contract.lessonCount,
+                    startsAt: contract.startsAt,
+                    endsAt: contract.endsAt,
+                    status: contract.status,
+                    packageName: contract.package.name,
+                    periodUnit: contract.package.periodUnit,
+                    periodCount: contract.package.periodCount,
+                  }
+                : null,
+          })),
+          ...legacyAccounts
+            .filter(
+              (account) => !contractAccountKeys.has(`${account.studentId}:${account.courseId}`),
+            )
+            .map((account) => ({
+              id: account.id,
+              courseContractId: account.id,
+              studentId: account.studentId,
+              courseId: account.courseId,
+              title: '历史课时账户',
+              packageId: null,
+              packageName: '历史课时账户',
+              billingType: 'lesson',
+              balance: account.balance,
+              lessonCount: account.balance,
+              consumedLessonCount: 0,
+              startsAt: null,
+              endsAt: null,
+              status: 'active',
+              updatedAt: account.updatedAt,
+              student: studentById.get(account.studentId),
+              course: courseById.get(account.courseId) ?? null,
+              package: null,
+              periodPackage: null,
+            })),
+        ],
       };
     });
 
@@ -834,13 +861,13 @@ export const parentCenterModule: AppModule = {
           const classGroup = session.classId ? classById.get(session.classId) : null;
           const course = courseById.get(session.courseId) ?? null;
           const classroom = classroomById.get(session.classroomId) ?? null;
-          const participantIds = new Set(
+          const participantByStudentId = new Map(
             (rosterBySessionId.get(session.id) ?? [])
-              .map((entry) => entry.studentId)
-              .filter((studentId) => studentById.has(studentId)),
+              .filter((entry) => studentById.has(entry.studentId))
+              .map((entry) => [entry.studentId, entry]),
           );
-          return Array.from(participantIds).flatMap((studentId) => {
-            const student = studentById.get(studentId);
+          return Array.from(participantByStudentId.values()).flatMap((entry) => {
+            const student = studentById.get(entry.studentId);
             if (!student) return [];
             const attendanceRecord = attendanceBySessionStudent.get(`${session.id}:${student.id}`);
             return [
@@ -853,6 +880,8 @@ export const parentCenterModule: AppModule = {
                 endsAt: session.endsAt,
                 status: session.status,
                 student: { id: student.id, name: student.name, grade: student.grade },
+                billingCourseId: entry.billingCourseId,
+                billingCourseContractId: entry.billingCourseContractId,
                 class: classGroup ? { id: classGroup.id, name: classGroup.name } : null,
                 course,
                 classroom,
@@ -907,6 +936,7 @@ export const parentCenterModule: AppModule = {
               note: '家长中心签到',
               courseId: rosterEntry.billingCourseId,
               lessonUnits: session.lessonUnits,
+              courseContractId: rosterEntry.billingCourseContractId,
             },
           ],
           completeSession: false,

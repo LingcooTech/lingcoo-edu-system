@@ -255,6 +255,18 @@ export const attendanceModule: AppModule = {
     );
 
     app.get(
+      '/v1/students/:studentId/attendance',
+      { preHandler: app.requireAdmin },
+      async (request) => {
+        const { studentId } = request.params as { studentId: string };
+        await peopleRepo.requireStudent(app.db, studentId);
+        return {
+          attendanceRecords: await attendanceRepo.listAttendanceForStudents(app.db, [studentId]),
+        };
+      },
+    );
+
+    app.get(
       '/v1/class-sessions/:sessionId/attendance-sources',
       { preHandler: app.requireAdmin },
       async (request) => {

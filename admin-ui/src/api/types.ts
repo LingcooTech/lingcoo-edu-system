@@ -472,6 +472,25 @@ export interface AttendanceRecord {
   } | null;
 }
 
+export interface StudentAttendanceHistoryRecord {
+  id: string;
+  studentId: string;
+  status: AttendanceStatus;
+  lessonDelta: number;
+  note?: string | null;
+  courseContractId?: string | null;
+  createdAt: string;
+  sessionId: string;
+  startsAt: string;
+  topic: string;
+  courseId: string;
+  className?: string | null;
+  courseName: string;
+  contractTitle?: string | null;
+  packageName?: string | null;
+  billingType?: string | null;
+}
+
 export interface AttendanceLessonSource {
   id: string;
   studentId: string;

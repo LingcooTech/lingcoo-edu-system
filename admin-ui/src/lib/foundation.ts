@@ -5,7 +5,6 @@ import {
   CalendarCheck,
   CalendarDays,
   CheckSquare,
-  ClipboardCheck,
   DoorOpen,
   FileText,
   GraduationCap,
@@ -64,14 +63,17 @@ export const adminSections = [
   {
     key: 'academic',
     label: '教务管理',
-    path: '/academic/students',
+    path: '/academic/workbench',
     icon: CalendarDays,
     items: [
+      {
+        key: 'teacherWorkbench',
+        label: '老师工作台',
+        path: '/academic/workbench',
+        icon: CalendarDays,
+      },
       { key: 'students', label: '学员档案', path: '/academic/students', icon: GraduationCap },
-      { key: 'classes', label: '班级排课', path: '/academic/classes', icon: CalendarDays },
-      { key: 'schedule', label: '排课总览', path: '/academic/schedule', icon: CalendarDays },
-      { key: 'attendance', label: '点名消课', path: '/academic/attendance', icon: ClipboardCheck },
-      { key: 'courseAttendance', label: '出勤总览', path: '/academic/course-attendance', icon: BarChart3 },
+      { key: 'classes', label: '班级管理', path: '/academic/classes', icon: CalendarDays },
     ],
   },
   {
@@ -158,6 +160,10 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   students: {
     eyebrow: 'Academic',
     title: '学员档案',
+  },
+  teacherWorkbench: {
+    eyebrow: 'Academic',
+    title: '老师工作台',
   },
   guardians: {
     eyebrow: 'Operations',
