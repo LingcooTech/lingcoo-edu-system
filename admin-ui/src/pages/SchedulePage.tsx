@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Ban,
   CalendarDays,
@@ -157,9 +157,13 @@ function defaultForm(
 
 export function SchedulePage({
   embedded = false,
+  hideActions = false,
+  actionRequest = null,
   onOpenAttendance,
 }: {
   embedded?: boolean;
+  hideActions?: boolean;
+  actionRequest?: { type: 'create' | 'batch'; key: number } | null;
   onOpenAttendance?: (sessionId: string) => void;
 } = {}) {
   const toast = useToast();
@@ -360,6 +364,15 @@ export function SchedulePage({
     setBatchForm(defaultBatchForm(classes));
     setBatchOpen(true);
   }
+
+  useEffect(() => {
+    if (!actionRequest) return;
+    if (actionRequest.type === 'batch') {
+      openBatch();
+      return;
+    }
+    openCreate();
+  }, [actionRequest?.key]);
 
   function toggleBatchWeekday(day: number) {
     setBatchForm((current) => ({
@@ -586,6 +599,18 @@ export function SchedulePage({
     }
   }
 
+  function requestCancelFromEditor() {
+    if (!editing) return;
+    setOpen(false);
+    setCancelTarget(editing);
+  }
+
+  function requestDeleteFromEditor() {
+    if (!editing) return;
+    setOpen(false);
+    setDeleteTarget(editing);
+  }
+
   async function addTemporaryStudent() {
     if (!editing) return;
     if (!temporaryStudentForm.studentId || !temporaryStudentForm.billingCourseContractId) {
@@ -691,12 +716,14 @@ export function SchedulePage({
   return (
     <PageFrame
       section="schedule"
-      actions={embedded ? undefined : scheduleActions}
+      actions={embedded || hideActions ? undefined : scheduleActions}
       headerClassName={embedded ? 'hidden' : undefined}
       contentClassName={embedded ? 'pt-0' : undefined}
     >
       <div className="space-y-4">
-        {embedded ? <div className="flex justify-end">{scheduleActions}</div> : null}
+        {embedded && !hideActions ? (
+          <div className="flex justify-end">{scheduleActions}</div>
+        ) : null}
         <div className="resource-card p-4">
           <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
             <select
@@ -946,14 +973,34 @@ export function SchedulePage({
         onClose={() => setOpen(false)}
         title={editing ? '编辑课次' : '新增课次'}
         footer={
-          <>
-            <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
-              取消
-            </button>
-            <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </>
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {editing && editing.status !== 'cancelled' ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary text-red-600"
+                  onClick={requestCancelFromEditor}
+                >
+                  <Ban className="h-4 w-4" />
+                  取消课次
+                </button>
+              ) : null}
+              {editing ? (
+                <button type="button" className="btn btn-danger" onClick={requestDeleteFromEditor}>
+                  <Trash2 className="h-4 w-4" />
+                  删除课次
+                </button>
+              ) : null}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+                关闭
+              </button>
+              <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
+                {saving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
         }
       >
         <Field label="班级" required>

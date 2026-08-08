@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
+
 /**
  * Centered modal used for resource create/edit forms across the admin.
  * Controlled via `open`; closes on overlay click or Escape. Provide form fields
@@ -13,6 +15,8 @@ export function Drawer({
   title,
   description,
   footer,
+  panelClassName,
+  contentClassName,
   children,
 }: {
   open: boolean;
@@ -20,6 +24,8 @@ export function Drawer({
   title: string;
   description?: string;
   footer?: ReactNode;
+  panelClassName?: string;
+  contentClassName?: string;
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -36,7 +42,12 @@ export function Drawer({
   return (
     <>
       <div className="drawer-overlay" onClick={onClose} />
-      <section className="drawer-panel" role="dialog" aria-modal="true" aria-label={title}>
+      <section
+        className={cn('drawer-panel', panelClassName)}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div>
             <h2 className="text-base font-semibold">{title}</h2>
@@ -51,7 +62,7 @@ export function Drawer({
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className={cn('flex-1 overflow-y-auto px-5 py-4', contentClassName)}>{children}</div>
         {footer && (
           <footer className="bg-muted/30 flex justify-end gap-2 border-t px-5 py-3">
             {footer}

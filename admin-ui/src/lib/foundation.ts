@@ -66,14 +66,14 @@ export const adminSections = [
     path: '/academic/workbench',
     icon: CalendarDays,
     items: [
+      { key: 'students', label: '学员档案', path: '/academic/students', icon: GraduationCap },
+      { key: 'classes', label: '班级管理', path: '/academic/classes', icon: CalendarDays },
       {
         key: 'teacherWorkbench',
-        label: '老师工作台',
+        label: '排课点名',
         path: '/academic/workbench',
         icon: CalendarDays,
       },
-      { key: 'students', label: '学员档案', path: '/academic/students', icon: GraduationCap },
-      { key: 'classes', label: '班级管理', path: '/academic/classes', icon: CalendarDays },
     ],
   },
   {
@@ -163,7 +163,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   teacherWorkbench: {
     eyebrow: 'Academic',
-    title: '老师工作台',
+    title: '排课点名',
   },
   guardians: {
     eyebrow: 'Operations',
@@ -171,7 +171,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   classes: {
     eyebrow: 'Academic',
-    title: '班级排课',
+    title: '班级管理',
   },
   schedule: {
     eyebrow: 'Academic',
@@ -179,7 +179,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   attendance: {
     eyebrow: 'Academic',
-    title: '点名消课总览',
+    title: '点名',
   },
   courseAttendance: {
     eyebrow: 'Academic',

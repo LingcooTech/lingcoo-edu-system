@@ -6,6 +6,7 @@ import { Shell } from '@/components/layout/Shell';
 import { AccountsPage } from '@/pages/AccountsPage';
 import { AdminChangePasswordPage } from '@/pages/AdminChangePasswordPage';
 import { AcademicWorkbenchPage } from '@/pages/AcademicWorkbenchPage';
+import { AttendancePage } from '@/pages/AttendancePage';
 import { BusinessModelPage } from '@/pages/BusinessModelPage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
@@ -109,7 +110,7 @@ const router = createBrowserRouter(
         { path: 'academic/students', element: <StudentsPage /> },
         { path: 'academic/classes', element: <ClassesPage /> },
         { path: 'academic/schedule', element: <Navigate to="/academic/workbench" replace /> },
-        { path: 'academic/attendance', element: <Navigate to="/academic/workbench" replace /> },
+        { path: 'academic/attendance', element: <AttendancePage /> },
         {
           path: 'academic/course-attendance',
           element: <Navigate to="/academic/workbench" replace />,
@@ -135,7 +136,7 @@ const router = createBrowserRouter(
         { path: 'guardians', element: <GuardiansPage /> },
         { path: 'classes', element: <ClassesPage /> },
         { path: 'schedule', element: <Navigate to="/academic/workbench" replace /> },
-        { path: 'attendance', element: <Navigate to="/academic/workbench" replace /> },
+        { path: 'attendance', element: <Navigate to="/academic/attendance" replace /> },
         { path: 'lessons', element: <LessonsPage /> },
         { path: 'teachers', element: <TeachersPage /> },
         { path: 'classrooms', element: <ClassroomsPage /> },

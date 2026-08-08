@@ -1,50 +1,82 @@
-import { ArrowLeft, CalendarDays, GraduationCap } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { CalendarCheck, List, Plus, Repeat } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { PageFrame } from '@/components/layout/PageFrame';
+import { Drawer } from '@/components/shared/Drawer';
 import { AttendancePage } from '@/pages/AttendancePage';
 import { SchedulePage } from '@/pages/SchedulePage';
 
 export function AcademicWorkbenchPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedSessionId = searchParams.get('sessionId') ?? '';
+  const [attendanceSessionId, setAttendanceSessionId] = useState('');
+  const [scheduleAction, setScheduleAction] = useState<{
+    type: 'create' | 'batch';
+    key: number;
+  } | null>(null);
 
   function openAttendance(sessionId: string) {
-    setSearchParams({ sessionId });
+    setAttendanceSessionId(sessionId);
   }
 
-  function backToSchedule() {
-    setSearchParams({});
+  function requestScheduleAction(type: 'create' | 'batch') {
+    setScheduleAction({ type, key: Date.now() });
   }
 
   return (
     <PageFrame
       section="teacherWorkbench"
       actions={
-        <Link className="btn btn-secondary" to="/academic/students">
-          <GraduationCap className="h-4 w-4" />
-          学员档案
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setAttendanceSessionId('')}
+          >
+            <List className="h-4 w-4" />
+            课表
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => requestScheduleAction('batch')}
+          >
+            <Repeat className="h-4 w-4" />
+            快捷排课
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => requestScheduleAction('create')}
+          >
+            <Plus className="h-4 w-4" />
+            新增课次
+          </button>
+          <Link className="btn btn-secondary" to="/academic/attendance">
+            <CalendarCheck className="h-4 w-4" />
+            点名
+          </Link>
+        </div>
       }
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <CalendarDays className="text-primary h-4 w-4" />
-          {selectedSessionId ? '当前课次点名' : '课表与排课'}
-        </div>
-        {selectedSessionId ? (
-          <button type="button" className="btn btn-secondary" onClick={backToSchedule}>
-            <ArrowLeft className="h-4 w-4" />
-            返回课表
-          </button>
-        ) : null}
-      </div>
+      <SchedulePage
+        embedded
+        hideActions
+        actionRequest={scheduleAction}
+        onOpenAttendance={openAttendance}
+      />
 
-      {selectedSessionId ? (
-        <AttendancePage embedded hideSessionPicker initialSessionId={selectedSessionId} />
-      ) : (
-        <SchedulePage embedded onOpenAttendance={openAttendance} />
-      )}
+      <Drawer
+        open={Boolean(attendanceSessionId)}
+        onClose={() => setAttendanceSessionId('')}
+        title="课次点名"
+        description="当前课次点名、扣课课包和课时核销"
+        panelClassName="!w-[min(96vw,1280px)]"
+        contentClassName="bg-slate-50/60"
+      >
+        {attendanceSessionId ? (
+          <AttendancePage embedded hideSessionPicker initialSessionId={attendanceSessionId} />
+        ) : null}
+      </Drawer>
     </PageFrame>
   );
 }
