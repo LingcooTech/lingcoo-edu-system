@@ -18,6 +18,7 @@ import { ResourceToolbar } from '@/components/shared/ResourceToolbar';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { exportStyledExcel } from '@/lib/excel-export';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { useApiResource } from '@/lib/useApiResource';
 import { CourseContractsPanel } from '@/pages/CourseContractsPage';
 import { LessonAccountsPanel } from '@/pages/LessonsPage';
@@ -134,7 +135,7 @@ export function StudentsPage() {
         {contracts.map((contract) => (
           <span key={contract.id} className="text-xs">
             {contract.course?.name ?? '未命名课程'} / {contract.package?.name ?? contract.title}：
-            {contract.remainingLessonCount} / {contract.lessonCount} 节
+            {formatPackageLessonBalance(contract.remainingLessonCount, contract.lessonCount)}
           </span>
         ))}
       </div>
@@ -205,7 +206,7 @@ export function StudentsPage() {
           },
           {
             key: 'courseBalances',
-            header: '课程 / 课包与剩余课时',
+            header: '课程 / 课包余额（剩余/总数）',
             value: (student) => {
               const contracts = studentContracts(student).filter(
                 (contract) => contract.status !== 'cancelled',
@@ -216,7 +217,10 @@ export function StudentsPage() {
                       (contract) =>
                         `${contract.course?.name ?? '未命名课程'} / ${
                           contract.package?.name ?? contract.title
-                        }：${contract.remainingLessonCount} 节`,
+                        }：${formatPackageLessonBalance(
+                          contract.remainingLessonCount,
+                          contract.lessonCount,
+                        )}`,
                     )
                     .join('\n')
                 : '暂无课时包账户';
@@ -813,7 +817,10 @@ export function StudentsPage() {
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
-                        {contract.remainingLessonCount} / {contract.lessonCount} 节
+                        {formatPackageLessonBalance(
+                          contract.remainingLessonCount,
+                          contract.lessonCount,
+                        )}
                         <span className="text-muted-foreground block text-xs">
                           已用 {Math.max(contract.lessonCount - contract.remainingLessonCount, 0)}{' '}
                           节

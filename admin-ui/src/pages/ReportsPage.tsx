@@ -5,7 +5,7 @@ import { api, apiPost } from '@/api/client';
 import type {
   CampaignFunnelRow,
   ChannelFunnelRow,
-  LessonAccount,
+  CourseContract,
   Order,
   SettlementBatch,
 } from '@/api/types';
@@ -15,6 +15,7 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { exportStyledExcel } from '@/lib/excel-export';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { formatDateTime, money } from '@/lib/utils';
 
 const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
@@ -121,7 +122,7 @@ export function ReportsPage() {
   const [channelFunnel, setChannelFunnel] = useState<ChannelFunnelRow[]>([]);
   const [campaignFunnel, setCampaignFunnel] = useState<CampaignFunnelRow[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [lessonAccounts, setLessonAccounts] = useState<LessonAccount[]>([]);
+  const [courseContracts, setCourseContracts] = useState<CourseContract[]>([]);
   const [settlementBatches, setSettlementBatches] = useState<SettlementBatch[]>([]);
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
@@ -133,21 +134,21 @@ export function ReportsPage() {
     Promise.all([
       api<{ byChannel: ChannelFunnelRow[]; byCampaign: CampaignFunnelRow[] }>('/v1/reports/funnel'),
       api<{ orders: Order[] }>('/v1/orders'),
-      api<{ lessonAccounts: LessonAccount[] }>('/v1/lesson-accounts'),
+      api<{ courseContracts: CourseContract[] }>('/v1/course-contracts'),
       api<{ settlementBatches: SettlementBatch[] }>('/v1/settlement-batches'),
     ])
       .then(([funnelPayload, orderPayload, lessonPayload, settlementPayload]) => {
         setChannelFunnel(funnelPayload.byChannel ?? []);
         setCampaignFunnel(funnelPayload.byCampaign ?? []);
         setOrders(orderPayload.orders ?? []);
-        setLessonAccounts(lessonPayload.lessonAccounts ?? []);
+        setCourseContracts(lessonPayload.courseContracts ?? []);
         setSettlementBatches(settlementPayload.settlementBatches ?? []);
       })
       .catch(() => {
         setChannelFunnel([]);
         setCampaignFunnel([]);
         setOrders([]);
-        setLessonAccounts([]);
+        setCourseContracts([]);
         setSettlementBatches([]);
       });
   }, []);
@@ -181,7 +182,9 @@ export function ReportsPage() {
     const pendingOrders = ordersInRange.filter((order) => order.status === 'pending');
     const revenue = paidOrders.reduce((sum, order) => sum + order.paidAmount, 0);
     const pendingAmount = pendingOrders.reduce((sum, order) => sum + order.amount, 0);
-    const lowBalanceAccounts = lessonAccounts.filter((account) => account.balance <= 3);
+    const lowBalanceAccounts = courseContracts.filter(
+      (contract) => contract.status === 'active' && contract.remainingLessonCount <= 3,
+    );
     const totalLeads = channelFunnel.reduce((sum, row) => sum + row.total, 0);
     const paidLeads = channelFunnel.reduce((sum, row) => sum + row.paid, 0);
     return {
@@ -194,7 +197,7 @@ export function ReportsPage() {
       paidLeads,
       conversionRate: totalLeads > 0 ? paidLeads / totalLeads : 0,
     };
-  }, [channelFunnel, lessonAccounts, ordersInRange]);
+  }, [channelFunnel, courseContracts, ordersInRange]);
 
   const receiverSettlement = useMemo(() => {
     const rows = new Map<string, ReceiverSettlementRow>();
@@ -737,7 +740,7 @@ export function ReportsPage() {
           value={money(summary.pendingAmount)}
           hint={`${summary.pendingOrders} 笔待支付订单`}
         />
-        <MetricCard label="低余额账户" value={summary.lowBalanceAccounts} hint="课时余额 <= 3" />
+        <MetricCard label="低余额课包" value={summary.lowBalanceAccounts} hint="课包余额 <= 3" />
         <MetricCard
           label="线索成交率"
           value={pct(summary.conversionRate)}
@@ -1033,7 +1036,7 @@ export function ReportsPage() {
       />
 
       <div className="mt-8 mb-3">
-        <h2 className="text-sm font-semibold text-slate-700">低余额课时账户</h2>
+        <h2 className="text-sm font-semibold text-slate-700">低余额课时包</h2>
       </div>
       <DataTable
         columns={[
@@ -1048,10 +1051,17 @@ export function ReportsPage() {
             ),
           },
           { key: 'course', header: '课程', cell: (row) => row.course?.name ?? '-' },
-          { key: 'balance', header: '剩余课时', cell: (row) => `${row.balance} 节` },
+          { key: 'package', header: '课时包', cell: (row) => row.package?.name ?? row.title },
+          {
+            key: 'balance',
+            header: '课包余额（剩余/总数）',
+            cell: (row) => formatPackageLessonBalance(row.remainingLessonCount, row.lessonCount),
+          },
         ]}
-        data={lessonAccounts.filter((account) => account.balance <= 3)}
-        emptyMessage="暂无低余额课时账户"
+        data={courseContracts.filter(
+          (contract) => contract.status === 'active' && contract.remainingLessonCount <= 3,
+        )}
+        emptyMessage="暂无低余额课时包"
       />
     </PageFrame>
   );

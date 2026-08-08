@@ -23,6 +23,7 @@ import type {
 import { PageFrame } from '@/components/layout/PageFrame';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { useApiResource } from '@/lib/useApiResource';
 
 interface AttendanceDraft {
@@ -643,7 +644,7 @@ export function AttendancePage({
                         </span>
                         <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                           {selectedLessonSource
-                            ? `${selectedLessonSource.packageName ?? selectedLessonSource.title} · 剩 ${selectedLessonSource.remainingLessonCount} 节`
+                            ? `${selectedLessonSource.packageName ?? selectedLessonSource.title} · 余额 ${formatPackageLessonBalance(selectedLessonSource.remainingLessonCount, selectedLessonSource.lessonCount)}`
                             : lessonSources.length > 0
                               ? `${lessonSources[0].packageName ?? lessonSources[0].title} · 余额不足，不可扣课`
                               : '请先为学员配置可用课时包'}
@@ -696,7 +697,11 @@ export function AttendancePage({
                                 {source.packageName ?? source.title}
                               </span>
                               <span className="mt-0.5 block opacity-75">
-                                剩 {source.remainingLessonCount} / {source.lessonCount} 节
+                                余额{' '}
+                                {formatPackageLessonBalance(
+                                  source.remainingLessonCount,
+                                  source.lessonCount,
+                                )}
                                 {source.endsAt
                                   ? ` · ${new Date(source.endsAt).toLocaleDateString('zh-CN')} 到期`
                                   : ''}

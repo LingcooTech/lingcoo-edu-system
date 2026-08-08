@@ -30,6 +30,7 @@ import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { formatDateTime } from '@/lib/utils';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { useApiResource } from '@/lib/useApiResource';
 
 const SESSIONS = () => '/v1/class-sessions';
@@ -1158,9 +1159,14 @@ export function SchedulePage({
                         {item.billingCourseContract?.package?.name
                           ? ` · ${item.billingCourseContract.package.name}`
                           : ''}
-                        {typeof item.lessonAccount?.balance === 'number'
-                          ? ` · 剩余 ${item.lessonAccount.balance} 课时`
-                          : ''}
+                        {item.billingCourseContract
+                          ? ` · 余额 ${formatPackageLessonBalance(
+                              item.billingCourseContract.remainingLessonCount,
+                              item.billingCourseContract.lessonCount,
+                            )}`
+                          : typeof item.lessonAccount?.balance === 'number'
+                            ? ` · 未关联课包：${item.lessonAccount.balance} 节`
+                            : ''}
                       </div>
                     </div>
                     <button
@@ -1216,8 +1222,8 @@ export function SchedulePage({
                     disabled={account.remainingLessonCount <= 0}
                   >
                     {account.course?.name ?? account.courseId} ·{' '}
-                    {account.package?.name ?? account.title} · 剩余 {account.remainingLessonCount}{' '}
-                    课时
+                    {account.package?.name ?? account.title} · 余额{' '}
+                    {formatPackageLessonBalance(account.remainingLessonCount, account.lessonCount)}
                     {account.recommended ? ' · 推荐' : ''}
                   </option>
                 ))}

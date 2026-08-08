@@ -1,6 +1,7 @@
 import type { CourseContract } from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { DataTable } from '@/components/shared/DataTable';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { useApiResource } from '@/lib/useApiResource';
 
 export function LessonsPage() {
@@ -49,7 +50,11 @@ export function LessonAccountsPanel() {
             return `${consumed} / ${row.lessonCount} 节`;
           },
         },
-        { key: 'balance', header: '剩余课时', cell: (row) => `${row.remainingLessonCount} 节` },
+        {
+          key: 'balance',
+          header: '课包余额（剩余/总数）',
+          cell: (row) => formatPackageLessonBalance(row.remainingLessonCount, row.lessonCount),
+        },
         {
           key: 'status',
           header: '状态',

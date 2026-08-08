@@ -18,6 +18,7 @@ import { Drawer } from '@/components/shared/Drawer';
 import { Field, FieldRow } from '@/components/shared/FormField';
 import { StatusPill, statusLabel, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { useApiResource } from '@/lib/useApiResource';
 
 const CLASSES = () => '/v1/classes';
@@ -602,8 +603,8 @@ export function ClassesPage() {
               {billingAccountOptions(studentId).map((contract) => (
                 <option key={contract.id} value={contract.id}>
                   {contract.course?.name ?? contract.courseId} ·{' '}
-                  {contract.package?.name ?? contract.title} · 剩余 {contract.remainingLessonCount}{' '}
-                  课时
+                  {contract.package?.name ?? contract.title} · 余额{' '}
+                  {formatPackageLessonBalance(contract.remainingLessonCount, contract.lessonCount)}
                 </option>
               ))}
             </select>
@@ -661,8 +662,11 @@ export function ClassesPage() {
                       }
                     >
                       扣 {contract.course?.name ?? contract.courseId} ·{' '}
-                      {contract.package?.name ?? contract.title} · 剩余{' '}
-                      {contract.remainingLessonCount} 课时
+                      {contract.package?.name ?? contract.title} · 余额{' '}
+                      {formatPackageLessonBalance(
+                        contract.remainingLessonCount,
+                        contract.lessonCount,
+                      )}
                     </option>
                   ))}
                 </select>

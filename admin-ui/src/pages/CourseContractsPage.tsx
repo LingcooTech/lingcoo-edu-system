@@ -18,6 +18,7 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusPill, statusToTone } from '@/components/shared/StatusPill';
 import { useToast } from '@/components/shared/Toast';
 import { exportStyledExcel } from '@/lib/excel-export';
+import { formatPackageLessonBalance } from '@/lib/lesson-balance';
 import { formatDateTime, money } from '@/lib/utils';
 import { useApiResource } from '@/lib/useApiResource';
 
@@ -770,11 +771,10 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
           },
           {
             key: 'remainingLessonCount',
-            header: '剩余课时',
-            value: (contract) => contract.remainingLessonCount,
-            width: 11,
-            format: 'integer',
-            alignment: 'right',
+            header: '课包余额（剩余/总数）',
+            value: (contract) =>
+              formatPackageLessonBalance(contract.remainingLessonCount, contract.lessonCount),
+            width: 18,
           },
           {
             key: 'gifts',
@@ -944,7 +944,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
             cell: (row) => (
               <div className="cell-stack">
                 <span className="cell-title">
-                  剩 {row.remainingLessonCount} / {row.lessonCount} 节
+                  余额 {formatPackageLessonBalance(row.remainingLessonCount, row.lessonCount)}
                 </span>
                 <span className="cell-subtitle">
                   {row.package?.billingType === 'period'

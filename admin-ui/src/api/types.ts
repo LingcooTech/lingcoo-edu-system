@@ -468,6 +468,7 @@ export interface AttendanceRecord {
     title: string;
     packageName?: string | null;
     billingType?: string | null;
+    lessonCount: number;
     remainingLessonCount: number;
   } | null;
 }

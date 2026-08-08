@@ -316,6 +316,7 @@ async function enrichAttendanceRecords(
     .select({
       id: schema.courseContracts.id,
       title: schema.courseContracts.title,
+      lessonCount: schema.courseContracts.lessonCount,
       remainingLessonCount: schema.courseContracts.remainingLessonCount,
       packageName: schema.coursePackages.name,
       billingType: schema.coursePackages.billingType,
@@ -548,24 +549,30 @@ export async function updateAttendanceRecord(
       lessonUnits: input.lessonUnits,
       periodPackage,
     });
-    const allocationChanged =
-      nextLessonDelta !== existing.lessonDelta ||
-      (nextLessonDelta < 0 && requestedSourceId !== existing.courseContractId);
+    const lessonDeltaChanged = nextLessonDelta !== existing.lessonDelta;
+    const sourceChanged = nextLessonDelta < 0 && requestedSourceId !== existing.courseContractId;
+    const allocationChanged = lessonDeltaChanged || sourceChanged;
     let lessonSourceId = existing.courseContractId;
     if (allocationChanged && existing.lessonDelta < 0) {
       const restoredAmount = -existing.lessonDelta;
       if (existing.courseContractId) {
         await restoreLessonSource(tx, existing.courseContractId, restoredAmount);
       }
-      await applyLessonDelta(tx, {
-        studentId: input.studentId,
-        courseId: input.courseId,
-        type: 'adjustment',
-        amount: restoredAmount,
-        relatedEntityType: 'attendance_correction',
-        relatedEntityId: input.sessionId,
-        courseContractId: existing.courseContractId,
-      });
+      // Historical attendance rows could predate package-level attribution. In
+      // that case the course account was already deducted, so selecting the
+      // package later is an attribution-only operation: do not restore and
+      // deduct the aggregate account a second time.
+      if (lessonDeltaChanged) {
+        await applyLessonDelta(tx, {
+          studentId: input.studentId,
+          courseId: input.courseId,
+          type: 'adjustment',
+          amount: restoredAmount,
+          relatedEntityType: 'attendance_correction',
+          relatedEntityId: input.sessionId,
+          courseContractId: existing.courseContractId,
+        });
+      }
       lessonSourceId = null;
     }
     if (allocationChanged && nextLessonDelta < 0) {
@@ -583,15 +590,17 @@ export async function updateAttendanceRecord(
         );
       }
       lessonSourceId = source?.id ?? null;
-      await applyLessonDelta(tx, {
-        studentId: input.studentId,
-        courseId: input.courseId,
-        type: 'consume',
-        amount: nextLessonDelta,
-        relatedEntityType: 'class_session',
-        relatedEntityId: input.sessionId,
-        courseContractId: lessonSourceId,
-      });
+      if (lessonDeltaChanged) {
+        await applyLessonDelta(tx, {
+          studentId: input.studentId,
+          courseId: input.courseId,
+          type: 'consume',
+          amount: nextLessonDelta,
+          relatedEntityType: 'class_session',
+          relatedEntityId: input.sessionId,
+          courseContractId: lessonSourceId,
+        });
+      }
     }
     const lessonDeltaAdjustment = nextLessonDelta - existing.lessonDelta;
     const [updated] = await tx
