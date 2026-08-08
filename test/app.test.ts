@@ -1967,7 +1967,7 @@ test('creates a course contract with offline payment, lesson credit and class en
         ),
       )
       .limit(1);
-    assert.equal(automaticCourseAssociation.source, 'enrollment');
+    assert.equal(automaticCourseAssociation.source, 'contract');
 
     const classesAfterAutomaticAssociation = await app.inject({
       method: 'GET',
