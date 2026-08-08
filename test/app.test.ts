@@ -1679,22 +1679,22 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(temporarilyUnassigned.statusCode, 200, temporarilyUnassigned.body);
     assert.equal(temporarilyUnassigned.json().courseContract.classId, null);
 
-    const listAfterHistoricalEnrollment = await app.inject({
+    const listAfterUnassignment = await app.inject({
       method: 'GET',
       url: '/v1/course-contracts',
       headers: { authorization: `Bearer ${adminToken}` },
     });
-    assert.equal(listAfterHistoricalEnrollment.statusCode, 200, listAfterHistoricalEnrollment.body);
-    const backfilledContract = listAfterHistoricalEnrollment
+    assert.equal(listAfterUnassignment.statusCode, 200, listAfterUnassignment.body);
+    const listedUnassignedContract = listAfterUnassignment
       .json()
       .courseContracts.find((item: { id: string }) => item.id === periodContract.id);
-    assert.equal(backfilledContract.classId, classGroup.id);
-    const [syncedPeriodContract] = await app.db
+    assert.equal(listedUnassignedContract.classId, null);
+    const [persistedUnassignedContract] = await app.db
       .select()
       .from(schema.courseContracts)
       .where(eq(schema.courseContracts.id, periodContract.id))
       .limit(1);
-    assert.equal(syncedPeriodContract.classId, classGroup.id);
+    assert.equal(persistedUnassignedContract.classId, null);
 
     const removedEnrollment = await app.inject({
       method: 'DELETE',
