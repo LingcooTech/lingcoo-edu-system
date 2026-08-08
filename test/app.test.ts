@@ -5,6 +5,7 @@ import test from 'node:test';
 import { and, eq } from 'drizzle-orm';
 
 import { buildApp } from '../src/app.js';
+import { applyLessonMovement } from '../src/db/repositories/lesson-movements.js';
 import * as schema from '../src/db/schema.js';
 import type { AppEnv } from '../src/lib/env.js';
 import { hashPassword, verifyPassword } from '../src/lib/password.js';
@@ -25,6 +26,55 @@ const testEnv: AppEnv = {
 };
 
 type TestApp = Awaited<ReturnType<typeof buildApp>>;
+
+async function createTestPackageWithBalance(
+  app: TestApp,
+  input: {
+    studentId: string;
+    courseId: string;
+    lessonCount: number;
+    title: string;
+    classId?: string | null;
+    packageId?: string | null;
+    institutionId?: string | null;
+  },
+) {
+  return app.db.transaction(async (tx) => {
+    let [contract] = await tx
+      .insert(schema.courseContracts)
+      .values({
+        studentId: input.studentId,
+        institutionId: input.institutionId ?? null,
+        courseId: input.courseId,
+        classId: input.classId ?? null,
+        packageId: input.packageId ?? null,
+        contractNo: `TEST-${randomUUID()}`,
+        title: input.title,
+        lessonCount: input.lessonCount,
+        remainingLessonCount: 0,
+        paidAmount: 0,
+        status: 'active',
+        origin: 'manual',
+      })
+      .returning();
+
+    if (input.lessonCount > 0) {
+      const grant = await applyLessonMovement(tx, {
+        courseContractId: contract.id,
+        studentId: input.studentId,
+        operationId: `test:${contract.id}:grant`,
+        type: 'grant',
+        units: input.lessonCount,
+        occurredAt: contract.createdAt,
+        reason: '测试课时包发放',
+        metadata: { test: true },
+      });
+      contract = grant.contract;
+    }
+
+    return contract;
+  });
+}
 
 function phoneFromSuffix(suffix: string, prefix = '136') {
   return `${prefix}${String(parseInt(suffix.replaceAll('-', '').slice(0, 8), 16))
@@ -162,20 +212,13 @@ async function createLessonNotificationFixture(
       status: 'scheduled',
     })
     .returning();
-  const [courseContract] = await app.db
-    .insert(schema.courseContracts)
-    .values({
-      studentId: student.id,
-      courseId: course.id,
-      classId: classGroup.id,
-      contractNo: `LESSON-${suffix}`,
-      title: `Lesson Package ${suffix.slice(0, 8)}`,
-      lessonCount: input.balance ?? 6,
-      remainingLessonCount: input.balance ?? 6,
-      paidAmount: 0,
-      status: 'active',
-    })
-    .returning();
+  const courseContract = await createTestPackageWithBalance(app, {
+    studentId: student.id,
+    courseId: course.id,
+    classId: classGroup.id,
+    lessonCount: input.balance ?? 6,
+    title: `Lesson Package ${suffix.slice(0, 8)}`,
+  });
   await app.db.insert(schema.classEnrollments).values({
     classId: classGroup.id,
     studentId: student.id,
@@ -183,9 +226,14 @@ async function createLessonNotificationFixture(
     billingCourseContractId: courseContract.id,
     active: true,
   });
-  const [lessonAccount] = await app.db
-    .insert(schema.lessonAccounts)
-    .values({ studentId: student.id, courseId: course.id, balance: input.balance ?? 6 })
+  const [adminAccount] = await app.db
+    .insert(schema.accounts)
+    .values({
+      role: 'admin',
+      email: `lesson-admin-${suffix}@example.com`,
+      passwordHash: hashPassword('test-password'),
+      displayName: `Lesson Admin ${suffix.slice(0, 8)}`,
+    })
     .returning();
 
   return {
@@ -200,7 +248,7 @@ async function createLessonNotificationFixture(
     classGroup,
     session,
     courseContract,
-    lessonAccount,
+    adminAccount,
   };
 }
 
@@ -788,9 +836,13 @@ test('binds and reuses a WeChat Mini Program parent account', async () => {
         status: 'active',
       })
       .returning();
-    await app.db
-      .insert(schema.lessonAccounts)
-      .values({ studentId: student.id, courseId: course.id, balance: 8 });
+    const lessonPackage = await createTestPackageWithBalance(app, {
+      studentId: student.id,
+      courseId: course.id,
+      packageId: pkg.id,
+      lessonCount: 8,
+      title: 'Mini Parent 8 课时包',
+    });
 
     const login = await app.inject({
       method: 'POST',
@@ -846,6 +898,8 @@ test('binds and reuses a WeChat Mini Program parent account', async () => {
       headers: { authorization: `Bearer ${bindPayload.token}` },
     });
     assert.equal(lessonAccounts.statusCode, 200);
+    assert.equal(lessonAccounts.json().lessonAccounts[0].courseContractId, lessonPackage.id);
+    assert.equal(lessonAccounts.json().lessonAccounts[0].balance, 8);
     assert.equal(lessonAccounts.json().lessonAccounts[0].course.name, course.name);
     assert.equal(lessonAccounts.json().lessonAccounts[0].student.name, student.name);
 
@@ -942,18 +996,27 @@ test('creates and mock-pays a public package order', async () => {
     assert.equal(paid.json().item.status, 'paid');
     assert.equal(paid.json().item.paidAmount, pkg.priceAmount);
 
-    const [lessonAccount] = await app.db
+    const [courseContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, checkoutPayload.order.studentId),
-          eq(schema.lessonAccounts.courseId, course.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.orderId, checkoutPayload.order.id))
       .limit(1);
-    assert.ok(lessonAccount);
-    assert.equal(lessonAccount.balance, pkg.lessonCount);
+    assert.ok(courseContract);
+    assert.equal(courseContract.studentId, checkoutPayload.order.studentId);
+    assert.equal(courseContract.courseId, course.id);
+    assert.equal(courseContract.packageId, pkg.id);
+    assert.equal(courseContract.lessonCount, pkg.lessonCount);
+    assert.equal(courseContract.remainingLessonCount, pkg.lessonCount);
+
+    const grantMovements = await app.db
+      .select()
+      .from(schema.lessonMovements)
+      .where(eq(schema.lessonMovements.courseContractId, courseContract.id));
+    assert.equal(grantMovements.length, 1);
+    assert.equal(grantMovements[0].type, 'grant');
+    assert.equal(grantMovements[0].units, pkg.lessonCount);
+    assert.equal(grantMovements[0].balanceBefore, 0);
+    assert.equal(grantMovements[0].balanceAfter, pkg.lessonCount);
 
     await app.db
       .update(schema.orders)
@@ -974,18 +1037,18 @@ test('creates and mock-pays a public package order', async () => {
     });
     assert.equal(lateMockPay.statusCode, 409);
 
-    const [unchangedLessonAccount] = await app.db
+    const [unchangedCourseContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, checkoutPayload.order.studentId),
-          eq(schema.lessonAccounts.courseId, course.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, courseContract.id))
       .limit(1);
-    assert.ok(unchangedLessonAccount);
-    assert.equal(unchangedLessonAccount.balance, pkg.lessonCount);
+    assert.ok(unchangedCourseContract);
+    assert.equal(unchangedCourseContract.remainingLessonCount, pkg.lessonCount);
+    const unchangedMovements = await app.db
+      .select()
+      .from(schema.lessonMovements)
+      .where(eq(schema.lessonMovements.courseContractId, courseContract.id));
+    assert.equal(unchangedMovements.length, 1);
   } finally {
     await app.close();
   }
@@ -1414,59 +1477,49 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(exportedOrder.student.guardian.phone, guardian.phone);
     assert.equal(exportedOrder.paidAmount, 158000);
 
-    const [lessonAccount] = await app.db
+    const [mainContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student.id),
-          eq(schema.lessonAccounts.courseId, course.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, createdPayload.courseContract.id))
       .limit(1);
-    assert.ok(lessonAccount);
-    assert.equal(lessonAccount.balance, coursePackage.lessonCount);
+    assert.ok(mainContract);
+    assert.equal(mainContract.remainingLessonCount, coursePackage.lessonCount);
 
-    const [giftLessonAccount] = await app.db
+    const initialGift = createdPayload.courseContract.gifts[0];
+    assert.ok(initialGift.grantedCourseContractId);
+    const [giftContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student.id),
-          eq(schema.lessonAccounts.courseId, giftCourse.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, initialGift.grantedCourseContractId))
       .limit(1);
-    assert.ok(giftLessonAccount);
-    assert.equal(giftLessonAccount.balance, 3);
+    assert.ok(giftContract);
+    assert.equal(giftContract.origin, 'gift');
+    assert.equal(giftContract.parentCourseContractId, mainContract.id);
+    assert.equal(giftContract.remainingLessonCount, 3);
 
-    const [lessonTransaction] = await app.db
+    const [grantMovement] = await app.db
       .select()
-      .from(schema.lessonTransactions)
-      .where(
-        and(
-          eq(schema.lessonTransactions.studentId, student.id),
-          eq(schema.lessonTransactions.relatedEntityType, 'course_contract'),
-          eq(schema.lessonTransactions.relatedEntityId, createdPayload.courseContract.id),
-        ),
-      )
+      .from(schema.lessonMovements)
+      .where(eq(schema.lessonMovements.operationId, `contract:${mainContract.id}:grant`))
       .limit(1);
-    assert.ok(lessonTransaction);
-    assert.equal(lessonTransaction.amount, coursePackage.lessonCount);
+    assert.ok(grantMovement);
+    assert.equal(grantMovement.courseContractId, mainContract.id);
+    assert.equal(grantMovement.type, 'grant');
+    assert.equal(grantMovement.units, coursePackage.lessonCount);
+    assert.equal(grantMovement.balanceBefore, 0);
+    assert.equal(grantMovement.balanceAfter, coursePackage.lessonCount);
 
-    const [giftTransaction] = await app.db
+    const [giftGrantMovement] = await app.db
       .select()
-      .from(schema.lessonTransactions)
-      .where(
-        and(
-          eq(schema.lessonTransactions.studentId, student.id),
-          eq(schema.lessonTransactions.relatedEntityType, 'course_contract_gift'),
-          eq(schema.lessonTransactions.relatedEntityId, createdPayload.courseContract.gifts[0].id),
-        ),
-      )
+      .from(schema.lessonMovements)
+      .where(eq(schema.lessonMovements.operationId, `gift:${initialGift.id}:grant`))
       .limit(1);
-    assert.ok(giftTransaction);
-    assert.equal(giftTransaction.amount, 3);
+    assert.ok(giftGrantMovement);
+    assert.equal(giftGrantMovement.courseContractId, giftContract.id);
+    assert.equal(giftGrantMovement.type, 'grant');
+    assert.equal(giftGrantMovement.units, 3);
+    assert.equal(giftGrantMovement.balanceBefore, 0);
+    assert.equal(giftGrantMovement.balanceAfter, 3);
 
     const [enrollment] = await app.db
       .select()
@@ -1505,32 +1558,32 @@ test('creates a course contract with offline payment, lesson credit and class en
     });
     assert.equal(edited.statusCode, 200, edited.body);
 
-    const [editedLessonAccount] = await app.db
+    const [editedMainContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student.id),
-          eq(schema.lessonAccounts.courseId, course.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, mainContract.id))
       .limit(1);
-    assert.ok(editedLessonAccount);
-    assert.equal(editedLessonAccount.balance, coursePackage.lessonCount + 2);
+    assert.ok(editedMainContract);
+    assert.equal(editedMainContract.remainingLessonCount, coursePackage.lessonCount + 2);
     assert.equal(edited.json().courseContract.remainingLessonCount, coursePackage.lessonCount + 2);
-
-    const [unchangedGiftLessonAccount] = await app.db
+    const [lessonCountAdjustment] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student.id),
-          eq(schema.lessonAccounts.courseId, giftCourse.id),
-        ),
-      )
+      .from(schema.lessonMovements)
+      .where(eq(schema.lessonMovements.operationId, `contract:${mainContract.id}:r2:lesson-count`))
       .limit(1);
-    assert.ok(unchangedGiftLessonAccount);
-    assert.equal(unchangedGiftLessonAccount.balance, 3);
+    assert.ok(lessonCountAdjustment);
+    assert.equal(lessonCountAdjustment.type, 'adjustment');
+    assert.equal(lessonCountAdjustment.units, 2);
+    assert.equal(lessonCountAdjustment.balanceBefore, coursePackage.lessonCount);
+    assert.equal(lessonCountAdjustment.balanceAfter, coursePackage.lessonCount + 2);
+
+    const [unchangedGiftContract] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, giftContract.id))
+      .limit(1);
+    assert.ok(unchangedGiftContract);
+    assert.equal(unchangedGiftContract.remainingLessonCount, 3);
 
     const addedGift = await app.inject({
       method: 'POST',
@@ -1547,32 +1600,29 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(addedGift.json().gift.course.id, giftCourse.id);
     assert.equal(addedGift.json().gift.lessonCount, 2);
 
-    const [supplementGiftLessonAccount] = await app.db
+    const supplementGift = addedGift.json().gift;
+    assert.ok(supplementGift.grantedCourseContractId);
+    const [supplementGiftContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student.id),
-          eq(schema.lessonAccounts.courseId, giftCourse.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, supplementGift.grantedCourseContractId))
       .limit(1);
-    assert.ok(supplementGiftLessonAccount);
-    assert.equal(supplementGiftLessonAccount.balance, 5);
+    assert.ok(supplementGiftContract);
+    assert.equal(supplementGiftContract.origin, 'gift');
+    assert.equal(supplementGiftContract.parentCourseContractId, mainContract.id);
+    assert.equal(supplementGiftContract.remainingLessonCount, 2);
 
-    const [supplementGiftTransaction] = await app.db
+    const [supplementGiftMovement] = await app.db
       .select()
-      .from(schema.lessonTransactions)
-      .where(
-        and(
-          eq(schema.lessonTransactions.studentId, student.id),
-          eq(schema.lessonTransactions.relatedEntityType, 'course_contract_gift'),
-          eq(schema.lessonTransactions.relatedEntityId, addedGift.json().gift.id),
-        ),
-      )
+      .from(schema.lessonMovements)
+      .where(eq(schema.lessonMovements.operationId, `gift:${supplementGift.id}:grant`))
       .limit(1);
-    assert.ok(supplementGiftTransaction);
-    assert.equal(supplementGiftTransaction.amount, 2);
+    assert.ok(supplementGiftMovement);
+    assert.equal(supplementGiftMovement.courseContractId, supplementGiftContract.id);
+    assert.equal(supplementGiftMovement.type, 'grant');
+    assert.equal(supplementGiftMovement.units, 2);
+    assert.equal(supplementGiftMovement.balanceBefore, 0);
+    assert.equal(supplementGiftMovement.balanceAfter, 2);
 
     const listedAfterSupplementGift = await app.inject({
       method: 'GET',
@@ -1842,7 +1892,7 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(targetClassCreated.statusCode, 200, targetClassCreated.body);
     const targetClass = targetClassCreated.json().class;
 
-    const fullyEdited = await app.inject({
+    const forbiddenIdentityEdit = await app.inject({
       method: 'PATCH',
       url: `/v1/course-contracts/${periodContract.id}`,
       headers: { authorization: `Bearer ${adminToken}` },
@@ -1860,25 +1910,47 @@ test('creates a course contract with offline payment, lesson credit and class en
         note: '修正原档案归属',
       },
     });
-    assert.equal(fullyEdited.statusCode, 200, fullyEdited.body);
-    assert.equal(fullyEdited.json().courseContract.student.id, targetStudent.id);
-    assert.equal(fullyEdited.json().courseContract.course.id, targetCourse.id);
-    assert.equal(fullyEdited.json().courseContract.package.id, targetPackage.id);
-    assert.equal(fullyEdited.json().courseContract.classId, null);
-    assert.equal(fullyEdited.json().courseContract.remainingLessonCount, 6);
+    assert.equal(forbiddenIdentityEdit.statusCode, 422, forbiddenIdentityEdit.body);
 
-    const crossCourseEnrollment = await app.inject({
+    const [unchangedPeriodContract] = await app.db
+      .select()
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, periodContract.id))
+      .limit(1);
+    assert.equal(unchangedPeriodContract.studentId, student.id);
+    assert.equal(unchangedPeriodContract.courseId, course.id);
+    assert.equal(unchangedPeriodContract.packageId, periodPackage.id);
+    assert.equal(unchangedPeriodContract.remainingLessonCount, periodPackage.lessonCount);
+
+    const targetContractCreated = await app.inject({
       method: 'POST',
-      url: `/v1/classes/${targetClass.id}/enrollments`,
+      url: '/v1/course-contracts',
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { studentId: targetStudent.id, billingCourseId: targetCourse.id },
+      payload: {
+        studentId: targetStudent.id,
+        courseId: targetCourse.id,
+        classId: targetClass.id,
+        packageId: targetPackage.id,
+        title: '新建的目标学员课时包',
+        lessonCount: targetPackage.lessonCount,
+        paidAmount: targetPackage.priceAmount,
+        paymentMethod: 'bank_transfer',
+        startsAt: futureDateFromSuffix(suffix, 2041).toISOString(),
+        note: '原课时包身份不可变，改为新建具体课时包',
+      },
     });
-    assert.equal(crossCourseEnrollment.statusCode, 200, crossCourseEnrollment.body);
+    assert.equal(targetContractCreated.statusCode, 200, targetContractCreated.body);
+    const targetContract = targetContractCreated.json().courseContract;
+    assert.equal(targetContract.student.id, targetStudent.id);
+    assert.equal(targetContract.course.id, targetCourse.id);
+    assert.equal(targetContract.package.id, targetPackage.id);
+    assert.equal(targetContract.class.id, targetClass.id);
+    assert.equal(targetContract.remainingLessonCount, targetPackage.lessonCount);
 
     const [contractAfterCrossCourseEnrollment] = await app.db
       .select()
       .from(schema.courseContracts)
-      .where(eq(schema.courseContracts.id, periodContract.id))
+      .where(eq(schema.courseContracts.id, targetContract.id))
       .limit(1);
     assert.equal(contractAfterCrossCourseEnrollment.classId, targetClass.id);
     const [automaticCourseAssociation] = await app.db
@@ -1993,47 +2065,57 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(teacherCrossCourseSession.statusCode, 200, teacherCrossCourseSession.body);
     assert.equal(teacherCrossCourseSession.json().classSession.course.id, targetCourse.id);
 
-    const [oldAccountAfterReassignment] = await app.db
+    const [originalContractAfterRejectedReassignment] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student.id),
-          eq(schema.lessonAccounts.courseId, course.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, createdPayload.courseContract.id))
       .limit(1);
-    const [targetAccountAfterReassignment] = await app.db
+    const [newTargetContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, targetStudent.id),
-          eq(schema.lessonAccounts.courseId, targetCourse.id),
-        ),
-      )
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, targetContract.id))
       .limit(1);
-    assert.equal(oldAccountAfterReassignment.balance, coursePackage.lessonCount + 1);
-    assert.equal(targetAccountAfterReassignment.balance, targetPackage.lessonCount);
+    assert.equal(
+      originalContractAfterRejectedReassignment.remainingLessonCount,
+      coursePackage.lessonCount + 1,
+    );
+    assert.equal(newTargetContract.studentId, targetStudent.id);
+    assert.equal(newTargetContract.courseId, targetCourse.id);
+    assert.equal(newTargetContract.remainingLessonCount, targetPackage.lessonCount);
 
-    const [reassignedOrder] = await app.db
+    const [unchangedPeriodOrder] = await app.db
       .select()
       .from(schema.orders)
       .where(eq(schema.orders.id, periodContract.orderId))
       .limit(1);
-    assert.equal(reassignedOrder.studentId, targetStudent.id);
-    assert.equal(reassignedOrder.courseId, targetCourse.id);
-    assert.equal(reassignedOrder.packageId, targetPackage.id);
-    assert.equal(reassignedOrder.lessonCount, targetPackage.lessonCount);
+    assert.equal(unchangedPeriodOrder.studentId, student.id);
+    assert.equal(unchangedPeriodOrder.courseId, course.id);
+    assert.equal(unchangedPeriodOrder.packageId, periodPackage.id);
+    assert.equal(unchangedPeriodOrder.lessonCount, periodPackage.lessonCount);
 
-    const completed = await app.inject({
+    const cancelled = await app.inject({
       method: 'PATCH',
       url: `/v1/course-contracts/${createdPayload.courseContract.id}/status`,
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { status: 'completed' },
+      payload: { status: 'cancelled' },
     });
-    assert.equal(completed.statusCode, 200, completed.body);
-    assert.equal(completed.json().courseContract.status, 'completed');
+    assert.equal(cancelled.statusCode, 200, cancelled.body);
+    assert.equal(cancelled.json().courseContract.status, 'cancelled');
+    assert.equal(cancelled.json().courseContract.remainingLessonCount, 0);
+    const [cancelMovement] = await app.db
+      .select()
+      .from(schema.lessonMovements)
+      .where(
+        eq(
+          schema.lessonMovements.operationId,
+          `contract:${createdPayload.courseContract.id}:cancel`,
+        ),
+      )
+      .limit(1);
+    assert.ok(cancelMovement);
+    assert.equal(cancelMovement.type, 'adjustment');
+    assert.equal(cancelMovement.units, -(coursePackage.lessonCount + 1));
+    assert.equal(cancelMovement.balanceAfter, 0);
 
     const [attendedLead] = await app.db
       .insert(schema.leads)
@@ -2533,11 +2615,11 @@ test('creates and mock-pays a public seat reservation without crediting lessons'
     });
     assert.equal(repeatedReschedule.statusCode, 422);
 
-    const lessonAccounts = await app.db
+    const courseContracts = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(eq(schema.lessonAccounts.courseId, course.id));
-    assert.equal(lessonAccounts.length, 0);
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.courseId, course.id));
+    assert.equal(courseContracts.length, 0);
   } finally {
     if (organization) {
       await app.db
@@ -2937,7 +3019,7 @@ test('creates lesson consumption notifications after admin attendance once', asy
       balance: 5,
     });
     const adminToken = await app.jwt.sign(
-      { sub: randomUUID(), role: 'admin' },
+      { sub: fixture.adminAccount.id, role: 'admin' },
       { expiresIn: '1h' },
     );
 
@@ -2952,12 +3034,12 @@ test('creates lesson consumption notifications after admin attendance once', asy
     assert.equal(firstResponse.statusCode, 200, firstResponse.body);
     assert.equal(sentPayloads.length, 1);
 
-    const [lessonAccount] = await app.db
+    const [courseContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(eq(schema.lessonAccounts.id, fixture.lessonAccount.id))
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, fixture.courseContract.id))
       .limit(1);
-    assert.equal(lessonAccount.balance, 4);
+    assert.equal(courseContract.remainingLessonCount, 4);
 
     const dedupeKey = `lesson.consumed:${fixture.account.id}:${fixture.session.id}:${fixture.student.id}`;
     const [notification] = await app.db
@@ -3144,12 +3226,12 @@ test('lets a parent check in for class and submit homework from parent center', 
     assert.equal(checkIn.statusCode, 200, checkIn.body);
     assert.match(checkIn.json().message, /签到成功/);
 
-    const [afterCheckInAccount] = await app.db
+    const [afterCheckInContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(eq(schema.lessonAccounts.id, fixture.lessonAccount.id))
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, fixture.courseContract.id))
       .limit(1);
-    assert.equal(afterCheckInAccount.balance, 2);
+    assert.equal(afterCheckInContract.remainingLessonCount, 2);
 
     const repeatedCheckIn = await app.inject({
       method: 'POST',
@@ -3160,12 +3242,12 @@ test('lets a parent check in for class and submit homework from parent center', 
     assert.equal(repeatedCheckIn.statusCode, 200, repeatedCheckIn.body);
     assert.match(repeatedCheckIn.json().message, /已签到/);
 
-    const [afterRepeatedAccount] = await app.db
+    const [afterRepeatedContract] = await app.db
       .select()
-      .from(schema.lessonAccounts)
-      .where(eq(schema.lessonAccounts.id, fixture.lessonAccount.id))
+      .from(schema.courseContracts)
+      .where(eq(schema.courseContracts.id, fixture.courseContract.id))
       .limit(1);
-    assert.equal(afterRepeatedAccount.balance, 2);
+    assert.equal(afterRepeatedContract.remainingLessonCount, 2);
 
     const homework = await app.inject({
       method: 'POST',
