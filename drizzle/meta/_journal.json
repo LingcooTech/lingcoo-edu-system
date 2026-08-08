@@ -414,6 +414,13 @@
       "when": 1786204800000,
       "tag": "0058_institution_roles_and_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1786291200000,
+      "tag": "0059_retire_legacy_lesson_model",
+      "breakpoints": true
     }
   ]
 }

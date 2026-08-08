@@ -89,12 +89,6 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
   'makeup',
   'trial',
 ]);
-export const lessonTransactionTypeEnum = pgEnum('lesson_transaction_type', [
-  'purchase',
-  'consume',
-  'refund',
-  'adjustment',
-]);
 export const lessonMovementTypeEnum = pgEnum('lesson_movement_type', [
   'grant',
   'consume',
@@ -1001,56 +995,6 @@ export const studentWorks = pgTable(
   }),
 );
 
-export const lessonAccounts = pgTable(
-  'lesson_accounts',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => students.id, { onDelete: 'cascade' }),
-    courseId: uuid('course_id')
-      .notNull()
-      .references(() => courses.id, { onDelete: 'restrict' }),
-    balance: integer('balance').notNull().default(0),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    studentCourseUnique: uniqueIndex('lesson_accounts_student_course_idx').on(
-      table.studentId,
-      table.courseId,
-    ),
-  }),
-);
-
-export const lessonTransactions = pgTable(
-  'lesson_transactions',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    lessonAccountId: uuid('lesson_account_id')
-      .notNull()
-      .references(() => lessonAccounts.id, { onDelete: 'cascade' }),
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => students.id, { onDelete: 'cascade' }),
-    courseContractId: uuid('course_contract_id').references(() => courseContracts.id, {
-      onDelete: 'set null',
-    }),
-    type: lessonTransactionTypeEnum('type').notNull(),
-    amount: integer('amount').notNull(),
-    balanceAfter: integer('balance_after').notNull(),
-    relatedEntityType: varchar('related_entity_type', { length: 80 }),
-    relatedEntityId: varchar('related_entity_id', { length: 120 }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    accountCreatedIdx: index('lesson_transactions_account_created_idx').on(
-      table.lessonAccountId,
-      table.createdAt,
-    ),
-    courseContractIdx: index('lesson_transactions_course_contract_idx').on(table.courseContractId),
-  }),
-);
-
 export const orders = pgTable(
   'orders',
   {
@@ -1203,8 +1147,10 @@ export const courseContractGifts = pgTable(
     courseContractId: uuid('course_contract_id')
       .notNull()
       .references(() => courseContracts.id, { onDelete: 'restrict' }),
-    grantedCourseContractId: uuid('granted_course_contract_id')
-      .references(() => courseContracts.id, { onDelete: 'restrict' }),
+    grantedCourseContractId: uuid('granted_course_contract_id').references(
+      () => courseContracts.id,
+      { onDelete: 'restrict' },
+    ),
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'restrict' }),
