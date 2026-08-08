@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -15,7 +17,12 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const accountRoleEnum = pgEnum('account_role', ['admin', 'teacher', 'parent']);
+export const accountRoleEnum = pgEnum('account_role', [
+  'admin',
+  'institution_admin',
+  'teacher',
+  'parent',
+]);
 export const accountStatusEnum = pgEnum('account_status', ['active', 'suspended']);
 export const courseStatusEnum = pgEnum('course_status', ['draft', 'published', 'archived']);
 export const courseSeriesStatusEnum = pgEnum('course_series_status', ['active', 'archived']);
@@ -85,6 +92,14 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
 export const lessonTransactionTypeEnum = pgEnum('lesson_transaction_type', [
   'purchase',
   'consume',
+  'refund',
+  'adjustment',
+]);
+export const lessonMovementTypeEnum = pgEnum('lesson_movement_type', [
+  'grant',
+  'consume',
+  'reversal',
+  'expire',
   'refund',
   'adjustment',
 ]);
@@ -183,6 +198,9 @@ export const accountRoleAssignments = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     role: accountRoleEnum('role').notNull(),
+    institutionId: uuid('institution_id').references(() => institutions.id, {
+      onDelete: 'restrict',
+    }),
     guardianId: uuid('guardian_id').references(() => guardians.id, { onDelete: 'set null' }),
     teacherId: uuid('teacher_id').references(() => teachers.id, { onDelete: 'set null' }),
     teacherPermissions: jsonb('teacher_permissions')
@@ -200,6 +218,7 @@ export const accountRoleAssignments = pgTable(
     ),
     accountIdx: index('account_role_assignments_account_idx').on(table.accountId),
     roleIdx: index('account_role_assignments_role_idx').on(table.role),
+    institutionIdx: index('account_role_assignments_institution_idx').on(table.institutionId),
     guardianIdx: index('account_role_assignments_guardian_idx').on(table.guardianId),
     teacherIdx: index('account_role_assignments_teacher_idx').on(table.teacherId),
   }),
@@ -828,12 +847,14 @@ export const attendanceRecords = pgTable(
       .notNull()
       .references(() => students.id, { onDelete: 'cascade' }),
     courseContractId: uuid('course_contract_id').references(() => courseContracts.id, {
-      onDelete: 'set null',
+      onDelete: 'restrict',
     }),
     status: attendanceStatusEnum('status').notNull(),
     lessonDelta: integer('lesson_delta').notNull().default(0),
     note: text('note'),
+    revision: integer('revision').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     sessionStudentUnique: uniqueIndex('attendance_records_session_student_idx').on(
@@ -841,6 +862,10 @@ export const attendanceRecords = pgTable(
       table.studentId,
     ),
     courseContractIdx: index('attendance_records_course_contract_idx').on(table.courseContractId),
+    deductedPackageRequired: check(
+      'attendance_records_deducted_package_required_check',
+      sql`${table.lessonDelta} >= 0 or ${table.courseContractId} is not null`,
+    ),
   }),
 );
 
@@ -1085,12 +1110,20 @@ export const courseContracts = pgTable(
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'restrict' }),
+    institutionId: uuid('institution_id').references(() => institutions.id, {
+      onDelete: 'restrict',
+    }),
     courseId: uuid('course_id')
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
     classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
     packageId: uuid('package_id').references(() => coursePackages.id, { onDelete: 'set null' }),
     orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+    parentCourseContractId: uuid('parent_course_contract_id').references(
+      (): AnyPgColumn => courseContracts.id,
+      { onDelete: 'restrict' },
+    ),
+    origin: varchar('origin', { length: 40 }).notNull().default('manual'),
     contractNo: varchar('contract_no', { length: 64 }).notNull(),
     title: varchar('title', { length: 200 }).notNull(),
     lessonCount: integer('lesson_count').notNull(),
@@ -1108,6 +1141,7 @@ export const courseContracts = pgTable(
     startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),
     status: courseContractStatusEnum('status').notNull().default('active'),
+    revision: integer('revision').notNull().default(1),
     note: text('note'),
     createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, {
       onDelete: 'set null',
@@ -1118,10 +1152,24 @@ export const courseContracts = pgTable(
   (table) => ({
     contractNoUnique: uniqueIndex('course_contracts_contract_no_idx').on(table.contractNo),
     studentIdx: index('course_contracts_student_idx').on(table.studentId),
+    institutionIdx: index('course_contracts_institution_idx').on(table.institutionId),
     courseIdx: index('course_contracts_course_idx').on(table.courseId),
     classIdx: index('course_contracts_class_idx').on(table.classId),
     orderIdx: index('course_contracts_order_idx').on(table.orderId),
+    parentIdx: index('course_contracts_parent_idx').on(table.parentCourseContractId),
     statusIdx: index('course_contracts_status_idx').on(table.status),
+    lessonCountNonnegative: check(
+      'course_contracts_lesson_count_nonnegative_check',
+      sql`${table.lessonCount} >= 0`,
+    ),
+    remainingNonnegative: check(
+      'course_contracts_remaining_nonnegative_check',
+      sql`${table.remainingLessonCount} >= 0`,
+    ),
+    remainingWithinTotal: check(
+      'course_contracts_remaining_within_total_check',
+      sql`${table.remainingLessonCount} <= ${table.lessonCount}`,
+    ),
   }),
 );
 
@@ -1131,7 +1179,7 @@ export const courseContractPaymentRecords = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     courseContractId: uuid('course_contract_id')
       .notNull()
-      .references(() => courseContracts.id, { onDelete: 'cascade' }),
+      .references(() => courseContracts.id, { onDelete: 'restrict' }),
     orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
     paidAmount: integer('paid_amount').notNull(),
     paymentMethod: varchar('payment_method', { length: 40 }),
@@ -1154,7 +1202,9 @@ export const courseContractGifts = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     courseContractId: uuid('course_contract_id')
       .notNull()
-      .references(() => courseContracts.id, { onDelete: 'cascade' }),
+      .references(() => courseContracts.id, { onDelete: 'restrict' }),
+    grantedCourseContractId: uuid('granted_course_contract_id')
+      .references(() => courseContracts.id, { onDelete: 'restrict' }),
     studentId: uuid('student_id')
       .notNull()
       .references(() => students.id, { onDelete: 'restrict' }),
@@ -1177,12 +1227,68 @@ export const courseContractGifts = pgTable(
   },
   (table) => ({
     contractIdx: index('course_contract_gifts_contract_idx').on(table.courseContractId),
+    grantedContractUnique: uniqueIndex('course_contract_gifts_granted_contract_idx')
+      .on(table.grantedCourseContractId)
+      .where(sql`${table.grantedCourseContractId} is not null`),
     studentCourseIdx: index('course_contract_gifts_student_course_idx').on(
       table.studentId,
       table.courseId,
     ),
     classIdx: index('course_contract_gifts_class_idx').on(table.classId),
     statusIdx: index('course_contract_gifts_status_idx').on(table.status),
+  }),
+);
+
+export const lessonMovements = pgTable(
+  'lesson_movements',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    courseContractId: uuid('course_contract_id')
+      .notNull()
+      .references(() => courseContracts.id, { onDelete: 'restrict' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'restrict' }),
+    attendanceRecordId: uuid('attendance_record_id').references(() => attendanceRecords.id, {
+      onDelete: 'restrict',
+    }),
+    operationId: varchar('operation_id', { length: 200 }).notNull(),
+    type: lessonMovementTypeEnum('type').notNull(),
+    units: integer('units').notNull(),
+    balanceBefore: integer('balance_before').notNull(),
+    balanceAfter: integer('balance_after').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    actorAccountId: uuid('actor_account_id').references(() => accounts.id, {
+      onDelete: 'restrict',
+    }),
+    reason: text('reason').notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    operationUnique: uniqueIndex('lesson_movements_operation_idx').on(table.operationId),
+    contractCreatedIdx: index('lesson_movements_contract_created_idx').on(
+      table.courseContractId,
+      table.createdAt,
+    ),
+    attendanceIdx: index('lesson_movements_attendance_idx').on(table.attendanceRecordId),
+    studentIdx: index('lesson_movements_student_idx').on(table.studentId, table.createdAt),
+    unitsNonZero: check('lesson_movements_units_nonzero_check', sql`${table.units} <> 0`),
+    balanceBeforeNonnegative: check(
+      'lesson_movements_balance_before_nonnegative_check',
+      sql`${table.balanceBefore} >= 0`,
+    ),
+    balanceAfterNonnegative: check(
+      'lesson_movements_balance_after_nonnegative_check',
+      sql`${table.balanceAfter} >= 0`,
+    ),
+    balanceMath: check(
+      'lesson_movements_balance_math_check',
+      sql`${table.balanceAfter} = ${table.balanceBefore} + ${table.units}`,
+    ),
   }),
 );
 
@@ -1290,8 +1396,12 @@ export const auditLogs = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     actorAccountId: uuid('actor_account_id').references(() => accounts.id, {
-      onDelete: 'set null',
+      onDelete: 'restrict',
     }),
+    institutionId: uuid('institution_id').references(() => institutions.id, {
+      onDelete: 'restrict',
+    }),
+    requestId: varchar('request_id', { length: 120 }),
     action: varchar('action', { length: 160 }).notNull(),
     resourceType: varchar('resource_type', { length: 80 }).notNull(),
     resourceId: varchar('resource_id', { length: 120 }),
@@ -1304,6 +1414,14 @@ export const auditLogs = pgTable(
   },
   (table) => ({
     actionIdx: index('audit_logs_action_idx').on(table.action),
+    institutionCreatedIdx: index('audit_logs_institution_created_idx').on(
+      table.institutionId,
+      table.createdAt,
+    ),
+    actorCreatedIdx: index('audit_logs_actor_created_idx').on(
+      table.actorAccountId,
+      table.createdAt,
+    ),
   }),
 );
 

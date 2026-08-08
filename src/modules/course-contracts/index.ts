@@ -5,10 +5,12 @@ import * as courseContractsRepo from '../../db/repositories/course-contracts.js'
 import * as organizationRepo from '../../db/repositories/organization.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import * as schema from '../../db/schema.js';
-import * as lessonRepo from '../../db/repositories/lesson.js';
+import { applyLessonMovement } from '../../db/repositories/lesson-movements.js';
+import { createAuditLog } from '../../db/repositories/audit.js';
 import * as packagesRepo from '../../db/repositories/packages.js';
 import { readBusinessModel } from '../../lib/business-model.js';
 import { httpError } from '../../lib/http-error.js';
+import { resolveBackofficeInstitutionScope } from '../../lib/institution-scope.js';
 import { resolvePaymentReceiverName } from '../../lib/payment-receiver.js';
 import type { AppModule } from '../types.js';
 import { and, eq, ne } from 'drizzle-orm';
@@ -148,14 +150,16 @@ export const courseContractsModule: AppModule = {
             leadId,
             school: body.school ?? null,
             createdByAccountId: request.account!.id,
+            requestId: request.id,
           });
         },
       );
     }
 
-    app.get('/v1/course-contracts', { preHandler: app.requireAdmin }, async () => {
+    app.get('/v1/course-contracts', { preHandler: app.requireBackoffice }, async (request) => {
+      const institutionId = await resolveBackofficeInstitutionScope(app.db, request.account);
       return {
-        courseContracts: await courseContractsRepo.listCourseContracts(app.db),
+        courseContracts: await courseContractsRepo.listCourseContracts(app.db, { institutionId }),
       };
     });
 
@@ -167,6 +171,7 @@ export const courseContractsModule: AppModule = {
         studentId: body.studentId,
         ...buildContractPayload(body, defaults),
         createdByAccountId: request.account!.id,
+        requestId: request.id,
       });
 
       return result;
@@ -191,6 +196,7 @@ export const courseContractsModule: AppModule = {
             note: body.note ?? null,
           },
           createdByAccountId: request.account!.id,
+          requestId: request.id,
         });
       },
     );
@@ -210,6 +216,7 @@ export const courseContractsModule: AppModule = {
           seatReservationId,
           school: body.school ?? null,
           createdByAccountId: request.account!.id,
+          requestId: request.id,
         });
       },
     );
@@ -229,6 +236,15 @@ export const courseContractsModule: AppModule = {
 
         if (!existingContract) {
           throw httpError(404, 'Course contract not found');
+        }
+        if (body.studentId && body.studentId !== existingContract.studentId) {
+          throw httpError(422, '课时包归属学员创建后不可修改');
+        }
+        if (body.courseId && body.courseId !== existingContract.courseId) {
+          throw httpError(422, '课时包适用课程创建后不可修改');
+        }
+        if (body.packageId !== undefined && body.packageId !== existingContract.packageId) {
+          throw httpError(422, '课时包模板创建后不可替换，请新建课时包档案');
         }
 
         const nextStudentId = body.studentId ?? existingContract.studentId;
@@ -263,6 +279,16 @@ export const courseContractsModule: AppModule = {
         });
 
         const result = await app.db.transaction(async (tx) => {
+          const [lockedContract] = await tx
+            .select()
+            .from(schema.courseContracts)
+            .where(eq(schema.courseContracts.id, courseContractId))
+            .limit(1)
+            .for('update');
+          if (!lockedContract) throw httpError(404, 'Course contract not found');
+          if (lockedContract.revision !== existingContract.revision) {
+            throw httpError(409, '课时包已被其他操作修改，请刷新后重试');
+          }
           const [student, coursePackage] = await Promise.all([
             tx
               .select()
@@ -340,10 +366,7 @@ export const courseContractsModule: AppModule = {
             }
           }
 
-          const identityChanged =
-            nextStudentId !== existingContract.studentId ||
-            nextCourseId !== existingContract.courseId;
-          const classChanged = nextClassId !== existingContract.classId || identityChanged;
+          const classChanged = nextClassId !== existingContract.classId;
           const classGroup = classChanged
             ? await courseContractsRepo.changeCourseContractClassInTx(tx, {
                 contractId: existingContract.id,
@@ -370,16 +393,37 @@ export const courseContractsModule: AppModule = {
             body.title === undefined
               ? existingContract.title
               : body.title?.trim() || coursePackage?.name || `${defaults.course.name}正式课程`;
+          const lessonCountDelta = nextLessonCount - existingContract.lessonCount;
+          if (lessonCountDelta > 0) {
+            await tx
+              .update(schema.courseContracts)
+              .set({ lessonCount: nextLessonCount, updatedAt: new Date() })
+              .where(eq(schema.courseContracts.id, courseContractId));
+          }
+          if (lessonCountDelta !== 0) {
+            await applyLessonMovement(tx, {
+              courseContractId,
+              studentId: existingContract.studentId,
+              operationId: `contract:${courseContractId}:r${existingContract.revision + 1}:lesson-count`,
+              type: 'adjustment',
+              units: lessonCountDelta,
+              occurredAt: new Date(),
+              actorAccountId: request.account!.id,
+              requestId: request.id,
+              reason: '后台调整课时包课时总数',
+              metadata: {
+                lessonCountBefore: existingContract.lessonCount,
+                lessonCountAfter: nextLessonCount,
+              },
+              allowInactive: lessonCountDelta > 0,
+            });
+          }
           const [courseContract] = await tx
             .update(schema.courseContracts)
             .set({
-              studentId: nextStudentId,
-              courseId: nextCourseId,
               classId: nextClassId,
-              packageId: nextPackageId,
               title: nextTitle,
               lessonCount: nextLessonCount,
-              remainingLessonCount: nextRemainingLessonCount,
               paidAmount: nextPaidAmount,
               paymentMethod: nextPaymentMethod,
               paymentReceiverType: defaults.paymentReceiverType,
@@ -388,6 +432,7 @@ export const courseContractsModule: AppModule = {
               startsAt,
               endsAt,
               note: nextNote,
+              revision: existingContract.revision + 1,
               updatedAt: new Date(),
             })
             .where(eq(schema.courseContracts.id, courseContractId))
@@ -395,48 +440,6 @@ export const courseContractsModule: AppModule = {
 
           if (!courseContract) {
             throw httpError(404, 'Course contract not found');
-          }
-
-          const accountDelta = identityChanged
-            ? -existingContract.remainingLessonCount
-            : nextRemainingLessonCount - existingContract.remainingLessonCount;
-          if (accountDelta !== 0) {
-            const [oldAccount] = await tx
-              .select()
-              .from(schema.lessonAccounts)
-              .where(
-                and(
-                  eq(schema.lessonAccounts.studentId, existingContract.studentId),
-                  eq(schema.lessonAccounts.courseId, existingContract.courseId),
-                ),
-              )
-              .limit(1)
-              .for('update');
-            if ((oldAccount?.balance ?? 0) + accountDelta < 0) {
-              throw httpError(422, '课时数不能低于已使用或已调整的课时数量');
-            }
-            await lessonRepo.applyLessonDelta(tx, {
-              studentId: existingContract.studentId,
-              courseId: existingContract.courseId,
-              type: 'adjustment',
-              amount: accountDelta,
-              relatedEntityType: identityChanged
-                ? 'course_contract_reassignment'
-                : 'course_contract',
-              relatedEntityId: courseContract.id,
-              courseContractId: courseContract.id,
-            });
-          }
-          if (identityChanged && nextRemainingLessonCount !== 0) {
-            await lessonRepo.applyLessonDelta(tx, {
-              studentId: nextStudentId,
-              courseId: nextCourseId,
-              type: 'adjustment',
-              amount: nextRemainingLessonCount,
-              relatedEntityType: 'course_contract_reassignment',
-              relatedEntityId: courseContract.id,
-              courseContractId: courseContract.id,
-            });
           }
 
           if (courseContract.orderId) {
@@ -470,6 +473,40 @@ export const courseContractsModule: AppModule = {
               .where(eq(schema.courseContractPaymentRecords.courseContractId, courseContract.id));
           }
 
+          await createAuditLog(tx, {
+            actorAccountId: request.account!.id,
+            institutionId: courseContract.institutionId,
+            requestId: request.id,
+            action: 'course_contract.updated',
+            resourceType: 'course_contract',
+            resourceId: courseContract.id,
+            summary: `修改课时包：${courseContract.title}`,
+            meta: {
+              before: {
+                title: existingContract.title,
+                classId: existingContract.classId,
+                lessonCount: existingContract.lessonCount,
+                remainingLessonCount: existingContract.remainingLessonCount,
+                paidAmount: existingContract.paidAmount,
+                startsAt: existingContract.startsAt,
+                endsAt: existingContract.endsAt,
+                note: existingContract.note,
+                revision: existingContract.revision,
+              },
+              after: {
+                title: courseContract.title,
+                classId: courseContract.classId,
+                lessonCount: courseContract.lessonCount,
+                remainingLessonCount: courseContract.remainingLessonCount,
+                paidAmount: courseContract.paidAmount,
+                startsAt: courseContract.startsAt,
+                endsAt: courseContract.endsAt,
+                note: courseContract.note,
+                revision: courseContract.revision,
+              },
+            },
+          });
+
           return {
             ...courseContract,
             student,
@@ -493,6 +530,7 @@ export const courseContractsModule: AppModule = {
           app.db,
           courseContractId,
           body.status,
+          { actorAccountId: request.account!.id, requestId: request.id },
         );
         return { courseContract };
       },

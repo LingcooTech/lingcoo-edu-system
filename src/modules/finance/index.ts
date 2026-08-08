@@ -187,6 +187,8 @@ export const financeModule: AppModule = {
         paymentReceiverName: body.paymentReceiverName,
         paymentMethod: body.paymentMethod,
         offlinePaymentNote: body.offlinePaymentNote,
+        actorAccountId: request.account!.id,
+        requestId: request.id,
       });
 
       return { order };
@@ -240,6 +242,8 @@ export const financeModule: AppModule = {
           paymentReceiverName,
           paymentMethod: body.paymentMethod,
           offlinePaymentNote: body.offlinePaymentNote,
+          actorAccountId: request.account!.id,
+          requestId: request.id,
         });
 
         return {

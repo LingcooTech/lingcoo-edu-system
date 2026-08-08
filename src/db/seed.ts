@@ -9,6 +9,7 @@ import { and, eq } from 'drizzle-orm';
 import { db, pool } from './client.js';
 import * as schema from './schema.js';
 import { hashPassword } from '../lib/password.js';
+import { applyLessonMovement } from './repositories/lesson-movements.js';
 
 async function findOne<T>(rows: Promise<T[]>): Promise<T | undefined> {
   return (await rows)[0];
@@ -364,49 +365,6 @@ async function seed(): Promise<void> {
     );
   }
 
-  let account = await findOne(
-    db
-      .select()
-      .from(schema.lessonAccounts)
-      .where(
-        and(
-          eq(schema.lessonAccounts.studentId, student!.id),
-          eq(schema.lessonAccounts.courseId, calligraphyCourseId),
-        ),
-      )
-      .limit(1),
-  );
-  if (!account) {
-    account = await findOne(
-      db
-        .insert(schema.lessonAccounts)
-        .values({
-          studentId: student!.id,
-          courseId: calligraphyCourseId,
-          balance: 11,
-        })
-        .returning(),
-    );
-    await db.insert(schema.lessonTransactions).values([
-      {
-        lessonAccountId: account!.id,
-        studentId: student!.id,
-        type: 'purchase',
-        amount: 12,
-        balanceAfter: 12,
-        relatedEntityType: 'order',
-      },
-      {
-        lessonAccountId: account!.id,
-        studentId: student!.id,
-        type: 'consume',
-        amount: -1,
-        balanceAfter: 11,
-        relatedEntityType: 'class_session',
-      },
-    ]);
-  }
-
   const order = await findOne(
     db.select().from(schema.orders).where(eq(schema.orders.orderNo, 'EDU202605280001')).limit(1),
   );
@@ -420,6 +378,51 @@ async function seed(): Promise<void> {
       lessonCount: 12,
       status: 'paid',
       paidAt: new Date(),
+    });
+  }
+
+  let contract = await findOne(
+    db
+      .select()
+      .from(schema.courseContracts)
+      .where(
+        and(
+          eq(schema.courseContracts.studentId, student!.id),
+          eq(schema.courseContracts.courseId, calligraphyCourseId),
+          eq(schema.courseContracts.title, '硬笔书法基础班演示课时包'),
+        ),
+      )
+      .limit(1),
+  );
+  if (!contract) {
+    contract = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(schema.courseContracts)
+        .values({
+          studentId: student!.id,
+          institutionId: null,
+          courseId: calligraphyCourseId,
+          contractNo: `SEED-${Date.now()}`,
+          title: '硬笔书法基础班演示课时包',
+          lessonCount: 12,
+          remainingLessonCount: 0,
+          paidAmount: 128000,
+          paymentMethod: 'seed',
+          paymentReceiverType: 'platform',
+          status: 'active',
+          origin: 'seed',
+        })
+        .returning();
+      const result = await applyLessonMovement(tx, {
+        courseContractId: created.id,
+        studentId: student!.id,
+        operationId: `seed:${created.id}:grant`,
+        type: 'grant',
+        units: 12,
+        occurredAt: created.createdAt,
+        reason: '演示数据课时包发放',
+      });
+      return result.contract;
     });
   }
 

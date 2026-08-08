@@ -137,17 +137,18 @@ export const parentCenterModule: AppModule = {
     }
 
     async function assertCourseBelongsToStudent(studentId: string, courseId: string) {
-      const [lessonAccount] = await app.db
-        .select({ id: schema.lessonAccounts.id })
-        .from(schema.lessonAccounts)
+      const [lessonPackage] = await app.db
+        .select({ id: schema.courseContracts.id })
+        .from(schema.courseContracts)
         .where(
           and(
-            eq(schema.lessonAccounts.studentId, studentId),
-            eq(schema.lessonAccounts.courseId, courseId),
+            eq(schema.courseContracts.studentId, studentId),
+            eq(schema.courseContracts.courseId, courseId),
+            ne(schema.courseContracts.status, 'cancelled'),
           ),
         )
         .limit(1);
-      if (lessonAccount) {
+      if (lessonPackage) {
         return;
       }
 
@@ -433,31 +434,22 @@ export const parentCenterModule: AppModule = {
     });
 
     app.get('/public/me/lesson-accounts', { preHandler: app.requireParent }, async (request) => {
-      await courseContractsRepo.expirePeriodPackageContracts(app.db);
       const { students } = await resolveChildren(request.account!.id);
       const studentIds = students.map((s) => s.id);
       if (studentIds.length === 0) {
         return { lessonAccounts: [] };
       }
-      const [contracts, courses, legacyAccounts] = await Promise.all([
+      const [contracts, courses] = await Promise.all([
         courseContractsRepo.listCourseContracts(app.db),
         catalogRepo.listCourses(app.db),
-        app.db
-          .select()
-          .from(schema.lessonAccounts)
-          .where(inArray(schema.lessonAccounts.studentId, studentIds)),
       ]);
       const studentById = new Map(students.map((s) => [s.id, s]));
       const courseById = new Map(courses.map((course) => [course.id, course]));
       const visibleContracts = contracts.filter(
         (contract) => studentById.has(contract.studentId) && contract.status !== 'cancelled',
       );
-      const contractAccountKeys = new Set(
-        visibleContracts.map((contract) => `${contract.studentId}:${contract.courseId}`),
-      );
       return {
-        lessonAccounts: [
-          ...visibleContracts.map((contract) => ({
+        lessonAccounts: visibleContracts.map((contract) => ({
             id: contract.id,
             courseContractId: contract.id,
             studentId: contract.studentId,
@@ -490,32 +482,6 @@ export const parentCenterModule: AppModule = {
                   }
                 : null,
           })),
-          ...legacyAccounts
-            .filter(
-              (account) => !contractAccountKeys.has(`${account.studentId}:${account.courseId}`),
-            )
-            .map((account) => ({
-              id: account.id,
-              courseContractId: account.id,
-              studentId: account.studentId,
-              courseId: account.courseId,
-              title: '历史课时账户',
-              packageId: null,
-              packageName: '历史课时账户',
-              billingType: 'lesson',
-              balance: account.balance,
-              lessonCount: account.balance,
-              consumedLessonCount: 0,
-              startsAt: null,
-              endsAt: null,
-              status: 'active',
-              updatedAt: account.updatedAt,
-              student: studentById.get(account.studentId),
-              course: courseById.get(account.courseId) ?? null,
-              package: null,
-              periodPackage: null,
-            })),
-        ],
       };
     });
 
@@ -940,6 +906,8 @@ export const parentCenterModule: AppModule = {
             },
           ],
           completeSession: false,
+          actorAccountId: request.account!.id,
+          requestId: request.id,
         });
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,

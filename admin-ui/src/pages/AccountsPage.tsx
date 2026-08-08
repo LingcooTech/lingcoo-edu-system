@@ -2,7 +2,14 @@ import { useMemo, useState } from 'react';
 import { KeyRound, Pencil, Plus, Trash2, Unlink } from 'lucide-react';
 
 import { apiDelete, apiPatch, apiPost } from '@/api/client';
-import type { Account, AccountRole, Guardian, Teacher, TeacherPermissions } from '@/api/types';
+import type {
+  Account,
+  AccountRole,
+  Guardian,
+  Institution,
+  Teacher,
+  TeacherPermissions,
+} from '@/api/types';
 import { PageFrame } from '@/components/layout/PageFrame';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AdminTabs, type AdminTabItem } from '@/components/shared/AdminTabs';
@@ -17,6 +24,7 @@ const ACCOUNTS = () => '/v1/accounts';
 
 const ROLE_LABEL: Record<AccountRole, string> = {
   admin: '管理员',
+  institution_admin: '机构负责人',
   teacher: '老师',
   parent: '家长',
 };
@@ -32,6 +40,7 @@ interface AccountForm {
   status: 'active' | 'suspended';
   teacherId: string;
   guardianId: string;
+  institutionId: string;
   password: string;
   teacherPermissions: TeacherPermissions;
 }
@@ -69,6 +78,7 @@ const emptyForm: AccountForm = {
   status: 'active',
   teacherId: '',
   guardianId: '',
+  institutionId: '',
   password: '',
   teacherPermissions: emptyTeacherPermissions,
 };
@@ -102,6 +112,10 @@ function accountToForm(account: Account): AccountForm {
     status: account.status,
     teacherId: account.teacherId ?? '',
     guardianId: account.guardianId ?? '',
+    institutionId:
+      (account.roleAssignments ?? account.roles ?? []).find(
+        (assignment) => assignment.role === 'institution_admin',
+      )?.institutionId ?? '',
     password: '',
     teacherPermissions: {
       ...emptyTeacherPermissions,
@@ -121,6 +135,9 @@ function buildPayload(form: AccountForm, includePassword: boolean) {
     status: form.status,
     teacherId: form.roles.includes('teacher') ? form.teacherId || undefined : null,
     guardianId: form.roles.includes('parent') ? form.guardianId || undefined : null,
+    institutionId: form.roles.includes('institution_admin')
+      ? form.institutionId || undefined
+      : null,
     teacherPermissions: form.roles.includes('teacher') ? form.teacherPermissions : undefined,
     ...(includePassword && form.password.trim() ? { password: form.password.trim() } : {}),
   };
@@ -131,6 +148,7 @@ export function AccountsPage() {
   const { data: accounts, setData: setAccounts } = useApiResource<Account>(ACCOUNTS(), 'accounts');
   const { data: teachers } = useApiResource<Teacher>('/v1/teachers', 'teachers');
   const { data: guardians } = useApiResource<Guardian>('/v1/guardians', 'guardians');
+  const { data: institutions } = useApiResource<Institution>('/v1/institutions', 'institutions');
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
@@ -150,6 +168,8 @@ export function AccountsPage() {
     () => ({
       all: accounts.length,
       admin: accounts.filter((account) => accountHasRole(account, 'admin')).length,
+      institution_admin: accounts.filter((account) => accountHasRole(account, 'institution_admin'))
+        .length,
       teacher: accounts.filter((account) => accountHasRole(account, 'teacher')).length,
       parent: accounts.filter((account) => accountHasRole(account, 'parent')).length,
     }),
@@ -160,6 +180,11 @@ export function AccountsPage() {
     () => [
       { key: 'all', label: '全部账号', badge: roleCounts.all },
       { key: 'admin', label: ROLE_LABEL.admin, badge: roleCounts.admin },
+      {
+        key: 'institution_admin',
+        label: ROLE_LABEL.institution_admin,
+        badge: roleCounts.institution_admin,
+      },
       { key: 'teacher', label: ROLE_LABEL.teacher, badge: roleCounts.teacher },
       { key: 'parent', label: ROLE_LABEL.parent, badge: roleCounts.parent },
     ],
@@ -192,31 +217,56 @@ export function AccountsPage() {
   function choosePrimaryRole(role: AccountRole) {
     setForm((current) => {
       if (role === 'parent') {
-        return { ...current, role, roles: ['parent'], teacherId: '' };
+        return { ...current, role, roles: ['parent'], teacherId: '', institutionId: '' };
       }
       const roles = current.roles.includes(role)
         ? current.roles.filter((item) => item !== 'parent')
         : [...current.roles.filter((item) => item !== 'parent'), role];
-      return { ...current, role, roles: roles.length ? roles : [role], guardianId: '' };
+      const nextRoles = roles.length ? roles : [role];
+      return {
+        ...current,
+        role,
+        roles: nextRoles,
+        guardianId: '',
+        institutionId: nextRoles.includes('institution_admin') ? current.institutionId : '',
+      };
     });
   }
 
   function toggleRole(role: AccountRole) {
     setForm((current) => {
       if (role === 'parent') {
-        return { ...current, role: 'parent', roles: ['parent'], teacherId: '' };
+        return {
+          ...current,
+          role: 'parent',
+          roles: ['parent'],
+          teacherId: '',
+          institutionId: '',
+        };
       }
 
-      const staffRoles = current.roles.filter((item) => item === 'admin' || item === 'teacher');
+      const staffRoles = current.roles.filter(
+        (item) => item === 'admin' || item === 'institution_admin' || item === 'teacher',
+      );
       const roles = staffRoles.includes(role)
         ? staffRoles.filter((item) => item !== role)
         : [...staffRoles, role];
       const nextRoles = roles.length ? roles : [role];
       const currentStaffRole =
-        current.role === 'admin' || current.role === 'teacher' ? current.role : null;
+        current.role === 'admin' ||
+        current.role === 'institution_admin' ||
+        current.role === 'teacher'
+          ? current.role
+          : null;
       const nextPrimary =
         currentStaffRole && nextRoles.includes(currentStaffRole) ? currentStaffRole : nextRoles[0];
-      return { ...current, role: nextPrimary, roles: nextRoles, guardianId: '' };
+      return {
+        ...current,
+        role: nextPrimary,
+        roles: nextRoles,
+        guardianId: '',
+        institutionId: nextRoles.includes('institution_admin') ? current.institutionId : '',
+      };
     });
   }
 
@@ -235,6 +285,10 @@ export function AccountsPage() {
     }
     if (form.roles.includes('teacher') && !form.teacherId) {
       toast.error('老师账号必须关联老师档案');
+      return;
+    }
+    if (form.roles.includes('institution_admin') && !form.institutionId) {
+      toast.error('机构负责人账号必须选择所属机构');
       return;
     }
 
@@ -308,15 +362,15 @@ export function AccountsPage() {
     }
   }
 
-  async function deleteAccount() {
+  async function suspendAccount() {
     if (!deleteTarget) return;
     try {
       const { account } = await apiDelete<{ account: Account }>(`${ACCOUNTS()}/${deleteTarget.id}`);
-      setAccounts(accounts.filter((item) => item.id !== account.id));
+      setAccounts(accounts.map((item) => (item.id === account.id ? account : item)));
       setDeleteTarget(null);
-      toast.success('账号已删除');
+      toast.success('账号已停用');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '删除失败');
+      toast.error(err instanceof Error ? err.message : '停用失败');
     }
   }
 
@@ -350,6 +404,16 @@ export function AccountsPage() {
             ),
           },
           { key: 'role', header: '身份', cell: (row) => roleListLabel(row) },
+          {
+            key: 'institution',
+            header: '所属机构',
+            cell: (row) => {
+              const institutionId = row.roleAssignments?.find(
+                (assignment) => assignment.role === 'institution_admin',
+              )?.institutionId;
+              return institutions.find((institution) => institution.id === institutionId)?.name ?? '-';
+            },
+          },
           {
             key: 'link',
             header: '关联档案',
@@ -425,7 +489,7 @@ export function AccountsPage() {
                   onClick={() => setDeleteTarget(row)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  删除
+                  停用
                 </button>
               </div>
             ),
@@ -438,7 +502,7 @@ export function AccountsPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? '编辑账号' : '开通账号'}
-        description="统一身份入口：管理员、老师、家长共用同一登录接口。"
+        description="统一身份入口：管理员、机构负责人、老师和家长共用同一登录接口。"
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
@@ -463,6 +527,7 @@ export function AccountsPage() {
               onChange={(event) => choosePrimaryRole(event.target.value as AccountRole)}
             >
               <option value="admin">管理员</option>
+              <option value="institution_admin">机构负责人</option>
               <option value="teacher">老师</option>
               <option value="parent">家长</option>
             </select>
@@ -485,8 +550,8 @@ export function AccountsPage() {
           hint="管理员和老师可以同时开通；家长身份保持独立，不参与工作台切换"
           required
         >
-          <div className="grid grid-cols-3 gap-2">
-            {(['admin', 'teacher', 'parent'] as AccountRole[]).map((role) => (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(['admin', 'institution_admin', 'teacher', 'parent'] as AccountRole[]).map((role) => (
               <label
                 key={role}
                 className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700"
@@ -534,6 +599,22 @@ export function AccountsPage() {
             />
           </Field>
         )}
+        {form.roles.includes('institution_admin') && (
+          <Field label="所属机构" required>
+            <select
+              className="form-input"
+              value={form.institutionId}
+              onChange={(event) => setForm({ ...form, institutionId: event.target.value })}
+            >
+              <option value="">请选择机构</option>
+              {institutions
+                .filter((institution) => institution.status === 'active')
+                .map((institution) => (
+                  <option key={institution.id} value={institution.id}>{institution.name}</option>
+                ))}
+            </select>
+          </Field>
+        )}
         {form.roles.includes('teacher') && (
           <>
             <Field label="关联老师档案" required>
@@ -553,14 +634,15 @@ export function AccountsPage() {
             <Field
               label="老师工作台权限"
               hint={
-                form.roles.includes('admin')
-                  ? '管理员 + 老师双重身份默认拥有全部权限'
+                form.roles.includes('admin') || form.roles.includes('institution_admin')
+                  ? '管理身份 + 老师双重身份默认拥有全部教学权限'
                   : '普通授课老师按需开通'
               }
             >
               <div className="grid gap-2 sm:grid-cols-2">
                 {teacherPermissionOptions.map((permission) => {
-                  const adminTeacher = form.roles.includes('admin');
+                  const adminTeacher =
+                    form.roles.includes('admin') || form.roles.includes('institution_admin');
                   return (
                     <label
                       key={permission.key}
@@ -613,12 +695,12 @@ export function AccountsPage() {
       </Drawer>
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="删除账号？"
-        message={`确认删除「${deleteTarget?.displayName ?? ''}」？该账号将无法继续登录。`}
-        confirmLabel="删除"
+        title="停用账号？"
+        message={`确认停用「${deleteTarget?.displayName ?? ''}」？账号和历史审计记录会保留，但无法继续登录。`}
+        confirmLabel="停用"
         danger
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={deleteAccount}
+        onConfirm={suspendAccount}
       />
     </PageFrame>
   );

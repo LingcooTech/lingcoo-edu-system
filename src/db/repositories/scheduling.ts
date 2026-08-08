@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lte, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -666,7 +666,6 @@ export async function createEnrollment(
       courseId: enrollment.billingCourseId,
       source: 'enrollment',
     });
-    await syncEnrollmentToCourseContracts(db, enrollment);
     return enrollment;
   }
 
@@ -677,25 +676,7 @@ export async function createEnrollment(
     courseId: enrollment.billingCourseId,
     source: 'enrollment',
   });
-  await syncEnrollmentToCourseContracts(db, enrollment);
   return enrollment;
-}
-
-async function syncEnrollmentToCourseContracts(
-  db: Database,
-  enrollment: typeof schema.classEnrollments.$inferSelect,
-) {
-  await db
-    .update(schema.courseContracts)
-    .set({ classId: enrollment.classId, updatedAt: new Date() })
-    .where(
-      and(
-        eq(schema.courseContracts.studentId, enrollment.studentId),
-        eq(schema.courseContracts.courseId, enrollment.billingCourseId),
-        eq(schema.courseContracts.status, 'active'),
-        isNull(schema.courseContracts.classId),
-      ),
-    );
 }
 
 async function ensureSessionRosterSnapshot(db: Database, sessionId: string) {
@@ -783,7 +764,6 @@ export async function updateEnrollmentBillingAccount(
       courseId: enrollment.billingCourseId,
       source: 'enrollment',
     });
-    await syncEnrollmentToCourseContracts(db, enrollment);
   }
   return enrollment ?? null;
 }
@@ -887,16 +867,5 @@ export async function removeEnrollment(
       });
     }
   }
-  await db
-    .update(schema.courseContracts)
-    .set({ classId: null, updatedAt: new Date() })
-    .where(
-      and(
-        eq(schema.courseContracts.studentId, current.studentId),
-        eq(schema.courseContracts.courseId, current.billingCourseId),
-        eq(schema.courseContracts.classId, classId),
-        eq(schema.courseContracts.status, 'active'),
-      ),
-    );
   return enrollment ?? null;
 }

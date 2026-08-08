@@ -26,6 +26,7 @@ function sectionPrefix(path: string) {
 
 const ROLE_LABEL: Record<string, string> = {
   admin: '管理员',
+  institution_admin: '机构负责人',
   teacher: '老师',
   parent: '家长',
 };
@@ -44,19 +45,30 @@ export function Sidebar({
   showCollapseToggle?: boolean;
 }) {
   const location = useLocation();
+  const visibleSections = useMemo(() => {
+    if (account.role !== 'institution_admin') return adminSections;
+    return adminSections
+      .filter((section) => section.key === 'operations')
+      .map((section) => ({
+        ...section,
+        path: '/operations/lessons',
+        items: section.items.filter((item) => item.key === 'lessons' || item.key === 'auditLogs'),
+      }));
+  }, [account.role]);
   const brandName = organization?.brandName || organization?.name || 'lingcoo-edu-system';
   const fullLogoUrl = organization?.branding.fullLogoUrl || organization?.branding.logoUrl || '';
   const squareLogoUrl =
     organization?.branding.squareLogoUrl || organization?.branding.logoUrl || fullLogoUrl;
   const activeSection = useMemo(
     () =>
-      adminSections.find((section) => location.pathname.startsWith(sectionPrefix(section.path))) ??
-      adminSections[0],
-    [location.pathname],
+      visibleSections.find((section) =>
+        location.pathname.startsWith(sectionPrefix(section.path)),
+      ) ?? visibleSections[0],
+    [location.pathname, visibleSections],
   );
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
-      adminSections.map((section) => [section.key, section.key === activeSection.key]),
+      visibleSections.map((section) => [section.key, section.key === activeSection.key]),
     ),
   );
 
@@ -135,7 +147,7 @@ export function Sidebar({
       </div>
 
       <ScrollArea className={cn('flex-1 px-2', collapsed && 'pt-2')}>
-        {adminSections.map((section) => {
+        {visibleSections.map((section) => {
           const isExpanded = expanded[section.key] ?? false;
           const hasChildren = section.items.length > 0;
           const isActiveSection = activeSection.key === section.key;

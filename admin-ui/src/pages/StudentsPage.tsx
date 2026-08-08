@@ -29,7 +29,7 @@ const STUDENT_TABS = [
   { key: 'profiles', label: '学员档案' },
   { key: 'history', label: '历史档案' },
   { key: 'parentAccounts', label: '家长账号' },
-  { key: 'lessonAccounts', label: '课时账户' },
+  { key: 'lessonAccounts', label: '课时包' },
   { key: 'courseContracts', label: '正式课程档案' },
 ] as const;
 type StudentTab = (typeof STUDENT_TABS)[number]['key'];
@@ -842,7 +842,7 @@ export function StudentsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm">暂无课时账户</p>
+                <p className="text-muted-foreground text-sm">暂无课时包</p>
               )}
             </section>
             <section className="resource-card p-4">
@@ -863,9 +863,16 @@ export function StudentsPage() {
                           {record.className || record.courseName}
                         </div>
                         <div className="text-muted-foreground mt-1 text-xs">
-                          课包：{record.packageName ?? record.contractTitle ?? '历史课时账户'}
+                          课时包：{record.packageName ?? record.contractTitle ?? '历史课时包'}
                           {record.lessonDelta < 0
-                            ? ` · 扣 ${-record.lessonDelta} 课时`
+                            ? ` · 扣 ${-record.lessonDelta} 课时 · 扣后余额 ${
+                                record.balanceAfter !== null &&
+                                record.balanceAfter !== undefined &&
+                                record.lessonCount !== null &&
+                                record.lessonCount !== undefined
+                                  ? `${record.balanceAfter} / ${record.lessonCount} 节`
+                                  : '暂无课包流水'
+                              }`
                             : ' · 未扣课'}
                         </div>
                       </div>
@@ -904,7 +911,7 @@ export function StudentsPage() {
       <ConfirmDialog
         open={Boolean(hardDeleteTarget)}
         title="永久删除学员？"
-        message={`确认永久删除「${hardDeleteTarget?.name ?? ''}」及其全部相关数据？此操作不可撤销，包括订单、课程合约、课时账户等所有数据都将被删除。`}
+        message={`确认永久删除「${hardDeleteTarget?.name ?? ''}」及其全部相关数据？此操作不可撤销，包括订单、课时包及消费流水等所有数据都将被删除。`}
         confirmLabel="永久删除"
         danger
         busy={hardDeleting}

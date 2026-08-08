@@ -156,6 +156,7 @@ const teacherAttendanceSchema = z.object({
       status: z.enum(['present', 'late', 'leave', 'absent', 'makeup', 'trial']),
       note: z.string().optional(),
       deductLesson: z.boolean().optional(),
+      courseContractId: z.string().uuid().nullable().optional(),
     }),
   ),
 });
@@ -522,25 +523,10 @@ export const teachingModule: AppModule = {
       };
     }
 
-    function consumedLessonsByAccountId(
-      transactions: (typeof schema.lessonTransactions.$inferSelect)[],
-    ) {
-      const consumed = new Map<string, number>();
-      for (const transaction of transactions) {
-        if (transaction.type !== 'consume') continue;
-        consumed.set(
-          transaction.lessonAccountId,
-          (consumed.get(transaction.lessonAccountId) ?? 0) - transaction.amount,
-        );
-      }
-      return consumed;
-    }
+    type LessonAccountView = Awaited<ReturnType<typeof lessonRepo.listLessonAccounts>>[number];
 
-    function totalLessonsForAccount(
-      account: typeof schema.lessonAccounts.$inferSelect,
-      consumedByAccountId: Map<string, number>,
-    ) {
-      return account.balance + Math.max(0, consumedByAccountId.get(account.id) ?? 0);
+    function totalLessonsForAccount(account: LessonAccountView) {
+      return account.lessonCount;
     }
 
     async function ensureSessionRosterSnapshot(sessionId: string) {
@@ -1069,14 +1055,11 @@ export const teachingModule: AppModule = {
           requireTeacherPermission(access.permissions, 'enrollStudents');
         }
 
-        const [course, classroom, students, lessonAccounts, allClasses] = await Promise.all([
+        const [course, classroom, students, allLessonAccounts, allClasses] = await Promise.all([
           catalogRepo.requireCourse(app.db, body.courseId),
           teachingRepo.findClassroom(app.db, body.classroomId),
           peopleRepo.listStudents(app.db, { scope: 'all' }),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(eq(schema.lessonAccounts.courseId, body.courseId)),
+          lessonRepo.listLessonAccounts(app.db),
           schedulingRepo.listClasses(app.db),
         ]);
         if (course.status !== 'published') {
@@ -1102,6 +1085,7 @@ export const teachingModule: AppModule = {
         }
 
         const studentById = new Map(students.map((student) => [student.id, student]));
+        const lessonAccounts = allLessonAccounts.filter((account) => account.courseId === body.courseId);
         const accountStudentIds = new Set(lessonAccounts.map((account) => account.studentId));
         for (const studentId of studentIds) {
           const student = studentById.get(studentId);
@@ -1203,7 +1187,7 @@ export const teachingModule: AppModule = {
           organizationRepo.findCampus(app.db, classGroup.campusId),
           schedulingRepo.listEnrollments(app.db, classGroup.id),
           peopleRepo.listStudents(app.db, { scope: 'all' }),
-          app.db.select().from(schema.lessonAccounts),
+          lessonRepo.listLessonAccounts(app.db),
           schedulingRepo.listClassCourseAssociations(app.db, [classGroup.id]),
         ]);
         requireCourseInTeacherInstitution(course, dataScope.institutionId);
@@ -1344,18 +1328,16 @@ export const teachingModule: AppModule = {
         const billingCourseId = body.billingCourseId ?? classGroup.courseId;
         const billingCourse = await catalogRepo.requireCourse(app.db, billingCourseId);
         requireCourseInTeacherInstitution(billingCourse, dataScope.institutionId);
-        const [lessonAccount] = await app.db
-          .select()
-          .from(schema.lessonAccounts)
-          .where(
-            and(
-              eq(schema.lessonAccounts.studentId, body.studentId),
-              eq(schema.lessonAccounts.courseId, billingCourseId),
-            ),
-          )
-          .limit(1);
-        if (!lessonAccount) {
+        const billingPackages = (await lessonRepo.listLessonAccounts(app.db)).filter(
+          (item) => item.studentId === body.studentId && item.courseId === billingCourseId,
+        );
+        if (billingPackages.length === 0) {
           throw Object.assign(new Error('该学员暂无所选扣课档案'), { statusCode: 422 });
+        }
+        if (billingPackages.filter((item) => item.status === 'active').length > 1) {
+          throw Object.assign(new Error('该学员有多个可用课时包，请先明确绑定课时包'), {
+            statusCode: 422,
+          });
         }
         const otherClassEnrollments = (
           await Promise.all(
@@ -1495,10 +1477,9 @@ export const teachingModule: AppModule = {
 
         const [classes, lessonAccounts, courses] = await Promise.all([
           schedulingRepo.listClasses(app.db),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(eq(schema.lessonAccounts.studentId, studentId)),
+          lessonRepo.listLessonAccounts(app.db).then((rows) =>
+            rows.filter((item) => item.studentId === studentId),
+          ),
           catalogRepo.listCourses(app.db),
         ]);
         const institutionCourseIds = new Set(
@@ -1574,21 +1555,16 @@ export const teachingModule: AppModule = {
       if (invitation.expiresAt <= new Date())
         throw httpError(410, '邀请已过期，请联系老师重新发送');
 
-      const [student, institution, lessonAccounts, courses, transactions, contracts] =
+      const [student, institution, lessonAccounts, courses, contracts] =
         await Promise.all([
           peopleRepo.findStudent(app.db, invitation.studentId),
           invitation.institutionId
             ? teachingRepo.findInstitution(app.db, invitation.institutionId)
             : Promise.resolve(null),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(eq(schema.lessonAccounts.studentId, invitation.studentId)),
+          lessonRepo.listLessonAccounts(app.db).then((rows) =>
+            rows.filter((item) => item.studentId === invitation.studentId),
+          ),
           catalogRepo.listCourses(app.db),
-          app.db
-            .select()
-            .from(schema.lessonTransactions)
-            .where(eq(schema.lessonTransactions.studentId, invitation.studentId)),
           app.db
             .select({
               id: schema.courseContracts.id,
@@ -1619,7 +1595,6 @@ export const teachingModule: AppModule = {
           .filter((course) => courseBelongsToTeacherInstitution(course, invitation.institutionId))
           .map((course) => course.id),
       );
-      const consumedByAccountId = consumedLessonsByAccountId(transactions);
       return {
         institution: institution
           ? { id: institution.id, name: institution.name, logoUrl: institution.logoUrl }
@@ -1647,7 +1622,7 @@ export const teachingModule: AppModule = {
               courseName: courseById.get(account.courseId)?.name ?? '课程',
               packageName: currentContract?.packageName ?? '课程档案',
               balance: account.balance,
-              totalLessons: totalLessonsForAccount(account, consumedByAccountId),
+              totalLessons: totalLessonsForAccount(account),
               startsAt: currentContract?.startsAt ?? null,
               endsAt: currentContract?.endsAt ?? null,
             };
@@ -1836,7 +1811,7 @@ export const teachingModule: AppModule = {
       return {
         ok: true,
         authToken,
-        message: '课时账户与家长资料已确认',
+        message: '课时包与家长资料已确认',
       };
     });
 
@@ -1878,7 +1853,7 @@ export const teachingModule: AppModule = {
         const query = teacherStudentSearchSchema.parse(request.query);
         const [students, lessonAccounts, courses, classes] = await Promise.all([
           peopleRepo.listStudents(app.db, { scope: 'all' }),
-          app.db.select().from(schema.lessonAccounts),
+          lessonRepo.listLessonAccounts(app.db),
           catalogRepo.listCourses(app.db),
           schedulingRepo.listClasses(app.db),
         ]);
@@ -1898,22 +1873,6 @@ export const teachingModule: AppModule = {
             .filter((course) => courseBelongsToTeacherInstitution(course, dataScope.institutionId))
             .map((course) => course.id),
         );
-        const institutionLessonAccountIds = lessonAccounts
-          .filter((lessonAccount) => institutionCourseIds.has(lessonAccount.courseId))
-          .map((lessonAccount) => lessonAccount.id);
-        const lessonTransactions =
-          institutionLessonAccountIds.length > 0
-            ? await app.db
-                .select()
-                .from(schema.lessonTransactions)
-                .where(
-                  and(
-                    eq(schema.lessonTransactions.type, 'consume'),
-                    inArray(schema.lessonTransactions.lessonAccountId, institutionLessonAccountIds),
-                  ),
-                )
-            : [];
-        const consumedByLessonAccountId = consumedLessonsByAccountId(lessonTransactions);
         const institutionClasses = classes.filter(
           (classGroup) =>
             institutionTeacherIds.has(classGroup.teacherId) &&
@@ -1973,7 +1932,7 @@ export const teachingModule: AppModule = {
                 id: account.id,
                 courseId: account.courseId,
                 balance: account.balance,
-                totalLessons: totalLessonsForAccount(account, consumedByLessonAccountId),
+                totalLessons: totalLessonsForAccount(account),
                 courseName: courseById.get(account.courseId)?.name ?? '课程',
               })),
           })),
@@ -2065,7 +2024,7 @@ export const teachingModule: AppModule = {
           catalogRepo.requireCourse(app.db, body.courseId),
           teachingRepo.findClassroom(app.db, body.classroomId),
           peopleRepo.listStudents(app.db, { scope: 'all' }),
-          app.db.select().from(schema.lessonAccounts),
+          lessonRepo.listLessonAccounts(app.db),
           catalogRepo.listCourses(app.db),
         ]);
         if (course.status === 'archived' || (!classGroup && course.status !== 'published')) {
@@ -2270,7 +2229,7 @@ export const teachingModule: AppModule = {
           schedulingRepo.listSessionRoster(app.db, sessionId),
           peopleRepo.listStudents(app.db, { scope: 'all' }),
           catalogRepo.listCourses(app.db),
-          app.db.select().from(schema.lessonAccounts),
+          lessonRepo.listLessonAccounts(app.db),
           attendanceRepo.listAttendanceForSession(app.db, sessionId),
         ]);
         const visibleCourses = courses.filter((item) =>
@@ -2452,16 +2411,11 @@ export const teachingModule: AppModule = {
         const [student, billingCourse, lessonAccount] = await Promise.all([
           peopleRepo.requireStudent(app.db, body.studentId),
           catalogRepo.requireCourse(app.db, billingCourseId),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(
-              and(
-                eq(schema.lessonAccounts.studentId, body.studentId),
-                eq(schema.lessonAccounts.courseId, billingCourseId),
-              ),
-            )
-            .limit(1),
+          lessonRepo.listLessonAccounts(app.db).then((rows) =>
+            rows.filter(
+              (item) => item.studentId === body.studentId && item.courseId === billingCourseId,
+            ),
+          ),
         ]);
         requireCourseInTeacherInstitution(billingCourse, dataScope.institutionId);
         if (student.status !== 'active' || lessonAccount.length === 0) {
@@ -2565,7 +2519,6 @@ export const teachingModule: AppModule = {
       '/public/teacher/dashboard',
       { preHandler: app.requireRole('teacher') },
       async (request) => {
-        await courseContractsRepo.expirePeriodPackageContracts(app.db);
         const access = await requireTeacherAccessForAccount(request.account!.id);
         const account = { ...access.account, teacherId: access.teacherId };
         const dataScope = await resolveTeacherDataScope(access);
@@ -2594,7 +2547,7 @@ export const teachingModule: AppModule = {
           peopleRepo.listGuardians(app.db),
           accountsRepo.listAccounts(app.db),
           app.db.select().from(schema.attendanceRecords),
-          app.db.select().from(schema.lessonAccounts),
+          lessonRepo.listLessonAccounts(app.db),
           app.db
             .select({
               id: schema.courseContracts.id,
@@ -3068,18 +3021,16 @@ export const teachingModule: AppModule = {
         const billingCourseId = body.billingCourseId ?? classGroup.courseId;
         const billingCourse = await catalogRepo.requireCourse(app.db, billingCourseId);
         requireCourseInTeacherInstitution(billingCourse, dataScope.institutionId);
-        const [lessonAccount] = await app.db
-          .select()
-          .from(schema.lessonAccounts)
-          .where(
-            and(
-              eq(schema.lessonAccounts.studentId, studentId),
-              eq(schema.lessonAccounts.courseId, billingCourseId),
-            ),
-          )
-          .limit(1);
-        if (!lessonAccount) {
+        const lessonAccounts = (await lessonRepo.listLessonAccounts(app.db)).filter(
+          (item) => item.studentId === studentId && item.courseId === billingCourseId,
+        );
+        if (lessonAccounts.length === 0) {
           throw Object.assign(new Error('该学员暂无所选扣课档案'), { statusCode: 422 });
+        }
+        if (lessonAccounts.filter((item) => item.status === 'active').length > 1) {
+          throw Object.assign(new Error('该学员有多个可用课时包，请先明确绑定课时包'), {
+            statusCode: 422,
+          });
         }
 
         const otherClassEnrollments = (
@@ -3311,10 +3262,9 @@ export const teachingModule: AppModule = {
           schedulingRepo.listClasses(app.db),
           catalogRepo.listCourses(app.db),
           teachingRepo.listClassrooms(app.db),
-          app.db
-            .select()
-            .from(schema.lessonAccounts)
-            .where(eq(schema.lessonAccounts.studentId, input.studentId)),
+          lessonRepo.listLessonAccounts(app.db).then((rows) =>
+            rows.filter((item) => item.studentId === input.studentId),
+          ),
           schedulingRepo.listClassCourseAssociations(app.db),
         ]);
 
@@ -3744,6 +3694,9 @@ export const teachingModule: AppModule = {
         const body = teacherAttendanceSchema.parse(request.body);
         const rosterEntries = await schedulingRepo.listSessionRoster(app.db, sessionId);
         const billingCourseMap = billingCourseByStudentId(rosterEntries);
+        const billingContractMap = new Map(
+          rosterEntries.map((entry) => [entry.studentId, entry.billingCourseContractId]),
+        );
         const rosterStudentIds = new Set(rosterEntries.map((entry) => entry.studentId));
         const invalidRecord = body.records.find(
           (record) => !rosterStudentIds.has(record.studentId),
@@ -3769,9 +3722,13 @@ export const teachingModule: AppModule = {
                 records: newRecords.map((record) => ({
                   ...record,
                   courseId: billingCourseMap.get(record.studentId),
+                  courseContractId:
+                    record.courseContractId ?? billingContractMap.get(record.studentId) ?? null,
                   lessonUnits: session.lessonUnits,
                 })),
                 completeSession: false,
+                actorAccountId: request.account!.id,
+                requestId: request.id,
               })
             : [];
         const correctedResults: NonNullable<
@@ -3788,32 +3745,15 @@ export const teachingModule: AppModule = {
             deductLesson: record.deductLesson,
             lessonUnits: session.lessonUnits,
             courseId: billingCourseId,
+            courseContractId:
+              record.courseContractId ?? billingContractMap.get(record.studentId) ?? undefined,
+            actorAccountId: request.account!.id,
+            requestId: request.id,
           });
           if (result) correctedResults.push(result);
         }
         const correctedRecords = correctedResults.map((result) => result.attendanceRecord);
         const attendanceRecords = [...createdRecords, ...correctedRecords];
-        for (const record of attendanceRecords) {
-          const billingCourseId = billingCourseMap.get(record.studentId) ?? session.courseId;
-          const [contract] = await app.db
-            .select()
-            .from(schema.courseContracts)
-            .where(
-              and(
-                eq(schema.courseContracts.studentId, record.studentId),
-                eq(schema.courseContracts.courseId, billingCourseId),
-                eq(schema.courseContracts.status, 'active'),
-              ),
-            )
-            .limit(1);
-          if (contract) {
-            await lessonRepo.checkAndCompleteCourseContract(app.db, {
-              studentId: record.studentId,
-              courseId: billingCourseId,
-              contractId: contract.id,
-            });
-          }
-        }
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
           records: [

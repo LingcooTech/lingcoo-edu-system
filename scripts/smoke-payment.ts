@@ -3,13 +3,14 @@
 // notification) + the transactional finance repo. Safe to re-run.
 //
 //   npx tsx scripts/smoke-payment.ts
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import { createDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import * as financeRepo from '../src/db/repositories/finance.js';
 import * as packagesRepo from '../src/db/repositories/packages.js';
 import * as paymentsRepo from '../src/db/repositories/payments.js';
+import * as lessonMovementsRepo from '../src/db/repositories/lesson-movements.js';
 import { hashPassword } from '../src/lib/password.js';
 import { loadEnv } from '../src/lib/env.js';
 import { PaymentService } from '../src/modules/payment/service.js';
@@ -86,12 +87,9 @@ async function main() {
   }
 
   // balance before
-  const [accountBefore] = await db
-    .select()
-    .from(schema.lessonAccounts)
-    .where(and(eq(schema.lessonAccounts.studentId, student.id), eq(schema.lessonAccounts.courseId, course.id)))
-    .limit(1);
-  const balanceBefore = accountBefore?.balance ?? 0;
+  const balanceBefore = await lessonMovementsRepo.getStudentAvailableBalance(db, {
+    studentId: student.id,
+  });
 
   console.log('\n[1] create pending package order');
   const order = await financeRepo.createPackageOrder(db, {
@@ -113,28 +111,24 @@ async function main() {
   check('order now paid', paid.item.status === 'paid', `(status=${paid.item.status})`);
   check('paidAmount set', paid.item.paidAmount === pkg.priceAmount);
 
-  const [accountAfter] = await db
-    .select()
-    .from(schema.lessonAccounts)
-    .where(and(eq(schema.lessonAccounts.studentId, student.id), eq(schema.lessonAccounts.courseId, course.id)))
-    .limit(1);
+  const balanceAfter = await lessonMovementsRepo.getStudentAvailableBalance(db, {
+    studentId: student.id,
+  });
   check(
     `lesson balance credited +${pkg.lessonCount}`,
-    (accountAfter?.balance ?? 0) === balanceBefore + pkg.lessonCount,
-    `(before=${balanceBefore} after=${accountAfter?.balance})`,
+    balanceAfter === balanceBefore + pkg.lessonCount,
+    `(before=${balanceBefore} after=${balanceAfter})`,
   );
 
-  const txns = await db
+  const [contract] = await db
     .select()
-    .from(schema.lessonTransactions)
-    .where(
-      and(
-        eq(schema.lessonTransactions.relatedEntityType, 'order'),
-        eq(schema.lessonTransactions.relatedEntityId, order.id),
-      ),
-    );
-  check('exactly one purchase ledger row for this order', txns.length === 1, `(found=${txns.length})`);
-  check('ledger row type=purchase', txns[0]?.type === 'purchase');
+    .from(schema.courseContracts)
+    .where(eq(schema.courseContracts.orderId, order.id))
+    .limit(1);
+  if (!contract) throw new Error('paid order did not create a course contract');
+  const movements = await lessonMovementsRepo.listMovementsForContracts(db, [contract.id]);
+  check('exactly one grant movement for this order', movements.length === 1, `(found=${movements.length})`);
+  check('movement type=grant', movements[0]?.type === 'grant');
 
   const payRows = await paymentsRepo.listByOrderNo(db, order.orderNo);
   check('exactly one payment row', payRows.length === 1, `(found=${payRows.length})`);
@@ -149,27 +143,17 @@ async function main() {
   const replay = await service.markMockPaid({ orderNo: order.orderNo });
   check('replay still reports paid', replay.item.status === 'paid');
 
-  const [accountReplay] = await db
-    .select()
-    .from(schema.lessonAccounts)
-    .where(and(eq(schema.lessonAccounts.studentId, student.id), eq(schema.lessonAccounts.courseId, course.id)))
-    .limit(1);
+  const balanceReplay = await lessonMovementsRepo.getStudentAvailableBalance(db, {
+    studentId: student.id,
+  });
   check(
     'balance unchanged after replay',
-    (accountReplay?.balance ?? 0) === (accountAfter?.balance ?? 0),
-    `(after=${accountAfter?.balance} replay=${accountReplay?.balance})`,
+    balanceReplay === balanceAfter,
+    `(after=${balanceAfter} replay=${balanceReplay})`,
   );
 
-  const txnsReplay = await db
-    .select()
-    .from(schema.lessonTransactions)
-    .where(
-      and(
-        eq(schema.lessonTransactions.relatedEntityType, 'order'),
-        eq(schema.lessonTransactions.relatedEntityId, order.id),
-      ),
-    );
-  check('still exactly one ledger row after replay', txnsReplay.length === 1, `(found=${txnsReplay.length})`);
+  const movementsReplay = await lessonMovementsRepo.listMovementsForContracts(db, [contract.id]);
+  check('still exactly one movement after replay', movementsReplay.length === 1, `(found=${movementsReplay.length})`);
 
   const payRowsReplay = await paymentsRepo.listByOrderNo(db, order.orderNo);
   check('still exactly one payment row after replay', payRowsReplay.length === 1, `(found=${payRowsReplay.length})`);

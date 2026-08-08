@@ -1269,7 +1269,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
               <div>
                 <div className="text-sm font-medium text-slate-900">赠课</div>
                 <div className="text-muted-foreground text-xs">
-                  赠课会直接进入对应课程的课时账户，可赠送同课程或其他课程。
+                  每笔赠课都会创建独立赠课包，可用于同课程或其他课程。
                 </div>
               </div>
               <button
@@ -1436,7 +1436,7 @@ export function CourseContractsPanel({ framed = false }: { framed?: boolean }) {
         {giftForm && (
           <div className="space-y-3">
             <div className="text-muted-foreground rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              补赠课不会创建新的正式课程档案，会直接进入所选课程的课时账户。
+              补赠课会创建独立赠课包，并保留与原课时包的关联和完整流水。
             </div>
             <FieldRow>
               <Field label="赠送课程" required>

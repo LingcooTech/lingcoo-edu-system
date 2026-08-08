@@ -8,6 +8,8 @@ export type AccountRole = (typeof schema.accountRoleEnum.enumValues)[number];
 export type AccountRoleAssignment = typeof schema.accountRoleAssignments.$inferSelect;
 export type AccountStatus = (typeof schema.accountStatusEnum.enumValues)[number];
 type SecurityPurpose = (typeof schema.accountSecurityPurposeEnum.enumValues)[number];
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+type DbOrTx = Database | Tx;
 
 export async function findById(db: Database, id: string) {
   const [account] = await db
@@ -75,7 +77,7 @@ export async function findByIdentifier(db: Database, identifier: string) {
   return account ?? null;
 }
 
-export async function createAccount(db: Database, values: typeof schema.accounts.$inferInsert) {
+export async function createAccount(db: DbOrTx, values: typeof schema.accounts.$inferInsert) {
   const [account] = await db.insert(schema.accounts).values(values).returning();
   await upsertRoleAssignment(db, {
     accountId: account.id,
@@ -88,7 +90,7 @@ export async function createAccount(db: Database, values: typeof schema.accounts
 }
 
 export async function updateAccount(
-  db: Database,
+  db: DbOrTx,
   id: string,
   patch: Partial<typeof schema.accounts.$inferInsert>,
 ) {
@@ -123,21 +125,13 @@ export async function listAccounts(db: Database) {
   return db.select().from(schema.accounts).orderBy(desc(schema.accounts.createdAt));
 }
 
-export async function deleteAccount(db: Database, accountId: string) {
-  const [account] = await db
-    .delete(schema.accounts)
-    .where(eq(schema.accounts.id, accountId))
-    .returning();
-  return account ?? null;
-}
-
 // --- Account role assignments ---
 
 export async function listRoleAssignments(db: Database) {
   return db.select().from(schema.accountRoleAssignments);
 }
 
-export async function listRoleAssignmentsForAccount(db: Database, accountId: string) {
+export async function listRoleAssignmentsForAccount(db: DbOrTx, accountId: string) {
   return db
     .select()
     .from(schema.accountRoleAssignments)
@@ -161,8 +155,17 @@ export async function findRoleAssignment(
   return assignment ?? null;
 }
 
+export async function findRoleAssignmentById(db: Database, assignmentId: string) {
+  const [assignment] = await db
+    .select()
+    .from(schema.accountRoleAssignments)
+    .where(eq(schema.accountRoleAssignments.id, assignmentId))
+    .limit(1);
+  return assignment ?? null;
+}
+
 export async function upsertRoleAssignment(
-  db: Database,
+  db: DbOrTx,
   values: typeof schema.accountRoleAssignments.$inferInsert,
 ) {
   const [assignment] = await db
@@ -171,6 +174,7 @@ export async function upsertRoleAssignment(
     .onConflictDoUpdate({
       target: [schema.accountRoleAssignments.accountId, schema.accountRoleAssignments.role],
       set: {
+        institutionId: values.institutionId ?? null,
         guardianId: values.guardianId ?? null,
         teacherId: values.teacherId ?? null,
         ...(values.teacherPermissions !== undefined
@@ -185,12 +189,13 @@ export async function upsertRoleAssignment(
 }
 
 export async function replaceRoleAssignmentsForAccount(
-  db: Database,
+  db: DbOrTx,
   accountId: string,
   assignments: Array<{
     role: AccountRole;
     guardianId?: string | null;
     teacherId?: string | null;
+    institutionId?: string | null;
     teacherPermissions?: schema.TeacherPermissions;
     status?: AccountStatus;
   }>,
@@ -209,6 +214,10 @@ export async function replaceRoleAssignmentsForAccount(
       assignments.map((assignment) => ({
         accountId,
         role: assignment.role,
+        institutionId:
+          assignment.role === 'institution_admin' || assignment.role === 'teacher'
+            ? (assignment.institutionId ?? null)
+            : null,
         guardianId: assignment.role === 'parent' ? (assignment.guardianId ?? null) : null,
         teacherId: assignment.role === 'teacher' ? (assignment.teacherId ?? null) : null,
         teacherPermissions:
@@ -318,7 +327,7 @@ export async function deleteWechatIdentity(db: Database, identityId: string) {
 }
 
 export async function deleteWechatIdentityForAccount(
-  db: Database,
+  db: DbOrTx,
   input: { identityId: string; accountId: string },
 ) {
   const [identity] = await db

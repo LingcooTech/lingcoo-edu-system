@@ -9,6 +9,7 @@ import {
   FileText,
   GraduationCap,
   Home,
+  History,
   LayoutDashboard,
   Megaphone,
   PieChart,
@@ -83,6 +84,7 @@ export const adminSections = [
     icon: BarChart3,
     items: [
       { key: 'orders', label: '订单收款', path: '/operations/orders', icon: ReceiptText },
+      { key: 'lessons', label: '课时包台账', path: '/operations/lessons', icon: BookOpen },
       {
         key: 'businessModel',
         label: '业务开关',
@@ -90,6 +92,7 @@ export const adminSections = [
         icon: Settings,
       },
       { key: 'accounts', label: '用户账号', path: '/operations/accounts', icon: ShieldCheck },
+      { key: 'auditLogs', label: '审计日志', path: '/operations/audit-logs', icon: History },
     ],
   },
   {
@@ -187,7 +190,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   },
   lessons: {
     eyebrow: 'Operations',
-    title: '课时账户',
+    title: '课时包台账',
   },
   teachers: {
     eyebrow: 'Resource',
@@ -232,5 +235,9 @@ export const pageMeta: Record<string, { title: string; eyebrow: string }> = {
   accounts: {
     eyebrow: 'Operations',
     title: '用户账号',
+  },
+  auditLogs: {
+    eyebrow: 'Operations',
+    title: '审计日志',
   },
 };

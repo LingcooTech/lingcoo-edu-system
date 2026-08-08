@@ -177,7 +177,7 @@ export interface Guardian {
   phone: string;
 }
 
-export type AccountRole = 'admin' | 'teacher' | 'parent';
+export type AccountRole = 'admin' | 'institution_admin' | 'teacher' | 'parent';
 
 export interface TeacherPermissions {
   createClassSession: boolean;
@@ -195,6 +195,7 @@ export interface AccountRoleAssignment {
   status: 'active' | 'suspended';
   guardianId?: string | null;
   teacherId?: string | null;
+  institutionId?: string | null;
   teacherPermissions?: TeacherPermissions;
 }
 
@@ -212,6 +213,7 @@ export interface Account {
   emailVerified: boolean;
   guardianId?: string | null;
   teacherId?: string | null;
+  institutionId?: string | null;
   guardian?: Guardian;
   teacher?: Teacher;
   wechatIdentities?: Array<{
@@ -490,6 +492,8 @@ export interface StudentAttendanceHistoryRecord {
   contractTitle?: string | null;
   packageName?: string | null;
   billingType?: string | null;
+  lessonCount?: number | null;
+  balanceAfter?: number | null;
 }
 
 export interface AttendanceLessonSource {
@@ -633,6 +637,7 @@ export interface CourseContractGift {
 export interface CourseContract {
   id: string;
   studentId: string;
+  institutionId?: string | null;
   courseId: string;
   classId?: string | null;
   packageId?: string | null;
@@ -660,6 +665,22 @@ export interface CourseContract {
   order?: Order;
   paymentRecords: CourseContractPaymentRecord[];
   gifts?: CourseContractGift[];
+}
+
+export interface AuditLog {
+  id: string;
+  actorAccountId?: string | null;
+  institutionId?: string | null;
+  requestId?: string | null;
+  action: string;
+  resourceType: string;
+  resourceId?: string | null;
+  outcome: 'succeeded' | 'failed';
+  summary?: string | null;
+  meta: Record<string, unknown>;
+  createdAt: string;
+  actor?: { displayName?: string | null; email?: string | null } | null;
+  institution?: { id: string; name?: string | null } | null;
 }
 
 export interface SettlementBatchOrder {

@@ -4,6 +4,7 @@
  * Run after `npm run db:seed`: tsx src/db/seed-demo.ts
  */
 import { and, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 
 import { db, pool } from './client.js';
 import * as schema from './schema.js';
@@ -15,7 +16,7 @@ import {
   findScheduleConflict,
 } from './repositories/scheduling.js';
 import { recordAttendance } from './repositories/attendance.js';
-import { applyLessonDelta } from './repositories/lesson.js';
+import { applyLessonMovement } from './repositories/lesson-movements.js';
 
 async function findOne<T>(rows: Promise<T[]>): Promise<T | undefined> {
   return (await rows)[0];
@@ -186,27 +187,47 @@ async function seedDemo(): Promise<void> {
   }
 
   async function ensurePurchase(studentId: string, courseId: string, amount: number) {
-    const account = await findOne(
+    const contract = await findOne(
       db
         .select()
-        .from(schema.lessonAccounts)
+        .from(schema.courseContracts)
         .where(
           and(
-            eq(schema.lessonAccounts.studentId, studentId),
-            eq(schema.lessonAccounts.courseId, courseId),
+            eq(schema.courseContracts.studentId, studentId),
+            eq(schema.courseContracts.courseId, courseId),
+            eq(schema.courseContracts.status, 'active'),
           ),
         )
         .limit(1),
     );
-    if (account) return;
-    await db.transaction(async (tx) => {
-      await applyLessonDelta(tx, {
+    if (contract) return contract;
+    return db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(schema.courseContracts)
+        .values({
+          studentId,
+          institutionId: null,
+          courseId,
+          contractNo: `DEMO-${randomUUID()}`,
+          title: '演示课时包',
+          lessonCount: amount,
+          remainingLessonCount: 0,
+          paidAmount: 0,
+          paymentReceiverType: 'platform',
+          status: 'active',
+          origin: 'demo',
+        })
+        .returning();
+      const result = await applyLessonMovement(tx, {
+        courseContractId: created.id,
         studentId,
-        courseId,
-        type: 'purchase',
-        amount,
-        relatedEntityType: 'order',
+        operationId: `demo:${created.id}:grant`,
+        type: 'grant',
+        units: amount,
+        occurredAt: created.createdAt,
+        reason: '演示数据发放课时包',
       });
+      return result.contract;
     });
   }
 
@@ -228,10 +249,24 @@ async function seedDemo(): Promise<void> {
         db.select().from(schema.classes).where(eq(schema.classes.id, classId)).limit(1),
       );
       if (!classGroup) return;
+      const [contract] = await db
+        .select()
+        .from(schema.courseContracts)
+        .where(
+          and(
+            eq(schema.courseContracts.studentId, studentId),
+            eq(schema.courseContracts.courseId, classGroup.courseId),
+            eq(schema.courseContracts.status, 'active'),
+          ),
+        )
+        .orderBy(schema.courseContracts.createdAt)
+        .limit(1);
+      if (!contract) throw new Error('demo enrollment requires a course contract');
       await db.insert(schema.classEnrollments).values({
         classId,
         studentId,
         billingCourseId: classGroup.courseId,
+        billingCourseContractId: contract.id,
         active: true,
       });
     }
@@ -457,13 +492,36 @@ async function seedDemo(): Promise<void> {
         .limit(1),
     );
     if (!already) {
+      const demoContracts = await db
+        .select({ id: schema.courseContracts.id, studentId: schema.courseContracts.studentId })
+        .from(schema.courseContracts)
+        .where(
+          and(
+            eq(schema.courseContracts.courseId, calligraphy.id),
+            eq(schema.courseContracts.status, 'active'),
+          ),
+        );
+      const contractByStudent = new Map(demoContracts.map((item) => [item.studentId, item.id]));
       await recordAttendance(db, {
         sessionId: pastSession.id,
         courseId: calligraphy.id,
         records: [
-          { studentId: xiaoyu.id, status: 'present' },
-          { studentId: zheng.id, status: 'present' },
-          { studentId: feng.id, status: 'leave', note: '家长临时请假，安排补课' },
+          {
+            studentId: xiaoyu.id,
+            status: 'present',
+            courseContractId: contractByStudent.get(xiaoyu.id),
+          },
+          {
+            studentId: zheng.id,
+            status: 'present',
+            courseContractId: contractByStudent.get(zheng.id),
+          },
+          {
+            studentId: feng.id,
+            status: 'leave',
+            note: '家长临时请假，安排补课',
+            courseContractId: contractByStudent.get(feng.id),
+          },
         ],
       });
     }

@@ -194,17 +194,18 @@ export const paymentModule: AppModule = {
           if (!existingStudent) {
             throw httpError(403, '无权为该学员续费');
           }
-          const [existingLessonAccount] = await tx
+          const [existingCourseContract] = await tx
             .select()
-            .from(schema.lessonAccounts)
+            .from(schema.courseContracts)
             .where(
               and(
-                eq(schema.lessonAccounts.studentId, existingStudent.id),
-                eq(schema.lessonAccounts.courseId, course.id),
+                eq(schema.courseContracts.studentId, existingStudent.id),
+                eq(schema.courseContracts.courseId, course.id),
+                ne(schema.courseContracts.status, 'cancelled'),
               ),
             )
             .limit(1);
-          if (!existingLessonAccount) {
+          if (!existingCourseContract) {
             throw httpError(422, '该学员暂无此课程档案，不能直接续费');
           }
           student = existingStudent;
@@ -452,6 +453,8 @@ export const paymentModule: AppModule = {
             {
               order,
               studentId: student.id,
+              actorAccountId: request.account!.id,
+              requestId: request.id,
             },
           );
 

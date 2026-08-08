@@ -136,6 +136,7 @@ export const refundModule: AppModule = {
                 id: refundId,
                 adminNote: body.adminNote,
                 decidedByAccountId: request.account!.id,
+                requestId: request.id,
               })
             : {
                 refund: await refundsRepo.rejectRefundRequest(app.db, {

@@ -19,25 +19,6 @@ function htmlEscape(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-function decodeHtmlEntities(value: string) {
-  return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-function stripHtml(value: string) {
-  return decodeHtmlEntities(
-    value
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/?[^>]+>/g, '')
-      .trim(),
-  );
-}
-
 function looksLikeHtml(value: string) {
   return /<\/?[a-z][\s\S]*>/i.test(value);
 }

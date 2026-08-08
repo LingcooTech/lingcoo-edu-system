@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../../db/client.js';
 import * as accountsRepo from '../../db/repositories/accounts.js';
@@ -151,6 +151,7 @@ export class LessonNotificationService {
       const balance = await this.findLessonBalance(
         target.studentId,
         billingCourseId ?? target.courseId,
+        record.courseContractId,
       );
       mergeRunResult(
         result,
@@ -303,18 +304,36 @@ export class LessonNotificationService {
     return rows.map((row) => row.account);
   }
 
-  private async findLessonBalance(studentId: string, courseId: string) {
+  private async findLessonBalance(
+    studentId: string,
+    courseId: string,
+    courseContractId?: string | null,
+  ) {
+    if (courseContractId) {
+      const [contract] = await this.input.db
+        .select({
+          balance: schema.courseContracts.remainingLessonCount,
+          studentId: schema.courseContracts.studentId,
+        })
+        .from(schema.courseContracts)
+        .where(eq(schema.courseContracts.id, courseContractId))
+        .limit(1);
+      if (contract?.studentId === studentId) return contract.balance;
+    }
+
     const [row] = await this.input.db
-      .select({ balance: schema.lessonAccounts.balance })
-      .from(schema.lessonAccounts)
+      .select({
+        balance: sql<number>`coalesce(sum(${schema.courseContracts.remainingLessonCount}), 0)`,
+      })
+      .from(schema.courseContracts)
       .where(
         and(
-          eq(schema.lessonAccounts.studentId, studentId),
-          eq(schema.lessonAccounts.courseId, courseId),
+          eq(schema.courseContracts.studentId, studentId),
+          eq(schema.courseContracts.courseId, courseId),
+          eq(schema.courseContracts.status, 'active'),
         ),
-      )
-      .limit(1);
-    return row?.balance ?? null;
+      );
+    return row ? Number(row.balance) : null;
   }
 
   private async sendWechatSubscribe(

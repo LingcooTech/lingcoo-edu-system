@@ -3,6 +3,7 @@ import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import * as accountsRepo from '../../db/repositories/accounts.js';
+import * as auditRepo from '../../db/repositories/audit.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
 import { httpError } from '../../lib/http-error.js';
@@ -21,7 +22,7 @@ const TOKEN_TTL = '14d';
 const loginSchema = z.object({
   identifier: z.string().min(1),
   password: z.string().min(1),
-  role: z.enum(['admin', 'teacher', 'parent']).optional(),
+  role: z.enum(['admin', 'institution_admin', 'teacher', 'parent']).optional(),
 });
 
 const registerSchema = z.object({
@@ -59,8 +60,8 @@ const wechatMiniBindPhoneSchema = z
     message: 'phoneCode 或 phone 至少提供一个',
   });
 
-const accountRoleSchema = z.enum(['admin', 'teacher', 'parent']);
-const workRoleSchema = z.enum(['admin', 'teacher']);
+const accountRoleSchema = z.enum(['admin', 'institution_admin', 'teacher', 'parent']);
+const workRoleSchema = z.enum(['admin', 'institution_admin', 'teacher']);
 const teacherPermissionsSchema = z.object({
   createClassSession: z.boolean().optional(),
   createAdHocSession: z.boolean().optional(),
@@ -80,6 +81,7 @@ const adminAccountCreateSchema = z.object({
   status: z.enum(['active', 'suspended']).default('active'),
   guardianId: z.string().uuid().optional().nullable(),
   teacherId: z.string().uuid().optional().nullable(),
+  institutionId: z.string().uuid().optional().nullable(),
   teacherPermissions: teacherPermissionsSchema.optional(),
   password: z.string().min(6).optional(),
 });
@@ -125,6 +127,7 @@ type PublicRoleAssignment = {
   status: accountsRepo.AccountStatus;
   guardianId: string | null;
   teacherId: string | null;
+  institutionId: string | null;
   teacherPermissions: ReturnType<typeof normalizeTeacherPermissions>;
 };
 
@@ -135,6 +138,7 @@ function legacyRoleAssignment(account: accountsRepo.Account): PublicRoleAssignme
     status: account.status,
     guardianId: account.role === 'parent' ? (account.guardianId ?? null) : null,
     teacherId: account.role === 'teacher' ? (account.teacherId ?? null) : null,
+    institutionId: null,
     teacherPermissions: normalizeTeacherPermissions(),
   };
 }
@@ -150,6 +154,10 @@ function toPublicRoleAssignments(
     status: assignment.status,
     guardianId: assignment.role === 'parent' ? (assignment.guardianId ?? null) : null,
     teacherId: assignment.role === 'teacher' ? (assignment.teacherId ?? null) : null,
+    institutionId:
+      assignment.role === 'institution_admin' || assignment.role === 'teacher'
+        ? (assignment.institutionId ?? null)
+        : null,
     teacherPermissions: normalizeTeacherPermissions(
       assignment.role === 'teacher' ? assignment.teacherPermissions : {},
     ),
@@ -193,6 +201,7 @@ function publicAccount(
     mustChangePassword: account.mustChangePassword,
     guardianId: activeAssignment.guardianId,
     teacherId: activeAssignment.teacherId,
+    institutionId: activeAssignment.institutionId,
   };
 }
 
@@ -516,11 +525,54 @@ export const authModule: AppModule = {
       return roles.length ? roles : [account.role];
     }
 
+    function accountAuditSnapshot(
+      account: accountsRepo.Account,
+      assignments: accountsRepo.AccountRoleAssignment[],
+    ) {
+      return {
+        role: account.role,
+        roles: assignments.map((assignment) => ({
+          role: assignment.role,
+          status: assignment.status,
+          institutionId: assignment.institutionId,
+          teacherId: assignment.teacherId,
+          guardianId: assignment.guardianId,
+          teacherPermissions: assignment.teacherPermissions,
+        })),
+        displayName: account.displayName,
+        email: account.email,
+        phone: account.phone,
+        status: account.status,
+        guardianId: account.guardianId,
+        teacherId: account.teacherId,
+        mustChangePassword: account.mustChangePassword,
+      };
+    }
+
+    function auditInstitutionId(assignments: accountsRepo.AccountRoleAssignment[]) {
+      return (
+        assignments.find((assignment) => assignment.role === 'institution_admin')
+          ?.institutionId ??
+        assignments.find((assignment) => assignment.role === 'teacher')?.institutionId ??
+        null
+      );
+    }
+
     async function validateProfileLinks(input: {
       roles: accountsRepo.AccountRole[];
       guardianId?: string | null;
       teacherId?: string | null;
+      institutionId?: string | null;
     }) {
+      if (input.roles.includes('institution_admin')) {
+        if (!input.institutionId) {
+          throw httpError(422, '机构负责人账号必须绑定机构');
+        }
+        const institution = await teachingRepo.findInstitution(app.db, input.institutionId);
+        if (!institution || institution.status !== 'active') {
+          throw httpError(422, '所选机构不存在或已停用');
+        }
+      }
       if (input.roles.includes('teacher')) {
         if (!input.teacherId) {
           throw httpError(422, '老师账号必须关联老师档案');
@@ -528,6 +580,12 @@ export const authModule: AppModule = {
         const teacher = await teachingRepo.findTeacher(app.db, input.teacherId);
         if (!teacher) {
           throw httpError(404, '老师档案不存在');
+        }
+        if (!teacher.institutionId) {
+          throw httpError(422, '老师档案必须先绑定机构');
+        }
+        if (input.institutionId && input.institutionId !== teacher.institutionId) {
+          throw httpError(422, '账号机构与老师所属机构不一致');
         }
       }
       if (input.roles.includes('parent') && input.guardianId) {
@@ -585,40 +643,61 @@ export const authModule: AppModule = {
       const roles = resolveSubmittedRoles({ role: body.role, roles: body.roles });
       const guardianId = roles.includes('parent') ? (body.guardianId ?? null) : null;
       const teacherId = roles.includes('teacher') ? (body.teacherId ?? null) : null;
+      const teacher = teacherId ? await teachingRepo.findTeacher(app.db, teacherId) : null;
+      const institutionId = roles.includes('institution_admin')
+        ? (body.institutionId ?? null)
+        : roles.includes('teacher')
+          ? (teacher?.institutionId ?? null)
+          : null;
       await validateProfileLinks({
         roles,
         guardianId,
         teacherId,
+        institutionId,
       });
 
       const defaultPassword = body.password ?? generateDefaultPassword(phone);
-      const account = await accountsRepo.createAccount(app.db, {
-        role: body.role,
-        email,
-        phone,
-        displayName: body.displayName.trim(),
-        status: body.status,
-        guardianId,
-        teacherId,
-        passwordHash: hashPassword(defaultPassword),
-        mustChangePassword: true,
-      });
-      const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
-        app.db,
-        account.id,
-        roles.map((role) => ({
-          role,
+      const { account, assignments } = await app.db.transaction(async (tx) => {
+        const account = await accountsRepo.createAccount(tx, {
+          role: body.role,
+          email,
+          phone,
+          displayName: body.displayName.trim(),
+          status: body.status,
           guardianId,
           teacherId,
-          teacherPermissions:
-            role === 'teacher'
-              ? roles.includes('admin')
-                ? ALL_TEACHER_PERMISSIONS
-                : normalizeTeacherPermissions(body.teacherPermissions)
-              : {},
-          status: body.status,
-        })),
-      );
+          passwordHash: hashPassword(defaultPassword),
+          mustChangePassword: true,
+        });
+        const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
+          tx,
+          account.id,
+          roles.map((role) => ({
+            role,
+            guardianId,
+            teacherId,
+            institutionId,
+            teacherPermissions:
+              role === 'teacher'
+                ? roles.includes('admin') || roles.includes('institution_admin')
+                  ? ALL_TEACHER_PERMISSIONS
+                  : normalizeTeacherPermissions(body.teacherPermissions)
+                : {},
+            status: body.status,
+          })),
+        );
+        await auditRepo.createAuditLog(tx, {
+          actorAccountId: request.account!.id,
+          institutionId: auditInstitutionId(assignments),
+          requestId: request.id,
+          action: 'account.created',
+          resourceType: 'account',
+          resourceId: account.id,
+          summary: `创建账号：${account.displayName}`,
+          meta: { after: accountAuditSnapshot(account, assignments) },
+        });
+        return { account, assignments };
+      });
 
       return { account: adminAccount(account, assignments), defaultPassword };
     });
@@ -655,36 +734,65 @@ export const authModule: AppModule = {
           ? current.teacherId
           : body.teacherId
         : null;
+      const teacher = teacherId ? await teachingRepo.findTeacher(app.db, teacherId) : null;
+      const currentInstitutionId = currentAssignments.find(
+        (assignment) => assignment.role === 'institution_admin',
+      )?.institutionId;
+      const institutionId = nextRoles.includes('institution_admin')
+        ? body.institutionId === undefined
+          ? (currentInstitutionId ?? null)
+          : body.institutionId
+        : nextRoles.includes('teacher')
+          ? (teacher?.institutionId ?? null)
+          : null;
       const currentTeacherPermissions = currentAssignments.find(
         (assignment) => assignment.role === 'teacher',
       )?.teacherPermissions;
-      const teacherPermissions = nextRoles.includes('admin')
+      const teacherPermissions =
+        nextRoles.includes('admin') || nextRoles.includes('institution_admin')
         ? ALL_TEACHER_PERMISSIONS
         : normalizeTeacherPermissions(body.teacherPermissions ?? currentTeacherPermissions);
 
       await ensureUniqueIdentifiers({ email, phone, ignoreAccountId: accountId });
-      await validateProfileLinks({ roles: nextRoles, guardianId, teacherId });
+      await validateProfileLinks({ roles: nextRoles, guardianId, teacherId, institutionId });
 
-      const updated = await accountsRepo.updateAccount(app.db, accountId, {
-        role: nextRole,
-        email,
-        phone,
-        displayName: body.displayName?.trim() ?? current.displayName,
-        status: body.status ?? current.status,
-        guardianId,
-        teacherId,
-      });
-      const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
-        app.db,
-        accountId,
-        nextRoles.map((role) => ({
-          role,
+      const { updated, assignments } = await app.db.transaction(async (tx) => {
+        const updated = await accountsRepo.updateAccount(tx, accountId, {
+          role: nextRole,
+          email,
+          phone,
+          displayName: body.displayName?.trim() ?? current.displayName,
+          status: body.status ?? current.status,
           guardianId,
           teacherId,
-          teacherPermissions: role === 'teacher' ? teacherPermissions : {},
-          status: body.status ?? current.status,
-        })),
-      );
+        });
+        const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
+          tx,
+          accountId,
+          nextRoles.map((role) => ({
+            role,
+            guardianId,
+            teacherId,
+            institutionId,
+            teacherPermissions: role === 'teacher' ? teacherPermissions : {},
+            status: body.status ?? current.status,
+          })),
+        );
+        await auditRepo.createAuditLog(tx, {
+          actorAccountId: request.account!.id,
+          institutionId: auditInstitutionId(assignments),
+          requestId: request.id,
+          action: 'account.updated',
+          resourceType: 'account',
+          resourceId: accountId,
+          summary: `修改账号：${updated!.displayName}`,
+          meta: {
+            before: accountAuditSnapshot(current, currentAssignments),
+            after: accountAuditSnapshot(updated!, assignments),
+          },
+        });
+        return { updated: updated!, assignments };
+      });
 
       return { account: adminAccount(updated!, assignments) };
     });
@@ -699,11 +807,24 @@ export const authModule: AppModule = {
           throw httpError(404, '账号不存在');
         }
         const defaultPassword = generateDefaultPassword(account.phone);
-        const updated = await accountsRepo.updateAccount(app.db, accountId, {
-          passwordHash: hashPassword(defaultPassword),
-          mustChangePassword: true,
+        const { updated, assignments } = await app.db.transaction(async (tx) => {
+          const updated = await accountsRepo.updateAccount(tx, accountId, {
+            passwordHash: hashPassword(defaultPassword),
+            mustChangePassword: true,
+          });
+          const assignments = await accountsRepo.listRoleAssignmentsForAccount(tx, accountId);
+          await auditRepo.createAuditLog(tx, {
+            actorAccountId: request.account!.id,
+            institutionId: auditInstitutionId(assignments),
+            requestId: request.id,
+            action: 'account.password_reset',
+            resourceType: 'account',
+            resourceId: accountId,
+            summary: `重置账号密码：${account.displayName}`,
+            meta: { mustChangePassword: true },
+          });
+          return { updated: updated!, assignments };
         });
-        const assignments = await accountsRepo.listRoleAssignmentsForAccount(app.db, accountId);
         return { account: adminAccount(updated!, assignments), defaultPassword };
       },
     );
@@ -713,15 +834,43 @@ export const authModule: AppModule = {
       if (request.account?.id === accountId) {
         throw httpError(422, '不能删除当前登录账号');
       }
-      const account = await accountsRepo.deleteAccount(app.db, accountId);
-      if (!account) {
+      const existing = await accountsRepo.findById(app.db, accountId);
+      if (!existing) {
         throw httpError(404, '账号不存在');
       }
-      const guardianDeleted =
-        account.role === 'parent' && account.guardianId
-          ? await peopleRepo.deleteGuardianIfOrphan(app.db, account.guardianId)
-          : null;
-      return { account: adminAccount(account), guardianDeleted };
+      const currentAssignments = await accountsRepo.listRoleAssignmentsForAccount(app.db, accountId);
+      const { account, assignments } = await app.db.transaction(async (tx) => {
+        const account = await accountsRepo.updateAccount(tx, accountId, {
+          status: 'suspended',
+        });
+        const assignments = await accountsRepo.replaceRoleAssignmentsForAccount(
+          tx,
+          accountId,
+          currentAssignments.map((assignment) => ({
+            role: assignment.role,
+            guardianId: assignment.guardianId,
+            teacherId: assignment.teacherId,
+            institutionId: assignment.institutionId,
+            teacherPermissions: assignment.teacherPermissions,
+            status: 'suspended',
+          })),
+        );
+        await auditRepo.createAuditLog(tx, {
+          actorAccountId: request.account!.id,
+          institutionId: auditInstitutionId(currentAssignments),
+          requestId: request.id,
+          action: 'account.suspended',
+          resourceType: 'account',
+          resourceId: accountId,
+          summary: `停用账号：${existing.displayName}`,
+          meta: {
+            before: accountAuditSnapshot(existing, currentAssignments),
+            after: accountAuditSnapshot(account!, assignments),
+          },
+        });
+        return { account: account!, assignments };
+      });
+      return { account: adminAccount(account, assignments), guardianDeleted: null };
     });
 
     app.delete(
@@ -736,9 +885,24 @@ export const authModule: AppModule = {
         if (!account) {
           throw httpError(404, '账号不存在');
         }
-        const identity = await accountsRepo.deleteWechatIdentityForAccount(app.db, {
-          accountId,
-          identityId,
+        const assignments = await accountsRepo.listRoleAssignmentsForAccount(app.db, accountId);
+        const identity = await app.db.transaction(async (tx) => {
+          const identity = await accountsRepo.deleteWechatIdentityForAccount(tx, {
+            accountId,
+            identityId,
+          });
+          if (!identity) return null;
+          await auditRepo.createAuditLog(tx, {
+            actorAccountId: request.account!.id,
+            institutionId: auditInstitutionId(assignments),
+            requestId: request.id,
+            action: 'account.wechat_unbound',
+            resourceType: 'account',
+            resourceId: accountId,
+            summary: `解绑微信：${account.displayName}`,
+            meta: { identityId: identity.id, appId: identity.appId },
+          });
+          return identity;
         });
         if (!identity) {
           throw httpError(404, '微信绑定不存在');

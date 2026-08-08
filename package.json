@@ -27,6 +27,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-demo": "tsx src/db/seed-demo.ts",
+    "db:preflight-lessons": "node scripts/preflight-package-ledger.mjs",
+    "db:reconcile-lessons": "node scripts/reconcile-package-ledger.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

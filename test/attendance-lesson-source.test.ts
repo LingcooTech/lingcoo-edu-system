@@ -17,7 +17,7 @@ function source(
   };
 }
 
-test('auto lesson-source selection prioritizes an active period package', () => {
+test('lesson-source display prioritizes an active period package', () => {
   const sources = [
     source('short-package', 'lesson', null, '2026-01-01T00:00:00.000Z'),
     source('monthly-card', 'period', '2026-08-31T23:59:59.999Z', '2026-08-01T00:00:00.000Z'),

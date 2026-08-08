@@ -7,6 +7,7 @@ import { AccountsPage } from '@/pages/AccountsPage';
 import { AdminChangePasswordPage } from '@/pages/AdminChangePasswordPage';
 import { AcademicWorkbenchPage } from '@/pages/AcademicWorkbenchPage';
 import { AttendancePage } from '@/pages/AttendancePage';
+import { AuditLogsPage } from '@/pages/AuditLogsPage';
 import { BusinessModelPage } from '@/pages/BusinessModelPage';
 import { CampusesPage } from '@/pages/CampusesPage';
 import { ClassesPage } from '@/pages/ClassesPage';
@@ -49,7 +50,7 @@ function ProtectedRoute() {
     }
     fetchMe()
       .then((account) => {
-        if (account && account.role === 'admin') {
+        if (account && ['admin', 'institution_admin'].includes(account.role)) {
           if (account.mustChangePassword) {
             window.location.href = '/admin/change-password';
             return;
@@ -121,6 +122,7 @@ const router = createBrowserRouter(
         { path: 'operations/contracts', element: <CourseContractsPage /> },
         { path: 'operations/lessons', element: <LessonsPage /> },
         { path: 'operations/accounts', element: <AccountsPage /> },
+        { path: 'operations/audit-logs', element: <AuditLogsPage /> },
         { path: 'operations/guardians', element: <GuardiansPage /> },
         // 系统设置
         { path: 'system/brand', element: <SettingsPage /> },

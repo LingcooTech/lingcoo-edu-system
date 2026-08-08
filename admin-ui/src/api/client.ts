@@ -104,7 +104,7 @@ function buildQueryString<T extends object>(params: T) {
   return query ? `?${query}` : '';
 }
 
-export type AccountRole = 'admin' | 'teacher' | 'parent';
+export type AccountRole = 'admin' | 'institution_admin' | 'teacher' | 'parent';
 
 export interface AuthAccount {
   id: string;
@@ -114,13 +114,18 @@ export interface AuthAccount {
   phone: string | null;
   emailVerified: boolean;
   mustChangePassword: boolean;
+  institutionId?: string | null;
 }
 
 export async function adminLogin(identifier: string, password: string) {
   const payload = await api<{ token: string; account: AuthAccount }>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier, password, role: 'admin' }),
+    body: JSON.stringify({ identifier, password }),
   });
+  if (!['admin', 'institution_admin'].includes(payload.account.role)) {
+    clearToken();
+    throw new Error('当前账号没有后台访问权限');
+  }
   setToken(payload.token);
   return payload.account;
 }

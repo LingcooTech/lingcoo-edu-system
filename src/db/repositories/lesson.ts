@@ -1,4 +1,4 @@
-import { and, desc, eq, sum } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sum } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
@@ -6,90 +6,59 @@ import * as schema from '../schema.js';
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 type DbOrTx = Database | Tx;
 
-export async function listLessonAccounts(db: Database) {
-  return db.select().from(schema.lessonAccounts);
-}
-
-export async function listLessonTransactions(db: Database) {
+// Compatibility name for callers that have not yet renamed their response
+// field. Each row is now one concrete package, never a course-level balance.
+export async function listLessonAccounts(db: Database, institutionId?: string | null) {
   return db
-    .select()
-    .from(schema.lessonTransactions)
-    .orderBy(desc(schema.lessonTransactions.createdAt));
+    .select({
+      id: schema.courseContracts.id,
+      courseContractId: schema.courseContracts.id,
+      studentId: schema.courseContracts.studentId,
+      courseId: schema.courseContracts.courseId,
+      balance: schema.courseContracts.remainingLessonCount,
+      status: schema.courseContracts.status,
+      title: schema.courseContracts.title,
+      lessonCount: schema.courseContracts.lessonCount,
+      updatedAt: schema.courseContracts.updatedAt,
+    })
+    .from(schema.courseContracts)
+    .where(institutionId ? eq(schema.courseContracts.institutionId, institutionId) : undefined)
+    .orderBy(desc(schema.courseContracts.createdAt));
 }
 
-async function findOrCreateAccount(tx: DbOrTx, input: { studentId: string; courseId: string }) {
-  const [existing] = await tx
-    .select()
-    .from(schema.lessonAccounts)
-    .where(
-      and(
-        eq(schema.lessonAccounts.studentId, input.studentId),
-        eq(schema.lessonAccounts.courseId, input.courseId),
-      ),
+export async function listLessonTransactions(db: Database, institutionId?: string | null) {
+  const movements = await db
+    .select({ movement: schema.lessonMovements })
+    .from(schema.lessonMovements)
+    .innerJoin(
+      schema.courseContracts,
+      eq(schema.lessonMovements.courseContractId, schema.courseContracts.id),
     )
-    .limit(1)
-    // Lock the account row for the duration of the enclosing transaction so two
-    // concurrent consumes can't both read the same balance and lose an update.
-    .for('update');
-  if (existing) {
-    return existing;
-  }
-  const [created] = await tx
-    .insert(schema.lessonAccounts)
-    .values({
-      studentId: input.studentId,
-      courseId: input.courseId,
-      balance: 0,
-    })
-    .returning();
-  return created;
-}
-
-/**
- * Applies a signed lesson delta to a student's course account and writes the
- * matching transaction row, returning the updated account + transaction.
- * `amount` is signed: positive for purchase/adjustment-up, negative for consume.
- * Runs inside the provided tx (caller owns the transaction boundary).
- */
-export async function applyLessonDelta(
-  tx: DbOrTx,
-  input: {
-    studentId: string;
-    courseId: string;
-    type: (typeof schema.lessonTransactionTypeEnum.enumValues)[number];
-    amount: number;
-    relatedEntityType?: string;
-    relatedEntityId?: string;
-    courseContractId?: string | null;
-  },
-) {
-  const account = await findOrCreateAccount(tx, {
-    studentId: input.studentId,
-    courseId: input.courseId,
-  });
-  const balanceAfter = account.balance + input.amount;
-
-  const [updated] = await tx
-    .update(schema.lessonAccounts)
-    .set({ balance: balanceAfter, updatedAt: new Date() })
-    .where(eq(schema.lessonAccounts.id, account.id))
-    .returning();
-
-  const [transaction] = await tx
-    .insert(schema.lessonTransactions)
-    .values({
-      lessonAccountId: account.id,
-      studentId: input.studentId,
-      courseContractId: input.courseContractId ?? null,
-      type: input.type,
-      amount: input.amount,
-      balanceAfter,
-      relatedEntityType: input.relatedEntityType,
-      relatedEntityId: input.relatedEntityId,
-    })
-    .returning();
-
-  return { account: updated, transaction };
+    .where(institutionId ? eq(schema.courseContracts.institutionId, institutionId) : undefined)
+    .orderBy(desc(schema.lessonMovements.createdAt));
+  return movements.map(({ movement }) => ({
+    id: movement.id,
+    lessonAccountId: movement.courseContractId,
+    studentId: movement.studentId,
+    courseContractId: movement.courseContractId,
+    type:
+      movement.type === 'grant'
+        ? ('purchase' as const)
+        : movement.type === 'consume'
+          ? ('consume' as const)
+          : movement.type === 'refund'
+            ? ('refund' as const)
+            : ('adjustment' as const),
+    amount: movement.units,
+    balanceBefore: movement.balanceBefore,
+    balanceAfter: movement.balanceAfter,
+    relatedEntityType: movement.attendanceRecordId ? 'attendance_record' : 'course_contract',
+    relatedEntityId: movement.attendanceRecordId ?? movement.courseContractId,
+    operationId: movement.operationId,
+    occurredAt: movement.occurredAt,
+    reason: movement.reason,
+    createdAt: movement.createdAt,
+  }));
 }
 
 export async function getConsumedLessonCount(
@@ -97,53 +66,18 @@ export async function getConsumedLessonCount(
   input: { studentId: string; courseId: string },
 ) {
   const [result] = await tx
-    .select({ total: sum(schema.lessonTransactions.amount).mapWith(Number) })
-    .from(schema.lessonTransactions)
+    .select({ total: sum(schema.lessonMovements.units).mapWith(Number) })
+    .from(schema.lessonMovements)
     .innerJoin(
-      schema.lessonAccounts,
-      eq(schema.lessonTransactions.lessonAccountId, schema.lessonAccounts.id),
+      schema.courseContracts,
+      eq(schema.lessonMovements.courseContractId, schema.courseContracts.id),
     )
     .where(
       and(
-        eq(schema.lessonAccounts.studentId, input.studentId),
-        eq(schema.lessonAccounts.courseId, input.courseId),
-        eq(schema.lessonTransactions.type, 'consume'),
+        eq(schema.lessonMovements.studentId, input.studentId),
+        eq(schema.courseContracts.courseId, input.courseId),
+        isNotNull(schema.lessonMovements.attendanceRecordId),
       ),
     );
   return Math.max(0, -(result?.total ?? 0));
-}
-
-export async function checkAndCompleteCourseContract(
-  db: Database,
-  input: { studentId: string; courseId: string; contractId: string },
-) {
-  return db.transaction(async (tx) => {
-    const [contract] = await tx
-      .select()
-      .from(schema.courseContracts)
-      .where(
-        and(
-          eq(schema.courseContracts.id, input.contractId),
-          eq(schema.courseContracts.studentId, input.studentId),
-          eq(schema.courseContracts.courseId, input.courseId),
-        ),
-      )
-      .limit(1);
-
-    if (contract?.remainingLessonCount === 0 && contract.status === 'active') {
-      const [updated] = await tx
-        .update(schema.courseContracts)
-        .set({ status: 'completed', updatedAt: new Date() })
-        .where(
-          and(
-            eq(schema.courseContracts.id, input.contractId),
-            eq(schema.courseContracts.status, 'active'),
-          ),
-        )
-        .returning();
-      return updated;
-    }
-
-    return null;
-  });
 }

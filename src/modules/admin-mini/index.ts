@@ -55,7 +55,7 @@ export const adminMiniModule: AppModule = {
         courses,
         teachers,
         classrooms,
-        lessonAccounts,
+        courseContracts,
       ] = await Promise.all([
         app.db.select().from(schema.orders).orderBy(desc(schema.orders.createdAt)),
         app.db.select().from(schema.students).orderBy(desc(schema.students.createdAt)),
@@ -66,7 +66,7 @@ export const adminMiniModule: AppModule = {
         app.db.select().from(schema.courses),
         app.db.select().from(schema.teachers),
         app.db.select().from(schema.classrooms),
-        app.db.select().from(schema.lessonAccounts),
+        app.db.select().from(schema.courseContracts),
       ]);
 
       const studentById = new Map(students.map((item) => [item.id, item]));
@@ -95,7 +95,9 @@ export const adminMiniModule: AppModule = {
           paidOrders: paidOrders.length,
           pendingOrders: orders.filter((item) => item.status === 'pending').length,
           activeStudents: students.filter((item) => item.status === 'active').length,
-          lowLessonAccounts: lessonAccounts.filter((item) => item.balance <= 3).length,
+          lowLessonPackages: courseContracts.filter(
+            (item) => item.status === 'active' && item.remainingLessonCount <= 3,
+          ).length,
         },
         recentOrders: orders.slice(0, 8).map((item) => {
           const student = item.studentId ? studentById.get(item.studentId) : null;
@@ -115,7 +117,9 @@ export const adminMiniModule: AppModule = {
         }),
         recentStudents: students.slice(0, 8).map((item) => {
           const guardian = item.guardianId ? guardianById.get(item.guardianId) : null;
-          const balances = lessonAccounts.filter((account) => account.studentId === item.id);
+          const balances = courseContracts.filter(
+            (contract) => contract.studentId === item.id && contract.status === 'active',
+          );
           return {
             id: item.id,
             name: item.name,
@@ -124,7 +128,7 @@ export const adminMiniModule: AppModule = {
             status: item.status,
             guardianName: guardian?.name ?? '',
             guardianPhone: guardian?.phone ?? '',
-            balance: balances.reduce((sum, account) => sum + account.balance, 0),
+            balance: balances.reduce((sum, contract) => sum + contract.remainingLessonCount, 0),
             createdAt: item.createdAt.toISOString(),
           };
         }),

@@ -1134,7 +1134,7 @@ export function SchedulePage({
             <div>
               <div className="text-sm font-semibold">临时学员</div>
               <div className="text-muted-foreground mt-1 text-xs">
-                仅加入当前课次；点名时按所选课时账户扣减，不改变班级正式学员。
+                仅加入当前课次；点名时从所选具体课时包扣减，不改变班级正式学员。
               </div>
             </div>
 

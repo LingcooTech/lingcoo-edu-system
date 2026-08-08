@@ -3,7 +3,8 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { httpError } from '../../lib/http-error.js';
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
-import { applyLessonDelta } from './lesson.js';
+import { applyLessonMovement } from './lesson-movements.js';
+import { createAuditLog } from './audit.js';
 
 export type RefundRequest = typeof schema.refundRequests.$inferSelect;
 export type RefundRequestStatus = (typeof schema.refundRequestStatusEnum.enumValues)[number];
@@ -130,6 +131,7 @@ export async function rejectRefundRequest(
     id: string;
     adminNote?: string | null;
     decidedByAccountId: string;
+    requestId?: string | null;
   },
 ): Promise<RefundRequest> {
   const [existing] = await db
@@ -170,6 +172,7 @@ export async function approveRefundRequestAndReverseOrder(
     id: string;
     adminNote?: string | null;
     decidedByAccountId: string;
+    requestId?: string | null;
   },
 ): Promise<{ refund: RefundRequest; order: typeof schema.orders.$inferSelect }> {
   return db.transaction(async (tx) => {
@@ -227,40 +230,60 @@ export async function approveRefundRequestAndReverseOrder(
         .where(eq(schema.courseContracts.orderId, order.id))
         .limit(1)
         .for('update');
-      const [lessonAccount] = await tx
+      if (!courseContract) {
+        throw httpError(409, '订单缺少对应课时包档案，请先完成数据核对');
+      }
+      const giftContracts = await tx
         .select()
-        .from(schema.lessonAccounts)
-        .where(
-          and(
-            eq(schema.lessonAccounts.studentId, order.studentId),
-            eq(schema.lessonAccounts.courseId, order.courseId),
-          ),
-        )
-        .limit(1)
+        .from(schema.courseContracts)
+        .where(eq(schema.courseContracts.parentCourseContractId, courseContract.id))
+        .orderBy(schema.courseContracts.id)
         .for('update');
-
+      const refundableContracts = [courseContract, ...giftContracts];
       if (
-        !lessonAccount ||
-        lessonAccount.balance < order.lessonCount ||
-        (courseContract && courseContract.remainingLessonCount < order.lessonCount)
+        refundableContracts.some(
+          (contract) => contract.remainingLessonCount !== contract.lessonCount,
+        )
       ) {
         throw httpError(422, '该订单课时已被消耗，暂不能自动全额退款');
       }
 
-      await applyLessonDelta(tx, {
-        studentId: order.studentId,
-        courseId: order.courseId,
-        type: 'refund',
-        amount: -order.lessonCount,
-        relatedEntityType: 'order',
-        relatedEntityId: order.id,
-        courseContractId: courseContract?.id ?? null,
-      });
-      if (courseContract) {
+      for (const contract of refundableContracts.sort((left, right) =>
+        left.id.localeCompare(right.id),
+      )) {
+        if (contract.remainingLessonCount > 0) {
+          await applyLessonMovement(tx, {
+            courseContractId: contract.id,
+            studentId: contract.studentId,
+            operationId: `order:${order.id}:refund:${contract.id}`,
+            type: 'refund',
+            units: -contract.remainingLessonCount,
+            occurredAt: new Date(),
+            actorAccountId: input.decidedByAccountId,
+            requestId: input.requestId,
+            reason: contract.id === courseContract.id ? '订单全额退款' : '主课时包退款，赠课包同步取消',
+            metadata: { orderId: order.id, refundRequestId: refund.id },
+          });
+        }
         await tx
           .update(schema.courseContracts)
-          .set({ remainingLessonCount: 0, status: 'cancelled', updatedAt: new Date() })
-          .where(eq(schema.courseContracts.id, courseContract.id));
+          .set({ status: 'cancelled', updatedAt: new Date() })
+          .where(eq(schema.courseContracts.id, contract.id));
+        await createAuditLog(tx, {
+          actorAccountId: input.decidedByAccountId,
+          institutionId: contract.institutionId,
+          requestId: input.requestId ?? null,
+          action: 'course_contract.cancelled',
+          resourceType: 'course_contract',
+          resourceId: contract.id,
+          summary: `退款取消课时包：${contract.title}`,
+          meta: {
+            orderId: order.id,
+            refundRequestId: refund.id,
+            previousStatus: contract.status,
+            remainingLessonCount: 0,
+          },
+        });
       }
     }
 

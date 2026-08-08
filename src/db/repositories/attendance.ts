@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
-import { applyLessonDelta } from './lesson.js';
+import { applyLessonMovement } from './lesson-movements.js';
 
 type AttendanceStatus = (typeof schema.attendanceStatusEnum.enumValues)[number];
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -46,7 +46,6 @@ async function periodPackageForSession(
   input: {
     sessionId: string;
     studentId: string;
-    courseId: string;
     preferredCourseContractId?: string | null;
   },
 ) {
@@ -76,7 +75,6 @@ async function periodPackageForSession(
         and(
           eq(schema.courseContracts.id, input.preferredCourseContractId),
           eq(schema.courseContracts.studentId, input.studentId),
-          eq(schema.courseContracts.courseId, input.courseId),
         ),
       )
       .limit(1);
@@ -93,60 +91,7 @@ async function periodPackageForSession(
     return true;
   }
 
-  const contracts = await tx
-    .select({
-      startsAt: schema.courseContracts.startsAt,
-      endsAt: schema.courseContracts.endsAt,
-      remainingLessonCount: schema.courseContracts.remainingLessonCount,
-      billingType: schema.coursePackages.billingType,
-    })
-    .from(schema.courseContracts)
-    .innerJoin(
-      schema.coursePackages,
-      eq(schema.courseContracts.packageId, schema.coursePackages.id),
-    )
-    .where(
-      and(
-        eq(schema.courseContracts.studentId, input.studentId),
-        eq(schema.courseContracts.courseId, input.courseId),
-        eq(schema.courseContracts.status, 'active'),
-        eq(schema.coursePackages.billingType, 'period'),
-      ),
-    );
-  if (contracts.length === 0) return false;
-
-  const valid = contracts.some(
-    (contract) =>
-      (!contract.startsAt || session.startsAt >= contract.startsAt) &&
-      (!contract.endsAt || session.startsAt <= contract.endsAt) &&
-      contract.remainingLessonCount > 0,
-  );
-  if (valid) return true;
-
-  const ordinaryContracts = await tx
-    .select({
-      startsAt: schema.courseContracts.startsAt,
-      endsAt: schema.courseContracts.endsAt,
-      billingType: schema.coursePackages.billingType,
-    })
-    .from(schema.courseContracts)
-    .leftJoin(schema.coursePackages, eq(schema.courseContracts.packageId, schema.coursePackages.id))
-    .where(
-      and(
-        eq(schema.courseContracts.studentId, input.studentId),
-        eq(schema.courseContracts.courseId, input.courseId),
-        eq(schema.courseContracts.status, 'active'),
-      ),
-    );
-  const hasValidOrdinaryContract = ordinaryContracts.some(
-    (contract) =>
-      contract.billingType !== 'period' &&
-      (!contract.startsAt || session.startsAt >= contract.startsAt) &&
-      (!contract.endsAt || session.startsAt <= contract.endsAt),
-  );
-  if (hasValidOrdinaryContract) return false;
-
-  throw Object.assign(new Error('该学员的周期卡不在本课次有效期内'), { statusCode: 422 });
+  return false;
 }
 
 function sourceIsValidAt(
@@ -175,11 +120,13 @@ export function compareAttendanceLessonSourcePriority(
 
 async function listLessonSourcesInTx(
   db: DbOrTx,
-  input: { studentId: string; courseId: string; occursAt: Date; includeEmpty?: boolean },
+  input: { studentId: string; occursAt: Date; includeEmpty?: boolean },
 ) {
   const rows = await db
     .select({
       id: schema.courseContracts.id,
+      studentId: schema.courseContracts.studentId,
+      courseId: schema.courseContracts.courseId,
       title: schema.courseContracts.title,
       packageId: schema.courseContracts.packageId,
       packageName: schema.coursePackages.name,
@@ -196,7 +143,6 @@ async function listLessonSourcesInTx(
     .where(
       and(
         eq(schema.courseContracts.studentId, input.studentId),
-        eq(schema.courseContracts.courseId, input.courseId),
         ne(schema.courseContracts.status, 'cancelled'),
       ),
     );
@@ -212,8 +158,8 @@ async function listLessonSourcesInTx(
       (source) =>
         ({
           id: source.id,
-          studentId: input.studentId,
-          courseId: input.courseId,
+          studentId: source.studentId,
+          courseId: source.courseId,
           title: source.title,
           packageId: source.packageId,
           packageName: source.packageName ?? null,
@@ -228,7 +174,7 @@ async function listLessonSourcesInTx(
 
 export async function listAttendanceLessonSources(
   db: Database,
-  input: { sessionId: string; studentId: string; courseId: string },
+  input: { sessionId: string; studentId: string },
 ) {
   const [session] = await db
     .select({ startsAt: schema.classSessions.startsAt })
@@ -243,61 +189,47 @@ async function takeLessonSource(
   tx: Tx,
   input: {
     studentId: string;
-    courseId: string;
     occursAt: Date;
     required: number;
     preferredCourseContractId?: string | null;
   },
 ) {
-  const sources = await listLessonSourcesInTx(tx, input);
-  const source = input.preferredCourseContractId
-    ? sources.find((item) => item.id === input.preferredCourseContractId)
-    : sources.find((item) => item.remainingLessonCount >= input.required);
-  if (input.preferredCourseContractId && !source) {
-    throw Object.assign(new Error('所选课时包当前不可用或不在本课次有效期内'), {
-      statusCode: 422,
-    });
+  if (!input.preferredCourseContractId) {
+    throw Object.assign(new Error('请先为该学员明确选择扣课课时包'), { statusCode: 422 });
   }
-  if (!source) return null;
-  const [lockedSource] = await tx
-    .select({ remainingLessonCount: schema.courseContracts.remainingLessonCount })
-    .from(schema.courseContracts)
-    .where(eq(schema.courseContracts.id, source.id))
-    .limit(1)
-    .for('update');
-  if (!lockedSource || lockedSource.remainingLessonCount < input.required) {
-    throw Object.assign(new Error(`「${source.packageName ?? source.title}」剩余课时不足`), {
-      statusCode: 422,
-    });
-  }
-  const remainingLessonCount = lockedSource.remainingLessonCount - input.required;
-  await tx
-    .update(schema.courseContracts)
-    .set({
-      remainingLessonCount,
-      status: remainingLessonCount === 0 ? 'completed' : 'active',
-      updatedAt: new Date(),
-    })
-    .where(eq(schema.courseContracts.id, source.id));
-  return { ...source, remainingLessonCount };
-}
-
-async function restoreLessonSource(tx: Tx, courseContractId: string, amount: number) {
   const [source] = await tx
     .select()
     .from(schema.courseContracts)
-    .where(eq(schema.courseContracts.id, courseContractId))
+    .where(eq(schema.courseContracts.id, input.preferredCourseContractId))
     .limit(1)
     .for('update');
-  if (!source) return;
-  await tx
-    .update(schema.courseContracts)
-    .set({
-      remainingLessonCount: source.remainingLessonCount + amount,
-      status: source.status === 'completed' ? 'active' : source.status,
-      updatedAt: new Date(),
-    })
-    .where(eq(schema.courseContracts.id, source.id));
+  if (
+    !source ||
+    source.studentId !== input.studentId ||
+    source.status !== 'active' ||
+    !sourceIsValidAt(source, input.occursAt)
+  ) {
+    throw Object.assign(new Error('所选课时包不属于该学员、不可用或不在本课次有效期内'), {
+      statusCode: 422,
+    });
+  }
+  if (source.remainingLessonCount < input.required) {
+    throw Object.assign(new Error(`「${source.title}」剩余课时不足`), {
+      statusCode: 422,
+    });
+  }
+  const [coursePackage] = source.packageId
+    ? await tx
+        .select({ name: schema.coursePackages.name, billingType: schema.coursePackages.billingType })
+        .from(schema.coursePackages)
+        .where(eq(schema.coursePackages.id, source.packageId))
+        .limit(1)
+    : [];
+  return {
+    ...source,
+    packageName: coursePackage?.name ?? null,
+    billingType: coursePackage?.billingType ?? 'lesson',
+  };
 }
 
 async function enrichAttendanceRecords(
@@ -350,7 +282,7 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
   if (studentIds.length === 0) {
     return [];
   }
-  return db
+  const records = await db
     .select({
       id: schema.attendanceRecords.id,
       studentId: schema.attendanceRecords.studentId,
@@ -383,6 +315,57 @@ export async function listAttendanceForStudents(db: Database, studentIds: string
     .leftJoin(schema.coursePackages, eq(schema.courseContracts.packageId, schema.coursePackages.id))
     .where(inArray(schema.attendanceRecords.studentId, studentIds))
     .orderBy(desc(schema.classSessions.startsAt));
+
+  const contractIds = Array.from(
+    new Set(
+      records.map((record) => record.courseContractId).filter((id): id is string => Boolean(id)),
+    ),
+  );
+  if (contractIds.length === 0) {
+    return records.map((record) => ({ ...record, lessonCount: null, balanceAfter: null }));
+  }
+
+  const [contracts, transactions] = await Promise.all([
+    db
+      .select({
+        id: schema.courseContracts.id,
+        lessonCount: schema.courseContracts.lessonCount,
+      })
+      .from(schema.courseContracts)
+      .where(inArray(schema.courseContracts.id, contractIds)),
+    db
+      .select({
+        attendanceRecordId: schema.lessonMovements.attendanceRecordId,
+        courseContractId: schema.lessonMovements.courseContractId,
+        units: schema.lessonMovements.units,
+        balanceAfter: schema.lessonMovements.balanceAfter,
+        createdAt: schema.lessonMovements.createdAt,
+      })
+      .from(schema.lessonMovements)
+      .where(inArray(schema.lessonMovements.courseContractId, contractIds))
+      .orderBy(desc(schema.lessonMovements.createdAt)),
+  ]);
+  const contractById = new Map(contracts.map((contract) => [contract.id, contract]));
+  const transactionByAttendance = new Map<string, (typeof transactions)[number]>();
+  for (const transaction of transactions) {
+    if (!transaction.attendanceRecordId) continue;
+    const key = `${transaction.attendanceRecordId}:${transaction.courseContractId}`;
+    if (!transactionByAttendance.has(key)) transactionByAttendance.set(key, transaction);
+  }
+
+  return records.map((record) => {
+    const contract = record.courseContractId ? contractById.get(record.courseContractId) : null;
+    const transaction = record.courseContractId
+      ? transactionByAttendance.get(
+          `${record.id}:${record.courseContractId}`,
+        )
+      : null;
+    return {
+      ...record,
+      lessonCount: contract?.lessonCount ?? null,
+      balanceAfter: record.lessonDelta < 0 ? (transaction?.balanceAfter ?? null) : null,
+    };
+  });
 }
 
 /**
@@ -408,6 +391,8 @@ export async function recordAttendance(
       courseContractId?: string | null;
     }>;
     completeSession?: boolean;
+    actorAccountId?: string | null;
+    requestId?: string | null;
   },
 ) {
   const records = await db.transaction(async (tx) => {
@@ -415,7 +400,8 @@ export async function recordAttendance(
       .select({ startsAt: schema.classSessions.startsAt })
       .from(schema.classSessions)
       .where(eq(schema.classSessions.id, input.sessionId))
-      .limit(1);
+      .limit(1)
+      .for('update');
     if (!session) throw Object.assign(new Error('课次不存在'), { statusCode: 404 });
     const created: Array<typeof schema.attendanceRecords.$inferSelect> = [];
 
@@ -429,17 +415,16 @@ export async function recordAttendance(
             eq(schema.attendanceRecords.studentId, record.studentId),
           ),
         )
-        .limit(1);
+        .limit(1)
+        .for('update');
       if (existing) {
         created.push(existing);
         continue;
       }
 
-      const billingCourseId = record.courseId ?? input.courseId;
       const periodPackage = await periodPackageForSession(tx, {
         sessionId: input.sessionId,
         studentId: record.studentId,
-        courseId: billingCourseId,
         preferredCourseContractId: record.courseContractId,
       });
       const lessonDelta = lessonDeltaForStatus(record.status, {
@@ -451,7 +436,6 @@ export async function recordAttendance(
         lessonDelta < 0
           ? await takeLessonSource(tx, {
               studentId: record.studentId,
-              courseId: billingCourseId,
               occursAt: session.startsAt,
               required: -lessonDelta,
               preferredCourseContractId: record.courseContractId,
@@ -476,15 +460,19 @@ export async function recordAttendance(
         .returning();
       created.push(attendanceRecord);
 
-      if (lessonDelta !== 0) {
-        await applyLessonDelta(tx, {
+      if (lessonDelta < 0) {
+        await applyLessonMovement(tx, {
+          courseContractId: lessonSource!.id,
           studentId: record.studentId,
-          courseId: billingCourseId,
+          operationId: `attendance:${attendanceRecord.id}:r1:consume`,
           type: 'consume',
-          amount: lessonDelta,
-          relatedEntityType: 'class_session',
-          relatedEntityId: input.sessionId,
-          courseContractId: lessonSource?.id ?? null,
+          units: lessonDelta,
+          occurredAt: session.startsAt,
+          attendanceRecordId: attendanceRecord.id,
+          actorAccountId: input.actorAccountId,
+          requestId: input.requestId,
+          reason: `签到扣课：${record.status}`,
+          metadata: { classSessionId: input.sessionId },
         });
       }
     }
@@ -512,6 +500,8 @@ export async function updateAttendanceRecord(
     deductLesson?: boolean;
     lessonUnits?: number;
     courseContractId?: string | null;
+    actorAccountId?: string | null;
+    requestId?: string | null;
   },
 ) {
   const result = await db.transaction(async (tx) => {
@@ -541,7 +531,6 @@ export async function updateAttendanceRecord(
     const periodPackage = await periodPackageForSession(tx, {
       sessionId: input.sessionId,
       studentId: input.studentId,
-      courseId: input.courseId,
       preferredCourseContractId: requestedSourceId,
     });
     const nextLessonDelta = lessonDeltaForStatus(input.status, {
@@ -553,32 +542,46 @@ export async function updateAttendanceRecord(
     const sourceChanged = nextLessonDelta < 0 && requestedSourceId !== existing.courseContractId;
     const allocationChanged = lessonDeltaChanged || sourceChanged;
     let lessonSourceId = existing.courseContractId;
+    if (allocationChanged && existing.lessonDelta < 0 && !existing.courseContractId) {
+      throw Object.assign(new Error('历史扣课缺少课时包归属，请先完成数据核对'), {
+        statusCode: 409,
+      });
+    }
+    if (allocationChanged) {
+      const contractIds = [existing.courseContractId, nextLessonDelta < 0 ? requestedSourceId : null]
+        .filter((id): id is string => Boolean(id))
+        .sort();
+      for (const contractId of Array.from(new Set(contractIds))) {
+        await tx
+          .select({ id: schema.courseContracts.id })
+          .from(schema.courseContracts)
+          .where(eq(schema.courseContracts.id, contractId))
+          .limit(1)
+          .for('update');
+      }
+    }
+    const nextRevision = existing.revision + 1;
     if (allocationChanged && existing.lessonDelta < 0) {
       const restoredAmount = -existing.lessonDelta;
-      if (existing.courseContractId) {
-        await restoreLessonSource(tx, existing.courseContractId, restoredAmount);
-      }
-      // Historical attendance rows could predate package-level attribution. In
-      // that case the course account was already deducted, so selecting the
-      // package later is an attribution-only operation: do not restore and
-      // deduct the aggregate account a second time.
-      if (lessonDeltaChanged) {
-        await applyLessonDelta(tx, {
-          studentId: input.studentId,
-          courseId: input.courseId,
-          type: 'adjustment',
-          amount: restoredAmount,
-          relatedEntityType: 'attendance_correction',
-          relatedEntityId: input.sessionId,
-          courseContractId: existing.courseContractId,
-        });
-      }
+      await applyLessonMovement(tx, {
+        courseContractId: existing.courseContractId!,
+        studentId: input.studentId,
+        operationId: `attendance:${existing.id}:r${nextRevision}:reversal`,
+        type: 'reversal',
+        units: restoredAmount,
+        occurredAt: session.startsAt,
+        attendanceRecordId: existing.id,
+        actorAccountId: input.actorAccountId,
+        requestId: input.requestId,
+        reason: `签到更正冲正：${existing.status} -> ${input.status}`,
+        metadata: { classSessionId: input.sessionId, reversedRevision: existing.revision },
+        allowInactive: true,
+      });
       lessonSourceId = null;
     }
     if (allocationChanged && nextLessonDelta < 0) {
       const source = await takeLessonSource(tx, {
         studentId: input.studentId,
-        courseId: input.courseId,
         occursAt: session.startsAt,
         required: -nextLessonDelta,
         preferredCourseContractId: requestedSourceId,
@@ -590,17 +593,19 @@ export async function updateAttendanceRecord(
         );
       }
       lessonSourceId = source?.id ?? null;
-      if (lessonDeltaChanged) {
-        await applyLessonDelta(tx, {
-          studentId: input.studentId,
-          courseId: input.courseId,
-          type: 'consume',
-          amount: nextLessonDelta,
-          relatedEntityType: 'class_session',
-          relatedEntityId: input.sessionId,
-          courseContractId: lessonSourceId,
-        });
-      }
+      await applyLessonMovement(tx, {
+        courseContractId: lessonSourceId!,
+        studentId: input.studentId,
+        operationId: `attendance:${existing.id}:r${nextRevision}:consume`,
+        type: 'consume',
+        units: nextLessonDelta,
+        occurredAt: session.startsAt,
+        attendanceRecordId: existing.id,
+        actorAccountId: input.actorAccountId,
+        requestId: input.requestId,
+        reason: `签到更正扣课：${existing.status} -> ${input.status}`,
+        metadata: { classSessionId: input.sessionId },
+      });
     }
     const lessonDeltaAdjustment = nextLessonDelta - existing.lessonDelta;
     const [updated] = await tx
@@ -610,6 +615,8 @@ export async function updateAttendanceRecord(
         lessonDelta: nextLessonDelta,
         courseContractId: nextLessonDelta < 0 ? lessonSourceId : null,
         note: input.note ?? null,
+        revision: nextRevision,
+        updatedAt: new Date(),
       })
       .where(eq(schema.attendanceRecords.id, existing.id))
       .returning();

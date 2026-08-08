@@ -176,6 +176,7 @@ export async function buildApp(env: AppEnv) {
   });
 
   app.decorate('requireAdmin', app.requireRole('admin'));
+  app.decorate('requireBackoffice', app.requireRole('admin', 'institution_admin'));
   app.decorate('requireParent', app.requireRole('parent'));
 
   for (const module of appModules) {

@@ -5,11 +5,8 @@ import * as attendanceRepo from '../../db/repositories/attendance.js';
 import * as catalogRepo from '../../db/repositories/catalog.js';
 import * as peopleRepo from '../../db/repositories/people.js';
 import * as teachingRepo from '../../db/repositories/teaching.js';
-import * as lessonRepo from '../../db/repositories/lesson.js';
-import * as schema from '../../db/schema.js';
 import { LessonNotificationService } from '../notifications/lesson-notification-service.js';
 import type { AppModule } from '../types.js';
-import { eq, and } from 'drizzle-orm';
 
 const attendanceSchema = z.object({
   records: z.array(
@@ -186,30 +183,7 @@ export const attendanceModule: AppModule = {
         completeSession: false,
       });
 
-      // Check and auto-complete course contract if all lessons are consumed
       const billingCourseMap = billingCourseByStudentId(context.rosterEntries);
-      for (const record of attendanceRecords) {
-        const billingCourseId = billingCourseMap.get(record.studentId) ?? context.session.courseId;
-        const [contract] = await app.db
-          .select()
-          .from(schema.courseContracts)
-          .where(
-            and(
-              eq(schema.courseContracts.studentId, record.studentId),
-              eq(schema.courseContracts.courseId, billingCourseId),
-              eq(schema.courseContracts.status, 'active'),
-            ),
-          )
-          .limit(1);
-
-        if (contract) {
-          await lessonRepo.checkAndCompleteCourseContract(app.db, {
-            studentId: record.studentId,
-            courseId: billingCourseId,
-            contractId: contract.id,
-          });
-        }
-      }
 
       await lessonNotifications.notifyLessonConsumedForAttendance({
         sessionId,
@@ -281,7 +255,6 @@ export const attendanceModule: AppModule = {
               await attendanceRepo.listAttendanceLessonSources(app.db, {
                 sessionId,
                 studentId: entry.studentId,
-                courseId: entry.billingCourseId,
               }),
             ]),
           ),
@@ -426,31 +399,9 @@ export const attendanceModule: AppModule = {
               record.courseContractId ?? billingContractMap.get(record.studentId) ?? null,
           })),
           completeSession: false,
+          actorAccountId: request.account!.id,
+          requestId: request.id,
         });
-
-        // Check and auto-complete course contracts if all lessons are consumed
-        for (const record of attendanceRecords) {
-          const billingCourseId = billingCourseMap.get(record.studentId) ?? session.courseId;
-          const [contract] = await app.db
-            .select()
-            .from(schema.courseContracts)
-            .where(
-              and(
-                eq(schema.courseContracts.studentId, record.studentId),
-                eq(schema.courseContracts.courseId, billingCourseId),
-                eq(schema.courseContracts.status, 'active'),
-              ),
-            )
-            .limit(1);
-
-          if (contract) {
-            await lessonRepo.checkAndCompleteCourseContract(app.db, {
-              studentId: record.studentId,
-              courseId: billingCourseId,
-              contractId: contract.id,
-            });
-          }
-        }
 
         await lessonNotifications.notifyLessonConsumedForAttendance({
           sessionId,
@@ -510,32 +461,14 @@ export const attendanceModule: AppModule = {
           lessonUnits: session.lessonUnits,
           courseId: billingCourseId,
           courseContractId: body.courseContractId,
+          actorAccountId: request.account!.id,
+          requestId: request.id,
         });
         if (!result) {
           throw Object.assign(new Error('Attendance record not found'), { statusCode: 404 });
         }
 
         if (result.lessonDeltaAdjustment < 0) {
-          const [contract] = await app.db
-            .select()
-            .from(schema.courseContracts)
-            .where(
-              and(
-                eq(schema.courseContracts.studentId, result.attendanceRecord.studentId),
-                eq(schema.courseContracts.courseId, billingCourseId),
-                eq(schema.courseContracts.status, 'active'),
-              ),
-            )
-            .limit(1);
-
-          if (contract) {
-            await lessonRepo.checkAndCompleteCourseContract(app.db, {
-              studentId: result.attendanceRecord.studentId,
-              courseId: billingCourseId,
-              contractId: contract.id,
-            });
-          }
-
           await lessonNotifications.notifyLessonConsumedForAttendance({
             sessionId,
             records: [result.attendanceRecord],

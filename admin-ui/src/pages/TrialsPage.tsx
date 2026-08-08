@@ -1470,7 +1470,7 @@ export function TrialsPage() {
               <div>
                 <div className="text-sm font-medium text-slate-900">赠课</div>
                 <div className="text-muted-foreground text-xs">
-                  赠课会直接进入对应课程的课时账户。
+                  赠课会创建独立赠课包并记录完整流水。
                 </div>
               </div>
               <button

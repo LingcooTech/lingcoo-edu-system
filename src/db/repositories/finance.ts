@@ -5,7 +5,7 @@ import { desc, eq } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import * as schema from '../schema.js';
 import { httpError } from '../../lib/http-error.js';
-import { applyLessonDelta } from './lesson.js';
+import * as courseContractsRepo from './course-contracts.js';
 
 export type Order = typeof schema.orders.$inferSelect;
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -48,9 +48,8 @@ export async function sumPaidRevenue(db: Database) {
 }
 
 /**
- * Creates an order and, when status is 'paid', credits the student's lesson
- * account (purchase) in the same transaction. Mirrors the in-memory finance
- * flow but atomic. Used by admin/staff manual order entry.
+ * Creates an order. Lesson units are granted only when a concrete course
+ * contract is created, never to a course-level aggregate account.
  */
 export async function createOrder(
   db: Database,
@@ -69,6 +68,8 @@ export async function createOrder(
     paymentReceiverName?: string | null;
     paymentMethod?: string | null;
     offlinePaymentNote?: string | null;
+    actorAccountId?: string | null;
+    requestId?: string | null;
   },
 ) {
   return db.transaction(async (tx) => {
@@ -95,14 +96,15 @@ export async function createOrder(
       })
       .returning();
 
-    if (order.status === 'paid' && order.lessonCount > 0) {
-      await applyLessonDelta(tx, {
+    if (order.status === 'paid') {
+      if (!order.packageId || order.lessonCount <= 0) {
+        throw httpError(422, '已付款课时包订单必须关联明确的课时包');
+      }
+      await courseContractsRepo.createCourseContractFromPaidPackageOrderInTx(tx, {
+        order,
         studentId: input.studentId,
-        courseId: input.courseId,
-        type: 'purchase',
-        amount: order.lessonCount,
-        relatedEntityType: 'order',
-        relatedEntityId: order.id,
+        actorAccountId: input.actorAccountId,
+        requestId: input.requestId,
       });
     }
 
@@ -202,23 +204,7 @@ export async function attachStudentToPaidPackageOrderInTx(
     .where(eq(schema.orders.id, order.id))
     .returning();
 
-  await applyLessonDelta(tx, {
-    studentId: input.studentId,
-    courseId: order.courseId,
-    type: 'purchase',
-    amount: order.lessonCount,
-    relatedEntityType: 'order',
-    relatedEntityId: order.id,
-  });
-
   return updated;
-}
-
-export async function attachStudentToPaidPackageOrder(
-  db: Database,
-  input: { orderNo: string; accountId: string; studentId: string },
-): Promise<Order> {
-  return db.transaction(async (tx) => attachStudentToPaidPackageOrderInTx(tx, input));
 }
 
 export async function createSeatReservationOrder(
@@ -263,7 +249,8 @@ export async function createSeatReservationOrder(
 }
 
 /**
- * Atomically marks an order paid and credits the linked lesson account. This is
+ * Atomically marks an order paid. Lesson units are granted later to the
+ * concrete course contract created from this order. This is
  * the idempotent settlement core shared by mock / WeChat / Alipay callbacks:
  *
  *  - the order row is locked `FOR UPDATE` so concurrent callbacks serialize;
@@ -271,7 +258,6 @@ export async function createSeatReservationOrder(
  *    nothing (the caller ACKs so the provider stops retrying);
  *  - provider / amount / currency are validated against the order before any
  *    mutation, inside the transaction (no TOCTOU window);
- *  - the lesson account is credited (+lessonCount) with a `purchase` ledger row;
  *  - a `payments` row keyed by the unique `providerEventId` is inserted as a
  *    second idempotency safety net (`onConflictDoNothing`).
  *
@@ -313,6 +299,17 @@ export async function markOrderPaidAndCredit(
     }
 
     if (order.status === 'paid') {
+      if (
+        order.orderType === 'package_purchase' &&
+        order.studentId &&
+        order.packageId &&
+        order.lessonCount > 0
+      ) {
+        await courseContractsRepo.createCourseContractFromPaidPackageOrderInTx(tx, {
+          order,
+          studentId: order.studentId,
+        });
+      }
       return { order, alreadyPaid: true };
     }
 
@@ -334,18 +331,14 @@ export async function markOrderPaidAndCredit(
       .returning();
 
     if (
-      ['package_purchase', 'manual_package_grant'].includes(order.orderType) &&
-      order.studentId &&
-      order.courseId &&
-      order.lessonCount > 0
+      updated.orderType === 'package_purchase' &&
+      updated.studentId &&
+      updated.packageId &&
+      updated.lessonCount > 0
     ) {
-      await applyLessonDelta(tx, {
-        studentId: order.studentId,
-        courseId: order.courseId,
-        type: 'purchase',
-        amount: order.lessonCount,
-        relatedEntityType: 'order',
-        relatedEntityId: order.id,
+      await courseContractsRepo.createCourseContractFromPaidPackageOrderInTx(tx, {
+        order: updated,
+        studentId: updated.studentId,
       });
     }
 
@@ -422,7 +415,7 @@ export async function cancelOrder(
   db: Database,
   orderId: string,
   input: {
-    reason: string;
+    reason: (typeof schema.orderCancelReasonEnum.enumValues)[number];
     cancelledByAdminId?: string;
   },
 ): Promise<Order> {
@@ -430,7 +423,7 @@ export async function cancelOrder(
     .update(schema.orders)
     .set({
       status: 'cancelled',
-      cancelReason: input.reason as any,
+      cancelReason: input.reason,
       cancelledByAdminId: input.cancelledByAdminId || null,
       cancelledAt: new Date(),
       updatedAt: new Date(),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { fetchOrganization, type AuthAccount } from '@/api/client';
 import type { OrganizationSettings } from '@/api/types';
@@ -22,6 +22,9 @@ export function Shell({ account }: { account: AuthAccount }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [organization, setOrganization] = useState<OrganizationSettings | null>(null);
   const location = useLocation();
+  const institutionAdminRouteAllowed =
+    location.pathname === '/operations/lessons' ||
+    location.pathname === '/operations/audit-logs';
 
   useEffect(() => {
     fetchOrganization()
@@ -94,7 +97,11 @@ export function Shell({ account }: { account: AuthAccount }) {
       <div className="bg-muted/25 flex h-screen min-h-0 flex-col overflow-hidden">
         <Topbar account={account} onMenuClick={() => setMobileOpen(true)} />
         <main className="min-h-0 flex-1 overflow-hidden">
-          <Outlet />
+          {account.role === 'institution_admin' && !institutionAdminRouteAllowed ? (
+            <Navigate to="/operations/lessons" replace />
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>
