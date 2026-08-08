@@ -58,7 +58,7 @@
     "@types/pg": "^8.15.5",
     "@types/qrcode": "^1.5.6",
     "drizzle-kit": "^0.31.5",
-    "eslint": "^9.39.4",
+    "eslint": "^10.4.1",
     "globals": "^15.15.0",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
