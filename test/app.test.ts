@@ -1754,13 +1754,17 @@ test('creates a course contract with offline payment, lesson credit and class en
     assert.equal(studentLessonSources[0].id, periodContract.id);
     assert.ok(
       studentLessonSources.every(
-        (source: { studentId: string; courseId: string }) =>
-          source.studentId === student.id && source.courseId === course.id,
+        (source: { studentId: string }) => source.studentId === student.id,
       ),
     );
     assert.deepEqual(
       new Set(studentLessonSources.map((source: { id: string }) => source.id)),
-      new Set([periodContract.id, createdPayload.courseContract.id]),
+      new Set([
+        periodContract.id,
+        createdPayload.courseContract.id,
+        giftContract.id,
+        supplementGiftContract.id,
+      ]),
     );
 
     const attendance = await app.inject({
